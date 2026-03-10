@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn compile:*)",
+      "Bash(mvn test:*)",
+      "Bash(mvn -q compile && mvn exec:java -Dexec.args=\"/tmp/classtest.ck\" 2>&1 | grep -v WARNING | grep -v \"^$\" | grep -v \"\\\\[INFO\\\\]\" | head -20)"
+    ]
+  }
+}

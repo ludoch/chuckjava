@@ -65,4 +65,6 @@ public sealed interface ChuckAST {
     record DeclStmt(String type, String name, Exp arraySize, int line, int column) implements Stmt {}
     
     record FuncDefStmt(String returnType, String name, java.util.List<String> argTypes, java.util.List<String> argNames, Stmt body, int line, int column) implements Stmt {}
+
+    record ClassDefStmt(String name, java.util.List<DeclStmt> fields, java.util.List<FuncDefStmt> methods, int line, int column) implements Stmt {}
 }

@@ -2,81 +2,121 @@ package org.chuck.midi;
 
 import org.chuck.core.ChuckEvent;
 import org.chuck.core.ChuckVM;
-import java.lang.foreign.*;
-import java.lang.invoke.MethodHandle;
+
+import javax.sound.midi.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.ArrayBlockingQueue;
 
 /**
- * Handles MIDI Input for the ChuckVM.
- * Utilizes the JDK 25 Foreign Function & Memory (FFM) API to bind to native MIDI libraries.
+ * Real MIDI input using javax.sound.midi (built into JDK — no native library needed).
+ *
+ * Usage from ChucK code:
+ *   MidiIn min;
+ *   MidiMsg msg;
+ *   min.open(0);          // open port 0
+ *   while (true) {
+ *       min => now;        // wait for next message
+ *       min.recv(msg);     // copy bytes into msg
+ *       msg.data1 => ...;
+ *   }
  */
 public class ChuckMidi {
     private final ChuckVM vm;
     private final ChuckEvent midiEvent;
-    private boolean running = false;
 
-    // MIDI Message state
-    public int data1;
-    public int data2;
-    public int data3;
+    // Raw bytes of the most recently received message
+    public volatile int data1 = 0;
+    public volatile int data2 = 0;
+    public volatile int data3 = 0;
 
-    public ChuckMidi(ChuckVM vm) {
+    // Queue so recv() can drain multiple messages that arrived between waits
+    private final ArrayBlockingQueue<int[]> messageQueue = new ArrayBlockingQueue<>(256);
+
+    private MidiDevice device;
+    private Transmitter transmitter;
+
+    public ChuckMidi(ChuckVM vm, ChuckEvent event) {
         this.vm = vm;
-        this.midiEvent = new ChuckEvent();
+        this.midiEvent = event;
     }
 
-    public ChuckEvent getMidiEvent() {
-        return midiEvent;
-    }
+    // ── Device enumeration ─────────────────────────────────────────────────────
 
-    /**
-     * Demonstrates binding to a native MIDI library (e.g., RtMidi) using FFM.
-     */
-    public void initNativeMidi() {
-        Linker linker = Linker.nativeLinker();
-        SymbolLookup lookup = linker.defaultLookup();
-
-        // In a real implementation, we would load the library:
-        // SymbolLookup rtMidiLookup = SymbolLookup.libraryLookup("librtmidi", Arena.global());
-        
-        // Example: Describing a native function 'rtmidi_in_create_default'
-        /*
-        lookup.find("rtmidi_in_create_default").ifPresent(addr -> {
-            FunctionDescriptor fd = FunctionDescriptor.of(ValueLayout.ADDRESS);
-            MethodHandle createIn = linker.downcallHandle(addr, fd);
-            // ... invoke and manage native MIDI device
-        });
-        */
-    }
-
-    /**
-     * Simulated MIDI callback from native code.
-     */
-    public void onMidiMessage(int b1, int b2, int b3) {
-        this.data1 = b1;
-        this.data2 = b2;
-        this.data3 = b3;
-        
-        // Signal the ChucK event to wake up waiting shreds
-        midiEvent.broadcast(vm);
-    }
-
-    public void start() {
-        running = true;
-        // High-priority listener thread (simulated)
-        Thread.ofPlatform().daemon().name("MidiEngine").start(() -> {
-            while (running) {
-                // Poll native MIDI or wait for callback
-                try {
-                    Thread.sleep(1000); 
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
+    /** Returns a human-readable list of all available MIDI input devices. */
+    public static List<String> listInputDevices() {
+        List<String> names = new ArrayList<>();
+        for (MidiDevice.Info info : MidiSystem.getMidiDeviceInfo()) {
+            try {
+                MidiDevice dev = MidiSystem.getMidiDevice(info);
+                if (dev.getMaxTransmitters() != 0) {   // input-capable
+                    names.add(info.getName() + " — " + info.getDescription());
                 }
-            }
-        });
+            } catch (MidiUnavailableException ignored) {}
+        }
+        return names;
     }
 
-    public void stop() {
-        running = false;
+    /** Returns the number of available MIDI input devices. */
+    public static int countInputDevices() {
+        return listInputDevices().size();
     }
+
+    // ── Open / close ───────────────────────────────────────────────────────────
+
+    /**
+     * Opens the MIDI input device at the given port index (0-based among input devices).
+     * Returns true on success.
+     */
+    public boolean open(int portIndex) {
+        close();
+        List<MidiDevice.Info> inputs = new ArrayList<>();
+        for (MidiDevice.Info info : MidiSystem.getMidiDeviceInfo()) {
+            try {
+                MidiDevice dev = MidiSystem.getMidiDevice(info);
+                if (dev.getMaxTransmitters() != 0) inputs.add(info);
+            } catch (MidiUnavailableException ignored) {}
+        }
+        if (portIndex < 0 || portIndex >= inputs.size()) return false;
+        try {
+            device = MidiSystem.getMidiDevice(inputs.get(portIndex));
+            device.open();
+            transmitter = device.getTransmitter();
+            transmitter.setReceiver(new Receiver() {
+                @Override public void send(MidiMessage message, long timeStamp) {
+                    byte[] raw = message.getMessage();
+                    int b1 = raw.length > 0 ? raw[0] & 0xFF : 0;
+                    int b2 = raw.length > 1 ? raw[1] & 0xFF : 0;
+                    int b3 = raw.length > 2 ? raw[2] & 0xFF : 0;
+                    data1 = b1; data2 = b2; data3 = b3;
+                    messageQueue.offer(new int[]{b1, b2, b3});
+                    midiEvent.broadcast(vm);   // wake any shreds waiting on min => now
+                }
+                @Override public void close() {}
+            });
+            return true;
+        } catch (MidiUnavailableException e) {
+            return false;
+        }
+    }
+
+    public void close() {
+        if (transmitter != null) { try { transmitter.close(); } catch (Exception ignored) {} transmitter = null; }
+        if (device != null)      { try { device.close();      } catch (Exception ignored) {} device = null; }
+    }
+
+    // ── Message retrieval ──────────────────────────────────────────────────────
+
+    /**
+     * Copies the next queued message into msg. Returns true if a message was available.
+     * Intended to be called right after a shred wakes from "min => now".
+     */
+    public boolean recv(MidiMsg msg) {
+        int[] m = messageQueue.poll();
+        if (m == null) return false;
+        msg.data1 = m[0]; msg.data2 = m[1]; msg.data3 = m[2];
+        return true;
+    }
+
+    public ChuckEvent getMidiEvent() { return midiEvent; }
 }

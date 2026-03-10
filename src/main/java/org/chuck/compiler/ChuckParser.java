@@ -28,21 +28,46 @@ public class ChuckParser {
         if (token.type() == ChuckLexer.TokenType.WHILE) return parseWhile();
         if (token.type() == ChuckLexer.TokenType.FOR) return parseFor();
         if (token.type() == ChuckLexer.TokenType.FUN) return parseFuncDef();
+        if (token.type() == ChuckLexer.TokenType.CLASS) return parseClassDef();
         if (token.type() == ChuckLexer.TokenType.LBRACE) return parseBlock();
-        
+        if (token.type() == ChuckLexer.TokenType.RETURN) {
+            advance(); // consume 'return'
+            ChuckAST.Exp exp = null;
+            if (!check(ChuckLexer.TokenType.SEMICOLON)) {
+                exp = parseExpression();
+            }
+            match(ChuckLexer.TokenType.SEMICOLON);
+            return new ChuckAST.ReturnStmt(exp, token.line(), token.column());
+        }
+
         if (isType(token)) return parseDecl();
 
         ChuckAST.Exp exp = parseExpression();
-        match(ChuckLexer.TokenType.SEMICOLON); 
+        match(ChuckLexer.TokenType.SEMICOLON);
         return new ChuckAST.ExpStmt(exp, token.line(), token.column());
     }
 
+    private final java.util.Set<String> knownTypes = new java.util.HashSet<>(java.util.Set.of(
+        "int", "float", "dur", "time", "string", "void",
+        // UGens - oscillators
+        "SinOsc", "SawOsc", "TriOsc", "SqrOsc", "PulseOsc", "Phasor", "Noise", "Impulse", "Step",
+        // UGens - instruments
+        "Mandolin", "Clarinet", "Plucked", "Rhodey",
+        // UGens - envelopes
+        "ADSR", "Adsr", "Envelope",
+        // UGens - utilities
+        "Gain", "Pan2", "FFT",
+        // UGens - effects
+        "Echo", "Delay", "DelayL", "JCRev", "Chorus", "ResonZ", "Lpf", "OnePole", "OneZero",
+        // IO
+        "MidiIn", "SndBuf", "WvOut",
+        // MIDI
+        "MidiMsg"
+    ));
+
     private boolean isType(ChuckLexer.Token token) {
         if (token.type() != ChuckLexer.TokenType.ID) return false;
-        String val = token.value();
-        return val.equals("int") || val.equals("float") || val.equals("dur") || val.equals("time") || val.equals("string") 
-            || val.equals("MidiIn") || val.equals("SinOsc") || val.equals("Mandolin") || val.equals("Clarinet")
-            || val.equals("ADSR") || val.equals("Gain") || val.equals("SawOsc") || val.equals("TriOsc") || val.equals("SqrOsc") || val.equals("Noise") || val.equals("Impulse");
+        return knownTypes.contains(token.value());
     }
 
     private ChuckAST.Stmt parseDecl() {
@@ -84,10 +109,27 @@ public class ChuckParser {
     }
 
     private ChuckAST.Exp parseChuck() {
-        ChuckAST.Exp left = parseComparison();
-        while (match(ChuckLexer.TokenType.CHUCK, ChuckLexer.TokenType.AT_CHUCK)) {
+        ChuckAST.Exp left = parseLogical();
+        while (match(ChuckLexer.TokenType.CHUCK, ChuckLexer.TokenType.AT_CHUCK, ChuckLexer.TokenType.ASSIGN)) {
             ChuckLexer.Token opToken = previous();
-            ChuckAST.Operator op = opToken.type() == ChuckLexer.TokenType.CHUCK ? ChuckAST.Operator.CHUCK : ChuckAST.Operator.AT_CHUCK;
+            ChuckAST.Operator op = switch (opToken.type()) {
+                case CHUCK -> ChuckAST.Operator.CHUCK;
+                case AT_CHUCK -> ChuckAST.Operator.AT_CHUCK;
+                case ASSIGN -> ChuckAST.Operator.ASSIGN;
+                default -> ChuckAST.Operator.NONE;
+            };
+            ChuckAST.Exp right = parseLogical();
+            left = new ChuckAST.BinaryExp(left, op, right, opToken.line(), opToken.column());
+        }
+        return left;
+    }
+
+    private ChuckAST.Exp parseLogical() {
+        ChuckAST.Exp left = parseComparison();
+        while (match(ChuckLexer.TokenType.AND_AND, ChuckLexer.TokenType.OR_OR)) {
+            ChuckLexer.Token opToken = previous();
+            ChuckAST.Operator op = opToken.type() == ChuckLexer.TokenType.AND_AND
+                    ? ChuckAST.Operator.AND : ChuckAST.Operator.OR;
             ChuckAST.Exp right = parseComparison();
             left = new ChuckAST.BinaryExp(left, op, right, opToken.line(), opToken.column());
         }
@@ -96,7 +138,8 @@ public class ChuckParser {
 
     private ChuckAST.Exp parseComparison() {
         ChuckAST.Exp left = parseBinary();
-        while (match(ChuckLexer.TokenType.LT, ChuckLexer.TokenType.GT, ChuckLexer.TokenType.LE, ChuckLexer.TokenType.GE, ChuckLexer.TokenType.EQ_EQ)) {
+        while (match(ChuckLexer.TokenType.LT, ChuckLexer.TokenType.GT, ChuckLexer.TokenType.LE,
+                     ChuckLexer.TokenType.GE, ChuckLexer.TokenType.EQ_EQ, ChuckLexer.TokenType.NEQ)) {
             ChuckLexer.Token opToken = previous();
             ChuckAST.Operator op = switch (opToken.type()) {
                 case LT -> ChuckAST.Operator.LT;
@@ -104,6 +147,7 @@ public class ChuckParser {
                 case LE -> ChuckAST.Operator.LE;
                 case GE -> ChuckAST.Operator.GE;
                 case EQ_EQ -> ChuckAST.Operator.EQ;
+                case NEQ -> ChuckAST.Operator.NEQ;
                 default -> ChuckAST.Operator.NONE;
             };
             ChuckAST.Exp right = parseBinary();
@@ -113,21 +157,66 @@ public class ChuckParser {
     }
 
     private ChuckAST.Exp parseBinary() {
-        ChuckAST.Exp left = parsePrimary();
-        while (match(ChuckLexer.TokenType.PLUS, ChuckLexer.TokenType.MINUS, ChuckLexer.TokenType.TIMES, ChuckLexer.TokenType.DIVIDE, ChuckLexer.TokenType.COLON_COLON)) {
+        ChuckAST.Exp left = parseUnary();
+        while (match(ChuckLexer.TokenType.PLUS, ChuckLexer.TokenType.MINUS,
+                     ChuckLexer.TokenType.TIMES, ChuckLexer.TokenType.DIVIDE,
+                     ChuckLexer.TokenType.PERCENT, ChuckLexer.TokenType.COLON_COLON)) {
             ChuckLexer.Token opToken = previous();
             ChuckAST.Operator op = switch (opToken.type()) {
                 case PLUS -> ChuckAST.Operator.PLUS;
                 case MINUS -> ChuckAST.Operator.MINUS;
                 case TIMES -> ChuckAST.Operator.TIMES;
                 case DIVIDE -> ChuckAST.Operator.DIVIDE;
+                case PERCENT -> ChuckAST.Operator.PERCENT;
                 default -> ChuckAST.Operator.NONE;
             };
-            
-            ChuckAST.Exp right = parsePrimary();
+            ChuckAST.Exp right = parseUnary();
             left = new ChuckAST.BinaryExp(left, op, right, opToken.line(), opToken.column());
         }
         return left;
+    }
+
+    private ChuckAST.Exp parseUnary() {
+        // Prefix operators: -, !, ++, --
+        if (match(ChuckLexer.TokenType.MINUS)) {
+            ChuckLexer.Token t = previous();
+            return new ChuckAST.UnaryExp(ChuckAST.Operator.MINUS, parseUnary(), t.line(), t.column());
+        }
+        if (match(ChuckLexer.TokenType.BANG)) {
+            ChuckLexer.Token t = previous();
+            return new ChuckAST.UnaryExp(ChuckAST.Operator.S_OR, parseUnary(), t.line(), t.column()); // reuse S_OR for !
+        }
+        if (match(ChuckLexer.TokenType.PLUS_PLUS)) {
+            ChuckLexer.Token t = previous();
+            return new ChuckAST.UnaryExp(ChuckAST.Operator.PLUS, parseUnary(), t.line(), t.column());
+        }
+        if (match(ChuckLexer.TokenType.MINUS_MINUS)) {
+            ChuckLexer.Token t = previous();
+            return new ChuckAST.UnaryExp(ChuckAST.Operator.MINUS, parseUnary(), t.line(), t.column());
+        }
+        // Check for postfix ++ / -- after parsing the primary
+        ChuckAST.Exp exp = parsePostfix();
+        return exp;
+    }
+
+    private ChuckAST.Exp parsePostfix() {
+        ChuckAST.Exp exp = parsePrimary();
+        while (true) {
+            if (match(ChuckLexer.TokenType.PLUS_PLUS)) {
+                ChuckLexer.Token t = previous();
+                // postfix ++: treated as (exp + 1) assigned back; emit as UnaryExp with SPORK reused
+                // For simplicity represent as BinaryExp(exp, PLUS, 1)
+                exp = new ChuckAST.BinaryExp(exp, ChuckAST.Operator.PLUS,
+                        new ChuckAST.IntExp(1, t.line(), t.column()), t.line(), t.column());
+            } else if (match(ChuckLexer.TokenType.MINUS_MINUS)) {
+                ChuckLexer.Token t = previous();
+                exp = new ChuckAST.BinaryExp(exp, ChuckAST.Operator.MINUS,
+                        new ChuckAST.IntExp(1, t.line(), t.column()), t.line(), t.column());
+            } else {
+                break;
+            }
+        }
+        return exp;
     }
 
     private ChuckAST.Exp parsePrimary() {
@@ -145,6 +234,9 @@ public class ChuckParser {
         }
         if (match(ChuckLexer.TokenType.FLOAT)) {
             return new ChuckAST.FloatExp(Double.parseDouble(previous().value()), previous().line(), previous().column());
+        }
+        if (match(ChuckLexer.TokenType.STRING)) {
+            return new ChuckAST.StringExp(previous().value(), previous().line(), previous().column());
         }
         if (match(ChuckLexer.TokenType.LBRACKET)) {
             return parseArrayLiteral();
@@ -202,6 +294,31 @@ public class ChuckParser {
         }
         consume(ChuckLexer.TokenType.RBRACKET, "Expected ']'");
         return new ChuckAST.ArrayLitExp(elements, start.line(), start.column());
+    }
+
+    private ChuckAST.ClassDefStmt parseClassDef() {
+        ChuckLexer.Token start = consume(ChuckLexer.TokenType.CLASS, "Expected 'class'");
+        String name = consume(ChuckLexer.TokenType.ID, "Expected class name").value();
+        knownTypes.add(name); // register so 'ClassName varName;' is recognized as a decl
+        consume(ChuckLexer.TokenType.LBRACE, "Expected '{' after class name");
+
+        List<ChuckAST.DeclStmt> fields = new ArrayList<>();
+        List<ChuckAST.FuncDefStmt> methods = new ArrayList<>();
+
+        while (!check(ChuckLexer.TokenType.RBRACE) && !isAtEnd()) {
+            if (peek().type() == ChuckLexer.TokenType.FUN) {
+                methods.add((ChuckAST.FuncDefStmt) parseFuncDef());
+            } else {
+                // member variable declaration: type name;
+                ChuckLexer.Token typeToken = advance();
+                ChuckLexer.Token nameToken = consume(ChuckLexer.TokenType.ID, "Expected field name");
+                consume(ChuckLexer.TokenType.SEMICOLON, "Expected ';' after field declaration");
+                fields.add(new ChuckAST.DeclStmt(typeToken.value(), nameToken.value(), null,
+                        typeToken.line(), typeToken.column()));
+            }
+        }
+        consume(ChuckLexer.TokenType.RBRACE, "Expected '}' after class body");
+        return new ChuckAST.ClassDefStmt(name, fields, methods, start.line(), start.column());
     }
 
     private ChuckAST.Stmt parseFuncDef() {

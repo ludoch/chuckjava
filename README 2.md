@@ -1,5 +1,47 @@
 # ChucK-Java (JDK 25 Migration)
 
+## Audit & Fix Progress (2026-03-10)
+
+An independent audit of the Gemini-generated port was performed by Claude Code, followed by a full fix pass.
+All 25 unit tests pass after the fixes.
+
+### Bugs Fixed
+
+| # | Bug | Status |
+|---|-----|--------|
+| 1 | **Concurrency model** — re-audited; `yield()` correctly uses `ReentrantLock` + `condition.await()` to suspend Virtual Threads. No fix needed. | ✅ Verified correct |
+| 2 | **Missing `SetMemberIntByName` instruction** — class was referenced in the emitter but never created. | ✅ Fixed |
+| 3 | **`++`/`--` operators not in lexer** — for-loop update expressions like `i + 1 => i` worked, but `i++` crashed. Added `PLUS_PLUS`, `MINUS_MINUS`, `BANG`, `AND_AND`, `OR_OR`, `PERCENT`, `ASSIGN` tokens. | ✅ Fixed |
+| 4 | **`SawOsc.setFrequency` naming mismatch** — the formula was correct but the method was named `setFrequency` instead of `setFreq`, breaking the reflection-based setter. Added `setFreq` alias. | ✅ Fixed |
+| 5 | **String literals not lexed** — quoted strings `"hello"` were not tokenized. Added `lexString()` with escape sequence support. | ✅ Fixed |
+| 6 | **No plain `=` assignment** — only `=>` worked. Added `ASSIGN` token and emitter support for `x = value`. | ✅ Fixed |
+| 7 | **No unary operators** — `-x`, `!b` had no AST/emitter support. Added `NegateAny`, `LogicalNot` instructions. | ✅ Fixed |
+| 8 | **`return` statement not emitted** — `ReturnStmt` existed in AST but was ignored by emitter. | ✅ Fixed |
+| 9 | **Limited UGen instantiation** — `InstantiateAndSetGlobal` only handled 8 UGen types. Added all 22 implemented UGens. | ✅ Fixed |
+| 10 | **No generic method calls** — `adsr.keyOn()`, `adsr.set(...)` etc. had no emission path. Added `CallMethod` instruction using reflection. | ✅ Fixed |
+| 11 | **Missing math functions** — `Math.sin`, `Math.cos`, `Math.sqrt`, etc. Added `MathFunc` instruction. Added `Std.ftom`. | ✅ Fixed |
+| 12 | **Missing logical/comparison operators** — `&&`, `\|\|`, `%`, `!=` not emitted. Added `LogicalAnd`, `LogicalOr`, `ModuloAny`, `NotEqualsAny`. | ✅ Fixed |
+| 13 | **Edit menu items had no handlers** — Undo/Redo/Cut/Copy/Paste items existed but did nothing. | ✅ Fixed |
+| 14 | **No keyboard shortcuts** — Ctrl+Enter (Add Shred), Ctrl+Shift+Enter (Replace), Ctrl+. (Remove), Ctrl+/ (Stop All) missing. | ✅ Fixed |
+
+### IDE Improvements
+
+- **Syntax highlighting** — replaced plain `TextArea` with RichTextFX `CodeArea` (was already in pom.xml but unused). Keywords, types, builtins, strings, numbers, comments, and `=>` operators are colour-coded.
+- **Line numbers** — displayed in gutter via `LineNumberFactory`.
+- **Error line highlighting** — compiler errors now scroll the editor to the offending line and select it.
+- **Keyboard shortcuts** — all standard shortcuts now work (Ctrl+Enter, Ctrl+S, Ctrl+Z, Ctrl+C/V/X, etc.).
+- **Save As** added to file menu.
+
+### Remaining Known Gaps
+
+- **MIDI** — `ChuckMidi` is a stub; FFM binding to `librtmidi` needs native library setup.
+- **FFT / UAna** — spectral analysis classes exist but contain no real implementation.
+- **`class` definitions** — user-defined classes are not supported in the parser/emitter.
+- **Audio input (ADC)** — `ChuckAudio` is output-only; no microphone input.
+- **Anti-aliasing** — oscillators generate aliased harmonics above Nyquist.
+
+
+
 A modern migration of the ChucK Strongly-timed Audio Programming Language to JDK 25, utilizing the latest Java platform features for real-time audio synthesis and concurrent script execution.
 
 ## 🚀 Key Modern Java Features Used

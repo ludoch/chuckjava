@@ -1,5 +1,6 @@
 package org.chuck.core;
 
+import org.chuck.audio.Adc;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.Blackhole;
 import java.util.concurrent.atomic.AtomicLong;
@@ -36,6 +37,7 @@ public class ChuckVM {
     private final ChuckUGen[] dacChannels = new ChuckUGen[numChannels];
     public final ChuckObject dac;
     public final Blackhole blackhole;
+    public final Adc adc;
 
     public ChuckVM(int sampleRate) {
         this.sampleRate = sampleRate;
@@ -52,6 +54,9 @@ public class ChuckVM {
 
         this.blackhole = new Blackhole();
         globalObjects.put("blackhole", blackhole);
+
+        this.adc = new Adc();
+        globalObjects.put("adc", adc);
     }
 
     public ChuckUGen getDacChannel(int channel) {
@@ -139,9 +144,14 @@ public class ChuckVM {
         }
         globalObjects.clear();
         globalInts.clear();
+        // Disconnect all UGens from the audio graph so sound stops immediately
+        for (int i = 0; i < numChannels; i++) dacChannels[i].clearSources();
+        blackhole.clearSources();
+
         // Re-register defaults
         globalObjects.put("dac", dac);
         globalObjects.put("blackhole", blackhole);
+        globalObjects.put("adc", adc);
     }
     
     /**

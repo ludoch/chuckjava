@@ -3,8 +3,12 @@ package org.chuck.ide;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
 import javafx.scene.layout.*;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
@@ -13,197 +17,343 @@ import org.chuck.compiler.ChuckEmitter;
 import org.chuck.compiler.ChuckLexer;
 import org.chuck.compiler.ChuckParser;
 import org.chuck.core.*;
+import org.fxmisc.richtext.CodeArea;
+import org.fxmisc.richtext.LineNumberFactory;
+import org.fxmisc.richtext.model.StyleSpans;
+import org.fxmisc.richtext.model.StyleSpansBuilder;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.ArrayList;
-import java.util.List;
+import java.time.Duration;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * A comprehensive professional desktop IDE for ChucK-Java (JDK 25).
- * Replicates and extends the Stanford WebChucK IDE features.
+ * Professional desktop IDE for ChucK-Java (JDK 25).
+ * Features syntax highlighting (RichTextFX), line numbers, keyboard shortcuts,
+ * shred management, WAV recording, and a file browser.
  */
 public class ChuckIDE extends Application {
+
+    // ── Syntax highlighting patterns ───────────────────────────────────────────
+    private static final String KEYWORD_PATTERN =
+        "\\b(if|else|while|for|repeat|return|new|spork|fun|class|extends|public|private|static|void)\\b";
+    private static final String TYPE_PATTERN =
+        "\\b(int|float|dur|time|string|" +
+        "SinOsc|SawOsc|TriOsc|SqrOsc|PulseOsc|Phasor|Noise|Impulse|Step|" +
+        "Mandolin|Clarinet|Plucked|Rhodey|" +
+        "ADSR|Adsr|Gain|Pan2|Echo|Delay|DelayL|JCRev|Chorus|ResonZ|Lpf|OnePole|OneZero|" +
+        "MidiIn|SndBuf|WvOut)\\b";
+    private static final String BUILTIN_PATTERN =
+        "\\b(dac|adc|blackhole|now|second|ms|samp|Std|Math|me)\\b";
+    private static final String NUMBER_PATTERN  = "\\b\\d+(\\.\\d+)?\\b";
+    private static final String STRING_PATTERN  = "\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"";
+    private static final String COMMENT_PATTERN = "//[^\n]*|/\\*.*?\\*/";
+    private static final String CHUCK_OP_PATTERN = "=>|@=>|::";
+
+    private static final Pattern HIGHLIGHT_PATTERN = Pattern.compile(
+        "(?<COMMENT>"  + COMMENT_PATTERN  + ")" +
+        "|(?<KEYWORD>" + KEYWORD_PATTERN  + ")" +
+        "|(?<TYPE>"    + TYPE_PATTERN     + ")" +
+        "|(?<BUILTIN>" + BUILTIN_PATTERN  + ")" +
+        "|(?<STRING>"  + STRING_PATTERN   + ")" +
+        "|(?<NUMBER>"  + NUMBER_PATTERN   + ")" +
+        "|(?<CHUCKOP>" + CHUCK_OP_PATTERN + ")",
+        Pattern.DOTALL
+    );
+
+    // ── State ──────────────────────────────────────────────────────────────────
     private ChuckVM vm;
     private ChuckAudio audio;
-    private TextArea editor;
+    private CodeArea editor;
     private TextArea outputArea;
     private ListView<String> shredListView;
-    private Map<String, Integer> shredNameToId = new ConcurrentHashMap<>();
+    private final Map<String, Integer> shredNameToId = new ConcurrentHashMap<>();
     private Label statusLabel;
     private TreeView<File> fileBrowser;
-    
     private Stage stage;
     private File currentFile;
 
     @Override
     public void start(Stage primaryStage) {
         this.stage = primaryStage;
-        
-        // Initialize VM and Audio Engine
+
         int sampleRate = 44100;
         vm = new ChuckVM(sampleRate);
         audio = new ChuckAudio(vm, 512, 2, sampleRate);
         audio.start();
 
-        primaryStage.setTitle("🎸 ChucK-Java Professional IDE (JDK 25)");
+        primaryStage.setTitle("ChucK-Java IDE (JDK 25)");
 
-        // --- 1. Menu Bar ---
-        MenuBar menuBar = createMenuBar();
-
-        // --- 2. Tool Bar ---
+        MenuBar menuBar = createMenuBar(primaryStage);
         ToolBar toolBar = createToolBar();
 
-        // --- 3. Editor Area ---
-        editor = new TextArea();
-        editor.setPromptText("Write your ChucK code here...");
-        editor.setText("// Welcome to ChucK-Java!\nSinOsc s => dac;\n0.5 => s.gain;\n440 => s.freq;\n1::second => now;");
-        editor.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 14;");
+        // ── Code editor with syntax highlighting and line numbers ──
+        editor = new CodeArea();
+        editor.setParagraphGraphicFactory(LineNumberFactory.get(editor));
+        editor.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 13;");
+        editor.replaceText(0, 0,
+            "// Welcome to ChucK-Java!\nSinOsc s => dac;\n0.5 => s.gain;\n440 => s.freq;\n1::second => now;");
+        // Compute highlighting on every text change (debounced 50 ms)
+        editor.multiPlainChanges()
+              .successionEnds(Duration.ofMillis(50))
+              .subscribe(ignore -> editor.setStyleSpans(0, computeHighlighting(editor.getText())));
+        editor.setStyleSpans(0, computeHighlighting(editor.getText()));
 
-        // --- 4. File Browser (Left) ---
+        // ── File browser ──
         fileBrowser = createFileBrowser();
-        VBox leftPanel = new VBox(new Label("  Project Explorer"), fileBrowser);
+        VBox leftPanel = new VBox(new Label("  Project"), fileBrowser);
         VBox.setVgrow(fileBrowser, Priority.ALWAYS);
-        leftPanel.setPrefWidth(220);
+        leftPanel.setPrefWidth(210);
 
-        // --- 5. Shred List (Right) ---
+        // ── Shred panel ──
         shredListView = new ListView<>();
         Button removeSelectedBtn = new Button("Stop Selected");
         removeSelectedBtn.setMaxWidth(Double.MAX_VALUE);
         removeSelectedBtn.setOnAction(e -> removeSelectedShred());
-        
-        VBox rightPanel = new VBox(10, new Label("Active Shreds"), shredListView, removeSelectedBtn);
-        rightPanel.setPadding(new Insets(10));
-        rightPanel.setPrefWidth(200);
+        VBox rightPanel = new VBox(8, new Label("Active Shreds"), shredListView, removeSelectedBtn);
+        rightPanel.setPadding(new Insets(8));
+        rightPanel.setPrefWidth(195);
 
-        // --- 6. Output & Status (Bottom) ---
+        // ── Output console ──
         outputArea = new TextArea();
         outputArea.setEditable(false);
-        outputArea.setPrefHeight(120);
-        outputArea.setStyle("-fx-control-inner-background: #f4f4f4; -fx-font-family: 'Monospaced';");
+        outputArea.setPrefHeight(110);
+        outputArea.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 12;");
 
-        statusLabel = new Label(" Ready");
+        statusLabel = new Label("  Ready");
         HBox statusBar = new HBox(statusLabel);
         statusBar.setStyle("-fx-background-color: #ddd; -fx-padding: 2;");
-
         VBox bottomPanel = new VBox(outputArea, statusBar);
 
-        // --- Layout ---
+        // ── Layout ──
+        SplitPane hSplit = new SplitPane(leftPanel, editor, rightPanel);
+        hSplit.setDividerPositions(0.18, 0.82);
+        SplitPane vSplit = new SplitPane(hSplit, bottomPanel);
+        vSplit.setOrientation(Orientation.VERTICAL);
+        vSplit.setDividerPositions(0.76);
+
         BorderPane root = new BorderPane();
         root.setTop(new VBox(menuBar, toolBar));
-        
-        SplitPane horizontalSplit = new SplitPane();
-        horizontalSplit.getItems().addAll(leftPanel, editor, rightPanel);
-        horizontalSplit.setDividerPositions(0.2, 0.8);
-        
-        SplitPane verticalSplit = new SplitPane();
-        verticalSplit.setOrientation(javafx.geometry.Orientation.VERTICAL);
-        verticalSplit.getItems().addAll(horizontalSplit, bottomPanel);
-        verticalSplit.setDividerPositions(0.75);
+        root.setCenter(vSplit);
 
-        root.setCenter(verticalSplit);
-
-        Scene scene = new Scene(root, 1200, 800);
+        Scene scene = new Scene(root, 1250, 820);
+        scene.getStylesheets().add(getClass().getResource("/chuck-ide.css") != null
+            ? getClass().getResource("/chuck-ide.css").toExternalForm() : "");
+        applyInlineStyles(scene);
         primaryStage.setScene(scene);
         primaryStage.show();
 
-        print("🔊 ChucK-Java Engine Online - High Performance Synthesis Ready");
+        print("ChucK-Java Engine Online — JDK 25 | Virtual Threads | Vector API");
     }
 
-    private MenuBar createMenuBar() {
+    // ── Syntax highlighting ────────────────────────────────────────────────────
+
+    private static StyleSpans<Collection<String>> computeHighlighting(String text) {
+        Matcher m = HIGHLIGHT_PATTERN.matcher(text);
+        StyleSpansBuilder<Collection<String>> spansBuilder = new StyleSpansBuilder<>();
+        int lastEnd = 0;
+        while (m.find()) {
+            String styleClass =
+                m.group("COMMENT") != null ? "ck-comment" :
+                m.group("KEYWORD") != null ? "ck-keyword" :
+                m.group("TYPE")    != null ? "ck-type"    :
+                m.group("BUILTIN") != null ? "ck-builtin" :
+                m.group("STRING")  != null ? "ck-string"  :
+                m.group("NUMBER")  != null ? "ck-number"  :
+                m.group("CHUCKOP") != null ? "ck-chuckop" : null;
+            spansBuilder.add(Collections.emptyList(), m.start() - lastEnd);
+            spansBuilder.add(styleClass != null
+                ? Collections.singleton(styleClass) : Collections.emptyList(),
+                m.end() - m.start());
+            lastEnd = m.end();
+        }
+        spansBuilder.add(Collections.emptyList(), text.length() - lastEnd);
+        return spansBuilder.create();
+    }
+
+    /** Apply highlight colours as inline JavaFX CSS (avoids needing an external file). */
+    private void applyInlineStyles(Scene scene) {
+        scene.getRoot().setStyle(
+            ".ck-comment  { -rtfx-background-color: transparent; -fx-fill: #5c7a5c; }" +
+            ".ck-keyword  { -fx-fill: #cc7722; -fx-font-weight: bold; }" +
+            ".ck-type     { -fx-fill: #2255aa; -fx-font-weight: bold; }" +
+            ".ck-builtin  { -fx-fill: #8844aa; }" +
+            ".ck-string   { -fx-fill: #b5491c; }" +
+            ".ck-number   { -fx-fill: #1c7c1c; }" +
+            ".ck-chuckop  { -fx-fill: #aa3322; -fx-font-weight: bold; }");
+        // Inject into scene stylesheets so RichTextFX picks them up
+        scene.getStylesheets().add("data:text/css," + java.net.URLEncoder.encode(
+            ".ck-comment  { -rtfx-background-color: transparent; -fx-fill: #5c7a5c; }" +
+            ".ck-keyword  { -fx-fill: #cc7722; -fx-font-weight: bold; }" +
+            ".ck-type     { -fx-fill: #2255aa; -fx-font-weight: bold; }" +
+            ".ck-builtin  { -fx-fill: #8844aa; }" +
+            ".ck-string   { -fx-fill: #b5491c; }" +
+            ".ck-number   { -fx-fill: #1c7c1c; }" +
+            ".ck-chuckop  { -fx-fill: #aa3322; -fx-font-weight: bold; }",
+            java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    // ── Menu bar ───────────────────────────────────────────────────────────────
+
+    private MenuBar createMenuBar(Stage stage) {
         MenuBar mb = new MenuBar();
 
-        Menu fileMenu = new Menu("File");
-        MenuItem newFile = new MenuItem("New");
-        newFile.setOnAction(e -> { editor.clear(); currentFile = null; });
-        MenuItem openFile = new MenuItem("Open...");
-        openFile.setOnAction(e -> openFile());
-        MenuItem saveFile = new MenuItem("Save");
-        saveFile.setOnAction(e -> saveFile());
-        MenuItem exit = new MenuItem("Exit");
-        exit.setOnAction(e -> Platform.exit());
-        fileMenu.getItems().addAll(newFile, openFile, saveFile, new SeparatorMenuItem(), exit);
+        // File
+        Menu fileMenu = new Menu("_File");
+        MenuItem newItem  = new MenuItem("New");
+        newItem.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN));
+        newItem.setOnAction(e -> { editor.replaceText(""); currentFile = null; stage.setTitle("ChucK-Java IDE"); });
 
-        Menu editMenu = new Menu("Edit");
-        editMenu.getItems().addAll(new MenuItem("Undo"), new MenuItem("Redo"), new SeparatorMenuItem(), new MenuItem("Cut"), new MenuItem("Copy"), new MenuItem("Paste"));
+        MenuItem openItem = new MenuItem("Open…");
+        openItem.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.CONTROL_DOWN));
+        openItem.setOnAction(e -> openFile(stage));
 
-        Menu examplesMenu = new Menu("Examples");
+        MenuItem saveItem = new MenuItem("Save");
+        saveItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN));
+        saveItem.setOnAction(e -> saveFile(stage));
+
+        MenuItem saveAsItem = new MenuItem("Save As…");
+        saveAsItem.setAccelerator(new KeyCodeCombination(KeyCode.S,
+            KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN));
+        saveAsItem.setOnAction(e -> { currentFile = null; saveFile(stage); });
+
+        MenuItem exitItem = new MenuItem("Exit");
+        exitItem.setOnAction(e -> Platform.exit());
+
+        fileMenu.getItems().addAll(newItem, openItem, saveItem, saveAsItem, new SeparatorMenuItem(), exitItem);
+
+        // Edit
+        Menu editMenu = new Menu("_Edit");
+        MenuItem undoItem  = new MenuItem("Undo");
+        undoItem.setAccelerator(new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN));
+        undoItem.setOnAction(e -> editor.undo());
+
+        MenuItem redoItem  = new MenuItem("Redo");
+        redoItem.setAccelerator(new KeyCodeCombination(KeyCode.Y, KeyCombination.CONTROL_DOWN));
+        redoItem.setOnAction(e -> editor.redo());
+
+        MenuItem cutItem   = new MenuItem("Cut");
+        cutItem.setAccelerator(new KeyCodeCombination(KeyCode.X, KeyCombination.CONTROL_DOWN));
+        cutItem.setOnAction(e -> editor.cut());
+
+        MenuItem copyItem  = new MenuItem("Copy");
+        copyItem.setAccelerator(new KeyCodeCombination(KeyCode.C, KeyCombination.CONTROL_DOWN));
+        copyItem.setOnAction(e -> editor.copy());
+
+        MenuItem pasteItem = new MenuItem("Paste");
+        pasteItem.setAccelerator(new KeyCodeCombination(KeyCode.V, KeyCombination.CONTROL_DOWN));
+        pasteItem.setOnAction(e -> editor.paste());
+
+        MenuItem selAllItem = new MenuItem("Select All");
+        selAllItem.setAccelerator(new KeyCodeCombination(KeyCode.A, KeyCombination.CONTROL_DOWN));
+        selAllItem.setOnAction(e -> editor.selectAll());
+
+        editMenu.getItems().addAll(undoItem, redoItem, new SeparatorMenuItem(),
+            cutItem, copyItem, pasteItem, new SeparatorMenuItem(), selAllItem);
+
+        // Examples
+        Menu examplesMenu = new Menu("_Examples");
         loadExamples(examplesMenu);
 
-        Menu helpMenu = new Menu("Help");
-        MenuItem about = new MenuItem("About ChucK-Java");
-        about.setOnAction(e -> {
-            Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("About ChucK-Java");
-            alert.setHeaderText("ChucK-Java (JDK 25 Migration)");
-            alert.setContentText("A modern, high-performance migration of the ChucK language to Java 25.\n\nUtilizing Virtual Threads, Vector API, and FFM API.");
-            alert.showAndWait();
+        // Help
+        Menu helpMenu = new Menu("_Help");
+        MenuItem aboutItem = new MenuItem("About ChucK-Java");
+        aboutItem.setOnAction(e -> {
+            Alert a = new Alert(Alert.AlertType.INFORMATION);
+            a.setTitle("About ChucK-Java");
+            a.setHeaderText("ChucK-Java — JDK 25 port");
+            a.setContentText(
+                "A modern port of the ChucK strongly-timed music language to Java 25.\n\n" +
+                "Features: Virtual Threads, Vector API, JavaFX IDE with syntax highlighting.\n\n" +
+                "Original ChucK: https://chuck.stanford.edu/");
+            a.showAndWait();
         });
-        helpMenu.getItems().add(about);
+        helpMenu.getItems().add(aboutItem);
 
         mb.getMenus().addAll(fileMenu, editMenu, examplesMenu, helpMenu);
         return mb;
     }
 
+    // ── Toolbar ────────────────────────────────────────────────────────────────
+
     private ToolBar createToolBar() {
-        Button addShred = new Button("➕ Add Shred");
-        addShred.setStyle("-fx-background-color: #ccffcc; -fx-font-weight: bold;");
-        addShred.setOnAction(e -> addShred());
+        Button addShredBtn = new Button("Add Shred  [Ctrl+Enter]");
+        addShredBtn.setStyle("-fx-background-color: #b8f0b8; -fx-font-weight: bold;");
+        addShredBtn.setOnAction(e -> addShred());
 
-        Button replaceShred = new Button("🔄 Replace Last");
-        replaceShred.setOnAction(e -> replaceLastShred());
+        Button replaceBtn = new Button("Replace Last  [Ctrl+Shift+Enter]");
+        replaceBtn.setOnAction(e -> replaceLastShred());
 
-        Button removeLast = new Button("➖ Remove Last");
-        removeLast.setOnAction(e -> removeLastShred());
+        Button removeLastBtn = new Button("Remove Last  [Ctrl+.]");
+        removeLastBtn.setOnAction(e -> removeLastShred());
 
-        Button stopAll = new Button("🛑 Stop All");
-        stopAll.setStyle("-fx-background-color: #ffcccc; -fx-font-weight: bold;");
-        stopAll.setOnAction(e -> clearVM());
+        Button stopAllBtn = new Button("Stop All  [Ctrl+/]");
+        stopAllBtn.setStyle("-fx-background-color: #f0b8b8; -fx-font-weight: bold;");
+        stopAllBtn.setOnAction(e -> clearVM());
 
-        Button recordBtn = new Button("⏺ Record");
+        Button recordBtn = new Button("Record");
         recordBtn.setOnAction(e -> toggleRecord(recordBtn));
 
-        return new ToolBar(addShred, replaceShred, removeLast, stopAll, new Separator(), recordBtn);
+        ToolBar tb = new ToolBar(addShredBtn, replaceBtn, removeLastBtn, stopAllBtn,
+                                  new Separator(), recordBtn);
+
+        // Keyboard shortcuts on the scene — wired after scene is set
+        Platform.runLater(() -> {
+            if (stage.getScene() == null) return;
+            stage.getScene().getAccelerators().put(
+                new KeyCodeCombination(KeyCode.ENTER, KeyCombination.CONTROL_DOWN),
+                this::addShred);
+            stage.getScene().getAccelerators().put(
+                new KeyCodeCombination(KeyCode.ENTER,
+                    KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN),
+                this::replaceLastShred);
+            stage.getScene().getAccelerators().put(
+                new KeyCodeCombination(KeyCode.PERIOD, KeyCombination.CONTROL_DOWN),
+                this::removeLastShred);
+            stage.getScene().getAccelerators().put(
+                new KeyCodeCombination(KeyCode.SLASH, KeyCombination.CONTROL_DOWN),
+                this::clearVM);
+        });
+
+        return tb;
     }
+
+    // ── File browser ───────────────────────────────────────────────────────────
 
     private TreeView<File> createFileBrowser() {
         File rootDir = new File(".");
-        TreeItem<File> rootItem = createTreeItem(rootDir);
+        TreeItem<File> rootItem = buildTreeItem(rootDir);
         TreeView<File> tree = new TreeView<>(rootItem);
         tree.setShowRoot(false);
         tree.setCellFactory(tv -> new TreeCell<>() {
-            @Override
-            protected void updateItem(File item, boolean empty) {
+            @Override protected void updateItem(File item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setText(null);
-                } else {
-                    setText(item.getName());
-                }
+                setText(empty || item == null ? null : item.getName());
             }
         });
         tree.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2) {
-                TreeItem<File> item = tree.getSelectionModel().getSelectedItem();
-                if (item != null && item.getValue().isFile()) {
-                    loadFile(item.getValue());
-                }
+                TreeItem<File> sel = tree.getSelectionModel().getSelectedItem();
+                if (sel != null && sel.getValue().isFile()) loadFileIntoEditor(sel.getValue());
             }
         });
         return tree;
     }
 
-    private TreeItem<File> createTreeItem(File file) {
+    private TreeItem<File> buildTreeItem(File file) {
         TreeItem<File> item = new TreeItem<>(file);
         if (file.isDirectory()) {
             File[] children = file.listFiles();
             if (children != null) {
                 for (File child : children) {
                     if (child.getName().startsWith(".") || child.getName().equals("target")) continue;
-                    item.getChildren().add(createTreeItem(child));
+                    item.getChildren().add(buildTreeItem(child));
                 }
             }
         }
@@ -211,9 +361,10 @@ public class ChuckIDE extends Application {
     }
 
     private void loadExamples(Menu menu) {
-        File examplesDir = new File("../examples");
-        if (!examplesDir.exists()) examplesDir = new File("examples");
-        if (examplesDir.exists()) addExampleSubmenu(menu, examplesDir);
+        File dir = new File("../examples");
+        if (!dir.exists()) dir = new File("examples");
+        if (dir.exists()) addExampleSubmenu(menu, dir);
+        else menu.getItems().add(new MenuItem("(no examples/ directory found)"));
     }
 
     private void addExampleSubmenu(Menu menu, File dir) {
@@ -226,148 +377,185 @@ public class ChuckIDE extends Application {
                 menu.getItems().add(sub);
             } else if (f.getName().endsWith(".ck")) {
                 MenuItem mi = new MenuItem(f.getName());
-                mi.setOnAction(e -> loadFile(f));
+                mi.setOnAction(e -> loadFileIntoEditor(f));
                 menu.getItems().add(mi);
             }
         }
     }
 
+    // ── Shred management ───────────────────────────────────────────────────────
+
     private void addShred() {
         String source = editor.getText();
-        statusLabel.setText(" Compiling...");
+        statusLabel.setText("  Compiling…");
         try {
             ChuckLexer lexer = new ChuckLexer(source);
             ChuckParser parser = new ChuckParser(lexer.tokenize());
             ChuckEmitter emitter = new ChuckEmitter();
-            ChuckCode code = emitter.emit(parser.parse(), currentFile != null ? currentFile.getName() : "Untitled");
+            ChuckCode code = emitter.emit(parser.parse(),
+                currentFile != null ? currentFile.getName() : "Untitled");
 
             ChuckShred shred = new ChuckShred(code);
             vm.spork(shred);
-            
-            String shredName = "Shred " + shred.getId() + " (" + (currentFile != null ? currentFile.getName() : "User") + ")";
-            shredNameToId.put(shredName, shred.getId());
-            shredListView.getItems().add(shredName);
-            
-            print("🚀 Sporked " + shredName);
-            statusLabel.setText(" Running " + shredListView.getItems().size() + " shreds");
+
+            String label = "Shred " + shred.getId()
+                + " (" + (currentFile != null ? currentFile.getName() : "User") + ")";
+            shredNameToId.put(label, shred.getId());
+            shredListView.getItems().add(label);
+            print("Sporked " + label);
+            updateStatus();
 
             Thread.ofVirtual().start(() -> {
                 while (!shred.isDone()) {
-                    try { Thread.sleep(100); } catch (InterruptedException e) {}
+                    try { Thread.sleep(100); } catch (InterruptedException ignored) {}
                 }
                 Platform.runLater(() -> {
-                    if (shredListView.getItems().contains(shredName)) {
-                        shredListView.getItems().remove(shredName);
-                        shredNameToId.remove(shredName);
-                        print("🏁 " + shredName + " finished.");
-                        statusLabel.setText(" Running " + shredListView.getItems().size() + " shreds");
-                    }
+                    shredListView.getItems().remove(label);
+                    shredNameToId.remove(label);
+                    print("Finished: " + label);
+                    updateStatus();
                 });
             });
 
-        } catch (Exception e) {
-            print("❌ Compilation Error: " + e.getMessage());
-            statusLabel.setText(" Compilation failed");
-        }
-    }
-
-    private void removeLastShred() {
-        if (!shredListView.getItems().isEmpty()) {
-            String last = shredListView.getItems().get(shredListView.getItems().size() - 1);
-            int id = shredNameToId.get(last);
-            vm.removeShred(id);
-            shredListView.getItems().remove(last);
-            shredNameToId.remove(last);
-            print("➖ Removed " + last);
+        } catch (Exception ex) {
+            // Extract line number from exception message if present
+            String msg = ex.getMessage() != null ? ex.getMessage() : ex.toString();
+            print("Compilation Error: " + msg);
+            highlightErrorLine(msg);
+            statusLabel.setText("  Compilation failed");
         }
     }
 
     private void replaceLastShred() {
         if (!shredListView.getItems().isEmpty()) {
             String last = shredListView.getItems().get(shredListView.getItems().size() - 1);
-            int id = shredNameToId.get(last);
-            vm.removeShred(id);
+            Integer id = shredNameToId.get(last);
+            if (id != null) vm.removeShred(id);
             shredListView.getItems().remove(last);
             shredNameToId.remove(last);
-            print("🔄 Replacing " + last + "...");
+            print("Replacing " + last);
         }
         addShred();
     }
 
+    private void removeLastShred() {
+        if (!shredListView.getItems().isEmpty()) {
+            String last = shredListView.getItems().get(shredListView.getItems().size() - 1);
+            Integer id = shredNameToId.get(last);
+            if (id != null) vm.removeShred(id);
+            shredListView.getItems().remove(last);
+            shredNameToId.remove(last);
+            print("Removed " + last);
+            updateStatus();
+        }
+    }
+
     private void removeSelectedShred() {
-        String selected = shredListView.getSelectionModel().getSelectedItem();
-        if (selected != null) {
-            int id = shredNameToId.get(selected);
-            vm.removeShred(id);
-            shredListView.getItems().remove(selected);
-            shredNameToId.remove(selected);
-            print("🛑 Stopped " + selected);
+        String sel = shredListView.getSelectionModel().getSelectedItem();
+        if (sel != null) {
+            Integer id = shredNameToId.get(sel);
+            if (id != null) vm.removeShred(id);
+            shredListView.getItems().remove(sel);
+            shredNameToId.remove(sel);
+            print("Stopped " + sel);
+            updateStatus();
         }
     }
 
     private void clearVM() {
-        print("🧹 Stopping all shreds and clearing VM state...");
+        print("Stopping all shreds…");
         vm.clear();
         shredListView.getItems().clear();
         shredNameToId.clear();
-        statusLabel.setText(" VM Reset Complete");
+        statusLabel.setText("  VM cleared");
     }
+
+    private void updateStatus() {
+        int n = shredListView.getItems().size();
+        statusLabel.setText("  " + (n == 0 ? "Ready" : "Running " + n + " shred" + (n > 1 ? "s" : "")));
+    }
+
+    // ── Error line highlighting ─────────────────────────────────────────────────
+
+    /**
+     * If the error message contains "at line N", scroll the editor to that line
+     * and temporarily highlight it.
+     */
+    private void highlightErrorLine(String msg) {
+        java.util.regex.Matcher m = java.util.regex.Pattern
+            .compile("(?:at|line)\\s+(\\d+)", java.util.regex.Pattern.CASE_INSENSITIVE)
+            .matcher(msg);
+        if (!m.find()) return;
+        int lineNum = Integer.parseInt(m.group(1)) - 1; // 0-indexed
+        if (lineNum < 0 || lineNum >= editor.getParagraphs().size()) return;
+        editor.showParagraphAtTop(Math.max(0, lineNum - 3));
+        // Select the whole line so user can see where the error is
+        int lineStart = editor.position(lineNum, 0).toOffset();
+        int lineEnd   = editor.position(lineNum,
+            editor.getParagraph(lineNum).length()).toOffset();
+        editor.selectRange(lineStart, lineEnd);
+    }
+
+    // ── Recording ──────────────────────────────────────────────────────────────
 
     private void toggleRecord(Button btn) {
         try {
             if (audio.isRecording()) {
                 audio.stopRecording();
-                btn.setText("⏺ Record");
+                btn.setText("Record");
                 btn.setStyle("");
-                print("💾 Recording saved to session.wav");
+                print("Recording saved to session.wav");
             } else {
                 audio.startRecording("session.wav");
-                btn.setText("⏹ Stop Recording");
+                btn.setText("Stop Recording");
                 btn.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
-                print("⏺ Recording started (session.wav)...");
+                print("Recording started → session.wav");
             }
-        } catch (IOException e) {
-            print("❌ Recording Error: " + e.getMessage());
+        } catch (IOException ex) {
+            print("Recording error: " + ex.getMessage());
         }
     }
 
-    private void loadFile(File file) {
+    // ── File I/O ───────────────────────────────────────────────────────────────
+
+    private void loadFileIntoEditor(File file) {
         try {
-            String content = Files.readString(file.toPath());
-            editor.setText(content);
+            editor.replaceText(Files.readString(file.toPath()));
             currentFile = file;
-            stage.setTitle("🎸 ChucK-Java - " + file.getName());
-            print("📂 Loaded: " + file.getAbsolutePath());
-        } catch (IOException e) {
-            print("❌ Error loading file: " + e.getMessage());
+            stage.setTitle("ChucK-Java IDE — " + file.getName());
+            print("Loaded: " + file.getAbsolutePath());
+        } catch (IOException ex) {
+            print("Error loading file: " + ex.getMessage());
         }
     }
 
-    private void openFile() {
+    private void openFile(Stage stage) {
         FileChooser fc = new FileChooser();
-        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("ChucK Files", "*.ck"));
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("ChucK Files (*.ck)", "*.ck"));
         File file = fc.showOpenDialog(stage);
-        if (file != null) loadFile(file);
+        if (file != null) loadFileIntoEditor(file);
     }
 
-    private void saveFile() {
+    private void saveFile(Stage stage) {
         if (currentFile == null) {
             FileChooser fc = new FileChooser();
-            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("ChucK Files", "*.ck"));
+            fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("ChucK Files (*.ck)", "*.ck"));
             currentFile = fc.showSaveDialog(stage);
         }
         if (currentFile != null) {
             try {
                 Files.writeString(currentFile.toPath(), editor.getText());
-                print("💾 Saved: " + currentFile.getAbsolutePath());
-            } catch (IOException e) {
-                print("❌ Error saving file: " + e.getMessage());
+                print("Saved: " + currentFile.getAbsolutePath());
+            } catch (IOException ex) {
+                print("Error saving: " + ex.getMessage());
             }
         }
     }
 
+    // ── Helpers ────────────────────────────────────────────────────────────────
+
     private void print(String text) {
-        outputArea.appendText(text + "\n");
+        Platform.runLater(() -> outputArea.appendText(text + "\n"));
     }
 
     @Override

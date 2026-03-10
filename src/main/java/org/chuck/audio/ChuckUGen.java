@@ -36,6 +36,16 @@ public abstract class ChuckUGen extends ChuckObject {
         }
     }
 
+    /** Remove a specific upstream connection. */
+    public void removeSource(ChuckUGen src) {
+        sources.remove(src);
+    }
+
+    /** Remove all upstream connections (used by VM clear to silence the DAC). */
+    public void clearSources() {
+        sources.clear();
+    }
+
     public void setGain(float gain) {
         this.gain = gain;
     }

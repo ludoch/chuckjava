@@ -1,5 +1,9 @@
 package org.chuck.core;
 
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,8 +21,10 @@ public class ChuckShred implements Comparable<ChuckShred> {
     private boolean isWaiting = false; // Waiting on an event
     
     // Virtual Machine stacks
-    public final ChuckStack reg = new ChuckStack(65536); // Increased for robustness
-    public final ChuckStack mem = new ChuckStack(65536); // Increased for robustness
+    public final ChuckStack reg = new ChuckStack(65536);
+    public final ChuckStack mem = new ChuckStack(65536);
+    /** Stack of 'this' references for active user-defined method calls. */
+    public final Deque<UserObject> thisStack = new ArrayDeque<>();
     
     // Execution state
     private ChuckCode code;
@@ -84,7 +90,7 @@ public class ChuckShred implements Comparable<ChuckShred> {
             this.wakeTime += samples;
             isRunning = false;
             condition.signal();
-            while (!isRunning) {
+            while (!isRunning && !isDone) {   // exit if abort() was called
                 condition.await();
             }
         } catch (InterruptedException e) {
@@ -101,7 +107,7 @@ public class ChuckShred implements Comparable<ChuckShred> {
             isRunning = false;
             isWaiting = true;
             condition.signal(); // Tell VM we are parked
-            while (!isRunning) {
+            while (!isRunning && !isDone) {   // exit if abort() was called
                 condition.await();
             }
         } catch (InterruptedException e) {

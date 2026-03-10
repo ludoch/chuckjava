@@ -105,4 +105,26 @@ public abstract class Osc extends ChuckUGen {
     }
 
     protected abstract double computeOsc(double phase);
+
+    /**
+     * PolyBLEP residual correction for a single discontinuity.
+     * Apply at every phase wrap-around / edge to reduce aliasing.
+     *
+     * @param t  normalised phase of the discontinuity (0–1)
+     * @param dt phase increment per sample (freq / sampleRate)
+     * @return   correction value to add to (or subtract from) the naive waveform
+     */
+    protected static double polyBlep(double t, double dt) {
+        if (dt <= 0.0) return 0.0;
+        if (t < dt) {
+            // Just after the discontinuity
+            t /= dt;
+            return t + t - t * t - 1.0;
+        } else if (t > 1.0 - dt) {
+            // Just before the discontinuity
+            t = (t - 1.0) / dt;
+            return t * t + t + t + 1.0;
+        }
+        return 0.0;
+    }
 }
