@@ -37,6 +37,7 @@ public class ChuckEvent extends ChuckObject {
                 ChuckShred shred = waitingShreds.remove(0);
                 shred.setWakeTime(vm.getCurrentTime());
                 vm.schedule(shred);
+                shred.resume(vm);
             }
         } finally {
             eventLock.unlock();
@@ -49,6 +50,7 @@ public class ChuckEvent extends ChuckObject {
             for (ChuckShred shred : waitingShreds) {
                 shred.setWakeTime(vm.getCurrentTime());
                 vm.schedule(shred);
+                shred.resume(vm);
             }
             waitingShreds.clear();
         } finally {

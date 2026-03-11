@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Represents a concurrent execution context in ChucK.
  */
-public class ChuckShred implements Comparable<ChuckShred> {
+public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     private static final AtomicInteger ID_GENERATOR = new AtomicInteger(1);
     
     private final int id;
@@ -19,12 +19,18 @@ public class ChuckShred implements Comparable<ChuckShred> {
     private boolean isDone = false;
     private boolean isRunning = false;
     private boolean isWaiting = false; // Waiting on an event
+    private String name = "";
+    private String[] args = new String[0];
     
     // Virtual Machine stacks
     public final ChuckStack reg = new ChuckStack(65536);
     public final ChuckStack mem = new ChuckStack(65536);
     /** Stack of 'this' references for active user-defined method calls. */
     public final Deque<UserObject> thisStack = new ArrayDeque<>();
+    /** UGens created by this shred, so they can be disconnected on stop. */
+    private final Set<org.chuck.audio.ChuckUGen> ownedUGens = ConcurrentHashMap.newKeySet();
+    public void registerUGen(org.chuck.audio.ChuckUGen ugen) { ownedUGens.add(ugen); }
+    public Set<org.chuck.audio.ChuckUGen> getOwnedUGens() { return ownedUGens; }
     
     // Execution state
     private ChuckCode code;
@@ -44,6 +50,7 @@ public class ChuckShred implements Comparable<ChuckShred> {
     private final Condition condition = lock.newCondition();
     
     public ChuckShred(ChuckCode code) {
+        super(new ChuckType("Shred", ChuckType.OBJECT, 0, 0));
         this.id = ID_GENERATOR.getAndIncrement();
         this.code = code;
     }
@@ -53,6 +60,16 @@ public class ChuckShred implements Comparable<ChuckShred> {
     public void setWakeTime(long time) { this.wakeTime = time; }
     public boolean isDone() { return isDone; }
     public boolean isWaiting() { return isWaiting; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String[] getArgs() { return args; }
+    public void setArgs(String[] args) { this.args = args; }
+
+    // ChucK 'me' methods
+    public int id() { return id; }
+    public void exit() { abort(); }
+    public String arg(int i) { return (i >= 0 && i < args.length) ? args[i] : ""; }
+    public int numArgs() { return args.length; }
 
     public void abort() {
         this.isDone = true;

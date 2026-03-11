@@ -17,6 +17,7 @@ public class ChuckAudio {
     private SourceDataLine outputLine;
     private TargetDataLine inputLine;   // null if no mic available
     private boolean running = false;
+    private float masterGain = 0.8f;
 
     // Optional recorder
     private WvOut recorder;
@@ -27,6 +28,10 @@ public class ChuckAudio {
         this.numChannels = numChannels;
         this.sampleRate = sampleRate;
         initJavaSound();
+    }
+
+    public void setMasterGain(float gain) {
+        this.masterGain = gain;
     }
 
     private void initJavaSound() {
@@ -83,8 +88,8 @@ public class ChuckAudio {
 
                     vm.advanceTime(1);
 
-                    float left  = vm.getChannelLastOut(0);
-                    float right = numChannels > 1 ? vm.getChannelLastOut(1) : left;
+                    float left  = vm.getChannelLastOut(0) * masterGain;
+                    float right = (numChannels > 1 ? vm.getChannelLastOut(1) : vm.getChannelLastOut(0)) * masterGain;
 
                     // Record if active
                     if (recorder != null && recorder.isRecording()) {

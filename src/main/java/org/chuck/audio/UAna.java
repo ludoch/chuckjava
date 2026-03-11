@@ -7,7 +7,13 @@ public abstract class UAna extends ChuckUGen {
     protected UAnaBlob lastBlob = new UAnaBlob();
 
     public UAnaBlob upchuck() {
-        // Trigger analysis
+        // Recursively trigger analysis on upstream UAnas
+        for (ChuckUGen src : sources) {
+            if (src instanceof UAna u) {
+                u.upchuck();
+            }
+        }
+        // Trigger this analyzer's calculation
         computeUAna();
         return lastBlob;
     }

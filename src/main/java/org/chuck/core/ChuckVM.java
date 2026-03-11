@@ -57,6 +57,10 @@ public class ChuckVM {
 
         this.adc = new Adc();
         globalObjects.put("adc", adc);
+
+        globalObjects.put("chout", new ChuckIO(System.out, this));
+        globalObjects.put("cherr", new ChuckIO(System.err, this));
+        globalObjects.put("IO", new ChuckIO(System.out, this));
     }
 
     public ChuckUGen getDacChannel(int channel) {
@@ -83,6 +87,51 @@ public class ChuckVM {
         return globalObjects.get(name);
     }
     
+    // Printing support
+    public interface PrintListener {
+        void onPrint(String text);
+    }
+    private final List<PrintListener> printListeners = new ArrayList<>();
+    
+    // HID support
+    private final List<org.chuck.hid.Hid> openHidDevices = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    private boolean antlrEnabled = false;
+
+    public void setAntlrEnabled(boolean enabled) {
+        this.antlrEnabled = enabled;
+    }
+
+    public boolean isAntlrEnabled() {
+        return antlrEnabled;
+    }
+
+    public void registerHid(org.chuck.hid.Hid hid) {
+        openHidDevices.add(hid);
+    }
+
+    public void dispatchHidMsg(org.chuck.hid.HidMsg msg) {
+        String type = msg.type == 3 || msg.type == 4 ? "mouse" : "keyboard";
+        for (org.chuck.hid.Hid hid : openHidDevices) {
+            if (hid.getDeviceType().equals(type)) {
+                hid.pushMsg(msg);
+                hid.broadcast(this);
+            }
+        }
+    }
+
+    public void addPrintListener(PrintListener listener) {
+        printListeners.add(listener);
+    }
+
+    public void print(String text) {
+        for (PrintListener listener : printListeners) {
+            listener.onPrint(text);
+        }
+        // Also print to stdout by default
+        System.out.println("[ChucK] " + text);
+    }
+
     public long getCurrentTime() {
         return currentTime.get();
     }
@@ -106,7 +155,7 @@ public class ChuckVM {
     /**
      * Spawns a new shred and starts its Virtual Thread.
      */
-    public void spork(ChuckShred shred) {
+    public int spork(ChuckShred shred) {
         schedulerLock.lock();
         try {
             shred.setWakeTime(currentTime.get());
@@ -123,6 +172,36 @@ public class ChuckVM {
                 activeShreds.remove(shred.getId());
             }
         });
+        return shred.getId();
+    }
+
+    public int add(String path) {
+        try {
+            String source = java.nio.file.Files.readString(java.nio.file.Paths.get(path));
+            List<org.chuck.compiler.ChuckAST.Stmt> ast;
+
+            if (antlrEnabled) {
+                org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
+                org.chuck.compiler.ChuckANTLRLexer lexer = new org.chuck.compiler.ChuckANTLRLexer(input);
+                org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
+                org.chuck.compiler.ChuckANTLRParser parser = new org.chuck.compiler.ChuckANTLRParser(tokens);
+                org.chuck.compiler.ChuckASTVisitor visitor = new org.chuck.compiler.ChuckASTVisitor();
+                ast = (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
+            } else {
+                org.chuck.compiler.ChuckLexer lexer = new org.chuck.compiler.ChuckLexer(source);
+                org.chuck.compiler.ChuckParser parser = new org.chuck.compiler.ChuckParser(lexer.tokenize());
+                ast = parser.parse();
+            }
+
+            org.chuck.compiler.ChuckEmitter emitter = new org.chuck.compiler.ChuckEmitter();
+            ChuckCode code = emitter.emit(ast, path);
+            ChuckShred shred = new ChuckShred(code);
+            return spork(shred);
+        } catch (Exception e) {
+            print("Machine.add error: " + e.getMessage());
+            e.printStackTrace();
+            return 0;
+        }
     }
 
     public void removeShred(int id) {

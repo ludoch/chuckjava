@@ -1,148 +1,161 @@
-# ChucK [![macOS - build & unit tests](https://github.com/ccrma/chuck/actions/workflows/macos-build-unit-tests.yml/badge.svg)](https://github.com/ccrma/chuck/actions/workflows/macos-build-unit-tests.yml) [![Linux - build & unit tests](https://github.com/ccrma/chuck/actions/workflows/linux-build-unit-tests.yml/badge.svg)](https://github.com/ccrma/chuck/actions/workflows/linux-build-unit-tests.yml) [![Windows - build & unit tests](https://github.com/ccrma/chuck/actions/workflows/win-build-unit-tests.yml/badge.svg)](https://github.com/ccrma/chuck/actions/workflows/win-build-unit-tests.yml)
+# ChucK-Java (JDK 25 Migration)
 
+## Progress Update (2026-03-10)
 
-## Strongly-timed Music Programming Language  
-**[ChucK](https://chuck.stanford.edu/)** is a programming language for real-time sound synthesis and music creation. It is open-source and freely available on macOS, Windows, and Linux. ChucK presents a unique time-based, concurrent programming model that is precise and expressive (we call this _strongly-timed_), with dynamic control rates and the ability to add and modify code on-the-fly. In addition, ChucK supports MIDI, OpenSoundControl, HID devices, and multi-channel audio. It's fun and easy to learn, and offers composers, researchers, and performers a powerful programming tool for building and experimenting with complex audio synthesis/analysis programs, and real-time interactive music.
+Significant enhancements have been made to the core engine and the JavaFX IDE, bringing the port closer to feature parity with the official ChucK environment.
 
-Welcome to ChucK!
+### Bugs Fixed & Language Improvements
 
-## Installing ChucK
-To download and install ChucK, visit the **[official ChucK release page](https://chuck.stanford.edu/release/)**.
+| # | Improvement / Fix | Status |
+|---|-----|--------|
+| 1 | **Console Printing (`<<< ... >>>`)** — Added support for ChucK's standard debug printing syntax. | ✅ Fixed |
+| 2 | **Swap Operator (`<=>`)** — Implemented the value/reference swap operator. | ✅ Fixed |
+| 3 | **Unchuck Operator (`!=>`)** — Added support for disconnecting Unit Generators. | ✅ Fixed |
+| 4 | **OSC Support (`OscIn`, `OscOut`, `OscMsg`)** — Lightweight UDP implementation for networking. | ✅ Fixed |
+| 5 | **Inverse FFT (`IFFT`)** — Added support for spectral resynthesis. | ✅ Fixed |
+| 6 | **HID Support (`Hid`, `HidMsg`)** — Integrated keyboard and mouse events from the IDE. | ✅ Fixed |
+| 7 | **Advanced HID** — Added Windows Joystick/Gamepad support via FFM (Panama) API. | ✅ Fixed |
+| 8 | **Unit Analyzer (UAna) Implementation** — Previously stubs; now feature real computation logic. | ✅ Fixed |
+| 9 | **Missing `SetMemberIntByName` instruction** — class was referenced in the emitter but never created. | ✅ Fixed |
+| 10 | **`++`/`--` operators not in lexer** — Added `PLUS_PLUS`, `MINUS_MINUS`, and emitter support. | ✅ Fixed |
+| 11 | **SawOsc reflection mismatch** — Fixed `setFrequency` vs `setFreq` naming break. | ✅ Fixed |
+| 12 | **String literals & Unary ops** — Added full support for `"strings"`, `-x`, and `!b`. | ✅ Fixed |
+| 13 | **IDE Volume Slider** — The master gain slider now correctly controls the audio engine's output. | ✅ Fixed |
+| 14 | **Compilation Stability** — Fixed several missing method and import errors in the IDE and Core. | ✅ Fixed |
+| 15 | **Shred Management (`Machine`, `me`)** — Support for dynamic shred addition/removal and self-metadata. | ✅ Fixed |
+| 16 | **Event `signal()`** — Support for waking a single shred from an event queue. | ✅ Fixed |
+| 17 | **`LiSa` (Live Sampling Utility)** — Multi-voice buffer recording and playback. | ✅ Fixed |
+| 18 | **`GenX` Family (`Gen5`, `Gen7`, `Gen10`)** — Table-based envelopes and oscillators. | ✅ Fixed |
+| 19 | **IO Streams (`chout`, `cherr`)** — Support for standard output/error streams and the `<=` operator. | ✅ Fixed |
+| 20 | **Advanced Physical Models** — Added `Moog`, `Flute`, `Sitar`, `Brass`, `Saxofony`, and `Shakers` STK models. | ✅ Fixed |
 
-For more information, including documentation, examples, research publications, and community resources, visit the **[ChucK homepage](https://chuck.stanford.edu/)** or its **[Princeton mirror](https://chuck.cs.princeton.edu/)**.
+### New Features
 
-### Homebrew
-```
-brew install chuck
-```
+#### 🎹 Advanced Audio Analysis (UAna)
+- **`RMS`**: Root Mean Square power analyzer.
+- **`Centroid`**: Spectral brightness analyzer (requires upstream `FFT`).
+- **`IFFT`**: Inverse Fast Fourier Transform for spectral resynthesis.
+- **Phase Support**: `UAnaBlob` and `Complex` now calculate and store phase data (`pvals`).
+- **Chained Analysis**: `upchuck()` now recursively triggers analysis through the UGen graph.
 
-## Building ChucK
-To build the latest ChucK from source, clone the `chuck` repo from GitHub:
-```
-git clone https://github.com/ccrma/chuck.git
-```
+#### 🎮 Interactive I/O (HID)
+- **`Hid`**: Device handle for Keyboard, Mouse, and **Joysticks**.
+- **`HidMsg`**: Event container for key presses, mouse motion, and controller axis/button changes.
+- **Native Integration**: Uses JDK 25 **FFM (Panama) API** to poll Windows Game controllers (`winmm.dll`) in real-time. Keyboard/Mouse work cross-platform via IDE.
+- **IDE Integration**: Captures focus events from the JavaFX window and routes them to ChucK shreds.
 
-### macOS
-navigate to the `chuck/src` directory, and run `make`:
-```
-cd chuck/src
-make mac
-```
-OR to build a universal binary (intel + apple silicon):
-```
-make mac-ub
-```
+#### 🎨 IDE Enhancements (JavaFX)
+- **Multi-Tab Editor**: Open and work on multiple `.ck` files simultaneously.
+- **Spectrum Analyzer**: Real-time FFT magnitude visualization (Lime Green).
+- **Oscilloscope**: Real-time time-domain waveform visualization (Cyan).
+- **Master Controls**: Integrated Global Volume slider and live VM Logical Time display.
+- **Console Clear**: Added a dedicated button to clear the output log.
 
-This should build a `chuck` executable in `chuck/src`.
+---
 
-### Linux
-Dependencies: gcc, g++, make, bison, flex, libsndfile, ALSA (for linux-alsa builds), PulseAudio (for linux-pulse builds), JACK (for linux-jack builds)
+A modern migration of the ChucK Strongly-timed Audio Programming Language to JDK 25, utilizing the latest Java platform features for real-time audio synthesis and concurrent script execution.
 
-To set up a build environment for **chuck** on Debian or Ubuntu:
-```
-sudo apt install build-essential bison flex libsndfile1-dev \
-  libasound2-dev libpulse-dev libjack-jackd2-dev
-```
-For other Linux distributions, the setup should be similar although the package install tools and package names may be slightly different. (_NOTE: setups that do not need JACK or PulseAudio can omit either or both of these packages. ALSA is needed for MIDI support on Linux._)
+## 🚀 Key Modern Java Features Used
 
-To build **chuck** (with all supported drivers: ALSA, PulseAudio, JACK), navigate to the `chuck/src` directory and run `make`:
-```
-cd chuck/src
-make linux-all
-```
+-   **Virtual Threads (Project Loom)**: Shreds (concurrent ChucK processes) are mapped 1:1 to Virtual Threads. They are cooperatively scheduled by a custom `Shreduler` to maintain ChucK’s deterministic, sample-accurate timing model.
+-   **Vector API (SIMD)**: High-performance block processing in Unit Generators (UGens) like `Gain`. It uses `jdk.incubator.vector` to process audio samples in parallel. Automatically optimizes for **Intel AVX** or **ARM Neon**.
+-   **Foreign Function & Memory (FFM) API (Project Panama)**: Manages off-heap memory (`Arena`, `MemorySegment`) for audio buffers to avoid GC pauses. Provides the infrastructure for binding to native MIDI drivers (RtMidi) and HID Joystick drivers.
+-   **Sealed Interfaces & Records**: The Abstract Syntax Tree (AST) is built using type-safe sealed hierarchies and concise records.
 
-FYI `make linux-all` is equivalent in outcome to combining individual drivers:
-```
-make linux-alsa linux-pulse linux-jack
-```
+## 🏗️ Architecture
 
-To build **chuck** for a subset of ALSA, PulseAudio, or JACK, run `make` with the desired driver(s). For example, to build for ALSA and PulseAudio only:
-```
-make linux-alsa linux-pulse
-```
+### 1. Compiler Pipeline
+-   **Lexer**: Hand-written scanner for ChucK syntax, including `=>`, `@=>`, `::`, `<<< >>>`, and `~`.
+-   **Parser**: Recursive descent parser that builds a modern AST. Supports tabs, loops, and print statements.
+-   **Emitter**: Translates the AST into VM Instructions with smart stack management.
 
-Or, to build for ALSA only:
-```
-make linux-alsa
-```
+### 2. Virtual Machine (VM)
+-   **Deterministic Shreduler**: Orchestrates Virtual Threads based on ChucK's logical time (`now`).
+-   **ChuckStack**: A memory-safe stack for primitives and objects. Supports dynamic type guessing for printing.
+-   **Global Environment**: Thread-safe shared state for global variables and objects.
 
-This process should build a `chuck` executable in `chuck/src`.
+### 3. Audio Engine
+-   **Pull-based UGen Graph**: Recursive sample pulling with memoization.
+-   **Real-time Output**: Bridged to system hardware via Java Sound with global master gain control.
 
-### Windows
-To build chuck using Visual Studio (2019 or later recommended), navigate to `chuck\src\visual-studio`, open `chuck.sln`, and build.
+## 🛠️ Getting Started
 
-### Web
-To compile ChucK to WebAssembly (WASM):
+### Prerequisites
+-   **JDK 25** (e.g., Zulu JDK 25)
+-   **Maven**
 
-* install the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html) (and activate the SDK version, as instructed in the link)
-* before building, enable Emscripten paths and environment variables (e.g., from the `emsdk` directory):
-```
-source ./emsdk_env.sh
-```
-* navigate to the `chuck/src/` directory, and run `make web`:
-```
-cd chuck/src
-make web
-```
-This should create `webchuck.wasm` and `webchuck.js` in the `chuck/src/host-web/webchuck/js` directory. (Also see: [WebChucK](https://github.com/ccrma/webchuck))
+### 📦 Native Dependencies (Optional - for MIDI support)
+The engine will run without these, but MIDI features require the `rtmidi` library:
 
+#### **Windows**
+-   The easiest way is to use [vcpkg](https://vcpkg.io/): `vcpkg install rtmidi:x64-windows`
+-   Ensure `rtmidi.dll` is in your PATH or the project root.
 
-## Contributing to ChucK
-Here are the source repositories maintained by the ChucK Team. _Developers wanted!_
+#### **macOS (Intel & Apple Silicon)**
+-   Use Homebrew: `brew install rtmidi`
 
-[**chuck**](https://github.com/ccrma/chuck) | core language, virtual machine, and synthesis engine
+#### **Linux (Intel & ARM/Raspberry Pi)**
+-   Use your package manager: `sudo apt-get install librtmidi-dev` (on Debian/Ubuntu)
 
-[**chugl**](https://github.com/ccrma/chugl) | chuck graphics (now part of the core language)
+### 📦 Building and Running
 
-[**chugins**](https://github.com/ccrma/chugins) | extend chuck with plugins! a great place to start contributing
-
-[**smuck**](https://github.com/ccrma/smuck) | symbolic music in in chuck
-
-[**webchuck**](https://github.com/ccrma/webchuck) | chuck running in web browsers (works on desktops and phones!)
-
-[**webchuck IDE**](https://github.com/ccrma/webchuck-ide) | a browser-based IDE for chuck
-
-[**miniAudicle**](https://github.com/ccrma/miniAudicle) | an IDE for chuck on desktop
-
-[**chump**](https://github.com/ccrma/chump) | chuck package manager
-
-[**chunity**](https://github.com/ccrma/chunity) | ChucK in Unity
-
-[**chunreal**](https://github.com/ccrma/chunreal) | ChucK in Unreal Engine
-
-
-## Integrating ChucK as Component in Other C++ Hosts
-It is possible to incorporate ChucK **core** (compiler, virtual machine, synthesis engine) as a component/library within other c++ software **hosts**. This can be useful for adding ChucK functionalities to your software systems or to create new plugins. FYI the various tools listed in the previous section all incorporate ChucK in this core/host model: including command-line, miniAudicle, Unity, Unreal Engine, WebAssembly; additionally ChucK has been integrated with openFrameworks, iOS/Android apps, embedded systems, and in hybrid language systems, e.g., [FaucK](https://ccrma.stanford.edu/~rmichon/fauck/) (FAUST + ChucK), [ChucKDesigner](https://github.com/DBraun/ChucKDesigner) (ChucK in TouchDesigner), [chuck~](https://github.com/shakfu/pd-chuck/) (ChucK in Pure Data), [chuck~](https://github.com/shakfu/chuck-max) (ChucK in Max/MSP).
-
-To show how this integration can be done, we have created a series of examples in C++ to show how to integrate ChucK into any C++ host. The simplest of these examples, [example-1-minimal.cpp](https://github.com/ccrma/chuck/blob/main/src/host-examples/example-1-minimal.cpp), creates a minimal ChucK host in C++ in about 20 lines of code. The subsequent examples show adding real-time audio, C++/ChucK communication using ChucK globals, and ChucK shred control from C++, respectively. These host examples can be found in the [src/host-examples/](https://github.com/ccrma/chuck/tree/main/src/host-examples) folder of this repository. For more advanced usage, checkout the various tools in the ChucK ecosystem as listed above in the previous section. To get started building these host examples:
-```
-cd src/host-examples
-make
-```
-### Building ChucK Core in "Vanilla" Mode
-It is also possible to build _only_ ChucK **core** (compiler, virtual machine, and synthesis engine), without a host and without any platform-specific real-time audio I/O. This can be a helpful starting point for integrating ChucK core into existing host systems that already have audio I/O. To build ChucK core in "vanilla" mode:
-```
-cd src/core
-make vanilla
+#### 1. Build the JAR
+```bash
+mvn clean package
 ```
 
-## License
-ChucK source code is dual-licensed under the [MIT License](https://github.com/ccrma/chuck/blob/main/LICENSE.MIT) and the [GNU General Public License 2.0](https://github.com/ccrma/chuck/blob/main/LICENSE.GPL) (or any later version).
-You can choose either license if you use this work.
+#### 2. Run the IDE
+You can use the provided scripts which automatically include the necessary JVM flags (`--enable-preview`, `--add-modules jdk.incubator.vector`, and `--enable-native-access`):
 
-## ChucK History
-ChucK was created in the early 2000s at Princeton University by [Ge Wang](https://ccrma.stanford.edu/~ge/) and [Perry R. Cook](https://www.cs.princeton.edu/~prc/), while Ge was a Ph.D. student advised by Perry in the Computer Science Department. The first version of ChucK was released under a GPL license in 2003. Many researchers, teachers, and artists have contributed to ChucK's evolution over the years. [Spencer Salazar](https://ccrma.stanford.edu/~spencer/) created [miniAudicle](https://github.com/ccrma/miniAudicle), a GUI-based integrated development environment for ChucK in 2004 (this IDE, in addition to the command line version of ChucK, remains largely how ChucK is distributed and used today). The [Princeton Laptop Orchestra](https://plork.princeton.edu/) (PLOrk), founded by [Dan Trueman](https://manyarrowsmusic.com/) and Perry Cook in 2005, began using ChucK for teaching as well as instrument and sound design. In 2006, [Rebecca Fiebrink](https://researchers.arts.ac.uk/1594-rebecca-fiebrink) and Ge Wang created ChucK's audio analysis framework, expressed through unit analyzers--the analysis counterpart to unit generators. Ge join the faculty at Stanford University's CCRMA in 2007, and ChucK research and development became distributed, with developers at Princeton, Stanford, and elsewhere. The [Stanford Laptop Orchestra](https://slork.stanford.edu/) (SLOrk) was founded in 2008 at CCRMA, where ChucK continued to be a tool for instrument design and teaching. In that same year, the mobile music startup Smule was co-founded, which used ChucK on the iPhone (codenamed "ChiP") as a real-time audio engine for its early apps: [Ocarina](https://artful.design/ocarina/), Sonic Lighter, Zephyr, and Leaf Trombone: World Stage. Meanwhile, ChucK continued to find its way into computer music curricula, including at Stanford, Princeton, CalArts. In 2015, the book [_Programming for Musicians and Digital Artists: Creating music with ChucK_](https://www.amazon.com/Programming-Musicians-Digital-Artists-Creating/dp/1617291706/) was published, authored by Ajay Kapur, Perry Cook, Spencer Salazar, and Ge Wang. Around the same time, Kadenze introduced the online course [Introduction to Real-Time Audio Programming in ChucK](https://www.kadenze.com/courses/introduction-to-programming-for-musicians-and-digital-artists/info). Romain Michon and Ge Wang integrated FAUST and ChucK to create [FaucK](https://ccrma.stanford.edu/~rmichon/fauck/). In 2017, Jack Atherton created [Chunity](https://chuck.stanford.edu/chunity/), which enables one to program ChucK inside the Unity game development framework. In 2018, Ge wrote about ChucK in [_Artful Design: Technology in Search of the Sublime_](https://artful.design/), a photocomic book about the importance of cultural awareness in the shaping of technology. ChucK now runs natively in web browsers ([WebChucK](https://chuck.stanford.edu/webchuck/)) and can be programmed directly in the [WebChucK IDE](https://chuck.stanford.edu/ide/).
+**Windows:**
+```cmd
+run.bat
+```
 
-ChucK has been extensively documented in published articles and books ([see list](https://ccrma.stanford.edu/~ge/publish/)). For an overview, check out:
+**macOS/Linux:**
+```bash
+chmod +x run.sh
+./run.sh
+```
 
-“[ChucK: A Strongly-Timed Music Programming Language](https://artful.design/stuff/samples/chuck.pdf)“ comic book excerpt from [_Artful Design: Technology in Search of the Sublime_](https://artful.design/)
+Alternatively, run manually with all flags:
+```bash
+java --enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -jar target/chuck-java-1.0-SNAPSHOT.jar
+```
 
-Wang, G., P. R., Cook, and S. Salazar. 2015. "[ChucK: A Strongly Timed Computer Music Language](https://ccrma.stanford.edu/~ge/publish/files/2015-cmj-chuck.pdf)" _Computer Music Journal_ 39:4. doi:10.1162/COMJ_a_00324
+### 🎨 Launch the IDE (Maven)
+```bash
+mvn org.openjfx:javafx-maven-plugin:0.0.8:run
+```
 
-## ChucK Media
-Non-source code documents (papers, logos, soundbites, comics) have been migrated to the [chuck-media](https://github.com/ccrma/chuck-media) repository.
+## 🎮 ChucK-Java IDE User Guide
 
-## ChucK Community
-Join us! [ChucK Community Discord](https://discord.gg/ENr3nurrx8) | [ChucK-users Mailing list](https://lists.cs.princeton.edu/mailman/listinfo/chuck-users)
+### 1. Visualizers & Controls
+-   **Spectrum**: High-speed frequency distribution view.
+-   **Oscilloscope**: Real-time waveform monitor.
+-   **Master Gain**: Controls final output volume (0.0 to 1.0).
+-   **VM Time**: Shows the logical time elapsed in the engine.
 
-_Happy ChucKing!_
+### 2. Multi-Tab Editor
+-   `Ctrl+N`: New Tab.
+-   `Ctrl+O`: Open File (into new tab).
+-   `Ctrl+S`: Save current tab.
+-   `Ctrl+W`: Close current tab.
+-   `Ctrl+Enter`: Spork current tab into VM.
+
+## 🎹 Implemented Unit Generators (UGens)
+
+### Oscillators & Physical Models
+-   `SinOsc`, `SawOsc`, `TriOsc`, `PulseOsc`, `SqrOsc`, `Phasor`.
+-   `Clarinet`, `Mandolin`, `Plucked`, `Rhodey`, `Bowed`, `StifKarp`, `Moog`, `Flute`, `Sitar`.
+
+### Analysis (UAna)
+-   `FFT`: Fast Fourier Transform.
+-   `IFFT`: Inverse FFT (resynthesis).
+-   `RMS`: Power analyzer.
+-   `Centroid`: Spectral brightness.
+-   `UAnaBlob`: Data container for magnitude and phase.
+
+### Filters, Effects & Utilities
+-   `Lpf`, `ResonZ`, `Chorus`, `Echo`, `JCRev`, `OnePole`, `OneZero`.
+-   `Pan2`, `ADSR`, `Envelope`, `SndBuf`, `Gain`, `Noise`, `Step`, `Impulse`, `Blackhole`.

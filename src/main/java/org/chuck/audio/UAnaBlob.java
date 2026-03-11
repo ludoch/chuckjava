@@ -9,13 +9,18 @@ import java.util.List;
 public class UAnaBlob {
     private List<Complex> cvals = new ArrayList<>();
     private float[] fvals = new float[0];
+    private float[] pvals = new float[0];
     private long when; // logical time of result
 
     public void setCvals(List<Complex> cvals) {
         this.cvals = cvals;
-        this.fvals = new float[cvals.size()];
-        for (int i = 0; i < cvals.size(); i++) {
-            fvals[i] = cvals.get(i).magnitude();
+        int size = cvals.size();
+        this.fvals = new float[size];
+        this.pvals = new float[size];
+        for (int i = 0; i < size; i++) {
+            Complex c = cvals.get(i);
+            fvals[i] = c.magnitude();
+            pvals[i] = c.phase();
         }
     }
 
@@ -25,6 +30,10 @@ public class UAnaBlob {
 
     public float[] getFvals() {
         return fvals;
+    }
+
+    public float[] getPvals() {
+        return pvals;
     }
 
     public void setWhen(long when) {

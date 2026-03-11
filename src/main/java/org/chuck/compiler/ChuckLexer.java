@@ -14,16 +14,29 @@ public class ChuckLexer {
         PLUS_PLUS, MINUS_MINUS,           // ++ --
         BANG,                              // !
         AND_AND, OR_OR,                    // && ||
+        AMP, PIPE,                         // & | (bitwise)
+        SHIFT_RIGHT,                       // >>
         LPAREN, RPAREN, LBRACE, RBRACE, LBRACKET, RBRACKET,
-        COMMA, SEMICOLON, DOT,
+        COMMA, SEMICOLON, DOT, COLON,
         COLON_COLON,                       // ::
         CHUCK,                             // =>
         AT_CHUCK,                          // @=>
+        UNCHUCK,                           // !=>
+        SWAP,                              // <=>
         ASSIGN,                            // = (plain assignment)
-        IF, ELSE, WHILE, FOR, REPEAT, RETURN,
-        NEW, SPORK, FUN, CLASS,
+        UPCHUCK,                           // =^
+        PLUS_CHUCK, MINUS_CHUCK, TIMES_CHUCK, DIVIDE_CHUCK, PERCENT_CHUCK, // +=> -= *= /=> %=>
+        PIPE_CHUCK, AMP_CHUCK,             // |=> &=>
+        APPEND,                            // <<
+        DOLLAR,                            // $ (cast operator)
+        HASH,                              // # (complex literal)
+        QUESTION,                          // ? (ternary)
+        IF, ELSE, WHILE, FOR, REPEAT, RETURN, BREAK, CONTINUE,
+        NEW, SPORK, FUN, CLASS, EXTENDS, PUBLIC, STATIC,
         LT, GT, LE, GE, EQ_EQ, NEQ,
+        WRITE_IO,                          // <=
         TILDE,
+        PRINT_START, PRINT_END, // <<< and >>>
         EOF
     }
 
@@ -62,7 +75,6 @@ public class ChuckLexer {
                     while (pos < source.length() && source.charAt(pos) != '\n') {
                         pos++;
                     }
-                    // Don't skip the newline so it can be handled by the whitespace logic
                     continue;
                 } else if (peek() == '*') {
                     // Multi-line comment
@@ -77,12 +89,36 @@ public class ChuckLexer {
                         }
                         pos++;
                     }
-                    pos += 2; // skip */
-                    column += 2;
+                    if (pos < source.length() - 1) {
+                        pos += 2; column += 2;
+                    }
                     continue;
                 }
             }
 
+            if (c == '\'') {
+                // Character literal: 'x' or '\n' etc.
+                int p = pos + 1;
+                char ch;
+                if (p < source.length() && source.charAt(p) == '\\' && p + 1 < source.length()) {
+                    char esc = source.charAt(p + 1);
+                    ch = switch (esc) {
+                        case 'n' -> '\n'; case 't' -> '\t'; case 'r' -> '\r';
+                        case '\\' -> '\\'; case '\'' -> '\''; case '0' -> '\0';
+                        default -> esc;
+                    };
+                    p += 2;
+                } else if (p < source.length()) {
+                    ch = source.charAt(p);
+                    p++;
+                } else { ch = 0; }
+                if (p < source.length() && source.charAt(p) == '\'') {
+                    tokens.add(new Token(TokenType.INT, String.valueOf((long) ch), line, column));
+                    int consumed = p + 1 - pos; pos = p + 1; column += consumed;
+                    continue; // character literal handled
+                }
+                // Not a valid char literal — fall through to lexPunctuation for the single quote
+            }
             if (Character.isDigit(c)) {
                 tokens.add(lexNumber());
             } else if (Character.isLetter(c) || c == '_') {
@@ -96,24 +132,49 @@ public class ChuckLexer {
                 } else if (peek() == '=') {
                     tokens.add(new Token(TokenType.EQ_EQ, "==", line, column));
                     pos += 2; column += 2;
+                } else if (peek() == '^') {
+                    tokens.add(new Token(TokenType.UPCHUCK, "=^", line, column));
+                    pos += 2; column += 2;
+                } else if (peek() == '<') {
+                    tokens.add(new Token(TokenType.UNCHUCK, "=<", line, column));
+                    pos += 2; column += 2;
                 } else {
                     tokens.add(new Token(TokenType.ASSIGN, "=", line, column));
                     pos++; column++;
                 }
             } else if (c == '!') {
-                if (peek() == '=') {
+                if (peek() == '=' && peek2() == '>') {
+                    tokens.add(new Token(TokenType.UNCHUCK, "!=>", line, column));
+                    pos += 3; column += 3;
+                } else if (peek() == '=') {
                     tokens.add(new Token(TokenType.NEQ, "!=", line, column));
                     pos += 2; column += 2;
                 } else {
                     tokens.add(new Token(TokenType.BANG, "!", line, column));
                     pos++; column++;
                 }
-            } else if (c == '&' && peek() == '&') {
-                tokens.add(new Token(TokenType.AND_AND, "&&", line, column));
-                pos += 2; column += 2;
-            } else if (c == '|' && peek() == '|') {
-                tokens.add(new Token(TokenType.OR_OR, "||", line, column));
-                pos += 2; column += 2;
+            } else if (c == '&') {
+                if (peek() == '=' && peek2() == '>') {
+                    tokens.add(new Token(TokenType.AMP_CHUCK, "&=>", line, column));
+                    pos += 3; column += 3;
+                } else if (peek() == '&') {
+                    tokens.add(new Token(TokenType.AND_AND, "&&", line, column));
+                    pos += 2; column += 2;
+                } else {
+                    tokens.add(new Token(TokenType.AMP, "&", line, column));
+                    pos++; column++;
+                }
+            } else if (c == '|') {
+                if (peek() == '=' && peek2() == '>') {
+                    tokens.add(new Token(TokenType.PIPE_CHUCK, "|=>", line, column));
+                    pos += 3; column += 3;
+                } else if (peek() == '|') {
+                    tokens.add(new Token(TokenType.OR_OR, "||", line, column));
+                    pos += 2; column += 2;
+                } else {
+                    tokens.add(new Token(TokenType.PIPE, "|", line, column));
+                    pos++; column++;
+                }
             } else if (c == '@') {
                 if (peek() == '=') {
                     if (peek2() == '>') {
@@ -136,29 +197,40 @@ public class ChuckLexer {
                     pos += 2;
                     column += 2;
                 } else {
-                    tokens.add(new Token(TokenType.ID, ":", line, column));
+                    tokens.add(new Token(TokenType.COLON, ":", line, column));
                     pos++;
                     column++;
                 }
             } else if (c == '<') {
-                if (peek() == '=') {
-                    tokens.add(new Token(TokenType.LE, "<=", line, column));
-                    pos += 2;
-                    column += 2;
+                if (peek() == '=' && peek2() == '>') {
+                    tokens.add(new Token(TokenType.SWAP, "<=>", line, column));
+                    pos += 3; column += 3;
+                } else if (peek() == '<' && peek2() == '<') {
+                    tokens.add(new Token(TokenType.PRINT_START, "<<<", line, column));
+                    pos += 3; column += 3;
+                } else if (peek() == '<') {
+                    tokens.add(new Token(TokenType.APPEND, "<<", line, column));
+                    pos += 2; column += 2;
+                } else if (peek() == '=') {
+                    tokens.add(new Token(TokenType.WRITE_IO, "<=", line, column));
+                    pos += 2; column += 2;
                 } else {
                     tokens.add(new Token(TokenType.LT, "<", line, column));
-                    pos++;
-                    column++;
+                    pos++; column++;
                 }
             } else if (c == '>') {
-                if (peek() == '=') {
+                if (peek() == '>' && peek2() == '>') {
+                    tokens.add(new Token(TokenType.PRINT_END, ">>>", line, column));
+                    pos += 3; column += 3;
+                } else if (peek() == '>') {
+                    tokens.add(new Token(TokenType.SHIFT_RIGHT, ">>", line, column));
+                    pos += 2; column += 2;
+                } else if (peek() == '=') {
                     tokens.add(new Token(TokenType.GE, ">=", line, column));
-                    pos += 2;
-                    column += 2;
+                    pos += 2; column += 2;
                 } else {
                     tokens.add(new Token(TokenType.GT, ">", line, column));
-                    pos++;
-                    column++;
+                    pos++; column++;
                 }
             } else {
                 tokens.add(lexPunctuation());
@@ -179,8 +251,19 @@ public class ChuckLexer {
     }
 
     private Token lexNumber() {
-        StringBuilder sb = new StringBuilder();
         int startCol = column;
+        // Hex literal: 0x or 0X
+        if (source.charAt(pos) == '0' && pos + 1 < source.length()
+                && (source.charAt(pos + 1) == 'x' || source.charAt(pos + 1) == 'X')) {
+            pos += 2; column += 2;
+            StringBuilder hex = new StringBuilder();
+            while (pos < source.length() && isHexDigit(source.charAt(pos))) {
+                hex.append(source.charAt(pos++)); column++;
+            }
+            long val = hex.length() > 0 ? Long.parseUnsignedLong(hex.toString(), 16) : 0;
+            return new Token(TokenType.INT, String.valueOf(val), line, startCol);
+        }
+        StringBuilder sb = new StringBuilder();
         boolean isFloat = false;
         while (pos < source.length() && (Character.isDigit(source.charAt(pos)) || source.charAt(pos) == '.')) {
             char c = source.charAt(pos);
@@ -190,6 +273,10 @@ public class ChuckLexer {
             column++;
         }
         return new Token(isFloat ? TokenType.FLOAT : TokenType.INT, sb.toString(), line, startCol);
+    }
+
+    private boolean isHexDigit(char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
     }
 
     private Token lexIdentifier() {
@@ -208,10 +295,15 @@ public class ChuckLexer {
             case "for" -> TokenType.FOR;
             case "repeat" -> TokenType.REPEAT;
             case "return" -> TokenType.RETURN;
+            case "break" -> TokenType.BREAK;
+            case "continue" -> TokenType.CONTINUE;
             case "new" -> TokenType.NEW;
             case "spork" -> TokenType.SPORK;
             case "fun" -> TokenType.FUN;
             case "class" -> TokenType.CLASS;
+            case "extends" -> TokenType.EXTENDS;
+            case "public" -> TokenType.PUBLIC;
+            case "static" -> TokenType.STATIC;
             default -> TokenType.ID;
         };
         return new Token(type, value, line, startCol);
@@ -220,6 +312,22 @@ public class ChuckLexer {
     private Token lexPunctuation() {
         char c = source.charAt(pos);
         int startCol = column;
+        // Handle dot-leading float literals like .5
+        if (c == '.' && Character.isDigit(peek())) {
+            return lexNumber();
+        }
+        // Compound chuck operators: +=> -= *= /=> %=>
+        if (peek() == '=' && peek2() == '>') {
+            TokenType ct = switch (c) {
+                case '+' -> TokenType.PLUS_CHUCK;
+                case '-' -> TokenType.MINUS_CHUCK;
+                case '*' -> TokenType.TIMES_CHUCK;
+                case '/' -> TokenType.DIVIDE_CHUCK;
+                case '%' -> TokenType.PERCENT_CHUCK;
+                default  -> null;
+            };
+            if (ct != null) { pos += 3; column += 3; return new Token(ct, c + "=>", line, startCol); }
+        }
         // Handle two-character operators before consuming
         if (c == '+' && peek() == '+') {
             pos += 2; column += 2;
@@ -247,6 +355,9 @@ public class ChuckLexer {
             case ';' -> new Token(TokenType.SEMICOLON, ";", line, startCol);
             case '.' -> new Token(TokenType.DOT, ".", line, startCol);
             case '~' -> new Token(TokenType.TILDE, "~", line, startCol);
+            case '$' -> new Token(TokenType.DOLLAR, "$", line, startCol);
+            case '#' -> new Token(TokenType.HASH, "#", line, startCol);
+            case '?' -> new Token(TokenType.QUESTION, "?", line, startCol);
             default -> new Token(TokenType.ID, String.valueOf(c), line, startCol);
         };
     }

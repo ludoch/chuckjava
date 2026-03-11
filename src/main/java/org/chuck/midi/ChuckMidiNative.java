@@ -7,18 +7,16 @@ import java.lang.invoke.MethodHandle;
 import java.util.Optional;
 
 /**
- * A production-ready MIDI input implementation using JDK 25 FFM API (Panama).
- * This binds directly to the RtMidi C library symbols.
+ * A cross-platform MIDI input implementation using JDK 25 FFM API (Panama).
+ * Binds to RtMidi (.dll, .so, or .dylib) dynamically based on the OS.
  */
 public class ChuckMidiNative {
     private final ChuckVM vm;
     private final ChuckEvent midiEvent;
     private final Arena arena;
     
-    // Native Handles
     private MemorySegment rtmidiIn = MemorySegment.NULL;
     
-    // Method Handles for RtMidi C API
     private MethodHandle createIn;
     private MethodHandle openPort;
     private MethodHandle getMessage;
@@ -33,23 +31,27 @@ public class ChuckMidiNative {
 
     private void initBindings() {
         Linker linker = Linker.nativeLinker();
-        SymbolLookup stdlib = linker.defaultLookup();
+        String os = System.getProperty("os.name").toLowerCase();
+        String libName = os.contains("win") ? "rtmidi.dll" : 
+                         os.contains("mac") ? "librtmidi.dylib" : "librtmidi.so";
         
         try {
-            createIn = lookup(stdlib, "rtmidi_in_create_default", 
+            SymbolLookup rtmidi = SymbolLookup.libraryLookup(libName, arena);
+            
+            createIn = lookup(rtmidi, "rtmidi_in_create_default", 
                 FunctionDescriptor.of(ValueLayout.ADDRESS));
 
-            openPort = lookup(stdlib, "rtmidi_open_port",
+            openPort = lookup(rtmidi, "rtmidi_open_port",
                 FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
 
-            getMessage = lookup(stdlib, "rtmidi_in_get_message",
+            getMessage = lookup(rtmidi, "rtmidi_in_get_message",
                 FunctionDescriptor.of(ValueLayout.JAVA_DOUBLE, ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-            closeIn = lookup(stdlib, "rtmidi_in_free",
+            closeIn = lookup(rtmidi, "rtmidi_in_free",
                 FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
 
         } catch (Exception e) {
-            // Log but don't fail; allows running in non-native environments
+            // Silently fail to allow IDE to run without native MIDI libraries present
         }
     }
 
@@ -88,7 +90,6 @@ public class ChuckMidiNative {
                     if (size > 0) {
                         int b1 = buffer.get(ValueLayout.JAVA_BYTE, 0) & 0xFF;
                         int b2 = size > 1 ? buffer.get(ValueLayout.JAVA_BYTE, 1) & 0xFF : 0;
-                        int b3 = size > 2 ? buffer.get(ValueLayout.JAVA_BYTE, 2) & 0xFF : 0;
                         
                         vm.setGlobalInt("midi_b1", b1);
                         vm.setGlobalInt("midi_b2", b2);

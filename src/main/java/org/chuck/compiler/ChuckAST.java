@@ -1,3 +1,4 @@
+
 package org.chuck.compiler;
 
 import org.chuck.core.ChuckType;
@@ -17,8 +18,8 @@ public sealed interface ChuckAST {
         EQ, NEQ, LT, LE, GT, GE,
         AND, OR, S_OR, S_AND,
         SHIFT_LEFT, SHIFT_RIGHT, PERCENT,
-        CHUCK, PLUS_CHUCK, MINUS_CHUCK, TIMES_CHUCK, DIVIDE_CHUCK,
-        ASSIGN, SPORK, NEW, AT_CHUCK
+        CHUCK, PLUS_CHUCK, MINUS_CHUCK, TIMES_CHUCK, DIVIDE_CHUCK, PERCENT_CHUCK,
+        ASSIGN, SPORK, NEW, AT_CHUCK, SWAP, UNCHUCK, WRITE_IO, UPCHUCK, APPEND
     }
 
     /**
@@ -46,6 +47,7 @@ public sealed interface ChuckAST {
     record ArrayLitExp(java.util.List<Exp> elements, int line, int column) implements Exp {}
     record ArrayAccessExp(Exp base, Exp index, int line, int column) implements Exp {}
     record SporkExp(CallExp call, int line, int column) implements Exp {}
+    record DeclExp(String type, String name, Exp arraySize, int line, int column) implements Exp {}
 
     // --- Statement Nodes ---
 
@@ -66,5 +68,13 @@ public sealed interface ChuckAST {
     
     record FuncDefStmt(String returnType, String name, java.util.List<String> argTypes, java.util.List<String> argNames, Stmt body, int line, int column) implements Stmt {}
 
-    record ClassDefStmt(String name, java.util.List<DeclStmt> fields, java.util.List<FuncDefStmt> methods, int line, int column) implements Stmt {}
+    record ClassDefStmt(String name, java.util.List<Stmt> body, int line, int column) implements Stmt {}
+
+    record RepeatStmt(Exp count, Stmt body, int line, int column) implements Stmt {}
+
+    record ForEachStmt(String iterType, String iterName, Exp collection, Stmt body, int line, int column) implements Stmt {}
+
+    record BreakStmt(int line, int column) implements Stmt {}
+
+    record PrintStmt(java.util.List<Exp> expressions, int line, int column) implements Stmt {}
 }

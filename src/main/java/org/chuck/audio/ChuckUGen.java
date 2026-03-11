@@ -26,11 +26,16 @@ public abstract class ChuckUGen extends ChuckObject {
         super(type);
     }
 
-    public void chuckTo(ChuckUGen dest) {
-        dest.addSource(this);
+    public void chuckTo(ChuckUGen target) {
+        target.addSource(this);
+    }
+
+    public void unchuck(ChuckUGen target) {
+        target.removeSource(this);
     }
 
     public void addSource(ChuckUGen src) {
+
         if (!sources.contains(src)) {
             sources.add(src);
         }
