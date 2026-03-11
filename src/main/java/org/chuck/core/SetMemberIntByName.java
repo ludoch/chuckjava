@@ -36,6 +36,11 @@ public class SetMemberIntByName implements ChuckInstr {
         ChuckObject obj = (ChuckObject) shred.reg.popObject();
         long rawValue = shred.reg.popLong();
 
+        if (obj == null) {
+            shred.reg.push(rawValue);   // restore balance; push value back as no-op result
+            return;
+        }
+
         // User-defined class field assignment
         if (obj instanceof UserObject uo) {
             uo.setPrimitiveField(memberName, rawValue);
@@ -72,6 +77,7 @@ public class SetMemberIntByName implements ChuckInstr {
 
     /** Returns true if a typed setter was found and invoked. */
     private boolean tryInvoke(ChuckObject obj, String setter, double doubleVal, long rawValue) {
+        if (obj == null) return false;
         for (Method m : obj.getClass().getMethods()) {
             if (!m.getName().equals(setter)) continue;
             Class<?>[] params = m.getParameterTypes();

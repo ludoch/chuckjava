@@ -55,6 +55,50 @@ Significant enhancements have been made to the core engine and the JavaFX IDE, b
 
 A modern migration of the ChucK Strongly-timed Audio Programming Language to JDK 25, utilizing the latest Java platform features for real-time audio synthesis and concurrent script execution.
 
+## ⌨️ Command Line Interface
+
+ChucK-Java now supports a full-featured CLI that mirrors the original ChucK implementation.
+
+### Usage
+```bash
+mvn exec:java "-Dexec.args=[options|commands] [+-=^] file1 file2 ..."
+```
+
+### Options
+- `--halt` / `-h`: (Default) Exit once all shreds finish.
+- `--loop` / `-l`: Continue running even if no shreds are active (starts the Machine Server).
+- `--silent` / `-s`: Disable audio output (time still passes logically).
+- `--syntax`: Check syntax of the provided files without running them.
+- `--dump`: Dump virtual instructions (bytecode) to the console.
+- `--srate:<N>`: Set sampling rate (default: 44100).
+- `--bufsize:<N>`: Set audio buffer size (default: 512).
+- `--chan:<N>`: Set number of channels (default: 2).
+- `--antlr`: Use the ANTLR4-based parser instead of the handwritten one.
+- `--version`: Display version information.
+- `--help`: Print usage information.
+
+### On-the-Fly (OTF) Commands
+These commands interact with a running ChucK-Java instance (started with `--loop`).
+- `+` / `--add`: Add a file as a new shred.
+- `-` / `--remove`: Remove a shred by its ID.
+- `=` / `--replace`: Replace an existing shred with a new file.
+- `^` / `--status`: Print the current status of the VM.
+
+### Examples
+```bash
+# Run a file in silent mode
+mvn exec:java "-Dexec.args=--silent examples/basic/foo.ck"
+
+# Start a background loop
+mvn exec:java "-Dexec.args=--loop"
+
+# (In another terminal) Add a file to the running loop
+mvn exec:java "-Dexec.args=+ examples/basic/moe.ck"
+
+# Check syntax of multiple files
+mvn exec:java "-Dexec.args=--syntax examples/basic/foo.ck examples/basic/bar.ck"
+```
+
 ## 🚀 Key Modern Java Features Used
 
 -   **Virtual Threads (Project Loom)**: Shreds (concurrent ChucK processes) are mapped 1:1 to Virtual Threads. They are cooperatively scheduled by a custom `Shreduler` to maintain ChucK’s deterministic, sample-accurate timing model.

@@ -11,7 +11,8 @@
       "Bash(cd \"C:\\\\Users\\\\ludo\\\\a\\\\chuckjava\" && mvn exec:java -Dexec.mainClass=\"org.chuck.HandwrittenExamplesTester\" 2>&1 | head -200)",
       "Bash(cd \"C:\\\\Users\\\\ludo\\\\a\\\\chuckjava\" && mvn exec:java -Dexec.mainClass=\"org.chuck.AntlrExamplesTester\" 2>&1 | head -200)",
       "Bash(find C:/Users/ludo/a/chuckjava/src/test -name \"*.java\" | xargs ls -la 2>/dev/null; find C:/Users/ludo/a/chuckjava/src/test -name \"*.java\" 2>/dev/null)",
-      "Bash(cd C:/Users/ludo/a/chuckjava && java --enable-preview --add-modules jdk.incubator.vector -cp \"target/classes:/c/Users/ludo/.m2/repository/org/antlr/antlr4-runtime/4.13.2/antlr4-runtime-4.13.2.jar\" org.chuck.AntlrExamplesTester 2>&1 | grep -v \"^Testing:\" | grep -v \"^WARNING\" | grep -v \"^$\")"
+      "Bash(cd C:/Users/ludo/a/chuckjava && java --enable-preview --add-modules jdk.incubator.vector -cp \"target/classes:/c/Users/ludo/.m2/repository/org/antlr/antlr4-runtime/4.13.2/antlr4-runtime-4.13.2.jar\" org.chuck.AntlrExamplesTester 2>&1 | grep -v \"^Testing:\" | grep -v \"^WARNING\" | grep -v \"^$\")",
+      "Bash(for f:*)"
     ]
   }
 }

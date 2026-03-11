@@ -270,13 +270,14 @@ public class ChuckEmitter {
                     case "abs"  -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("abs")); } }
                     case "floor"-> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("floor")); } }
                     case "ceil" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("ceil")); } }
+                    case "help" -> code.addInstruction(new MathHelp());
                     default     -> {
                         if (!e.args().isEmpty()) {
                             emitExpression(e.args().get(0), code);
                             code.addInstruction(new MathFunc(dot.member()));
                         } else {
-                            // help() or other no-arg Math methods
-                            code.addInstruction(new CallMethod(dot.member(), 0));
+                            // other no-arg Math methods — no object on stack, just no-op
+                            code.addInstruction(new MathHelp());
                         }
                     }
                 }
@@ -691,6 +692,19 @@ public class ChuckEmitter {
             double freq = s.reg.popAsDouble();
             double midi = 69.0 + 12.0 * Math.log(freq / 440.0) / Math.log(2.0);
             s.reg.push(Double.doubleToRawLongBits(midi));
+        }
+    }
+
+    /** Math.help() — prints Math API without touching the stack. */
+    static class MathHelp implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            System.out.println("[Chuck] Math API:");
+            System.out.println("  Math.sin(float)   Math.cos(float)  Math.tan(float)");
+            System.out.println("  Math.sqrt(float)  Math.pow(float,float)");
+            System.out.println("  Math.abs(float)   Math.floor(float) Math.ceil(float)");
+            System.out.println("  Math.log(float)   Math.log2(float) Math.exp(float)");
+            System.out.println("  Math.random()     Math.randf()");
+            System.out.println("  Math.PI           Math.TWO_PI      Math.E");
         }
     }
 
