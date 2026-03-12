@@ -1,20 +1,30 @@
 package org.chuck.core;
 
 /**
- * Gets an integer value from an indexed array.
+ * Gets an element from an indexed array.
+ * If objectData[index] is non-null, pushes it as an object (for UGen/object arrays).
+ * Otherwise pushes intData[index] as a long.
  */
 public class GetArrayInt implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
-        // ChucK order: Array[Index]
-        // Stack: [ArrayObj, Index]
-        // Top is Index
+        if (shred.reg.getSp() < 2) { shred.reg.push(0L); return; }
         int index = (int) shred.reg.popLong();
         ChuckArray arr = (ChuckArray) shred.reg.popObject();
-        
+
         if (arr == null) {
-            throw new RuntimeException("GetArrayInt: array object is null");
+            shred.reg.push(0L);
+            return;
         }
-        shred.reg.push(arr.getInt(index));
+        if (index < 0 || index >= arr.size()) {
+            shred.reg.push(0L);
+            return;
+        }
+        Object obj = arr.getObject(index);
+        if (obj != null) {
+            shred.reg.pushObject(obj);
+        } else {
+            shred.reg.push(arr.getInt(index));
+        }
     }
 }

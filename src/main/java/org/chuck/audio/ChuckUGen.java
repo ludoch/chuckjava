@@ -3,6 +3,7 @@ package org.chuck.audio;
 import org.chuck.core.ChuckObject;
 import org.chuck.core.ChuckType;
 import java.util.ArrayList;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.List;
 
 /**
@@ -11,7 +12,8 @@ import java.util.List;
 public abstract class ChuckUGen extends ChuckObject {
     protected float lastOut = 0.0f;
     protected float gain = 1.0f;
-    protected final List<ChuckUGen> sources = new ArrayList<>();
+    protected final List<ChuckUGen> sources = new CopyOnWriteArrayList<>();
+    protected final List<ChuckUGen> targets = new CopyOnWriteArrayList<>();
     
     // The last logical time (in samples) this UGen was ticked.
     protected long lastTickTime = -1;
@@ -27,16 +29,31 @@ public abstract class ChuckUGen extends ChuckObject {
     }
 
     public void chuckTo(ChuckUGen target) {
-        target.addSource(this);
+        if (target != null) {
+            target.addSource(this);
+            if (!targets.contains(target)) {
+                targets.add(target);
+            }
+        }
     }
 
     public void unchuck(ChuckUGen target) {
-        target.removeSource(this);
+        if (target != null) {
+            target.removeSource(this);
+            targets.remove(target);
+        }
+    }
+
+    /** Disconnect this UGen from all downstream targets. */
+    public void disconnectAll() {
+        for (ChuckUGen target : new ArrayList<>(targets)) {
+            target.removeSource(this);
+        }
+        targets.clear();
     }
 
     public void addSource(ChuckUGen src) {
-
-        if (!sources.contains(src)) {
+        if (src != null && !sources.contains(src)) {
             sources.add(src);
         }
     }
@@ -55,16 +72,37 @@ public abstract class ChuckUGen extends ChuckObject {
         this.gain = gain;
     }
 
+    /** ChucK-style method call: osc.gain(0.5) */
+    public float gain(float g) {
+        this.gain = g;
+        return g;
+    }
+
     public float getGain() {
         return gain;
     }
 
     @Override
-    public void setData(int index, long value) {
+    protected void triggerDataHook(int index, long value) {
         if (index == 1) { // gain
-            this.gain = (float) Double.longBitsToDouble(value);
+            this.gain = (float) getDataAsDouble(1);
         }
+    }
+
+    @Override
+    public void setData(int index, long value) {
         super.setData(index, value);
+        // The base class super.setData(index, value) sets isDouble[index] = false
+        // Then we trigger the hook.
+        triggerDataHook(index, value);
+    }
+
+    @Override
+    public void setData(int index, double value) {
+        super.setData(index, value);
+        // The base class super.setData(index, double) sets isDouble[index] = true
+        // Then we trigger the hook.
+        triggerDataHook(index, Double.doubleToRawLongBits(value));
     }
 
     /**

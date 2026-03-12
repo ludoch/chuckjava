@@ -9,10 +9,13 @@ import org.chuck.audio.ChuckUGen;
 public class ChuckUnchuck implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
-        ChuckUGen rhs = (ChuckUGen) shred.reg.popObject();
-        ChuckUGen lhs = (ChuckUGen) shred.reg.popObject();
-        lhs.unchuck(rhs);
-        // Leave rhs on stack for chaining (e.g. a !=> b !=> c)
-        shred.reg.pushObject(rhs);
+        Object rawRhs = shred.reg.popObject();
+        Object rawLhs = shred.reg.popObject();
+        if (rawLhs instanceof ChuckUGen lhs && rawRhs instanceof ChuckUGen rhs) {
+            lhs.unchuck(rhs);
+            shred.reg.pushObject(rhs);
+        } else {
+            shred.reg.push(0L); // keep stack balanced
+        }
     }
 }

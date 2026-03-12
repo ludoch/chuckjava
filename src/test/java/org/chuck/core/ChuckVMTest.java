@@ -178,15 +178,21 @@ public class ChuckVMTest {
     @Test
     public void testFunctionCalls() throws InterruptedException {
         ChuckVM vm = new ChuckVM(44100);
-        
+
+        // Args are in mem stack at fp+0, fp+1 with the new calling convention.
         ChuckCode funcCode = new ChuckCode("AddFunction");
-        funcCode.addInstruction(new AddInt());
+        funcCode.addInstruction((vm2, shred) -> {
+            int fp = shred.getFramePointer();
+            long a = shred.mem.getData(fp);
+            long b = shred.mem.getData(fp + 1);
+            shred.reg.push(a + b);
+        });
         funcCode.addInstruction(new ReturnFunc());
         
         ChuckCode mainCode = new ChuckCode("MainProgram");
         mainCode.addInstruction(new PushInt(10));
         mainCode.addInstruction(new PushInt(20));
-        mainCode.addInstruction(new CallFunc(funcCode)); 
+        mainCode.addInstruction(new CallFunc(funcCode, 2));
         mainCode.addInstruction(new PushInt(5)); 
         mainCode.addInstruction(new AddInt()); 
         

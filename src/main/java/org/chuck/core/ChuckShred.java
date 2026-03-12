@@ -35,11 +35,14 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     // Execution state
     private ChuckCode code;
     private int pc = 0;
+    private int framePointer = 0; // Index in mem stack where current frame starts
     
     public ChuckCode getCode() { return code; }
     public void setCode(ChuckCode code) { this.code = code; }
     public int getPc() { return pc; }
     public void setPc(int pc) { this.pc = pc; }
+    public int getFramePointer() { return framePointer; }
+    public void setFramePointer(int fp) { this.framePointer = fp; }
 
     public long getResult() {
         if (reg.getSp() > 0) return reg.popLong();
@@ -70,6 +73,13 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     public void exit() { abort(); }
     public String arg(int i) { return (i >= 0 && i < args.length) ? args[i] : ""; }
     public int numArgs() { return args.length; }
+
+    public void cleanup() {
+        for (org.chuck.audio.ChuckUGen ugen : ownedUGens) {
+            ugen.disconnectAll();
+        }
+        ownedUGens.clear();
+    }
 
     public void abort() {
         this.isDone = true;

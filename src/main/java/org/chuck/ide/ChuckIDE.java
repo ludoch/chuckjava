@@ -106,8 +106,32 @@ public class ChuckIDE extends Application {
     private ChuckAudio audio;
     private TabPane tabPane;
     private TextArea outputArea;
-    private ListView<String> shredListView;
-    private final Map<String, Integer> shredNameToId = new ConcurrentHashMap<>();
+    
+    // Model for active shreds
+    public static class ShredInfo {
+        public final int id;
+        public final String name;
+        public final long startTimeMillis;
+        public final ChuckShred shred;
+        public final javafx.beans.property.StringProperty durationProp = new javafx.beans.property.SimpleStringProperty("0.0s");
+
+        public ShredInfo(int id, String name, ChuckShred shred) {
+            this.id = id;
+            this.name = name;
+            this.shred = shred;
+            this.startTimeMillis = System.currentTimeMillis();
+        }
+
+        public void updateDuration() {
+            double secs = (System.currentTimeMillis() - startTimeMillis) / 1000.0;
+            String s = String.format("%.1fs", secs);
+            if (!s.equals(durationProp.get())) {
+                durationProp.set(s);
+            }
+        }
+    }
+
+    private ListView<ShredInfo> shredListView;
     private Label statusLabel;
     private TreeView<File> fileBrowser;
     private Stage stage;
@@ -116,6 +140,7 @@ public class ChuckIDE extends Application {
     private final Map<Tab, File> tabToFile = new java.util.HashMap<>();
 
     // Visualizers
+    private Pane visContainer; // Container for dynamic resizing
     private Canvas visualizerCanvas;
     private Canvas scopeCanvas;
     private FFT analyzer;
@@ -172,19 +197,70 @@ public class ChuckIDE extends Application {
 
         // ── Shred panel ──
         shredListView = new ListView<>();
-        Button removeSelectedBtn = new Button("Stop Selected");
-        removeSelectedBtn.setMaxWidth(Double.MAX_VALUE);
-        removeSelectedBtn.setOnAction(e -> removeSelectedShred());
+        shredListView.setCellFactory(lv -> new ListCell<>() {
+            private final HBox root = new HBox(5);
+            private final Label idNameLabel = new Label();
+            private final Label durationLabel = new Label();
+            private final Button removeBtn = new Button("-");
+            private final Region spacer = new Region();
 
-        // Visualizer Canvases
-        visualizerCanvas = new Canvas(195, 80);
-        scopeCanvas = new Canvas(195, 80);
+            {
+                idNameLabel.setStyle("-fx-font-weight: bold;");
+                durationLabel.setTextFill(Color.GRAY);
+                durationLabel.setStyle("-fx-font-family: 'Monospaced';");
+                
+                removeBtn.setStyle("-fx-padding: 1 6 1 6; -fx-background-color: #f0b8b8; -fx-font-weight: bold; -fx-text-fill: white; -fx-background-radius: 3;");
+                removeBtn.setFocusTraversable(false);
+                
+                HBox.setHgrow(spacer, Priority.ALWAYS);
+                root.getChildren().addAll(idNameLabel, durationLabel, spacer, removeBtn);
+                root.setPadding(new Insets(2));
+                root.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+            }
+
+            @Override
+            protected void updateItem(ShredInfo item, boolean empty) {
+                super.updateItem(item, empty);
+                durationLabel.textProperty().unbind();
+                if (empty || item == null) {
+                    setGraphic(null);
+                    setText(null);
+                } else {
+                    idNameLabel.setText(item.id + ": " + item.name);
+                    durationLabel.textProperty().bind(javafx.beans.binding.Bindings.concat("[", item.durationProp, "]"));
+                    removeBtn.setOnAction(e -> {
+                        vm.removeShred(item.id);
+                        shredListView.getItems().remove(item);
+                        updateStatus();
+                    });
+                    setGraphic(root);
+                }
+            }
+        });
+
+        // Visualizer Canvases (wrapped in StackPanes for resizing)
+        visualizerCanvas = new Canvas();
+        scopeCanvas = new Canvas();
+        
+        StackPane specStack = new StackPane(visualizerCanvas);
+        specStack.setStyle("-fx-background-color: black;");
+        specStack.setPrefHeight(80);
+        visualizerCanvas.widthProperty().bind(specStack.widthProperty());
+        visualizerCanvas.heightProperty().bind(specStack.heightProperty());
+
+        StackPane scopeStack = new StackPane(scopeCanvas);
+        scopeStack.setStyle("-fx-background-color: black;");
+        scopeStack.setPrefHeight(80);
+        scopeCanvas.widthProperty().bind(scopeStack.widthProperty());
+        scopeCanvas.heightProperty().bind(scopeStack.heightProperty());
         
         VBox visBox = new VBox(2, 
-            new Label("Spectrum"), visualizerCanvas,
-            new Label("Oscilloscope"), scopeCanvas
+            new Label("Spectrum"), specStack,
+            new Label("Oscilloscope"), scopeStack
         );
         visBox.setStyle("-fx-background-color: #222; -fx-padding: 5;");
+        VBox.setVgrow(specStack, Priority.ALWAYS);
+        VBox.setVgrow(scopeStack, Priority.ALWAYS);
         for (javafx.scene.Node n : visBox.getChildren()) {
             if (n instanceof Label l) l.setTextFill(Color.LIGHTGRAY);
         }
@@ -201,16 +277,34 @@ public class ChuckIDE extends Application {
         
         VBox masterControls = new VBox(5, new Label("Master Gain"), masterGainSlider, vmTimeLabel);
         masterControls.setStyle("-fx-background-color: #eee; -fx-padding: 8; -fx-border-color: #ccc;");
+        masterControls.setMinHeight(0);
 
-        VBox rightPanel = new VBox(8, 
-            new Label("Active Shreds"), shredListView, removeSelectedBtn, 
-            new Separator(),
-            visBox,
-            new Separator(),
-            masterControls
-        );
-        rightPanel.setPadding(new Insets(8));
-        rightPanel.setPrefWidth(210);
+        // ── Right panel with SplitPane for height adjustment ──
+        SplitPane rightSplit = new SplitPane();
+        rightSplit.setOrientation(Orientation.VERTICAL);
+        
+        VBox shredBox = new VBox(5, new Label("Active Shreds"), shredListView);
+        VBox.setVgrow(shredListView, Priority.ALWAYS);
+        shredBox.setPadding(new Insets(5));
+        shredBox.setMinHeight(0);
+        
+        rightSplit.getItems().addAll(shredBox, visBox, masterControls);
+        rightSplit.setDividerPositions(0.3, 0.75);
+
+        // Fix resize bug: allow components to shrink
+        shredListView.setMinWidth(0);
+        shredListView.setMinHeight(0);
+        visBox.setMinWidth(0);
+        visBox.setMinHeight(0);
+        masterControls.setMinWidth(0);
+        rightSplit.setMinWidth(0);
+        rightSplit.setMinHeight(0);
+
+        VBox rightPanel = new VBox(rightSplit);
+        VBox.setVgrow(rightSplit, Priority.ALWAYS);
+        rightPanel.setPrefWidth(250);
+        rightPanel.setMinWidth(0); 
+        rightPanel.setMinHeight(0);
 
         startVisualizer();
 
@@ -788,24 +882,12 @@ public class ChuckIDE extends Application {
             ChuckShred shred = new ChuckShred(code);
             vm.spork(shred);
 
-            String label = "Shred " + shred.getId()
-                + " (" + (currentFile != null ? currentFile.getName() : "User") + ")";
-            shredNameToId.put(label, shred.getId());
-            shredListView.getItems().add(label);
-            print("Sporked " + label);
+            String name = currentFile != null ? currentFile.getName() : "User";
+            ShredInfo info = new ShredInfo(shred.getId(), name, shred);
+            shredListView.getItems().add(info);
+            
+            print("Sporked Shred " + shred.getId() + " (" + name + ")");
             updateStatus();
-
-            Thread.ofVirtual().start(() -> {
-                while (!shred.isDone()) {
-                    try { Thread.sleep(100); } catch (InterruptedException ignored) {}
-                }
-                Platform.runLater(() -> {
-                    shredListView.getItems().remove(label);
-                    shredNameToId.remove(label);
-                    print("Finished: " + label);
-                    updateStatus();
-                });
-            });
 
         } catch (Exception ex) {
             String msg = ex.getMessage() != null ? ex.getMessage() : ex.toString();
@@ -817,36 +899,30 @@ public class ChuckIDE extends Application {
 
     private void replaceLastShred() {
         if (!shredListView.getItems().isEmpty()) {
-            String last = shredListView.getItems().get(shredListView.getItems().size() - 1);
-            Integer id = shredNameToId.get(last);
-            if (id != null) vm.removeShred(id);
+            ShredInfo last = shredListView.getItems().get(shredListView.getItems().size() - 1);
+            vm.removeShred(last.id);
             shredListView.getItems().remove(last);
-            shredNameToId.remove(last);
-            print("Replacing " + last);
+            print("Replacing Shred " + last.id);
         }
         addShred();
     }
 
     private void removeLastShred() {
         if (!shredListView.getItems().isEmpty()) {
-            String last = shredListView.getItems().get(shredListView.getItems().size() - 1);
-            Integer id = shredNameToId.get(last);
-            if (id != null) vm.removeShred(id);
+            ShredInfo last = shredListView.getItems().get(shredListView.getItems().size() - 1);
+            vm.removeShred(last.id);
             shredListView.getItems().remove(last);
-            shredNameToId.remove(last);
-            print("Removed " + last);
+            print("Removed Shred " + last.id);
             updateStatus();
         }
     }
 
     private void removeSelectedShred() {
-        String sel = shredListView.getSelectionModel().getSelectedItem();
+        ShredInfo sel = shredListView.getSelectionModel().getSelectedItem();
         if (sel != null) {
-            Integer id = shredNameToId.get(sel);
-            if (id != null) vm.removeShred(id);
+            vm.removeShred(sel.id);
             shredListView.getItems().remove(sel);
-            shredNameToId.remove(sel);
-            print("Stopped " + sel);
+            print("Stopped Shred " + sel.id);
             updateStatus();
         }
     }
@@ -855,7 +931,6 @@ public class ChuckIDE extends Application {
         print("Stopping all shreds…");
         vm.clear();
         shredListView.getItems().clear();
-        shredNameToId.clear();
         statusLabel.setText("  VM cleared");
     }
 
@@ -871,9 +946,26 @@ public class ChuckIDE extends Application {
                 renderSpectrum();
                 renderScope();
                 updateVMTime();
+                updateShredList();
             }
         };
         visTimer.start();
+    }
+
+    private void updateShredList() {
+        List<ShredInfo> toRemove = new java.util.ArrayList<>();
+        for (ShredInfo si : shredListView.getItems()) {
+            if (si.shred.isDone()) {
+                toRemove.add(si);
+            } else {
+                si.updateDuration();
+            }
+        }
+        if (!toRemove.isEmpty()) {
+            shredListView.getItems().removeAll(toRemove);
+            updateStatus();
+        }
+        // Removed shredListView.refresh() to keep buttons responsive
     }
 
     private void updateVMTime() {
@@ -885,13 +977,14 @@ public class ChuckIDE extends Application {
         GraphicsContext gc = visualizerCanvas.getGraphicsContext2D();
         double w = visualizerCanvas.getWidth();
         double h = visualizerCanvas.getHeight();
+        if (w <= 0 || h <= 0) return;
 
         gc.setFill(Color.BLACK);
         gc.fillRect(0, 0, w, h);
 
         UAnaBlob blob = analyzer.upchuck();
         float[] mags = blob.getFvals();
-        if (mags.length == 0) return;
+        if (mags == null || mags.length == 0) return;
 
         gc.setStroke(Color.LIME);
         gc.setLineWidth(1.5);
@@ -912,13 +1005,15 @@ public class ChuckIDE extends Application {
         GraphicsContext gc = scopeCanvas.getGraphicsContext2D();
         double w = scopeCanvas.getWidth();
         double h = scopeCanvas.getHeight();
+        if (w <= 0 || h <= 0) return;
 
         gc.setFill(Color.BLACK);
         gc.fillRect(0, 0, w, h);
 
         UAnaBlob blob = scope.upchuck();
-        float[] samples = blob.getFvals(); // Complex re is in fvals
-        if (samples.length == 0) return;
+        if (blob == null) return;
+        float[] samples = blob.getFvals(); 
+        if (samples == null || samples.length == 0) return;
 
         gc.setStroke(Color.CYAN);
         gc.setLineWidth(1.5);
@@ -928,7 +1023,7 @@ public class ChuckIDE extends Application {
         gc.beginPath();
         for (int i = 0; i < samples.length; i++) {
             double x = i * step;
-            double y = midY - (samples[i] * midY * 0.9); // Scale to 90% of height
+            double y = midY - (samples[i] * midY * 0.9);
             if (i == 0) gc.moveTo(x, y);
             else gc.lineTo(x, y);
         }

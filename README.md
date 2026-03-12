@@ -99,6 +99,55 @@ mvn exec:java "-Dexec.args=+ examples/basic/moe.ck"
 mvn exec:java "-Dexec.args=--syntax examples/basic/foo.ck examples/basic/bar.ck"
 ```
 
+## 🔌 Embedding & Hosting
+
+ChucK-Java is designed to be easily embedded as a library using the `ChuckHost` class. This provides a unified API for managing the VM, audio hardware, and global state.
+
+### 1. Minimal Hosting (No Audio Hardware)
+Ideal for pure logic or non-real-time processing.
+```java
+ChuckHost host = new ChuckHost(44100);
+host.onPrint(System.out::println);
+
+host.run("<<< \"Hello from Java Host!\" >>>; 1::second => now;");
+host.advance(44100); // Manually drive the engine
+```
+
+### 2. Standard Real-time Hosting
+Initializes the JavaSound engine automatically.
+```java
+ChuckHost host = new ChuckHost(44100)
+    .withAudio(512, 2); // Buffer size, channels
+
+host.add("myscript.ck");
+host.setMasterGain(0.8f);
+```
+
+### 3. Custom Audio Callback
+Drive ChucK from your own external audio loop (e.g. game engine).
+```java
+ChuckHost host = new ChuckHost(44100);
+host.run("SinOsc s => dac; 440 => s.freq;");
+
+// Inside your own audio callback:
+for (int i = 0; i < buffer.length; i++) {
+    host.advance(1); // Advance VM by 1 sample
+    buffer[i] = host.getLastOut(0); // Pull from channel 0
+}
+```
+
+### 4. Global Variable Interop
+Pass data between Java and ChucK at runtime.
+```java
+// Java Side
+host.setGlobalInt("playerHealth", 100);
+
+// ChucK Side
+// Machine.getGlobalInt("playerHealth") => int health;
+```
+
+For full examples, see the `org.chuck.examples.host` package.
+
 ## 🚀 Key Modern Java Features Used
 
 -   **Virtual Threads (Project Loom)**: Shreds (concurrent ChucK processes) are mapped 1:1 to Virtual Threads. They are cooperatively scheduled by a custom `Shreduler` to maintain ChucK’s deterministic, sample-accurate timing model.

@@ -42,8 +42,16 @@ public class Envelope extends ChuckUGen {
         this.target = 1.0f;
     }
 
+    public void setKeyOn(double val) {
+        if (val > 0) keyOn();
+    }
+
     public void keyOff() {
         this.target = 0.0f;
+    }
+
+    public void setKeyOff(double val) {
+        if (val > 0) keyOff();
     }
 
     @Override

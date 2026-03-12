@@ -10,10 +10,11 @@ public class NoteOn implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
         // Stack: [Velocity, Object]
+        if (shred.reg.getSp() < 2) return; // not enough values on stack
         ChuckObject obj = (ChuckObject) shred.reg.popObject();
         float velocity = (float) Double.longBitsToDouble(shred.reg.popLong());
-        
-        if (obj == null) throw new RuntimeException("NoteOn: target is null");
+
+        if (obj == null) return; // silently skip if target not yet wired
         
         try {
             // Use reflection to call noteOn if it exists

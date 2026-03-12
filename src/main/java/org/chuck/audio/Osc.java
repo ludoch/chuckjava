@@ -13,12 +13,18 @@ public abstract class Osc extends ChuckUGen {
     protected final float sampleRate;
 
     public Osc(float sampleRate) {
-        super(new ChuckType("Osc", ChuckType.OBJECT, 2, 0));
+        super(new ChuckType("Osc", ChuckType.OBJECT, 8, 0));
         this.sampleRate = sampleRate;
     }
 
     public void setFreq(double freq) {
         this.freq = freq;
+    }
+
+    /** ChucK-style method call: osc.freq(440) */
+    public double freq(double f) {
+        this.freq = f;
+        return f;
     }
 
     public double getFreq() {
@@ -30,12 +36,24 @@ public abstract class Osc extends ChuckUGen {
         if (this.phase < 0) this.phase += 1.0;
     }
 
+    /** ChucK-style method call: osc.phase(0.5) */
+    public double phase(double p) {
+        setPhase(p);
+        return this.phase;
+    }
+
     public double getPhase() {
         return phase;
     }
 
     public void setWidth(double width) {
         this.width = width;
+    }
+
+    /** ChucK-style method call: osc.width(0.5) */
+    public double width(double w) {
+        this.width = w;
+        return w;
     }
 
     public double getWidth() {
@@ -46,18 +64,37 @@ public abstract class Osc extends ChuckUGen {
         this.sync = sync;
     }
 
+    /** ChucK-style method call: osc.sync(2) */
+    public int sync(int s) {
+        this.sync = s;
+        return s;
+    }
+
     public int getSync() {
         return sync;
+    }
+
+    /** ChucK-style: osc.last() returns most recent sample */
+    public float last() {
+        return lastOut;
+    }
+
+    @Override
+    protected void triggerDataHook(int index, long value) {
+        super.triggerDataHook(index, value);
+        if (index == 0) { // freq
+            this.freq = getDataAsDouble(0);
+        } else if (index == 2) { // width
+            this.width = getDataAsDouble(2);
+        } else if (index == 3) { // phase
+            this.phase = getDataAsDouble(3) % 1.0;
+            if (this.phase < 0) this.phase += 1.0;
+        }
     }
 
     @Override
     public void setData(int index, long value) {
         super.setData(index, value);
-        if (index == 0) { // freq
-            this.freq = getDataAsDouble(0);
-        } else if (index == 1) { // width
-            this.width = getDataAsDouble(1);
-        }
     }
 
     @Override
@@ -72,22 +109,23 @@ public abstract class Osc extends ChuckUGen {
         }
 
         boolean incPhase = true;
+        double effectiveFreq = freq;
         if (getNumSources() > 0) {
-            if (sync == 0) { 
-                freq = in;
-            } else if (sync == 1) { 
+            if (sync == 0) {
+                // Input IS the frequency (audio-rate freq control); don't clobber stored freq
+                effectiveFreq = in;
+            } else if (sync == 1) {
                 phase = in % 1.0;
                 if (phase < 0) phase += 1.0;
                 incPhase = false;
-            } else if (sync == 2) { 
-                double currentFreq = freq + in;
-                phase += currentFreq / sampleRate;
-                incPhase = false;
+            } else if (sync == 2) {
+                // FM: add input to base freq
+                effectiveFreq = freq + in;
             }
         }
 
         if (incPhase) {
-            phase += freq / sampleRate;
+            phase += effectiveFreq / sampleRate;
         }
         
         phase = phase % 1.0;

@@ -11,6 +11,7 @@ public class ChuckArray extends ChuckObject {
     private final long[] intData;
     private final double[] floatData;
     private final Object[] objectData;
+    private final byte[] types; // 0=int, 1=float, 2=object
     
     // For associative behavior
     private final Map<String, Long> assocInt = new HashMap<>();
@@ -22,10 +23,12 @@ public class ChuckArray extends ChuckObject {
         this.intData = new long[size];
         this.floatData = new double[size];
         this.objectData = new Object[size];
+        this.types = new byte[size];
     }
 
     public void setInt(int index, long value) {
         intData[index] = value;
+        types[index] = 0;
     }
 
     public long getInt(int index) {
@@ -34,14 +37,20 @@ public class ChuckArray extends ChuckObject {
 
     public void setFloat(int index, double value) {
         floatData[index] = value;
+        types[index] = 1;
     }
 
     public double getFloat(int index) {
         return floatData[index];
     }
 
+    public boolean isDoubleAt(int index) {
+        return types[index] == 1;
+    }
+
     public void setObject(int index, Object value) {
         objectData[index] = value;
+        types[index] = 2;
     }
 
     public Object getObject(int index) {

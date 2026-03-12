@@ -30,6 +30,7 @@ public class ChuckVM {
     
     // Global variables
     private final Map<String, Long> globalInts = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> globalIsDouble = new ConcurrentHashMap<>();
     private final Map<String, ChuckObject> globalObjects = new ConcurrentHashMap<>();
 
     // Multi-channel output (dac)
@@ -41,14 +42,32 @@ public class ChuckVM {
 
     public ChuckVM(int sampleRate) {
         this.sampleRate = sampleRate;
-        
+
         // Initialize dac channels as virtual summing nodes
         for (int i = 0; i < numChannels; i++) {
+            final int channelIndex = i;
             dacChannels[i] = new ChuckUGen() {
                 @Override protected float compute(float input) { return input; }
+                @Override public float tick(long systemTime) {
+                    if (systemTime != -1 && systemTime == lastTickTime) {
+                        return lastOut;
+                    }
+                    float sum = 0.0f;
+                    for (ChuckUGen src : sources) {
+                        float val = src.tick(systemTime);
+                        if (src instanceof org.chuck.audio.StereoUGen s) {
+                            sum += (channelIndex == 0) ? s.getLastOutLeft() : s.getLastOutRight();
+                        } else {
+                            sum += val;
+                        }
+                    }
+                    lastOut = compute(sum) * gain;
+                    lastTickTime = systemTime;
+                    return lastOut;
+                }
             };
         }
-        
+
         this.dac = new ChuckObject(new ChuckType("dac", ChuckType.OBJECT, 0, 0));
         globalObjects.put("dac", dac);
 
@@ -73,12 +92,21 @@ public class ChuckVM {
 
     public void setGlobalInt(String name, long value) {
         globalInts.put(name, value);
+        globalIsDouble.put(name, false);
+    }
+
+    public void setGlobalFloat(String name, double value) {
+        globalInts.put(name, Double.doubleToRawLongBits(value));
+        globalIsDouble.put(name, true);
     }
 
     public long getGlobalInt(String name) {
         return globalInts.getOrDefault(name, 0L);
     }
 
+    public boolean isGlobalDouble(String name) {
+        return globalIsDouble.getOrDefault(name, false);
+    }
     public void setGlobalObject(String name, ChuckObject obj) {
         globalObjects.put(name, obj);
     }
@@ -169,6 +197,7 @@ public class ChuckVM {
             try {
                 shred.execute(this);
             } finally {
+                shred.cleanup();
                 activeShreds.remove(shred.getId());
             }
         });
@@ -178,6 +207,21 @@ public class ChuckVM {
     public int add(String path) {
         try {
             String source = java.nio.file.Files.readString(java.nio.file.Paths.get(path));
+            return run(source, path);
+        } catch (Exception e) {
+            print("Machine.add error: " + e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Compiles and executes a ChucK source string.
+     * @param source The ChucK source code
+     * @param name A label for this shred (e.g. filename)
+     * @return The shred ID
+     */
+    public int run(String source, String name) {
+        try {
             List<org.chuck.compiler.ChuckAST.Stmt> ast;
 
             if (antlrEnabled) {
@@ -194,11 +238,11 @@ public class ChuckVM {
             }
 
             org.chuck.compiler.ChuckEmitter emitter = new org.chuck.compiler.ChuckEmitter();
-            ChuckCode code = emitter.emit(ast, path);
+            ChuckCode code = emitter.emit(ast, name);
             ChuckShred shred = new ChuckShred(code);
             return spork(shred);
         } catch (Exception e) {
-            print("Machine.add error: " + e.getMessage());
+            print("Machine.run error: " + e.getMessage());
             e.printStackTrace();
             return 0;
         }

@@ -5,50 +5,67 @@ package org.chuck.core;
  */
 public class ChuckStack {
     private final long[] primitives;
+    private final boolean[] isDouble; // Tracks if a primitive slot contains a double bitmask
     private final Object[] objects;
     private int sp; 
 
     public ChuckStack(int size) {
         this.primitives = new long[size];
+        this.isDouble = new boolean[size];
         this.objects = new Object[size];
         this.sp = 0;
     }
 
     public void push(long value) {
         primitives[sp] = value;
+        isDouble[sp] = false;
         objects[sp] = null;
         sp++;
     }
 
     public void push(double value) {
         primitives[sp] = Double.doubleToRawLongBits(value);
+        isDouble[sp] = true;
         objects[sp] = null;
         sp++;
     }
 
     public void pushObject(Object obj) {
         primitives[sp] = 0;
+        isDouble[sp] = false;
         objects[sp] = obj;
         sp++;
     }
 
     public long popLong() {
-        return primitives[--sp];
+        sp--;
+        return primitives[sp];
     }
 
     public double popDouble() {
-        return Double.longBitsToDouble(primitives[--sp]);
+        sp--;
+        return Double.longBitsToDouble(primitives[sp]);
     }
 
     /**
-     * ChucK specific pop that handles mixed types.
+     * ChucK specific pop that handles mixed types correctly.
      */
     public double popAsDouble() {
-        long raw = primitives[--sp];
-        // Heuristic: If it looks like a small integer, it's likely an int being used as a float.
-        // ChucK does this auto-casting frequently.
-        if (Math.abs(raw) < 2000000) return (double) raw;
-        return Double.longBitsToDouble(raw);
+        sp--;
+        long raw = primitives[sp];
+        if (isDouble[sp]) return Double.longBitsToDouble(raw);
+        return (double) raw;
+    }
+
+    public boolean isDouble(int offset) {
+        int idx = sp - 1 - offset;
+        if (idx < 0) return false;
+        return isDouble[idx];
+    }
+
+    public boolean isDoubleAt(int index) {
+        if (index < 0 || index >= isDouble.length) return false;
+        return isDouble[index];
     }
 
     @SuppressWarnings("unchecked")
@@ -98,5 +115,36 @@ public class ChuckStack {
 
     public int getSp() {
         return sp;
+    }
+
+    public long getData(int index) {
+        if (index < 0 || index >= primitives.length) return 0;
+        return primitives[index];
+    }
+
+    public Object getRef(int index) {
+        if (index < 0 || index >= objects.length) return null;
+        return objects[index];
+    }
+
+    public void setData(int index, long value) {
+        if (index >= 0 && index < primitives.length) {
+            primitives[index] = value;
+            isDouble[index] = false;
+        }
+    }
+
+    public void setData(int index, double value) {
+        if (index >= 0 && index < primitives.length) {
+            primitives[index] = Double.doubleToRawLongBits(value);
+            isDouble[index] = true;
+        }
+    }
+
+    /** Directly set the stack pointer (used by CallFunc/ReturnFunc to clean up args). */
+    public void setSp(int newSp) {
+        // Clear object refs above new sp to avoid memory leaks
+        for (int i = newSp; i < sp; i++) objects[i] = null;
+        sp = newSp;
     }
 }

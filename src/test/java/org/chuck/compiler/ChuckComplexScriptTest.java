@@ -38,15 +38,13 @@ public class ChuckComplexScriptTest {
         List<Double> frequencies = Collections.synchronizedList(new ArrayList<>());
         ChuckObject sinOsc = new ChuckObject(sinType) {
             @Override
-            public void setData(int index, long value) {
-                if (index == 0) { // freq
-                    frequencies.add(Double.longBitsToDouble(value));
-                }
+            public void setData(int index, double value) {
+                if (index == 0) frequencies.add(value);
                 super.setData(index, value);
             }
         };
         vm.setGlobalObject("s", sinOsc);
-        
+
         ChuckShred shred = new ChuckShred(bytecode);
         vm.spork(shred);
         
@@ -87,8 +85,8 @@ public class ChuckComplexScriptTest {
         List<Double> frequencies = Collections.synchronizedList(new ArrayList<>());
         ChuckObject sinOsc = new ChuckObject(sinType) {
             @Override
-            public void setData(int index, long value) {
-                if (index == 0) frequencies.add(Double.longBitsToDouble(value));
+            public void setData(int index, double value) {
+                if (index == 0) frequencies.add(value);
                 super.setData(index, value);
             }
         };

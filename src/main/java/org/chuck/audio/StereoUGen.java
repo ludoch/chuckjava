@@ -16,16 +16,27 @@ public abstract class StereoUGen extends ChuckUGen {
     }
 
     @Override
-    public float tick() {
-        // For stereo UGens, tick returns the average or mono-downmix by default,
-        // but populates lastOutLeft and lastOutRight.
-        float in = 0.0f;
-        for (ChuckUGen src : sources) {
-            in += src.getLastOut();
+    public float tick(long systemTime) {
+        if (systemTime != -1 && systemTime == lastTickTime) {
+            return lastOut;
         }
-        computeStereo(in);
+
+        float sum = 0.0f;
+        for (ChuckUGen src : sources) {
+            sum += src.tick(systemTime);
+        }
+
+        computeStereo(sum);
         lastOut = (lastOutLeft + lastOutRight) * 0.5f * gain;
+        lastTickTime = systemTime;
+        
         return lastOut;
+    }
+
+    @Override
+    public float tick() {
+        // Fallback for manual ticks
+        return tick(-1);
     }
 
     protected abstract void computeStereo(float input);

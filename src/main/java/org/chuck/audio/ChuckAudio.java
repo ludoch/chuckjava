@@ -64,49 +64,55 @@ public class ChuckAudio {
         if (inputLine != null) inputLine.start();
 
         Thread.ofPlatform().name("ChucK-Audio-Engine").start(() -> {
-            int bytesPerBuffer = bufferSize * numChannels * 2; // 16-bit PCM
-            byte[] outBuf = new byte[bytesPerBuffer];
-            byte[] inBuf  = inputLine != null ? new byte[bytesPerBuffer] : null;
+            try {
+                int bytesPerBuffer = bufferSize * numChannels * 2; // 16-bit PCM
+                byte[] outBuf = new byte[bytesPerBuffer];
+                byte[] inBuf  = inputLine != null ? new byte[bytesPerBuffer] : null;
 
-            while (running) {
-                // ── Capture: read one buffer of mic input ─────────────────────
-                if (inputLine != null && inBuf != null) {
-                    // read() blocks until the buffer is filled — keeps us in sync
-                    inputLine.read(inBuf, 0, inBuf.length);
-                }
-
-                // ── Per-sample processing ─────────────────────────────────────
-                for (int i = 0; i < bufferSize; i++) {
-                    // Feed ADC with the captured sample for this frame
-                    if (inBuf != null) {
-                        for (int c = 0; c < numChannels; c++) {
-                            int idx = (i * numChannels + c) * 2;
-                            short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
-                            vm.adc.setInputSample(c, pcm / 32768.0f);
+                while (running) {
+                    // ── Capture: read only if available to avoid blocking output
+                    if (inputLine != null && inBuf != null) {
+                        int available = inputLine.available();
+                        if (available >= inBuf.length) {
+                            inputLine.read(inBuf, 0, inBuf.length);
                         }
                     }
 
-                    vm.advanceTime(1);
+                    // ── Per-sample processing ─────────────────────────────────────
+                    for (int i = 0; i < bufferSize; i++) {
+                        // Feed ADC with captured frame
+                        if (inBuf != null) {
+                            for (int c = 0; c < numChannels; c++) {
+                                int idx = (i * numChannels + c) * 2;
+                                short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
+                                vm.adc.setInputSample(c, pcm / 32768.0f);
+                            }
+                        }
 
-                    float left  = vm.getChannelLastOut(0) * masterGain;
-                    float right = (numChannels > 1 ? vm.getChannelLastOut(1) : vm.getChannelLastOut(0)) * masterGain;
+                        vm.advanceTime(1);
 
-                    // Record if active
-                    if (recorder != null && recorder.isRecording()) {
-                        try { recorder.record(left, right); }
-                        catch (IOException e) { e.printStackTrace(); }
+                        // Interleave Left/Right for stereo output
+                        for (int c = 0; c < numChannels; c++) {
+                            float sample = vm.getChannelLastOut(c) * masterGain;
+                            short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
+                            int idx = (i * numChannels + c) * 2;
+                            outBuf[idx]     = (byte)  (s16 & 0xFF);
+                            outBuf[idx + 1] = (byte) ((s16 >> 8) & 0xFF);
+                            
+                            // Record
+                            if (c == 0 && recorder != null && recorder.isRecording()) {
+                                 try { recorder.record(vm.getChannelLastOut(0) * masterGain, 
+                                                       vm.getChannelLastOut(1) * masterGain); }
+                                 catch (IOException e) {}
+                            }
+                        }
                     }
-
-                    // Encode to 16-bit PCM
-                    for (int c = 0; c < numChannels; c++) {
-                        float sample = (c == 0) ? left : right;
-                        short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
-                        int idx = (i * numChannels + c) * 2;
-                        outBuf[idx]     = (byte)  (s16 & 0xFF);
-                        outBuf[idx + 1] = (byte) ((s16 >> 8) & 0xFF);
-                    }
+                    outputLine.write(outBuf, 0, outBuf.length);
                 }
-                outputLine.write(outBuf, 0, outBuf.length);
+            } catch (Throwable t) {
+                System.err.println("CRITICAL: Audio Engine Thread Crashed!");
+                t.printStackTrace();
+                vm.print("Audio Engine Error: " + t.getMessage());
             }
         });
     }

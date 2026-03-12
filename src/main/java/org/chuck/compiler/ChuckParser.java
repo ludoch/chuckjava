@@ -330,11 +330,15 @@ public class ChuckParser {
         }
         if (match(ChuckLexer.TokenType.PLUS_PLUS)) {
             ChuckLexer.Token t = previous();
-            return new ChuckAST.UnaryExp(ChuckAST.Operator.PLUS, parseUnary(), t.line(), t.column());
+            return new ChuckAST.BinaryExp(
+                    new ChuckAST.IntExp(1, t.line(), t.column()),
+                    ChuckAST.Operator.PLUS_CHUCK, parseUnary(), t.line(), t.column());
         }
         if (match(ChuckLexer.TokenType.MINUS_MINUS)) {
             ChuckLexer.Token t = previous();
-            return new ChuckAST.UnaryExp(ChuckAST.Operator.MINUS, parseUnary(), t.line(), t.column());
+            return new ChuckAST.BinaryExp(
+                    new ChuckAST.IntExp(1, t.line(), t.column()),
+                    ChuckAST.Operator.MINUS_CHUCK, parseUnary(), t.line(), t.column());
         }
         return parsePostfix();
     }
@@ -344,12 +348,16 @@ public class ChuckParser {
         while (true) {
             if (match(ChuckLexer.TokenType.PLUS_PLUS)) {
                 ChuckLexer.Token t = previous();
-                exp = new ChuckAST.BinaryExp(exp, ChuckAST.Operator.PLUS,
-                        new ChuckAST.IntExp(1, t.line(), t.column()), t.line(), t.column());
+                // exp++ -> (1 +=> exp) — compound assignment performs the increment
+                exp = new ChuckAST.BinaryExp(
+                        new ChuckAST.IntExp(1, t.line(), t.column()),
+                        ChuckAST.Operator.PLUS_CHUCK, exp, t.line(), t.column());
             } else if (match(ChuckLexer.TokenType.MINUS_MINUS)) {
                 ChuckLexer.Token t = previous();
-                exp = new ChuckAST.BinaryExp(exp, ChuckAST.Operator.MINUS,
-                        new ChuckAST.IntExp(1, t.line(), t.column()), t.line(), t.column());
+                // exp-- -> (1 -=> exp)
+                exp = new ChuckAST.BinaryExp(
+                        new ChuckAST.IntExp(1, t.line(), t.column()),
+                        ChuckAST.Operator.MINUS_CHUCK, exp, t.line(), t.column());
             } else if (match(ChuckLexer.TokenType.DOT)) {
                 consume(ChuckLexer.TokenType.ID, "Expected member name after '.'");
                 ChuckLexer.Token member = previous();

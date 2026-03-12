@@ -37,7 +37,8 @@ public class Rhodey extends ChuckUGen {
     public void noteOn(float velocity) {
         carrierEnv.keyOn();
         modulatorEnv.keyOn();
-        modIndex = velocity * 1000.0f;
+        // Modulation index proportional to velocity, scaled to freq (like STK Rhodey)
+        modIndex = (float)(baseFreq * velocity * 0.5);
     }
 
     public void noteOff(float velocity) {

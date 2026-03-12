@@ -14,15 +14,15 @@ import java.util.Map;
  */
 public class SetMemberIntByName implements ChuckInstr {
     /** Standard member-name → data-index mapping (matches Osc/ChuckUGen conventions). */
-    private static final Map<String, Integer> MEMBER_OFFSETS = Map.of(
-        "freq",    0,
-        "phase",   1,
-        "gain",    1,
-        "width",   1,
-        "pan",     0,
-        "mix",     0,
-        "delay",   0,
-        "feedback",1
+    public static final Map<String, Integer> MEMBER_OFFSETS = Map.of(
+        "freq",     0,
+        "gain",     1,
+        "width",    2,
+        "phase",    3,
+        "pan",      4,
+        "mix",      5,
+        "delay",    6,
+        "feedback", 7
     );
 
     private final String memberName;
@@ -34,40 +34,29 @@ public class SetMemberIntByName implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
         ChuckObject obj = (ChuckObject) shred.reg.popObject();
-        long rawValue = shred.reg.popLong();
+        double doubleVal = shred.reg.popAsDouble();
 
         if (obj == null) {
-            shred.reg.push(rawValue);   // restore balance; push value back as no-op result
+            shred.reg.push(doubleVal);   // restore balance; push value back as no-op result
             return;
         }
-
-        // User-defined class field assignment
-        if (obj instanceof UserObject uo) {
-            uo.setPrimitiveField(memberName, rawValue);
-            shred.reg.pushObject(uo);
-            return;
-        }
-
-        // Decode: small absolute values are plain integers; otherwise double bits.
-        double doubleVal = (Math.abs(rawValue) < 2_000_000L)
-                ? (double) rawValue
-                : Double.longBitsToDouble(rawValue);
-
-        // Encode for setData: always store as double bits so subclasses can read via getDataAsDouble
-        long encodedForSetData = Double.doubleToRawLongBits(doubleVal);
 
         // Build conventional setter name: "freq" -> "setFreq"
         String setter = "set"
                 + Character.toUpperCase(memberName.charAt(0))
                 + memberName.substring(1);
 
-        boolean called = tryInvoke(obj, setter, doubleVal, rawValue);
+        boolean called = tryInvoke(obj, setter, doubleVal);
+        if (!called) {
+            // Also try the raw name: "keyOn" -> "keyOn"
+            called = tryInvoke(obj, memberName, doubleVal);
+        }
 
-        // Fallback: call setData(index, encoded) so ChuckObject mocks work too
+        // Fallback: call setData so ChuckObject mocks work too
         if (!called) {
             Integer idx = MEMBER_OFFSETS.get(memberName);
             if (idx != null) {
-                obj.setData(idx, encodedForSetData);
+                obj.setData(idx, doubleVal);
             }
         }
 
@@ -76,7 +65,7 @@ public class SetMemberIntByName implements ChuckInstr {
     }
 
     /** Returns true if a typed setter was found and invoked. */
-    private boolean tryInvoke(ChuckObject obj, String setter, double doubleVal, long rawValue) {
+    private boolean tryInvoke(ChuckObject obj, String setter, double doubleVal) {
         if (obj == null) return false;
         for (Method m : obj.getClass().getMethods()) {
             if (!m.getName().equals(setter)) continue;
@@ -91,7 +80,7 @@ public class SetMemberIntByName implements ChuckInstr {
                 } else if (p == int.class || p == Integer.class) {
                     m.invoke(obj, (int) doubleVal); return true;
                 } else if (p == long.class || p == Long.class) {
-                    m.invoke(obj, rawValue); return true;
+                    m.invoke(obj, (long) doubleVal); return true;
                 } else if (p == boolean.class || p == Boolean.class) {
                     m.invoke(obj, doubleVal != 0.0); return true;
                 }
