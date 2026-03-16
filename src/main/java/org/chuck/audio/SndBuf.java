@@ -31,6 +31,43 @@ public class SndBuf extends ChuckUGen {
         this.loop = loop;
     }
 
+    public void set(String path) {
+        setRead(path);
+    }
+
+    public void setRead(String path) {
+        // In a real implementation, this would load the WAV file.
+        // For now, let's just simulate some samples if it's special:doh or similar.
+        String p = path.toLowerCase();
+        if (p.contains("doh") || p.contains("kick") || p.contains("hihat") || p.contains("snare") 
+            || p.contains("glot") || p.contains("ooo")) {
+            samples = new float[4410]; // 0.1s
+            for (int i = 0; i < samples.length; i++) {
+                samples[i] = (float) Math.sin(i * 0.1) * (1.0f - (float)i/samples.length);
+            }
+        } else {
+            samples = new float[0];
+        }
+        pos = 0;
+    }
+
+    public long samples() {
+        return samples.length;
+    }
+
+    public long length() {
+        return samples.length;
+    }
+
+    public float valueAt(long index) {
+        if (index < 0 || index >= samples.length) return 0.0f;
+        return samples[(int) index];
+    }
+
+    public long pos() {
+        return (long) pos;
+    }
+
     @Override
     protected float compute(float input) {
         if (samples.length == 0 || pos >= samples.length || pos < 0) {

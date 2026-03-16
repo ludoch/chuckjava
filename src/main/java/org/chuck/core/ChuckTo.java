@@ -8,10 +8,20 @@ import org.chuck.audio.ChuckUGen;
 public class ChuckTo implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
-        ChuckUGen rhs = (ChuckUGen) shred.reg.popObject();
-        ChuckUGen lhs = (ChuckUGen) shred.reg.popObject();
-        lhs.chuckTo(rhs);
+        if (shred.reg.getSp() < 2) {
+            if (shred.reg.getSp() > 0) {
+                // leave top on stack for chaining if possible
+            }
+            return;
+        }
+        Object rawRhs = shred.reg.popObject();
+        Object rawLhs = shred.reg.popObject();
+        
+        if (rawRhs instanceof ChuckUGen rhs && rawLhs instanceof ChuckUGen lhs) {
+            lhs.chuckTo(rhs);
+        }
+        
         // Leave rhs on stack for chaining (e.g. a => b => c)
-        shred.reg.pushObject(rhs);
+        shred.reg.pushObject(rawRhs);
     }
 }

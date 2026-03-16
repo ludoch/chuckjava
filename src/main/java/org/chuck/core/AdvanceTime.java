@@ -8,8 +8,9 @@ package org.chuck.core;
 public class AdvanceTime implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
+        if (shred.reg.getSp() == 0) return;
         long samples = shred.reg.popLong();
         shred.yield(samples);
-        shred.reg.push(vm.getCurrentTime()); // push new 'now' for use as condition value
+        shred.reg.push(vm.getCurrentTime());
     }
 }

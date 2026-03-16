@@ -134,7 +134,20 @@ public class ChuckVMTest {
             public void execute(ChuckVM vm, ChuckShred shred) {
                 new PushString("hello").execute(vm, shred);
                 ChuckString s = (ChuckString) shred.reg.popObject();
-                assertEquals("hello", s.getValue());
+                assertEquals("hello", s.toString());
+            }
+        });
+
+        code.addInstruction(new ChuckInstr() {
+            @Override
+            public void execute(ChuckVM vm, ChuckShred shred) {
+                ChuckString s = new ChuckString("abc");
+                shred.reg.pushObject(s);
+                shred.reg.push(0L); // index
+                // Manually trigger CallMethod logic (since it's internal to Emitter, we can't easily new it here)
+                // But we can test ChuckString directly
+                assertEquals(97, s.charAt(0));
+                assertEquals(3, s.length());
             }
         });
         

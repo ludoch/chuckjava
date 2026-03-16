@@ -5,146 +5,136 @@ package org.chuck.core;
  */
 public class ChuckStack {
     private final long[] primitives;
-    private final boolean[] isDouble; // Tracks if a primitive slot contains a double bitmask
+    private final boolean[] isDouble;
+    private final boolean[] isObject;
     private final Object[] objects;
-    private int sp; 
+    private int sp = 0;
 
     public ChuckStack(int size) {
-        this.primitives = new long[size];
-        this.isDouble = new boolean[size];
-        this.objects = new Object[size];
-        this.sp = 0;
+        primitives = new long[size];
+        isDouble = new boolean[size];
+        isObject = new boolean[size];
+        objects = new Object[size];
     }
 
-    public void push(long value) {
-        primitives[sp] = value;
+    public void push(long val) {
+        if (sp >= primitives.length) throw new RuntimeException("ChucK stack overflow: " + primitives.length);
+        primitives[sp] = val;
         isDouble[sp] = false;
-        objects[sp] = null;
+        isObject[sp] = false;
         sp++;
     }
 
-    public void push(double value) {
-        primitives[sp] = Double.doubleToRawLongBits(value);
+    public void push(double val) {
+        if (sp >= primitives.length) throw new RuntimeException("ChucK stack overflow: " + primitives.length);
+        primitives[sp] = Double.doubleToRawLongBits(val);
         isDouble[sp] = true;
-        objects[sp] = null;
+        isObject[sp] = false;
         sp++;
     }
 
     public void pushObject(Object obj) {
-        primitives[sp] = 0;
-        isDouble[sp] = false;
+        if (sp >= primitives.length) throw new RuntimeException("ChucK stack overflow: " + primitives.length);
         objects[sp] = obj;
+        isObject[sp] = true;
+        isDouble[sp] = false;
         sp++;
     }
 
     public long popLong() {
+        if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow: sp=" + sp);
         sp--;
-        return primitives[sp];
+        long raw = primitives[sp];
+        long val = isDouble[sp] ? Math.round(Double.longBitsToDouble(raw)) : raw;
+        objects[sp] = null;
+        primitives[sp] = 0;
+        isDouble[sp] = false;
+        isObject[sp] = false;
+        return val;
     }
 
     public double popDouble() {
-        sp--;
-        return Double.longBitsToDouble(primitives[sp]);
-    }
-
-    /**
-     * ChucK specific pop that handles mixed types correctly.
-     */
-    public double popAsDouble() {
+        if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow: sp=" + sp);
         sp--;
         long raw = primitives[sp];
-        if (isDouble[sp]) return Double.longBitsToDouble(raw);
-        return (double) raw;
-    }
-
-    public boolean isDouble(int offset) {
-        int idx = sp - 1 - offset;
-        if (idx < 0) return false;
-        return isDouble[idx];
-    }
-
-    public boolean isDoubleAt(int index) {
-        if (index < 0 || index >= isDouble.length) return false;
-        return isDouble[index];
-    }
-
-    @SuppressWarnings("unchecked")
-    public <T> T popObject() {
-        T obj = (T) objects[--sp];
+        double val = isDouble[sp] ? Double.longBitsToDouble(raw) : (double) raw;
         objects[sp] = null;
+        primitives[sp] = 0;
+        isDouble[sp] = false;
+        isObject[sp] = false;
+        return val;
+    }
+
+    public Object popObject() {
+        if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow: sp=" + sp);
+        sp--;
+        Object obj = objects[sp];
+        objects[sp] = null;
+        isObject[sp] = false;
+        isDouble[sp] = false;
         return obj;
     }
 
-    public long peekLong(int offset) {
-        return primitives[sp - 1 - offset];
-    }
-
-    public Object peekObject(int offset) {
-        return objects[sp - 1 - offset];
-    }
-
-    public void pop(int count) {
-        for (int i = 0; i < count; i++) {
-            objects[--sp] = null;
-        }
-    }
-
-    public boolean isObject(int offset) {
-        if (sp - 1 - offset < 0) return false;
-        Object obj = objects[sp - 1 - offset];
-        return obj != null && !(obj instanceof Long || obj instanceof Double || obj instanceof Integer);
-    }
-
     public Object pop() {
-        sp--;
-        Object obj = objects[sp];
-        if (obj != null) {
-            objects[sp] = null;
-            return obj;
+        if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow");
+        if (isObject[sp - 1]) return popObject();
+        if (isDouble[sp - 1]) return popDouble();
+        return popLong();
+    }
+
+    public void pop(int n) {
+        for (int i = 0; i < n; i++) pop();
+    }
+
+    public double popAsDouble() {
+        if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow");
+        if (isObject[sp - 1]) {
+            Object o = popObject();
+            if (o instanceof Number) return ((Number) o).doubleValue();
+            if (o instanceof FileIO fio) return fio.good() ? 1.0 : 0.0;
+            return o != null ? 1.0 : 0.0;
         }
-        long raw = primitives[sp];
-        // Guess if it's double or long based on raw value range (imperfect but works for basic printing)
-        double d = Double.longBitsToDouble(raw);
-        if (Double.isNaN(d) || Double.isInfinite(d) || (Math.abs(d) < 1e-10 && raw != 0)) {
-            return raw;
-        }
-        // If it's a whole number, return as Long
-        if (d == (long) d) return (long) d;
-        return d;
+        return popDouble();
     }
 
-    public int getSp() {
-        return sp;
-    }
-
-    public long getData(int index) {
-        if (index < 0 || index >= primitives.length) return 0;
-        return primitives[index];
-    }
-
-    public Object getRef(int index) {
-        if (index < 0 || index >= objects.length) return null;
-        return objects[index];
-    }
-
-    public void setData(int index, long value) {
-        if (index >= 0 && index < primitives.length) {
-            primitives[index] = value;
-            isDouble[index] = false;
-        }
-    }
-
-    public void setData(int index, double value) {
-        if (index >= 0 && index < primitives.length) {
-            primitives[index] = Double.doubleToRawLongBits(value);
-            isDouble[index] = true;
-        }
-    }
-
-    /** Directly set the stack pointer (used by CallFunc/ReturnFunc to clean up args). */
+    public int getSp() { return sp; }
     public void setSp(int newSp) {
-        // Clear object refs above new sp to avoid memory leaks
-        for (int i = newSp; i < sp; i++) objects[i] = null;
+        for (int i = newSp; i < sp; i++) {
+            objects[i] = null;
+            isObject[i] = false;
+            isDouble[i] = false;
+        }
         sp = newSp;
     }
+
+    public boolean isObject(int depth) { return isObject[sp - 1 - depth]; }
+    public boolean isDouble(int depth) { return isDouble[sp - 1 - depth]; }
+    public Object peekObject(int depth) { return objects[sp - 1 - depth]; }
+    public long peekLong(int depth) { return primitives[sp - 1 - depth]; }
+    public double peekAsDouble(int depth) {
+        int idx = sp - 1 - depth;
+        if (isDouble[idx]) return Double.longBitsToDouble(primitives[idx]);
+        return (double) primitives[idx];
+    }
+
+    // Random access for locals
+    public long getData(int idx) { return primitives[idx]; }
+    public void setData(int idx, long val) {
+        primitives[idx] = val;
+        isObject[idx] = false;
+        isDouble[idx] = false;
+    }
+    public void setData(int idx, double val) {
+        primitives[idx] = Double.doubleToRawLongBits(val);
+        isObject[idx] = false;
+        isDouble[idx] = true;
+    }
+    public Object getRef(int idx) { return objects[idx]; }
+    public void setRef(int idx, Object obj) {
+        objects[idx] = obj;
+        isObject[idx] = true;
+        isDouble[idx] = false;
+    }
+    public boolean isObjectAt(int idx) { return isObject[idx]; }
+    public boolean isDoubleAt(int idx) { return isDouble[idx]; }
 }

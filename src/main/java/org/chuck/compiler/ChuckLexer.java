@@ -31,11 +31,11 @@ public class ChuckLexer {
         DOLLAR,                            // $ (cast operator)
         HASH,                              // # (complex literal)
         QUESTION,                          // ? (ternary)
-        IF, ELSE, WHILE, FOR, REPEAT, RETURN, BREAK, CONTINUE,
-        NEW, SPORK, FUN, CLASS, EXTENDS, PUBLIC, STATIC,
+        IF, ELSE, WHILE, FOR, REPEAT, RETURN, BREAK, CONTINUE, DO, UNTIL,
+        NEW, SPORK, FUN, CLASS, EXTENDS, PUBLIC, STATIC, ME,
         LT, GT, LE, GE, EQ_EQ, NEQ,
         WRITE_IO,                          // <=
-        TILDE,
+        TILDE, AT,
         PRINT_START, PRINT_END, // <<< and >>>
         EOF
     }
@@ -182,12 +182,13 @@ public class ChuckLexer {
                         pos += 3;
                         column += 3;
                     } else {
-                        tokens.add(new Token(TokenType.ID, "@=", line, column));
+                        tokens.add(new Token(TokenType.AT, "@", line, column));
+                        tokens.add(new Token(TokenType.ASSIGN, "=", line, column + 1));
                         pos += 2;
                         column += 2;
                     }
                 } else {
-                    tokens.add(new Token(TokenType.ID, "@", line, column));
+                    tokens.add(new Token(TokenType.AT, "@", line, column));
                     pos++;
                     column++;
                 }
@@ -297,6 +298,8 @@ public class ChuckLexer {
             case "return" -> TokenType.RETURN;
             case "break" -> TokenType.BREAK;
             case "continue" -> TokenType.CONTINUE;
+            case "do" -> TokenType.DO;
+            case "until" -> TokenType.UNTIL;
             case "new" -> TokenType.NEW;
             case "spork" -> TokenType.SPORK;
             case "fun" -> TokenType.FUN;
@@ -304,6 +307,7 @@ public class ChuckLexer {
             case "extends" -> TokenType.EXTENDS;
             case "public" -> TokenType.PUBLIC;
             case "static" -> TokenType.STATIC;
+            case "me" -> TokenType.ME;
             default -> TokenType.ID;
         };
         return new Token(type, value, line, startCol);

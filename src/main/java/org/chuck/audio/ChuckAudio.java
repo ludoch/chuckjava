@@ -18,6 +18,7 @@ public class ChuckAudio {
     private TargetDataLine inputLine;   // null if no mic available
     private boolean running = false;
     private float masterGain = 0.8f;
+    private int verbose = 1;
 
     // Optional recorder
     private WvOut recorder;
@@ -28,6 +29,10 @@ public class ChuckAudio {
         this.numChannels = numChannels;
         this.sampleRate = sampleRate;
         initJavaSound();
+    }
+
+    public void setVerbose(int verbose) {
+        this.verbose = verbose;
     }
 
     public void setMasterGain(float gain) {
@@ -78,6 +83,7 @@ public class ChuckAudio {
                         }
                     }
 
+                    double sumSq = 0;
                     // ── Per-sample processing ─────────────────────────────────────
                     for (int i = 0; i < bufferSize; i++) {
                         // Feed ADC with captured frame
@@ -94,6 +100,7 @@ public class ChuckAudio {
                         // Interleave Left/Right for stereo output
                         for (int c = 0; c < numChannels; c++) {
                             float sample = vm.getChannelLastOut(c) * masterGain;
+                            sumSq += sample * sample;
                             short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
                             int idx = (i * numChannels + c) * 2;
                             outBuf[idx]     = (byte)  (s16 & 0xFF);
@@ -107,6 +114,14 @@ public class ChuckAudio {
                             }
                         }
                     }
+                    
+                    if (verbose > 1) {
+                        double rms = Math.sqrt(sumSq / (bufferSize * numChannels));
+                        if (rms > 1e-9) {
+                            System.out.printf("[Audio] RMS: %.9f\n", rms);
+                        }
+                    }
+                    
                     outputLine.write(outBuf, 0, outBuf.length);
                 }
             } catch (Throwable t) {

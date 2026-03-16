@@ -31,7 +31,17 @@ public class ChuckVM {
     // Global variables
     private final Map<String, Long> globalInts = new ConcurrentHashMap<>();
     private final Map<String, Boolean> globalIsDouble = new ConcurrentHashMap<>();
-    private final Map<String, ChuckObject> globalObjects = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> globalIsObject = new ConcurrentHashMap<>();
+    private final Map<String, Object> globalObjects = new ConcurrentHashMap<>();
+    private final Map<String, UserClassDescriptor> userClassRegistry = new ConcurrentHashMap<>();
+
+    public void registerUserClass(String name, UserClassDescriptor descriptor) {
+        userClassRegistry.put(name, descriptor);
+    }
+
+    public UserClassDescriptor getUserClass(String name) {
+        return userClassRegistry.get(name);
+    }
 
     // Multi-channel output (dac)
     private final int numChannels = 2;
@@ -54,11 +64,13 @@ public class ChuckVM {
                     }
                     float sum = 0.0f;
                     for (ChuckUGen src : sources) {
-                        float val = src.tick(systemTime);
+                        // Crucially, tick the source once per sample (the first dac channel handles this)
+                        // Subsequent channels will use the cached value.
+                        src.tick(systemTime);
                         if (src instanceof org.chuck.audio.StereoUGen s) {
                             sum += (channelIndex == 0) ? s.getLastOutLeft() : s.getLastOutRight();
                         } else {
-                            sum += val;
+                            sum += src.getLastOut();
                         }
                     }
                     lastOut = compute(sum) * gain;
@@ -90,14 +102,20 @@ public class ChuckVM {
         return dacChannels[channel % numChannels].getLastOut();
     }
 
+    public int getNumChannels() {
+        return numChannels;
+    }
+
     public void setGlobalInt(String name, long value) {
         globalInts.put(name, value);
         globalIsDouble.put(name, false);
+        globalIsObject.put(name, false);
     }
 
     public void setGlobalFloat(String name, double value) {
         globalInts.put(name, Double.doubleToRawLongBits(value));
         globalIsDouble.put(name, true);
+        globalIsObject.put(name, false);
     }
 
     public long getGlobalInt(String name) {
@@ -107,11 +125,21 @@ public class ChuckVM {
     public boolean isGlobalDouble(String name) {
         return globalIsDouble.getOrDefault(name, false);
     }
-    public void setGlobalObject(String name, ChuckObject obj) {
-        globalObjects.put(name, obj);
+
+    public boolean isGlobalObject(String name) {
+        return globalIsObject.getOrDefault(name, false);
     }
 
-    public ChuckObject getGlobalObject(String name) {
+    public void setGlobalObject(String name, Object obj) {
+        globalIsObject.put(name, true);
+        if (obj == null) {
+            globalObjects.remove(name);
+        } else {
+            globalObjects.put(name, obj);
+        }
+    }
+
+    public Object getGlobalObject(String name) {
         return globalObjects.get(name);
     }
     
@@ -132,6 +160,10 @@ public class ChuckVM {
 
     public boolean isAntlrEnabled() {
         return antlrEnabled;
+    }
+
+    public int getActiveShredCount() {
+        return activeShreds.size();
     }
 
     public void registerHid(org.chuck.hid.Hid hid) {
@@ -157,7 +189,6 @@ public class ChuckVM {
             listener.onPrint(text);
         }
         // Also print to stdout by default
-        System.out.println("[ChucK] " + text);
     }
 
     public long getCurrentTime() {
@@ -196,6 +227,9 @@ public class ChuckVM {
         Thread.ofVirtual().name("Shred-" + shred.getId()).start(() -> {
             try {
                 shred.execute(this);
+            } catch (Throwable t) {
+                print("Error: Shred-" + shred.getId() + " (" + shred.getName() + ") crashed: " + t.getMessage());
+                t.printStackTrace();
             } finally {
                 shred.cleanup();
                 activeShreds.remove(shred.getId());
@@ -237,7 +271,7 @@ public class ChuckVM {
                 ast = parser.parse();
             }
 
-            org.chuck.compiler.ChuckEmitter emitter = new org.chuck.compiler.ChuckEmitter();
+            org.chuck.compiler.ChuckEmitter emitter = new org.chuck.compiler.ChuckEmitter(userClassRegistry);
             ChuckCode code = emitter.emit(ast, name);
             ChuckShred shred = new ChuckShred(code);
             return spork(shred);
@@ -246,6 +280,10 @@ public class ChuckVM {
             e.printStackTrace();
             return 0;
         }
+    }
+
+    public ChuckShred getShred(int id) {
+        return activeShreds.get(id);
     }
 
     public void removeShred(int id) {
@@ -281,29 +319,14 @@ public class ChuckVM {
      * Advance logical time by computing audio samples and waking shreds.
      */
     public void advanceTime(int samplesToCompute) {
+        // First, run any shreds scheduled for NOW (handles yield behavior)
+        runShredsAt(currentTime.get());
+
+        // Then, advance time and compute samples
         for (int s = 0; s < samplesToCompute; s++) {
+            currentTime.incrementAndGet();
             long now = currentTime.get();
-            
-            while (true) {
-                ChuckShred nextShred = null;
-                
-                schedulerLock.lock();
-                try {
-                    if (!shreduler.isEmpty() && shreduler.peek().getWakeTime() <= now) {
-                        nextShred = shreduler.poll();
-                    }
-                } finally {
-                    schedulerLock.unlock();
-                }
-
-                if (nextShred == null) break;
-
-                nextShred.resume(this);
-                
-                if (!nextShred.isDone() && !nextShred.isWaiting()) {
-                    schedule(nextShred);
-                }
-            }
+            runShredsAt(now);
             
             // DRIVE THE UGEN GRAPH: Pull samples through the dac channels
             for (int i = 0; i < numChannels; i++) {
@@ -311,8 +334,34 @@ public class ChuckVM {
             }
             // Also tick blackhole
             blackhole.tick(now);
+        }
+    }
+
+    private void runShredsAt(long now) {
+        int loopGuard = 0;
+        while (true) {
+            ChuckShred nextShred = null;
             
-            currentTime.incrementAndGet();
+            schedulerLock.lock();
+            try {
+                if (!shreduler.isEmpty() && shreduler.peek().getWakeTime() <= now) {
+                    nextShred = shreduler.poll();
+                }
+            } finally {
+                schedulerLock.unlock();
+            }
+
+            if (nextShred == null) break;
+            if (++loopGuard > 10000) {
+                System.err.println("[ChucK] Infinite loop detected at time " + now + " - forcing sample advance");
+                break;
+            }
+
+            nextShred.resume(this);
+            
+            if (!nextShred.isDone() && !nextShred.isWaiting()) {
+                schedule(nextShred);
+            }
         }
     }
 }

@@ -10,22 +10,34 @@ import java.util.List;
  * Base class for Unit Generators.
  */
 public abstract class ChuckUGen extends ChuckObject {
-    protected float lastOut = 0.0f;
-    protected float gain = 1.0f;
     protected final List<ChuckUGen> sources = new CopyOnWriteArrayList<>();
     protected final List<ChuckUGen> targets = new CopyOnWriteArrayList<>();
-    
-    // The last logical time (in samples) this UGen was ticked.
+    protected float lastOut = 0.0f;
+    protected float gain = 1.0f;
     protected long lastTickTime = -1;
-    // Internal counter for manual ticks (unit tests)
-    private long manualTickCount = 0;
-
-    public ChuckUGen() {
-        super(new ChuckType("UGen", ChuckType.OBJECT, 8, 0));
-    }
+    protected boolean isTicking = false;
+    
+    protected int numInputs = 1;
+    protected int numOutputs = 1;
+    protected ChuckUGen[] inputChannels;
+    protected ChuckUGen[] outputChannels;
 
     public ChuckUGen(ChuckType type) {
         super(type);
+    }
+
+    public ChuckUGen() {
+        super(new ChuckType("UGen", ChuckType.OBJECT, 0, 0));
+    }
+
+    public void addSource(ChuckUGen src) {
+        if (src != null && !sources.contains(src)) {
+            sources.add(src);
+        }
+    }
+
+    public void removeSource(ChuckUGen src) {
+        sources.remove(src);
     }
 
     public void chuckTo(ChuckUGen target) {
@@ -44,104 +56,47 @@ public abstract class ChuckUGen extends ChuckObject {
         }
     }
 
-    /** Disconnect this UGen from all downstream targets. */
-    public void disconnectAll() {
-        for (ChuckUGen target : new ArrayList<>(targets)) {
-            target.removeSource(this);
-        }
-        targets.clear();
-    }
-
-    public void addSource(ChuckUGen src) {
-        if (src != null && !sources.contains(src)) {
-            sources.add(src);
-        }
-    }
-
-    /** Remove a specific upstream connection. */
-    public void removeSource(ChuckUGen src) {
-        sources.remove(src);
-    }
-
-    /** Remove all upstream connections (used by VM clear to silence the DAC). */
-    public void clearSources() {
-        sources.clear();
-    }
-
-    public void setGain(float gain) {
-        this.gain = gain;
-    }
-
-    /** ChucK-style method call: osc.gain(0.5) */
-    public float gain(float g) {
-        this.gain = g;
-        return g;
-    }
-
-    public float getGain() {
-        return gain;
-    }
-
-    @Override
-    protected void triggerDataHook(int index, long value) {
-        if (index == 1) { // gain
-            this.gain = (float) getDataAsDouble(1);
-        }
-    }
-
-    @Override
-    public void setData(int index, long value) {
-        super.setData(index, value);
-        // The base class super.setData(index, value) sets isDouble[index] = false
-        // Then we trigger the hook.
-        triggerDataHook(index, value);
-    }
-
-    @Override
-    public void setData(int index, double value) {
-        super.setData(index, value);
-        // The base class super.setData(index, double) sets isDouble[index] = true
-        // Then we trigger the hook.
-        triggerDataHook(index, Double.doubleToRawLongBits(value));
-    }
-
-    /**
-     * Pull-based ticking mechanism. 
-     */
     public float tick(long systemTime) {
         if (systemTime != -1 && systemTime == lastTickTime) {
             return lastOut;
         }
 
-        float sum = 0.0f;
-        for (ChuckUGen src : sources) {
-            sum += src.tick(systemTime);
+        if (isTicking) return lastOut;
+        isTicking = true;
+
+        try {
+            float sum = 0.0f;
+            for (ChuckUGen src : sources) {
+                sum += src.tick(systemTime);
+            }
+
+            lastOut = compute(sum) * gain;
+            lastTickTime = systemTime;
+            
+            return lastOut;
+        } finally {
+            isTicking = false;
         }
-
-        lastOut = compute(sum) * gain;
-        lastTickTime = systemTime;
-        
-        return lastOut;
     }
 
-    /**
-     * For manual processing (not driven by pull).
-     * Uses a dedicated counter to ensure unit tests are deterministic.
-     */
     public float tick() {
-        return tick(manualTickCount++);
+        return tick(-1);
     }
 
-    /**
-     * Convenience method for testing or manual processing with specific input.
-     */
-    public float tick(float input) {
-        lastOut = compute(input) * gain;
-        // Don't update lastTickTime here to not interfere with pull-based graph
+    public float tick(float manualInput) {
+        lastOut = compute(manualInput) * gain;
         return lastOut;
     }
 
     protected abstract float compute(float input);
+
+    public void setGain(float gain) {
+        this.gain = gain;
+    }
+
+    public float getGain() {
+        return gain;
+    }
 
     public float getLastOut() {
         return lastOut;
@@ -151,9 +106,49 @@ public abstract class ChuckUGen extends ChuckObject {
         return sources.size();
     }
 
+    public int isConnectedTo(ChuckUGen target) {
+        return isConnectedTo(target, 0);
+    }
+
+    private int isConnectedTo(ChuckUGen target, int depth) {
+        if (depth > 5) return 0;
+        if (targets.contains(target)) return 1;
+        System.err.println("  " + this + " isConnectedTo " + target + " ? targets=" + targets);
+        // Check if any of our targets connects to the target (recursive)
+        for (ChuckUGen t : targets) {
+            if (t.isConnectedTo(target, depth + 1) == 1) return 1;
+        }
+        // Also check input channels of target
+        if (target != null && target.inputChannels != null) {
+            for (ChuckUGen in : target.inputChannels) {
+                if (in != null && this.isConnectedTo(in, depth + 1) == 1) return 1;
+            }
+        }
+        return 0;
+    }
+
+    public void disconnectAll() {
+        for (ChuckUGen target : targets) {
+            target.removeSource(this);
+        }
+        targets.clear();
+    }
+
+    public void clearSources() {
+        for (ChuckUGen src : sources) {
+            src.targets.remove(this);
+        }
+        sources.clear();
+    }
+
     public void tick(float[] buffer) {
         for (int i = 0; i < buffer.length; i++) {
             buffer[i] = tick();
         }
     }
+    
+    public int getNumInputs() { return numInputs; }
+    public int getNumOutputs() { return numOutputs; }
+    public ChuckUGen getInputChannel(int i) { return (inputChannels != null && i < inputChannels.length) ? inputChannels[i] : this; }
+    public ChuckUGen getOutputChannel(int i) { return (outputChannels != null && i < outputChannels.length) ? outputChannels[i] : this; }
 }

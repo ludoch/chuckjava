@@ -28,6 +28,10 @@ Significant enhancements have been made to the core engine and the JavaFX IDE, b
 | 18 | **`GenX` Family (`Gen5`, `Gen7`, `Gen10`)** — Table-based envelopes and oscillators. | ✅ Fixed |
 | 19 | **IO Streams (`chout`, `cherr`)** — Support for standard output/error streams and the `<=` operator. | ✅ Fixed |
 | 20 | **Advanced Physical Models** — Added `Moog`, `Flute`, `Sitar`, `Brass`, `Saxofony`, and `Shakers` STK models. | ✅ Fixed |
+| 21 | **Operator Precedence** — Fixed math precedence (multiplicative > additive) in handwritten parser. | ✅ Fixed |
+| 22 | **Chained Chuck Operators** — Support for long chains like `SinOsc s => Envelope e => dac;`. | ✅ Fixed |
+| 23 | **Improved Mixed-Type Stack** — Corrected `popAsDouble` to handle both long and double bits seamlessly. | ✅ Fixed |
+| 24 | **Array/UGen introspection** — Added support for `.size()` on arrays and `.last()` on UGens. | ✅ Fixed |
 
 ### New Features
 
@@ -37,14 +41,10 @@ Significant enhancements have been made to the core engine and the JavaFX IDE, b
 - **`IFFT`**: Inverse Fast Fourier Transform for spectral resynthesis.
 - **Phase Support**: `UAnaBlob` and `Complex` now calculate and store phase data (`pvals`).
 - **Chained Analysis**: `upchuck()` now recursively triggers analysis through the UGen graph.
-
-#### 🎮 Interactive I/O (HID)
-- **`Hid`**: Device handle for Keyboard, Mouse, and **Joysticks**.
-- **`HidMsg`**: Event container for key presses, mouse motion, and controller axis/button changes.
-- **Native Integration**: Uses JDK 25 **FFM (Panama) API** to poll Windows Game controllers (`winmm.dll`) in real-time. Keyboard/Mouse work cross-platform via IDE.
-- **IDE Integration**: Captures focus events from the JavaFX window and routes them to ChucK shreds.
+- **Real-time Monitoring**: Use `--verbose:2` to see real-time RMS levels in the console.
 
 #### 🎨 IDE Enhancements (JavaFX)
+- **CLI Loading**: Pass `.ck` files as arguments to `run.sh` to open them directly in editor tabs.
 - **Multi-Tab Editor**: Open and work on multiple `.ck` files simultaneously.
 - **Spectrum Analyzer**: Real-time FFT magnitude visualization (Lime Green).
 - **Oscilloscope**: Real-time time-domain waveform visualization (Cyan).
@@ -61,13 +61,18 @@ ChucK-Java now supports a full-featured CLI that mirrors the original ChucK impl
 
 ### Usage
 ```bash
-mvn exec:java "-Dexec.args=[options|commands] [+-=^] file1 file2 ..."
+# Launch the IDE with files loaded
+./run.sh examples/basic/bar.ck examples/basic/chirp.ck
+
+# Run in headless mode with real-time RMS monitoring
+./run.sh --verbose:2 examples/basic/bar.ck
 ```
 
 ### Options
-- `--halt` / `-h`: (Default) Exit once all shreds finish.
-- `--loop` / `-l`: Continue running even if no shreds are active (starts the Machine Server).
-- `--silent` / `-s`: Disable audio output (time still passes logically).
+- `--halt` / `-h`: (Default Headless) Exit once all shreds finish.
+- `--loop` / `-l`: Continue running headless even if no shreds are active (starts the Machine Server).
+- `--silent` / `-s`: Headless mode with audio output disabled.
+- `--verbose:<level>`: Set log level. Level 2 enables real-time RMS monitoring.
 - `--syntax`: Check syntax of the provided files without running them.
 - `--dump`: Dump virtual instructions (bytecode) to the console.
 - `--srate:<N>`: Set sampling rate (default: 44100).
@@ -77,7 +82,7 @@ mvn exec:java "-Dexec.args=[options|commands] [+-=^] file1 file2 ..."
 - `--version`: Display version information.
 - `--help`: Print usage information.
 
-### On-the-Fly (OTF) Commands
+### Headless Headless OTF Commands (Headless)
 These commands interact with a running ChucK-Java instance (started with `--loop`).
 - `+` / `--add`: Add a file as a new shred.
 - `-` / `--remove`: Remove a shred by its ID.
@@ -86,17 +91,17 @@ These commands interact with a running ChucK-Java instance (started with `--loop
 
 ### Examples
 ```bash
-# Run a file in silent mode
+# Run a file in silent headless mode
 mvn exec:java "-Dexec.args=--silent examples/basic/foo.ck"
 
-# Start a background loop
+# Start a background headless loop
 mvn exec:java "-Dexec.args=--loop"
 
-# (In another terminal) Add a file to the running loop
+# (In another terminal) Add a file to the running headless loop
 mvn exec:java "-Dexec.args=+ examples/basic/moe.ck"
 
-# Check syntax of multiple files
-mvn exec:java "-Dexec.args=--syntax examples/basic/foo.ck examples/basic/bar.ck"
+# Open the IDE with multiple scripts
+./run.sh examples/basic/bar.ck examples/basic/chirp2.ck
 ```
 
 ## 🔌 Embedding & Hosting

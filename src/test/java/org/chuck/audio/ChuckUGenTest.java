@@ -18,11 +18,11 @@ public class ChuckUGenTest {
         sine.chuckTo(gain);
         
         // Tick the sine wave (source) first
-        sine.tick();
+        sine.tick(0);
         float outSine = sine.getLastOut();
         
         // Tick the gain (downstream)
-        gain.tick();
+        gain.tick(0);
         float outGain = gain.getLastOut();
         
         assertEquals(outSine * 0.5f, outGain, 1e-6);

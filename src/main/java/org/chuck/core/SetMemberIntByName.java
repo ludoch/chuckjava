@@ -6,11 +6,6 @@ import java.util.Map;
 /**
  * Sets a named member on a ChucK object using reflection.
  * Stack layout at execution: [value ... object] (object on top).
- * Pops the object and value, calls the appropriate setter, then pushes the object back
- * (ChucK chuck-operator convention: the RHS is returned).
- *
- * Falls back to ChuckObject.setData(index, rawValue) if no typed setter is found,
- * so plain ChuckObject mocks/subclasses that only override setData still work.
  */
 public class SetMemberIntByName implements ChuckInstr {
     /** Standard member-name → data-index mapping (matches Osc/ChuckUGen conventions). */
@@ -33,12 +28,27 @@ public class SetMemberIntByName implements ChuckInstr {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
-        ChuckObject obj = (ChuckObject) shred.reg.popObject();
-        double doubleVal = shred.reg.popAsDouble();
-
-        if (obj == null) {
-            shred.reg.push(doubleVal);   // restore balance; push value back as no-op result
+        // Stack layout: [value, object] (object on top)
+        if (shred.reg.getSp() < 2) {
+            shred.reg.pop(shred.reg.getSp());
             return;
+        }
+        Object rawObj = shred.reg.popObject();
+        if (rawObj == null) {
+            shred.reg.pop();
+            shred.reg.push(0L);
+            return;
+        }
+
+        // Now pop the value (LHS of the chuck operator)
+        Object valObj = null;
+        double doubleVal = 0;
+        boolean isObjVal = shred.reg.isObject(0);
+        
+        if (isObjVal) {
+            valObj = shred.reg.popObject();
+        } else {
+            doubleVal = shred.reg.popAsDouble();
         }
 
         // Build conventional setter name: "freq" -> "setFreq"
@@ -46,31 +56,49 @@ public class SetMemberIntByName implements ChuckInstr {
                 + Character.toUpperCase(memberName.charAt(0))
                 + memberName.substring(1);
 
-        boolean called = tryInvoke(obj, setter, doubleVal);
-        if (!called) {
-            // Also try the raw name: "keyOn" -> "keyOn"
-            called = tryInvoke(obj, memberName, doubleVal);
+        boolean called = false;
+        if (isObjVal) {
+            called = tryInvokeObj(rawObj, setter, valObj);
+            if (!called) called = tryInvokeObj(rawObj, memberName, valObj);
+        } else {
+            called = tryInvoke(rawObj, setter, doubleVal);
+            if (!called) called = tryInvoke(rawObj, memberName, doubleVal);
         }
 
         // Fallback: call setData so ChuckObject mocks work too
-        if (!called) {
+        if (!called && !isObjVal && rawObj instanceof ChuckObject obj) {
             Integer idx = MEMBER_OFFSETS.get(memberName);
             if (idx != null) {
                 obj.setData(idx, doubleVal);
             }
         }
 
-        // Push the object back so the chuck expression can be chained
-        shred.reg.pushObject(obj);
+        // Push the value back so the chuck expression can be chained
+        if (isObjVal) shred.reg.pushObject(valObj);
+        else shred.reg.push(doubleVal);
     }
 
-    /** Returns true if a typed setter was found and invoked. */
-    private boolean tryInvoke(ChuckObject obj, String setter, double doubleVal) {
-        if (obj == null) return false;
+    private boolean tryInvokeObj(Object obj, String setter, Object val) {
         for (Method m : obj.getClass().getMethods()) {
             if (!m.getName().equals(setter)) continue;
             Class<?>[] params = m.getParameterTypes();
             if (params.length != 1) continue;
+            if (val != null && !params[0].isAssignableFrom(val.getClass())) continue;
+            if (val == null && params[0].isPrimitive()) continue;
+            
+            try {
+                m.invoke(obj, val); return true;
+            } catch (Exception ignored) {}
+        }
+        return false;
+    }
+
+    private boolean tryInvoke(Object obj, String setter, double doubleVal) {
+        for (Method m : obj.getClass().getMethods()) {
+            if (!m.getName().equals(setter)) continue;
+            Class<?>[] params = m.getParameterTypes();
+            if (params.length != 1) continue;
+
             try {
                 Class<?> p = params[0];
                 if (p == double.class || p == Double.class) {
@@ -84,9 +112,7 @@ public class SetMemberIntByName implements ChuckInstr {
                 } else if (p == boolean.class || p == Boolean.class) {
                     m.invoke(obj, doubleVal != 0.0); return true;
                 }
-            } catch (Exception ignored) {
-                // Fall through and try next overload
-            }
+            } catch (Exception ignored) {}
         }
         return false;
     }

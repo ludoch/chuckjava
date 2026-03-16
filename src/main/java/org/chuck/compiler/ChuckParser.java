@@ -32,36 +32,45 @@ public class ChuckParser {
         }
         if (token.type() == ChuckLexer.TokenType.IF) return parseIf();
         if (token.type() == ChuckLexer.TokenType.WHILE) return parseWhile();
+        if (token.type() == ChuckLexer.TokenType.UNTIL) return parseUntil();
+        if (token.type() == ChuckLexer.TokenType.DO) return parseDo();
         if (token.type() == ChuckLexer.TokenType.FOR) return parseFor();
         if (token.type() == ChuckLexer.TokenType.REPEAT) return parseRepeat();
         if (token.type() == ChuckLexer.TokenType.BREAK || token.type() == ChuckLexer.TokenType.CONTINUE) {
             advance();
             match(ChuckLexer.TokenType.SEMICOLON);
-            return new ChuckAST.BreakStmt(token.line(), token.column());
+            if (token.type() == ChuckLexer.TokenType.BREAK)
+                return new ChuckAST.BreakStmt(token.line(), token.column());
+            else
+                return new ChuckAST.ContinueStmt(token.line(), token.column());
         }
-        if (token.type() == ChuckLexer.TokenType.PUBLIC || token.type() == ChuckLexer.TokenType.STATIC) {
-            advance(); // skip modifier, re-parse
-            return parseStatement();
+        // Check for modifiers
+        boolean isPublic = false;
+        boolean isStatic = false;
+        while (!isAtEnd() && (peek().type() == ChuckLexer.TokenType.PUBLIC || peek().type() == ChuckLexer.TokenType.STATIC)) {
+            if (match(ChuckLexer.TokenType.PUBLIC)) isPublic = true;
+            if (match(ChuckLexer.TokenType.STATIC)) isStatic = true;
         }
-        // @-directives: @import "file.ck", @doc "...", etc. — skip to end of statement
-        // Only treat as directive if @identifier (not @( which is a complex literal expression)
-        if (token.type() == ChuckLexer.TokenType.ID && token.value().equals("@")
+        token = peek(); // refresh token after skipping modifiers
+
+        // @-directives...
+        if (token.type() == ChuckLexer.TokenType.AT
                 && pos + 1 < tokens.size() && tokens.get(pos + 1).type() == ChuckLexer.TokenType.ID) {
+            // ... (keep existing directive logic)
             advance(); // consume "@"
             if (!isAtEnd() && peek().type() == ChuckLexer.TokenType.ID) advance(); // directive name
-            // consume args until STRING, SEMICOLON, or next statement-starting token
             while (!isAtEnd() && !check(ChuckLexer.TokenType.SEMICOLON)
                     && !check(ChuckLexer.TokenType.FUN) && !check(ChuckLexer.TokenType.CLASS)
                     && !check(ChuckLexer.TokenType.RBRACE) && !check(ChuckLexer.TokenType.IF)
                     && !check(ChuckLexer.TokenType.WHILE) && !check(ChuckLexer.TokenType.FOR)) {
                 boolean wasString = check(ChuckLexer.TokenType.STRING);
                 advance();
-                if (wasString) break; // stop after string argument
+                if (wasString) break;
             }
             match(ChuckLexer.TokenType.SEMICOLON);
             return new ChuckAST.BlockStmt(List.of(), token.line(), token.column());
         }
-        if (token.type() == ChuckLexer.TokenType.FUN) return parseFuncDef();
+        if (token.type() == ChuckLexer.TokenType.FUN) return parseFuncDef(isPublic, isStatic);
         if (token.type() == ChuckLexer.TokenType.CLASS) return parseClassDef();
         if (token.type() == ChuckLexer.TokenType.LBRACE) return parseBlock();
         if (token.type() == ChuckLexer.TokenType.PRINT_START) return parsePrint();
@@ -75,7 +84,7 @@ public class ChuckParser {
             return new ChuckAST.ReturnStmt(exp, token.line(), token.column());
         }
 
-        if (isType(token) && isDeclStart()) return parseDecl();
+        if (isType(token) && isDeclStart()) return parseDecl(isPublic, isStatic, true);
 
         ChuckAST.Exp exp = parseExpression();
         match(ChuckLexer.TokenType.SEMICOLON);
@@ -135,48 +144,98 @@ public class ChuckParser {
     private boolean isDeclStart() {
         if (pos + 1 >= tokens.size()) return false;
         ChuckLexer.TokenType next = tokens.get(pos + 1).type();
-        return next == ChuckLexer.TokenType.ID;
+        if (next == ChuckLexer.TokenType.ID) return true;
+        // Support @ reference syntax: Gain @ g;
+        if (next == ChuckLexer.TokenType.AT && pos + 2 < tokens.size()) {
+            return tokens.get(pos + 2).type() == ChuckLexer.TokenType.ID;
+        }
+        return false;
+    }
+
+    private boolean isDeclNext() {
+        if (check(ChuckLexer.TokenType.ID) || check(ChuckLexer.TokenType.AT)) {
+            ChuckLexer.Token t = peek();
+            if (t.type() == ChuckLexer.TokenType.AT) {
+                // If it's @ followed by ID, might be a decl like Gain @ g;
+                if (pos + 1 < tokens.size() && tokens.get(pos+1).type() == ChuckLexer.TokenType.ID) {
+                    // Check if the ID is a type
+                    if (isType(tokens.get(pos+1))) {
+                         // peek further for name
+                         if (pos + 2 < tokens.size()) {
+                             ChuckLexer.Token next2 = tokens.get(pos + 2);
+                             return next2.type() == ChuckLexer.TokenType.ID || next2.type() == ChuckLexer.TokenType.AT;
+                         }
+                    }
+                }
+                return false;
+            }
+            // A declaration starts with a type name.
+            // In ChucK, if it's an ID followed by another ID, it's a declaration.
+            if (isType(t)) {
+                // Peek ahead to see if there is another ID (the variable name)
+                if (pos + 1 < tokens.size()) {
+                    ChuckLexer.Token next = tokens.get(pos + 1);
+                    return next.type() == ChuckLexer.TokenType.ID || next.type() == ChuckLexer.TokenType.AT;
+                }
+            }
+        }
+        return false;
     }
 
     private boolean isType(ChuckLexer.Token token) {
         if (token.type() != ChuckLexer.TokenType.ID) return false;
         String val = token.value();
-        if (val.equals("me") || val.equals("Machine") || val.equals("@")) return false;
+        if (val.equals("me") || val.equals("Machine")) return false;
         // Known types, or any capitalized identifier (user-defined classes are always capitalized in ChucK)
         return knownTypes.contains(val) || (!val.isEmpty() && Character.isUpperCase(val.charAt(0)));
     }
 
-    private ChuckAST.Stmt parseDecl() {
+    private ChuckAST.Stmt parseDecl(boolean isPublic, boolean isStatic, boolean allowInlineChuck) {
         ChuckLexer.Token type = advance();
         List<ChuckAST.Stmt> results = new ArrayList<>();
+        // Support @ reference for the whole declaration: Gain @ h, g;
+        boolean isRef = match(ChuckLexer.TokenType.AT);
+        
+        int variableCount = 0;
+        boolean hasChuck = false;
+
         // Support multiple names: float x[], y[];
         do {
+            variableCount++;
+            // Also support @ per-variable if needed (though unconventional)
+            boolean thisRef = isRef || match(ChuckLexer.TokenType.AT);
+            
             ChuckLexer.Token nameToken = consume(ChuckLexer.TokenType.ID, "Expected variable name");
             // Collect array dimensions: int a[0][2] or int a[]
-            ChuckAST.Exp arraySize = null;
+            List<ChuckAST.Exp> arraySizes = new ArrayList<>();
             while (check(ChuckLexer.TokenType.LBRACKET)) {
                 advance(); // [
                 ChuckAST.Exp dim = check(ChuckLexer.TokenType.RBRACKET)
                         ? new ChuckAST.IntExp(-1, type.line(), type.column())
                         : parseExpression();
                 consume(ChuckLexer.TokenType.RBRACKET, "Expected ']'");
-                if (arraySize == null) arraySize = dim;
+                arraySizes.add(dim);
             }
-            ChuckAST.DeclStmt decl = new ChuckAST.DeclStmt(type.value(), nameToken.value(), arraySize,
-                    type.line(), type.column());
-
-            // Handle constructor args: Foo a(1, 2) — consume but discard
+            // Handle constructor args: Foo a(1, 2)
+            ChuckAST.Exp callArgs = null;
             if (check(ChuckLexer.TokenType.LPAREN)) {
-                advance(); // (
+                ChuckLexer.Token start = advance(); // (
+                List<ChuckAST.Exp> args = new ArrayList<>();
                 if (!check(ChuckLexer.TokenType.RPAREN)) {
-                    do { parseExpression(); } while (match(ChuckLexer.TokenType.COMMA));
+                    do { args.add(parseExpression()); } while (match(ChuckLexer.TokenType.COMMA));
                 }
                 consume(ChuckLexer.TokenType.RPAREN, "Expected ')'");
+                callArgs = new ChuckAST.CallExp(new ChuckAST.IdExp(type.value(), start.line(), start.column()),
+                        args, start.line(), start.column());
             }
 
+            ChuckAST.DeclStmt decl = new ChuckAST.DeclStmt(type.value(), nameToken.value(), arraySizes, callArgs, thisRef, isStatic,
+                    type.line(), type.column());
+
             // Handle inline chuck after the name: SinOsc s => dac; or fc =^ unflip
-            if (match(ChuckLexer.TokenType.CHUCK, ChuckLexer.TokenType.AT_CHUCK,
+            if (allowInlineChuck && match(ChuckLexer.TokenType.CHUCK, ChuckLexer.TokenType.AT_CHUCK,
                       ChuckLexer.TokenType.UPCHUCK)) {
+                hasChuck = true;
                 ChuckLexer.Token opToken = previous();
                 ChuckAST.Operator op = switch (opToken.type()) {
                     case AT_CHUCK -> ChuckAST.Operator.AT_CHUCK;
@@ -193,6 +252,10 @@ public class ChuckParser {
                 results.add(decl);
             }
         } while (match(ChuckLexer.TokenType.COMMA)); // float x, y;  or  float x[], y[];
+
+        if (variableCount > 1 && hasChuck) {
+            throw new RuntimeException("cannot '=>' from/to a multi-variable declaration (from parseDecl)");
+        }
 
         match(ChuckLexer.TokenType.SEMICOLON);
         return results.size() == 1 ? results.get(0)
@@ -232,19 +295,18 @@ public class ChuckParser {
                 case AMP_CHUCK    -> ChuckAST.Operator.S_AND;
                 default           -> ChuckAST.Operator.NONE;
             };
-            ChuckAST.Exp right = parseTernary();
-            left = new ChuckAST.BinaryExp(left, op, right, opToken.line(), opToken.column());
-        }
-        return left;
-    }
-
-    private ChuckAST.Exp parseLogical() {
-        ChuckAST.Exp left = parseComparison();
-        while (match(ChuckLexer.TokenType.AND_AND, ChuckLexer.TokenType.OR_OR)) {
-            ChuckLexer.Token opToken = previous();
-            ChuckAST.Operator op = opToken.type() == ChuckLexer.TokenType.AND_AND
-                    ? ChuckAST.Operator.AND : ChuckAST.Operator.OR;
-            ChuckAST.Exp right = parseComparison();
+            ChuckAST.Exp right;
+            if (isDeclNext()) {
+                ChuckAST.Stmt decl = parseDecl(false, false, false);
+                if (decl instanceof ChuckAST.BlockStmt) {
+                    throw new RuntimeException("cannot '=>' from/to a multi-variable declaration (from parseChuck)");
+                }
+                // Wrap DeclStmt back into DeclExp for the BinaryExp
+                ChuckAST.DeclStmt ds = (ChuckAST.DeclStmt) decl;
+                right = new ChuckAST.DeclExp(ds.type(), ds.name(), ds.arraySizes(), ds.callArgs(), ds.isReference(), ds.isStatic(), ds.line(), ds.column());
+            } else {
+                right = parseTernary();
+            }
             left = new ChuckAST.BinaryExp(left, op, right, opToken.line(), opToken.column());
         }
         return left;
@@ -258,6 +320,18 @@ public class ChuckParser {
             return thenExp; // simplified: return then branch
         }
         return exp;
+    }
+
+    private ChuckAST.Exp parseLogical() {
+        ChuckAST.Exp left = parseComparison();
+        while (match(ChuckLexer.TokenType.AND_AND, ChuckLexer.TokenType.OR_OR)) {
+            ChuckLexer.Token opToken = previous();
+            ChuckAST.Operator op = opToken.type() == ChuckLexer.TokenType.AND_AND
+                    ? ChuckAST.Operator.AND : ChuckAST.Operator.OR;
+            ChuckAST.Exp right = parseComparison();
+            left = new ChuckAST.BinaryExp(left, op, right, opToken.line(), opToken.column());
+        }
+        return left;
     }
 
     private ChuckAST.Exp parseComparison() {
@@ -274,15 +348,14 @@ public class ChuckParser {
                 case NEQ -> ChuckAST.Operator.NEQ;
                 default  -> ChuckAST.Operator.NONE;
             };
-            ChuckAST.Exp right = parseBinary();
+            ChuckAST.Exp right = parseCast();
             left = new ChuckAST.BinaryExp(left, op, right, opToken.line(), opToken.column());
         }
         return left;
     }
 
-    /** expr $ type  — cast; treat as identity (just discard the type token) */
     private ChuckAST.Exp parseCast() {
-        ChuckAST.Exp exp = parseBinary();
+        ChuckAST.Exp exp = parseAdditive();
         while (match(ChuckLexer.TokenType.DOLLAR)) {
             advance(); // consume type name
             // optional [] suffix
@@ -293,24 +366,37 @@ public class ChuckParser {
         return exp;
     }
 
-    private ChuckAST.Exp parseBinary() {
-        ChuckAST.Exp left = parseUnary();
+    private ChuckAST.Exp parseAdditive() {
+        ChuckAST.Exp left = parseMultiplicative();
         while (match(ChuckLexer.TokenType.PLUS, ChuckLexer.TokenType.MINUS,
-                     ChuckLexer.TokenType.TIMES, ChuckLexer.TokenType.DIVIDE,
-                     ChuckLexer.TokenType.PERCENT, ChuckLexer.TokenType.COLON_COLON,
-                     ChuckLexer.TokenType.APPEND, ChuckLexer.TokenType.SHIFT_RIGHT,
-                     ChuckLexer.TokenType.AMP, ChuckLexer.TokenType.PIPE)) {
+                     ChuckLexer.TokenType.SHIFT_RIGHT,
+                     ChuckLexer.TokenType.PIPE)) {
             ChuckLexer.Token opToken = previous();
             ChuckAST.Operator op = switch (opToken.type()) {
                 case PLUS         -> ChuckAST.Operator.PLUS;
                 case MINUS        -> ChuckAST.Operator.MINUS;
+                case SHIFT_RIGHT  -> ChuckAST.Operator.SHIFT_RIGHT;
+                case PIPE         -> ChuckAST.Operator.S_OR;
+                default           -> ChuckAST.Operator.NONE;
+            };
+            ChuckAST.Exp right = parseMultiplicative();
+            left = new ChuckAST.BinaryExp(left, op, right, opToken.line(), opToken.column());
+        }
+        return left;
+    }
+
+    private ChuckAST.Exp parseMultiplicative() {
+        ChuckAST.Exp left = parseUnary();
+        while (match(ChuckLexer.TokenType.TIMES, ChuckLexer.TokenType.DIVIDE,
+                     ChuckLexer.TokenType.PERCENT, ChuckLexer.TokenType.AMP,
+                     ChuckLexer.TokenType.COLON_COLON)) {
+            ChuckLexer.Token opToken = previous();
+            ChuckAST.Operator op = switch (opToken.type()) {
                 case TIMES        -> ChuckAST.Operator.TIMES;
                 case DIVIDE       -> ChuckAST.Operator.DIVIDE;
                 case PERCENT      -> ChuckAST.Operator.PERCENT;
-                case APPEND       -> ChuckAST.Operator.SHIFT_LEFT;
-                case SHIFT_RIGHT  -> ChuckAST.Operator.SHIFT_RIGHT;
                 case AMP          -> ChuckAST.Operator.S_AND;
-                case PIPE         -> ChuckAST.Operator.S_OR;
+                case COLON_COLON  -> ChuckAST.Operator.DUR_MUL;
                 default           -> ChuckAST.Operator.NONE;
             };
             ChuckAST.Exp right = parseUnary();
@@ -367,9 +453,12 @@ public class ChuckParser {
                     // empty [] — array type annotation suffix, not an access; skip
                     advance();
                 } else {
-                    ChuckAST.Exp index = parseExpression();
+                    List<ChuckAST.Exp> indices = new ArrayList<>();
+                    do {
+                        indices.add(parseExpression());
+                    } while (match(ChuckLexer.TokenType.COMMA));
                     consume(ChuckLexer.TokenType.RBRACKET, "Expected ']' after array index");
-                    exp = new ChuckAST.ArrayAccessExp(exp, index, previous().line(), previous().column());
+                    exp = new ChuckAST.ArrayAccessExp(exp, indices, previous().line(), previous().column());
                 }
             } else if (match(ChuckLexer.TokenType.LPAREN)) {
                 List<ChuckAST.Exp> args = new ArrayList<>();
@@ -400,6 +489,8 @@ public class ChuckParser {
         if (match(ChuckLexer.TokenType.NEW)) {
             ChuckLexer.Token start = previous();
             ChuckLexer.Token typeTok = advance(); // type name
+            
+            // new Type[size]
             if (match(ChuckLexer.TokenType.LBRACKET)) {
                 ChuckAST.Exp size = check(ChuckLexer.TokenType.RBRACKET)
                         ? new ChuckAST.IntExp(0, start.line(), start.column())
@@ -414,7 +505,21 @@ public class ChuckParser {
                         new ChuckAST.IdExp(typeTok.value(), typeTok.line(), typeTok.column()),
                         ChuckAST.Operator.NEW, size, start.line(), start.column());
             }
-            return new ChuckAST.IdExp(typeTok.value(), typeTok.line(), typeTok.column());
+            
+            // new Type(args)
+            ChuckAST.Exp callArgs = null;
+            if (match(ChuckLexer.TokenType.LPAREN)) {
+                List<ChuckAST.Exp> args = new ArrayList<>();
+                if (!check(ChuckLexer.TokenType.RPAREN)) {
+                    do { args.add(parseExpression()); } while (match(ChuckLexer.TokenType.COMMA));
+                }
+                consume(ChuckLexer.TokenType.RPAREN, "Expected ')' after new args");
+                callArgs = new ChuckAST.CallExp(new ChuckAST.IdExp(typeTok.value(), typeTok.line(), typeTok.column()),
+                        args, typeTok.line(), typeTok.column());
+            }
+            
+            return new ChuckAST.DeclExp(typeTok.value(), "@new_" + start.line() + "_" + start.column(), 
+                    new ArrayList<>(), callArgs, false, false, start.line(), start.column());
         }
         if (match(ChuckLexer.TokenType.INT)) {
             return new ChuckAST.IntExp(Long.parseLong(previous().value()), previous().line(), previous().column());
@@ -442,22 +547,56 @@ public class ChuckParser {
         if (match(ChuckLexer.TokenType.LBRACKET)) {
             return parseArrayLiteral();
         }
+        if (match(ChuckLexer.TokenType.ME)) {
+            return new ChuckAST.MeExp(previous().line(), previous().column());
+        }
         if (match(ChuckLexer.TokenType.ID)) {
             ChuckLexer.Token idTok = previous();
             String name = idTok.value();
             if (name.equals("true"))  return new ChuckAST.IntExp(1, idTok.line(), idTok.column());
             if (name.equals("false")) return new ChuckAST.IntExp(0, idTok.line(), idTok.column());
 
-            // type name  →  treat as just IdExp("name"); consume optional [] array suffix
-            if (isType(idTok) && check(ChuckLexer.TokenType.ID)) {
-                ChuckLexer.Token varName = advance();
-                // consume [] array-type suffixes (not an access)
-                while (check(ChuckLexer.TokenType.LBRACKET) && peekAt(1).type() == ChuckLexer.TokenType.RBRACKET) {
-                    advance(); advance(); // [ ]
+            // type name  →  DeclExp
+            if (isType(idTok) && (check(ChuckLexer.TokenType.ID) || check(ChuckLexer.TokenType.AT))) {
+                boolean isRef = match(ChuckLexer.TokenType.AT);
+                ChuckLexer.Token varName = consume(ChuckLexer.TokenType.ID, "Expected variable name");
+                // optional [] array suffix
+                List<ChuckAST.Exp> arraySizes = new ArrayList<>();
+                while (check(ChuckLexer.TokenType.LBRACKET)) {
+                    advance(); // [
+                    ChuckAST.Exp dim = check(ChuckLexer.TokenType.RBRACKET)
+                            ? new ChuckAST.IntExp(-1, idTok.line(), idTok.column())
+                            : parseExpression();
+                    consume(ChuckLexer.TokenType.RBRACKET, "Expected ']'");
+                    arraySizes.add(dim);
                 }
-                return new ChuckAST.IdExp(varName.value(), varName.line(), varName.column());
+                // Handle constructor args: Foo a(1, 2)
+                ChuckAST.Exp callArgs = null;
+                if (check(ChuckLexer.TokenType.LPAREN)) {
+                    ChuckLexer.Token start = advance(); // (
+                    List<ChuckAST.Exp> args = new ArrayList<>();
+                    if (!check(ChuckLexer.TokenType.RPAREN)) {
+                        do { args.add(parseExpression()); } while (match(ChuckLexer.TokenType.COMMA));
+                    }
+                    consume(ChuckLexer.TokenType.RPAREN, "Expected ')'");
+                    callArgs = new ChuckAST.CallExp(new ChuckAST.IdExp(idTok.value(), start.line(), start.column()),
+                            args, start.line(), start.column());
+                }
+                return new ChuckAST.DeclExp(idTok.value(), varName.value(), arraySizes, callArgs, isRef, false, idTok.line(), idTok.column());
             }
             return new ChuckAST.IdExp(name, idTok.line(), idTok.column());
+        }
+        if (match(ChuckLexer.TokenType.AT)) {
+            ChuckLexer.Token start = previous();
+            consume(ChuckLexer.TokenType.LPAREN, "Expected '(' after '@'");
+            List<ChuckAST.Exp> elements = new ArrayList<>();
+            if (!check(ChuckLexer.TokenType.RPAREN)) {
+                do {
+                    elements.add(parseExpression());
+                } while (match(ChuckLexer.TokenType.COMMA));
+            }
+            consume(ChuckLexer.TokenType.RPAREN, "Expected ')' after vector literal elements");
+            return new ChuckAST.ArrayLitExp(elements, start.line(), start.column());
         }
         if (match(ChuckLexer.TokenType.LPAREN)) {
             // () => foo  (empty-arg call syntax)
@@ -508,35 +647,33 @@ public class ChuckParser {
         String name = consume(ChuckLexer.TokenType.ID, "Expected class name").value();
         knownTypes.add(name);
         // optional: extends SuperType
+        String parentName = null;
         if (match(ChuckLexer.TokenType.EXTENDS)) {
-            advance(); // super type name (consume, ignore for now)
+            parentName = consume(ChuckLexer.TokenType.ID, "Expected parent class name").value();
         }
         consume(ChuckLexer.TokenType.LBRACE, "Expected '{' after class name");
 
         List<ChuckAST.Stmt> body = new ArrayList<>();
         while (!check(ChuckLexer.TokenType.RBRACE) && !isAtEnd()) {
-            // skip access modifiers
-            while (peek().type() == ChuckLexer.TokenType.PUBLIC
-                    || peek().type() == ChuckLexer.TokenType.STATIC) {
-                advance();
-            }
-            if (isAtEnd() || check(ChuckLexer.TokenType.RBRACE)) break;
-            body.add(parseStatement());
+            ChuckAST.Stmt s = parseStatement();
+            if (s != null) body.add(s);
         }
         consume(ChuckLexer.TokenType.RBRACE, "Expected '}' after class body");
-        return new ChuckAST.ClassDefStmt(name, body, start.line(), start.column());
+        return new ChuckAST.ClassDefStmt(name, parentName, body, start.line(), start.column());
     }
 
-    private ChuckAST.Stmt parseFuncDef() {
+    private ChuckAST.Stmt parseFuncDef(boolean isPublic, boolean isStatic) {
         consume(ChuckLexer.TokenType.FUN, "Expected 'fun'");
         ChuckLexer.Token start = previous();
-        // skip modifiers: fun static void foo() or fun public void foo()
-        while (peek().type() == ChuckLexer.TokenType.PUBLIC || peek().type() == ChuckLexer.TokenType.STATIC) {
-            advance();
+
+        // Also handle modifiers after 'fun': fun static void foo()
+        while (!isAtEnd() && (peek().type() == ChuckLexer.TokenType.PUBLIC || peek().type() == ChuckLexer.TokenType.STATIC)) {
+            if (match(ChuckLexer.TokenType.PUBLIC)) isPublic = true;
+            if (match(ChuckLexer.TokenType.STATIC)) isStatic = true;
         }
 
         // fun @construct(...) — constructor; no return type token
-        if (peek().type() == ChuckLexer.TokenType.ID && peek().value().equals("@")) {
+        if (peek().type() == ChuckLexer.TokenType.AT) {
             advance(); // consume "@"
             String constructName = check(ChuckLexer.TokenType.ID) ? advance().value() : "construct";
             // directly to parameter list
@@ -547,14 +684,14 @@ public class ChuckParser {
                 do {
                     argTypes2.add(advance().value());
                     if (check(ChuckLexer.TokenType.LBRACKET)) { advance(); if (!check(ChuckLexer.TokenType.RBRACKET)) advance(); consume(ChuckLexer.TokenType.RBRACKET, ""); }
-                    if (peek().type() == ChuckLexer.TokenType.ID && peek().value().equals("@")) advance(); // skip @ ref
+                    if (peek().type() == ChuckLexer.TokenType.AT) advance(); // skip @ ref
                     argNames2.add(check(ChuckLexer.TokenType.ID) ? advance().value() : "_");
                     if (check(ChuckLexer.TokenType.LBRACKET)) { advance(); if (!check(ChuckLexer.TokenType.RBRACKET)) advance(); consume(ChuckLexer.TokenType.RBRACKET, ""); }
                 } while (match(ChuckLexer.TokenType.COMMA));
             }
             consume(ChuckLexer.TokenType.RPAREN, "Expected ')'");
             ChuckAST.Stmt body2 = parseStatement();
-            return new ChuckAST.FuncDefStmt("void", "@" + constructName, argTypes2, argNames2, body2, start.line(), start.column());
+            return new ChuckAST.FuncDefStmt("void", "@" + constructName, argTypes2, argNames2, body2, isStatic, start.line(), start.column());
         }
 
         // Handle @operator return type prefix: fun @operator +
@@ -565,15 +702,15 @@ public class ChuckParser {
         }
 
         String returnType = advance().value(); // return type
-        // array return type like int[]
-        if (match(ChuckLexer.TokenType.LBRACKET)) consume(ChuckLexer.TokenType.RBRACKET, "Expected ']'");
+        // array return type like int[][]
+        while (match(ChuckLexer.TokenType.LBRACKET)) consume(ChuckLexer.TokenType.RBRACKET, "Expected ']'");
 
         // function name — could be ID or operator symbol
         // Special case: fun ClassName(...) — constructor, no separate name token
         String funcName;
         if (check(ChuckLexer.TokenType.LPAREN)) {
             funcName = returnType; returnType = "void";
-        } else if (check(ChuckLexer.TokenType.ID) && peek().value().equals("@")) {
+        } else if (check(ChuckLexer.TokenType.AT)) {
             // fun ReturnType @operator symbol (...) — operator overload with @operator keyword
             advance(); // skip "@"
             if (check(ChuckLexer.TokenType.ID)) advance(); // skip "operator" word
@@ -602,7 +739,7 @@ public class ChuckParser {
                     if (!check(ChuckLexer.TokenType.RBRACKET)) advance(); // size if present
                     consume(ChuckLexer.TokenType.RBRACKET, "Expected ']'");
                 }
-                if (peek().type() == ChuckLexer.TokenType.ID && peek().value().equals("@")) advance(); // skip @ ref
+                if (peek().type() == ChuckLexer.TokenType.AT) advance(); // skip @ ref
                 if (check(ChuckLexer.TokenType.ID)) {
                     argNames.add(advance().value());
                 } else {
@@ -624,7 +761,7 @@ public class ChuckParser {
         }
 
         ChuckAST.Stmt body = parseStatement();
-        return new ChuckAST.FuncDefStmt(returnType, funcName, argTypes, argNames, body, start.line(), start.column());
+        return new ChuckAST.FuncDefStmt(returnType, funcName, argTypes, argNames, body, isStatic, start.line(), start.column());
     }
 
     private ChuckAST.Stmt parseIf() {
@@ -647,6 +784,33 @@ public class ChuckParser {
         consume(ChuckLexer.TokenType.RPAREN, "Expected ')' after condition");
         ChuckAST.Stmt body = parseStatement();
         return new ChuckAST.WhileStmt(condition, body, start.line(), start.column());
+    }
+
+    private ChuckAST.Stmt parseUntil() {
+        ChuckLexer.Token start = consume(ChuckLexer.TokenType.UNTIL, "Expected 'until'");
+        consume(ChuckLexer.TokenType.LPAREN, "Expected '(' after 'until'");
+        ChuckAST.Exp condition = parseExpression();
+        consume(ChuckLexer.TokenType.RPAREN, "Expected ')' after condition");
+        ChuckAST.Stmt body = parseStatement();
+        return new ChuckAST.UntilStmt(condition, body, start.line(), start.column());
+    }
+
+    private ChuckAST.Stmt parseDo() {
+        ChuckLexer.Token start = consume(ChuckLexer.TokenType.DO, "Expected 'do'");
+        ChuckAST.Stmt body = parseStatement();
+        boolean isUntil = false;
+        if (match(ChuckLexer.TokenType.WHILE)) {
+            isUntil = false;
+        } else if (match(ChuckLexer.TokenType.UNTIL)) {
+            isUntil = true;
+        } else {
+            throw new RuntimeException("Expected 'while' or 'until' after 'do' body at line " + start.line());
+        }
+        consume(ChuckLexer.TokenType.LPAREN, "Expected '('");
+        ChuckAST.Exp condition = parseExpression();
+        consume(ChuckLexer.TokenType.RPAREN, "Expected ')'");
+        match(ChuckLexer.TokenType.SEMICOLON);
+        return new ChuckAST.DoStmt(body, condition, isUntil, start.line(), start.column());
     }
 
     private ChuckAST.Stmt parseFor() {

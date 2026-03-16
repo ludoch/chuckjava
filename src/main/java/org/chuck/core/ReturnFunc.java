@@ -8,8 +8,10 @@ package org.chuck.core;
 public class ReturnFunc implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
-        // If mem stack is empty, this is a sporked root function — just terminate.
-        if (shred.mem.getSp() == 0) {
+        int currentFP = shred.getFramePointer();
+        
+        // If mem stack doesn't have enough for a frame before FP, this is a root function — just terminate.
+        if (currentFP < 4) {
             shred.abort();
             return;
         }
@@ -21,12 +23,10 @@ public class ReturnFunc implements ChuckInstr {
         
         // Restore state from mem stack (order mirrors CallFunc push order, reversed)
         // [SavedCode, SavedPC, SavedFP, SavedRegSP, Arg0, Arg1, ... ]
-        // The frame pointer is at the position saved by CallFunc.
-        int currentFP = shred.getFramePointer();
         
         // Capture return value from top of reg stack if it was pushed AFTER savedRegSp
         int savedRegSp = (int) shred.mem.getData(currentFP - 1);
-        if (shred.reg.getSp() > savedRegSp) {
+        if (shred.reg.getSp() > savedRegSp && shred.reg.getSp() > 0) {
             retIsDouble = shred.reg.isDouble(0);
             retPrim = shred.reg.peekLong(0);
             retObj = shred.reg.peekObject(0);
@@ -53,7 +53,7 @@ public class ReturnFunc implements ChuckInstr {
         } else if (retIsDouble) {
             shred.reg.push(Double.longBitsToDouble(retPrim));
         } else {
-            shred.reg.push(retPrim);
+            if (retObj != null || retPrim != 0) shred.reg.push(retPrim);
         }
     }
 }

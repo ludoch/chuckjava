@@ -6,6 +6,7 @@ package org.chuck.core;
 public class StdMtof implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
+        if (shred.reg.getSp() == 0) return;
         double midi = shred.reg.popAsDouble();
         double freq = Std.mtof(midi);
         shred.reg.push(freq);

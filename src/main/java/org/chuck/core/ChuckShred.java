@@ -72,7 +72,19 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     public int id() { return id; }
     public void exit() { abort(); }
     public String arg(int i) { return (i >= 0 && i < args.length) ? args[i] : ""; }
+    public int args() { return args.length; }
     public int numArgs() { return args.length; }
+
+    public String dir() {
+        if (code != null && code.getName() != null) {
+            java.io.File f = new java.io.File(code.getName());
+            String parent = f.getParent();
+            if (parent != null) return parent + "/";
+        }
+        return "./";
+    }
+
+    public String sourceDir() { return dir(); }
 
     public void cleanup() {
         for (org.chuck.audio.ChuckUGen ugen : ownedUGens) {
@@ -114,6 +126,7 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     public void yield(long samples) {
         lock.lock();
         try {
+            this.instructionCount = 0;
             this.wakeTime += samples;
             isRunning = false;
             condition.signal();
@@ -145,23 +158,36 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     }
     
     // The main interpreter loop for the Virtual Thread
+    private long instructionCount = 0;
+    private static final long MAX_INSTRUCTIONS_BEFORE_YIELD = 1000000;
+
     public void execute(ChuckVM vm) {
         lock.lock();
         try {
-            while (!isRunning) {
-                condition.await();
-            }
-            
-            // Interpreter Loop
-            while (!isDone && pc < code.getNumInstructions()) {
-                ChuckInstr instr = code.getInstruction(pc);
-                if (instr == null) break;
+            while (!isDone && code != null && pc < code.getNumInstructions()) {
+                while (!isRunning && !isDone) {
+                    condition.await();
+                }
+                if (isDone) break;
                 
-                // Execute instruction
-                instr.execute(vm, this);
-                
-                // Advance PC
-                pc++;
+                // Interpreter Loop
+                while (!isDone && isRunning && code != null && pc < code.getNumInstructions()) {
+                    ChuckInstr instr = code.getInstruction(pc);
+                    if (instr == null) break;
+
+                    // Execute instruction
+                    instr.execute(vm, this);
+
+                    // Advance PC
+                    pc++;
+
+                    // Safety check: prevent infinite tight loops from hanging the VM
+                    if (++instructionCount > MAX_INSTRUCTIONS_BEFORE_YIELD) {
+                        instructionCount = 0;
+                        this.yield(0); // Force yield to allow other shreds/audio to run
+                        break; 
+                    }
+                }
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

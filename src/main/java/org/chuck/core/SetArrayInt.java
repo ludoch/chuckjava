@@ -13,20 +13,24 @@ import org.chuck.audio.ChuckUGen;
 public class SetArrayInt implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
+        if (shred.reg.getSp() < 3) {
+            // Unlikely, but let's be safe
+            shred.reg.pop(shred.reg.getSp());
+            shred.reg.push(0L);
+            return;
+        }
         int index = (int) shred.reg.popLong();
-        ChuckArray arr = (ChuckArray) shred.reg.popObject();
-
-        if (arr == null) {
+        Object rawArr = shred.reg.popObject();
+        
+        if (!(rawArr instanceof ChuckArray arr)) {
             // Discard value and push 0 to keep stack balanced
-            if (shred.reg.isObject(0)) shred.reg.popObject();
-            else shred.reg.popLong();
+            shred.reg.pop();
             shred.reg.push(0L);
             return;
         }
 
         if (index < 0 || index >= arr.size()) {
-            if (shred.reg.isObject(0)) shred.reg.popObject();
-            else shred.reg.popLong();
+            shred.reg.pop();
             shred.reg.push(0L);
             return;
         }
@@ -42,6 +46,10 @@ public class SetArrayInt implements ChuckInstr {
                 arr.setObject(index, value);
                 shred.reg.pushObject(value);
             }
+        } else if (shred.reg.isDouble(0)) {
+            double value = shred.reg.popAsDouble();
+            arr.setFloat(index, value);
+            shred.reg.push(value);
         } else {
             long value = shred.reg.popLong();
             arr.setInt(index, value);

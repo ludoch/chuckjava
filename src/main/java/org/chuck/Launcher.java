@@ -7,6 +7,6 @@ import org.chuck.ide.ChuckIDE;
  */
 public class Launcher {
     public static void main(String[] args) {
-        ChuckIDE.main(args);
+        Main.main(args);
     }
 }

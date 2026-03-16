@@ -11,6 +11,7 @@ me.dir() + "../data/kick.wav" => buf.read;
 Impulse i => dac;
 
 // infinite time-loop
+<<< "Samples:", buf.samples() >>>;
 while( true )
 {
     // index

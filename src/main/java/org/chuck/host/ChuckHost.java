@@ -103,8 +103,15 @@ public class ChuckHost {
     /**
      * Sets a global object (e.g. for interop).
      */
-    public void setGlobalObject(String name, ChuckObject obj) {
+    public void setGlobalObject(String name, Object obj) {
         vm.setGlobalObject(name, obj);
+    }
+
+    /**
+     * Gets a global object.
+     */
+    public Object getGlobalObject(String name) {
+        return vm.getGlobalObject(name);
     }
 
     /**

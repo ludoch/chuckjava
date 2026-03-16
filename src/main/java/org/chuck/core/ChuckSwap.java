@@ -19,8 +19,9 @@ public class ChuckSwap implements ChuckInstr {
     public void execute(ChuckVM vm, ChuckShred shred) {
         if (isMember) {
             // Swap members of an object on the stack
-            ChuckObject obj = (ChuckObject) shred.reg.popObject();
-            if (obj instanceof UserObject uo) {
+            if (shred.reg.getSp() < 1) return;
+            Object raw = shred.reg.popObject();
+            if (raw instanceof UserObject uo) {
                 long val1 = uo.getPrimitiveField(name1);
                 long val2 = uo.getPrimitiveField(name2);
                 uo.setPrimitiveField(name1, val2);
@@ -28,12 +29,17 @@ public class ChuckSwap implements ChuckInstr {
             }
         } else {
             // Swap global variables
-            ChuckObject obj1 = vm.getGlobalObject(name1);
-            ChuckObject obj2 = vm.getGlobalObject(name2);
+            Object obj1 = vm.getGlobalObject(name1);
+            Object obj2 = vm.getGlobalObject(name2);
             
-            if (obj1 != null || obj2 != null) {
+            if (vm.isGlobalObject(name1) || vm.isGlobalObject(name2)) {
                 vm.setGlobalObject(name1, obj2);
                 vm.setGlobalObject(name2, obj1);
+            } else if (vm.isGlobalDouble(name1) || vm.isGlobalDouble(name2)) {
+                double val1 = Double.longBitsToDouble(vm.getGlobalInt(name1));
+                double val2 = Double.longBitsToDouble(vm.getGlobalInt(name2));
+                vm.setGlobalFloat(name1, val2);
+                vm.setGlobalFloat(name2, val1);
             } else {
                 long val1 = vm.getGlobalInt(name1);
                 long val2 = vm.getGlobalInt(name2);

@@ -48,6 +48,10 @@ public class ChuckObject {
         // Default: do nothing. Subclasses like Osc will override this.
     }
 
+    public boolean isDouble(int index) {
+        return (index < isDouble.length) ? isDouble[index] : false;
+    }
+
     public long getData(int index) {
         return (index < data.length) ? data[index] : 0;
     }

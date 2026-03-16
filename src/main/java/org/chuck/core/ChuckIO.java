@@ -29,8 +29,12 @@ public class ChuckIO extends ChuckObject {
     }
 
     public ChuckIO write(double d) {
-        stream.print(d);
-        vm.print(String.valueOf(d));
+        String s = java.math.BigDecimal.valueOf(d).stripTrailingZeros().toPlainString();
+        // Handle case where stripTrailingZeros leaves a .0
+        if (s.endsWith(".0")) s = s.substring(0, s.length() - 2);
+        // Handle whole numbers that became e.g. "3"
+        stream.print(s);
+        vm.print(s);
         return this;
     }
 

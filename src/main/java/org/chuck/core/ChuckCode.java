@@ -14,8 +14,16 @@ public class ChuckCode {
         this.name = name;
     }
 
+    public String getName() {
+        return name;
+    }
+
     public void addInstruction(ChuckInstr instr) {
         instructions.add(instr);
+    }
+
+    public void prependInstruction(ChuckInstr instr) {
+        instructions.add(0, instr);
     }
 
     public void replaceInstruction(int index, ChuckInstr instr) {

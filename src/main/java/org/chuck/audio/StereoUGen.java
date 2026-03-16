@@ -21,16 +21,30 @@ public abstract class StereoUGen extends ChuckUGen {
             return lastOut;
         }
 
-        float sum = 0.0f;
-        for (ChuckUGen src : sources) {
-            sum += src.tick(systemTime);
-        }
+        if (isTicking) return lastOut;
+        isTicking = true;
 
-        computeStereo(sum);
-        lastOut = (lastOutLeft + lastOutRight) * 0.5f * gain;
-        lastTickTime = systemTime;
-        
-        return lastOut;
+        try {
+            float sum = 0.0f;
+            for (ChuckUGen src : sources) {
+                sum += src.tick(systemTime);
+            }
+
+            computeStereo(sum);
+            
+            // Apply gain to stereo outputs
+            lastOutLeft *= gain;
+            lastOutRight *= gain;
+            
+            // For mono output of a stereo UGen, average the channels
+            lastOut = (lastOutLeft + lastOutRight) * 0.5f;
+            
+            lastTickTime = systemTime;
+            
+            return lastOut;
+        } finally {
+            isTicking = false;
+        }
     }
 
     @Override

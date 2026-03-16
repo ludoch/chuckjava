@@ -139,7 +139,7 @@ primary
     | ID                                                   # idExp
     | REFERENCE_TAG ID                                     # idExp
     | primary '.' memberName                               # memberExp
-    | primary '[' expression ']'                           # arrayAccessExp
+    | primary '[' expressionList ']'                       # arrayAccessExp
     | primary '(' expressionList? ')'                      # callExp
     | '(' expressionList? ')'                              # parenExp
     | '[' expressionList? ']'                              # arrayLitExp

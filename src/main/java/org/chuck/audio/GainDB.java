@@ -13,9 +13,10 @@ public class GainDB extends ChuckUGen {
         this.db = dBValue;
         setGain((float) Math.pow(10.0, dBValue / 20.0));
     }
-    public double getDb() { return db; }
-    public double db()    { return db; }
-    public double gain()  { return gain; }
+    public float db(float db) { setDb(db); return db; }
+    public float db()         { return (float) db; }
+    public float gain(float g) { setGain(g); this.db = 20.0 * Math.log10(g); return g; }
+    public float gain()        { return gain; }
 
     @Override
     protected float compute(float input) { return input; }

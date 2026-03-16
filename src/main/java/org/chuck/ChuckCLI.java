@@ -17,17 +17,24 @@ public class ChuckCLI {
     private boolean dump = false;
     private boolean useAntlr = false;
     private boolean syntaxOnly = false;
+    private boolean forceGui = false;
     private int verbose = 1;
+    private int timeoutSeconds = -1;
     private List<String> filesToAdd = new ArrayList<>();
     private List<String> otfCommands = new ArrayList<>();
 
     public void run(String[] args) {
         if (args.length == 0) {
-            printUsage();
+            org.chuck.ide.ChuckIDE.main(args);
             return;
         }
 
         parseArgs(args);
+
+        if (forceGui) {
+            org.chuck.ide.ChuckIDE.main(args);
+            return;
+        }
 
         if (syntaxOnly) {
             checkSyntax();
@@ -65,6 +72,8 @@ public class ChuckCLI {
                 useAntlr = true;
             } else if (arg.equals("--syntax")) {
                 syntaxOnly = true;
+            } else if (arg.equals("--gui") || arg.equals("--ide")) {
+                forceGui = true;
             } else if (arg.startsWith("--srate:")) {
                 sampleRate = Integer.parseInt(arg.substring("--srate:".length()));
             } else if (arg.startsWith("--bufsize:")) {
@@ -73,6 +82,8 @@ public class ChuckCLI {
                 numChannels = Integer.parseInt(arg.substring(arg.indexOf(':') + 1));
             } else if (arg.startsWith("--verbose:")) {
                 verbose = Integer.parseInt(arg.substring("--verbose:".length()));
+            } else if (arg.startsWith("--timeout:")) {
+                timeoutSeconds = Integer.parseInt(arg.substring("--timeout:".length()));
             } else if (arg.equals("+") || arg.equals("--add")) {
                 if (i + 1 < args.length) {
                     otfCommands.add("+" + args[++i]);
@@ -161,6 +172,7 @@ public class ChuckCLI {
             ChuckAudio audio = null;
             if (!silent) {
                 audio = new ChuckAudio(vm, bufferSize, numChannels, sampleRate);
+                audio.setVerbose(verbose);
                 audio.start();
             }
 
@@ -169,30 +181,9 @@ public class ChuckCLI {
             for (String fileName : filesToAdd) {
                 try {
                     String source = Files.readString(Paths.get(fileName));
-                    List<ChuckAST.Stmt> ast;
-                    if (useAntlr) {
-                        org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
-                        ChuckANTLRLexer lexer = new ChuckANTLRLexer(input);
-                        org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
-                        ChuckANTLRParser parser = new ChuckANTLRParser(tokens);
-                        ChuckASTVisitor visitor = new ChuckASTVisitor();
-                        ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
-                    } else {
-                        ChuckLexer lexer = new ChuckLexer(source);
-                        ChuckParser parser = new ChuckParser(lexer.tokenize());
-                        ast = parser.parse();
-                    }
-
-                    ChuckEmitter emitter = new ChuckEmitter();
-                    ChuckCode bytecode = emitter.emit(ast, fileName);
-                    
-                    if (dump) {
-                        System.out.println("--- Bytecode for " + fileName + " ---");
-                    }
-
-                    ChuckShred shred = new ChuckShred(bytecode);
-                    vm.spork(shred);
-                    initialShreds.add(shred);
+                    int id = vm.run(source, fileName);
+                    ChuckShred shred = vm.getShred(id);
+                    if (shred != null) initialShreds.add(shred);
                 } catch (Exception e) {
                     System.err.println("❌ Error loading " + fileName + ": " + e.getMessage());
                 }
@@ -210,7 +201,12 @@ public class ChuckCLI {
             }
 
             if (loop || !initialShreds.isEmpty()) {
+                long startTime = System.currentTimeMillis();
                 while (true) {
+                    if (timeoutSeconds > 0 && (System.currentTimeMillis() - startTime) > timeoutSeconds * 1000L) {
+                        if (verbose > 0) System.out.println("[CLI] Timeout reached, stopping...");
+                        break;
+                    }
                     boolean anyRunning = false;
                     for (ChuckShred s : initialShreds) {
                         if (!s.isDone()) {
@@ -243,6 +239,8 @@ public class ChuckCLI {
         System.out.println("  --srate:<N>      Set sampling rate (default 44100)");
         System.out.println("  --bufsize:<N>    Set audio buffer size (default 512)");
         System.out.println("  --chan:<N>       Set number of channels (default 2)");
+        System.out.println("  --timeout:<N>    Exit after N seconds");
+        System.out.println("  --gui / --ide    Force launch the JavaFX IDE");
         System.out.println("  --about / --help Print this help message");
         System.out.println("  --version        Display version information");
         System.out.println("  --antlr          Use ANTLR4 parser mode");

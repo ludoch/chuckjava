@@ -19,6 +19,19 @@ public class Gain extends ChuckUGen {
         return input;
     }
 
+    public float db(float db) {
+        this.gain = (float) Math.pow(10.0, db / 20.0);
+        return db;
+    }
+
+    public float db() {
+        return (float) (20.0 * Math.log10(this.gain));
+    }
+
+    public void setDb(float db) {
+        db(db);
+    }
+
     /**
      * SIMD Optimized block processing using the JDK 25 Vector API.
      */

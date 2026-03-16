@@ -169,6 +169,17 @@ public class ChuckIDE extends Application {
         vm.getDacChannel(1).chuckTo(masterGain);
         
         audio = new ChuckAudio(vm, 512, 2, sampleRate);
+        
+        List<String> rawArgs = getParameters().getRaw();
+        for (String arg : rawArgs) {
+            if (arg.startsWith("--verbose:")) {
+                try {
+                    int v = Integer.parseInt(arg.substring("--verbose:".length()));
+                    audio.setVerbose(v);
+                } catch (Exception ignored) {}
+            }
+        }
+        
         audio.start();
 
         // Setup hidden analyzers for visualizers (mono)
@@ -187,7 +198,20 @@ public class ChuckIDE extends Application {
 
         // ── Tabbed editor ──
         tabPane = new TabPane();
-        addNewTab("Untitled.ck", "// Welcome to ChucK-Java!\nSinOsc s => dac;\n0.5 => s.gain;\n440 => s.freq;\n1::second => now;");
+        
+        boolean loadedAny = false;
+        for (String arg : rawArgs) {
+            if (arg.startsWith("-")) continue; // Skip flags
+            File f = new File(arg);
+            if (f.exists() && f.isFile()) {
+                loadFileIntoEditor(f);
+                loadedAny = true;
+            }
+        }
+        
+        if (!loadedAny) {
+            addNewTab("Untitled.ck", "// Welcome to ChucK-Java!\nSinOsc s => dac;\n0.5 => s.gain;\n440 => s.freq;\n1::second => now;");
+        }
 
         // ── File browser ──
         fileBrowser = createFileBrowser();

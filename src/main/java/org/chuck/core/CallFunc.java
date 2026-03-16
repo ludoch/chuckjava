@@ -16,46 +16,32 @@ public class CallFunc implements ChuckInstr {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
-        // 1. Save return address and state
-        shred.mem.pushObject(shred.getCode());
-        shred.mem.push(shred.getPc());
-        shred.mem.push(shred.getFramePointer());
-        
-        // 2. Save the sp BEFORE args so ReturnFunc can restore it
-        int savedRegSp = shred.reg.getSp() - argCount;
-        shred.mem.push(savedRegSp);
-
-        // 3. Move arguments from reg stack to mem stack (local variables)
-        // Store in temporary arrays to preserve order
+        // 1. Move arguments from reg stack to mem stack first
         long[] prims = new long[argCount];
         boolean[] isD = new boolean[argCount];
         Object[] objs = new Object[argCount];
-        
         for (int i = argCount - 1; i >= 0; i--) {
             isD[i] = shred.reg.isDouble(0);
-            if (shred.reg.isObject(0)) {
-                objs[i] = shred.reg.popObject();
-            } else {
-                prims[i] = shred.reg.popLong();
-            }
-        }
-        
-        // 4. Set new Frame Pointer to current mem stack top
-        shred.setFramePointer(shred.mem.getSp());
-        
-        // 5. Push them to mem stack in order (FP+0, FP+1...)
-        for (int i = 0; i < argCount; i++) {
-            if (objs[i] != null) {
-                shred.mem.pushObject(objs[i]);
-            } else if (isD[i]) {
-                shred.mem.push(Double.longBitsToDouble(prims[i]));
-            } else {
-                shred.mem.push(prims[i]);
-            }
+            if (shred.reg.isObject(0)) objs[i] = shred.reg.popObject();
+            else prims[i] = shred.reg.popLong();
         }
 
-        // 6. Switch to target code
+        // 2. Save return state
+        shred.mem.pushObject(shred.getCode());
+        shred.mem.push(shred.getPc());
+        shred.mem.push(shred.getFramePointer());
+        shred.mem.push(shred.reg.getSp()); // reg sp before return value is pushed
+
+        // 3. Set new FP and push args to it
+        shred.setFramePointer(shred.mem.getSp());
+        for (int i = 0; i < argCount; i++) {
+            if (objs[i] != null) shred.mem.pushObject(objs[i]);
+            else if (isD[i]) shred.mem.push(Double.longBitsToDouble(prims[i]));
+            else shred.mem.push(prims[i]);
+        }
+
+        // 4. Jump
         shred.setCode(targetCode);
-        shred.setPc(-1); // Will be incremented to 0 by the loop
+        shred.setPc(-1);
     }
 }

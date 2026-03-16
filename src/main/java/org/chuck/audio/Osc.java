@@ -15,6 +15,8 @@ public abstract class Osc extends ChuckUGen {
     public Osc(float sampleRate) {
         super(new ChuckType("Osc", ChuckType.OBJECT, 8, 0));
         this.sampleRate = sampleRate;
+        // Default freq = 220.0 (index 0)
+        setData(0, 220.0);
     }
 
     public void setFreq(double freq) {
@@ -74,6 +76,10 @@ public abstract class Osc extends ChuckUGen {
         return sync;
     }
 
+    public void init(double f) {
+        setFreq(f);
+    }
+
     /** ChucK-style: osc.last() returns most recent sample */
     public float last() {
         return lastOut;
@@ -102,39 +108,46 @@ public abstract class Osc extends ChuckUGen {
         if (systemTime != -1 && systemTime == lastTickTime) {
             return lastOut;
         }
+        
+        if (isTicking) return lastOut;
+        isTicking = true;
 
-        float in = 0.0f;
-        for (ChuckUGen src : sources) {
-            in += src.tick(systemTime);
-        }
-
-        boolean incPhase = true;
-        double effectiveFreq = freq;
-        if (getNumSources() > 0) {
-            if (sync == 0) {
-                // Input IS the frequency (audio-rate freq control); don't clobber stored freq
-                effectiveFreq = in;
-            } else if (sync == 1) {
-                phase = in % 1.0;
-                if (phase < 0) phase += 1.0;
-                incPhase = false;
-            } else if (sync == 2) {
-                // FM: add input to base freq
-                effectiveFreq = freq + in;
+        try {
+            float in = 0.0f;
+            for (ChuckUGen src : sources) {
+                in += src.tick(systemTime);
             }
-        }
 
-        if (incPhase) {
-            phase += effectiveFreq / sampleRate;
-        }
-        
-        phase = phase % 1.0;
-        if (phase < 0) phase += 1.0;
+            boolean incPhase = true;
+            double effectiveFreq = freq;
+            if (getNumSources() > 0) {
+                if (sync == 0) {
+                    // Input IS the frequency (audio-rate freq control); don't clobber stored freq
+                    effectiveFreq = in;
+                } else if (sync == 1) {
+                    phase = in % 1.0;
+                    if (phase < 0) phase += 1.0;
+                    incPhase = false;
+                } else if (sync == 2) {
+                    // FM: add input to base freq
+                    effectiveFreq = freq + in;
+                }
+            }
 
-        lastOut = (float) (computeOsc(phase) * gain);
-        lastTickTime = systemTime;
-        
-        return lastOut;
+            if (incPhase) {
+                phase += effectiveFreq / sampleRate;
+            }
+            
+            phase = phase % 1.0;
+            if (phase < 0) phase += 1.0;
+
+            lastOut = (float) (computeOsc(phase) * gain);
+            lastTickTime = systemTime;
+            
+            return lastOut;
+        } finally {
+            isTicking = false;
+        }
     }
 
     @Override

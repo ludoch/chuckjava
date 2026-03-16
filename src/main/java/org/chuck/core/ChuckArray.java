@@ -1,17 +1,20 @@
 package org.chuck.core;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * Represents an array in ChucK.
  * ChucK arrays can be both indexed and associative.
+ * They are dynamic and can grow via the append (<<) operator.
  */
 public class ChuckArray extends ChuckObject {
-    private final long[] intData;
-    private final double[] floatData;
-    private final Object[] objectData;
-    private final byte[] types; // 0=int, 1=float, 2=object
+    private final List<Long> intData = new ArrayList<>();
+    private final List<Double> floatData = new ArrayList<>();
+    private final List<Object> objectData = new ArrayList<>();
+    private final List<Byte> types = new ArrayList<>(); // 0=int, 1=float, 2=object
     
     // For associative behavior
     private final Map<String, Long> assocInt = new HashMap<>();
@@ -20,45 +23,112 @@ public class ChuckArray extends ChuckObject {
 
     public ChuckArray(ChuckType type, int size) {
         super(type);
-        this.intData = new long[size];
-        this.floatData = new double[size];
-        this.objectData = new Object[size];
-        this.types = new byte[size];
+        for (int i = 0; i < size; i++) {
+            intData.add(0L);
+            floatData.add(0.0);
+            objectData.add(null);
+            types.add((byte)1); // default to float/double for vec types
+        }
     }
 
     public void setInt(int index, long value) {
-        intData[index] = value;
-        types[index] = 0;
+        ensureCapacity(index);
+        intData.set(index, value);
+        types.set(index, (byte)0);
     }
 
     public long getInt(int index) {
-        return intData[index];
+        if (index < 0 || index >= intData.size()) return 0;
+        return intData.get(index);
     }
 
     public void setFloat(int index, double value) {
-        floatData[index] = value;
-        types[index] = 1;
+        ensureCapacity(index);
+        floatData.set(index, value);
+        types.set(index, (byte)1);
     }
 
     public double getFloat(int index) {
-        return floatData[index];
+        if (index < 0 || index >= floatData.size()) return 0.0;
+        return floatData.get(index);
     }
 
     public boolean isDoubleAt(int index) {
-        return types[index] == 1;
+        if (index < 0 || index >= types.size()) return false;
+        return types.get(index) == 1;
+    }
+
+    public boolean isObjectAt(int index) {
+        if (index < 0 || index >= types.size()) return false;
+        return types.get(index) == 2;
     }
 
     public void setObject(int index, Object value) {
-        objectData[index] = value;
-        types[index] = 2;
+        ensureCapacity(index);
+        objectData.set(index, value);
+        types.set(index, (byte)2);
     }
 
     public Object getObject(int index) {
-        return objectData[index];
+        if (index < 0 || index >= objectData.size()) return null;
+        return objectData.get(index);
     }
 
     public int size() {
-        return intData.length;
+        return types.size();
+    }
+
+    public void popOut(int index) {
+        if (index < 0 || index >= types.size()) return;
+        intData.remove(index);
+        floatData.remove(index);
+        objectData.remove(index);
+        types.remove(index);
+    }
+
+    public void erase(int index) {
+        popOut(index);
+    }
+
+    public void clear() {
+        intData.clear();
+        floatData.clear();
+        objectData.clear();
+        types.clear();
+    }
+
+    // append (<<) support
+    public ChuckArray append(long val) {
+        int idx = types.size();
+        ensureCapacity(idx);
+        intData.set(idx, val);
+        types.set(idx, (byte)0);
+        return this;
+    }
+
+    public ChuckArray append(double val) {
+        int idx = types.size();
+        ensureCapacity(idx);
+        floatData.set(idx, val);
+        types.set(idx, (byte)1);
+        return this;
+    }
+
+    public ChuckArray append(Object val) {
+        int idx = types.size();
+        ensureCapacity(idx);
+        objectData.set(idx, val);
+        types.set(idx, (byte)2);
+        return this;
+    }
+
+    private void ensureCapacity(int index) {
+        while (types.size() <= index) {
+            intData.add(0L);
+            floatData.add(0.0);
+            objectData.add(null);
+            types.add((byte)0);
+        }
     }
 
     // Associative access
