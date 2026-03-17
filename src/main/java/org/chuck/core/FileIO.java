@@ -57,8 +57,15 @@ public class FileIO extends ChuckObject {
     }
 
     public boolean good() {
-        boolean g = file != null && !eof;
-        return g;
+        if (file == null || eof) return false;
+        if ((mode & WRITE) != 0) return true;
+        try {
+            long len = file.length();
+            if (len == 0) return true; // empty file: open but not yet read
+            return file.getFilePointer() < len;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     public void seek(long pos) {

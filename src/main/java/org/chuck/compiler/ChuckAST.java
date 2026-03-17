@@ -87,4 +87,6 @@ public sealed interface ChuckAST {
     record ContinueStmt(int line, int column) implements Stmt {}
 
     record PrintStmt(java.util.List<Exp> expressions, int line, int column) implements Stmt {}
+
+    record ImportStmt(String path, int line, int column) implements Stmt {}
 }

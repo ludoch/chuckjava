@@ -65,6 +65,13 @@ public class SetMemberIntByName implements ChuckInstr {
             if (!called) called = tryInvoke(rawObj, memberName, doubleVal);
         }
 
+        // Handle UserObject (user-defined ChucK classes) with named fields
+        if (!called && rawObj instanceof UserObject uo) {
+            if (isObjVal) uo.setObjectField(memberName, valObj instanceof ChuckObject ? (ChuckObject) valObj : null);
+            else uo.setPrimitiveField(memberName, (long) doubleVal);
+            called = true;
+        }
+
         // Fallback: call setData so ChuckObject mocks work too
         if (!called && !isObjVal && rawObj instanceof ChuckObject obj) {
             Integer idx = MEMBER_OFFSETS.get(memberName);

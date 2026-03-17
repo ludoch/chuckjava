@@ -44,6 +44,6 @@ public class ChuckPrint implements ChuckInstr {
             if (i < numArgs - 1) sb.append(" ");
         }
         
-        vm.print(sb.toString());
+        vm.print(sb.toString() + "\n");
     }
 }

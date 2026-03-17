@@ -28,7 +28,7 @@ public class Adsr extends ChuckUGen {
     // Default values (seconds)
     private float attackTime = 0.005f;
     private float decayTime = 0.005f;
-    private float sustainLevel = 1.0f;
+    private float sustainLevel = 0.5f;
     private float releaseTime = 0.005f;
     
     // Increments per sample

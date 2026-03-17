@@ -136,7 +136,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.3.0</version>
                 <configuration>
-                    <argLine>--enable-preview --add-modules jdk.incubator.vector</argLine>
+                    <argLine>--enable-preview --add-modules jdk.incubator.vector -Xmx512m -Xms64m -XX:+UseSerialGC -XX:MaxRAM=512m</argLine>
                 </configuration>
             </plugin>
             <!-- Exec plugin for running the application -->

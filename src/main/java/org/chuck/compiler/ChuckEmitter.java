@@ -13,11 +13,14 @@ import java.util.Map;
 public class ChuckEmitter {
     private final Map<String, ChuckCode> functions = new HashMap<>();
     private final java.util.Stack<Map<String, Integer>> localScopes = new java.util.Stack<>();
+    /** Tracks variable name → declared type for operator overload dispatch. */
+    private final Map<String, String> varTypes = new HashMap<>();
 
     private final Map<String, UserClassDescriptor> userClassRegistry = new HashMap<>();
 
     private String currentClass = null;
     private java.util.Set<String> currentClassFields = java.util.Collections.emptySet();
+    private String currentFile = "";
 
     private final java.util.Stack<List<Integer>> breakJumps = new java.util.Stack<>();
     private final java.util.Stack<List<Integer>> continueJumps = new java.util.Stack<>();
@@ -28,6 +31,30 @@ public class ChuckEmitter {
 
     public ChuckEmitter(Map<String, UserClassDescriptor> registry) {
         this.userClassRegistry.putAll(registry);
+    }
+
+    public ChuckEmitter(Map<String, UserClassDescriptor> registry, Map<String, ChuckCode> preloadedFunctions) {
+        this.userClassRegistry.putAll(registry);
+        this.functions.putAll(preloadedFunctions);
+    }
+
+    /** Returns all classes this emitter has registered (including from imports). */
+    public Map<String, UserClassDescriptor> getUserClassRegistry() {
+        return userClassRegistry;
+    }
+
+    /** Returns public operator functions (keys starting with __pub_op__). */
+    public Map<String, ChuckCode> getPublicFunctions() {
+        Map<String, ChuckCode> result = new HashMap<>();
+        for (var e : functions.entrySet()) {
+            if (e.getKey().startsWith("__pub_op__")) result.put(e.getKey(), e.getValue());
+        }
+        return result;
+    }
+
+    private String getVarType(ChuckAST.Exp exp) {
+        if (exp instanceof ChuckAST.IdExp id) return varTypes.get(id.name());
+        return null;
     }
 
     private void flattenStmts(List<ChuckAST.Stmt> input, List<ChuckAST.Stmt> output) {
@@ -51,11 +78,13 @@ public class ChuckEmitter {
 
     public ChuckCode emit(List<ChuckAST.Stmt> statements, String programName) {
         localScopes.clear();
+        varTypes.clear();
+        currentFile = programName;
         // Pass 1: Collect all global function signatures
         for (ChuckAST.Stmt stmt : statements) {
             if (stmt instanceof ChuckAST.FuncDefStmt s) {
                 String key = s.name() + ":" + s.argNames().size();
-                functions.put(key, new ChuckCode(s.name()));
+                if (!functions.containsKey(key)) functions.put(key, new ChuckCode(s.name()));
             }
         }
 
@@ -70,7 +99,7 @@ public class ChuckEmitter {
         ChuckCode code = new ChuckCode(programName);
         code.addInstruction(new MoveArgs(0));
         for (ChuckAST.Stmt stmt : statements) {
-            if (!(stmt instanceof ChuckAST.FuncDefStmt)) {
+            if (!(stmt instanceof ChuckAST.FuncDefStmt) && !(stmt instanceof ChuckAST.ImportStmt)) {
                 emitStatement(stmt, code);
             }
         }
@@ -186,7 +215,10 @@ public class ChuckEmitter {
             for (ChuckAST.Stmt inner : s.statements()) {
                 emitStatement(inner, code);
             }
+        } else if (stmt instanceof ChuckAST.ImportStmt) {
+            // already processed by VM before emit — skip
         } else if (stmt instanceof ChuckAST.DeclStmt s) {
+            varTypes.put(s.name(), s.type()); // track variable type for operator dispatch
             int argCount = 0;
             boolean isUserClass = userClassRegistry.containsKey(s.type());
             boolean isVec = s.type().equals("vec3") || s.type().equals("vec4") || s.type().equals("complex") || s.type().equals("polar");
@@ -441,6 +473,7 @@ public class ChuckEmitter {
                 default    -> {}
             }
         } else if (exp instanceof ChuckAST.DeclExp e) {
+            varTypes.put(e.name(), e.type()); // track variable type
             int argCount = 0;
             boolean isUserClass = userClassRegistry.containsKey(e.type());
 
@@ -490,6 +523,15 @@ public class ChuckEmitter {
                 emitExpression(e.rhs(), code);
                 code.addInstruction(new ChuckUnchuck());
             } else if (e.op() == ChuckAST.Operator.UPCHUCK) {
+                // Error if used on user-class objects (local =^ operator not exported)
+                String lhsType = getVarType(e.lhs());
+                if (lhsType != null && userClassRegistry.containsKey(lhsType)) {
+                    String rhsType = getVarType(e.rhs());
+                    String rhsName = rhsType != null ? rhsType : lhsType;
+                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                            + ": error: cannot resolve operator '=^' on types '"
+                            + lhsType + "' and '" + rhsName + "'");
+                }
                 emitExpression(e.lhs(), code);
                 emitChuckTarget(e.rhs(), code);
             } else if (e.op() == ChuckAST.Operator.APPEND) {
@@ -574,6 +616,19 @@ public class ChuckEmitter {
                     code.addInstruction(new CreateDuration(id.name()));
                 }
             } else {
+                // Check for public operator overload on user-class types
+                if (e.op() == ChuckAST.Operator.PLUS) {
+                    String lhsType = getVarType(e.lhs());
+                    if (lhsType != null && userClassRegistry.containsKey(lhsType)) {
+                        ChuckCode op = functions.get("__pub_op__+:2");
+                        if (op != null) {
+                            emitExpression(e.lhs(), code);
+                            emitExpression(e.rhs(), code);
+                            code.addInstruction(new CallFunc(op, 2));
+                            return;
+                        }
+                    }
+                }
                 emitExpression(e.lhs(), code);
                 emitExpression(e.rhs(), code);
                 switch (e.op()) {
@@ -723,9 +778,20 @@ public class ChuckEmitter {
                     emitExpression(e.args().get(1), code);
                     code.addInstruction(new Std2RandI());
                 } else if (dot.member().equals("powtodb") || dot.member().equals("dbtopow")
-                        || dot.member().equals("rmstodb") || dot.member().equals("dbtorms")) {
+                        || dot.member().equals("rmstodb") || dot.member().equals("dbtorms")
+                        || dot.member().equals("dbtolin") || dot.member().equals("lintodb")) {
                     emitExpression(e.args().get(0), code);
                     code.addInstruction(new MathFunc(dot.member()));
+                } else if (dot.member().equals("clamp") && e.args().size() == 3) {
+                    emitExpression(e.args().get(0), code);
+                    emitExpression(e.args().get(1), code);
+                    emitExpression(e.args().get(2), code);
+                    code.addInstruction(new StdClamp(false));
+                } else if (dot.member().equals("clampf") && e.args().size() == 3) {
+                    emitExpression(e.args().get(0), code);
+                    emitExpression(e.args().get(1), code);
+                    emitExpression(e.args().get(2), code);
+                    code.addInstruction(new StdClamp(true));
                 } else if (!e.args().isEmpty()) {
                     emitExpression(e.args().get(0), code);
                 } else {
@@ -1167,7 +1233,7 @@ public class ChuckEmitter {
                 if (s.mem.isObjectAt(idx)) {
                     s.mem.setRef(idx, new ChuckString(fio.readString()));
                 } else if (s.mem.isDoubleAt(idx)) {
-                    double val = fio.readFloat(); s.mem.setData(idx, Double.doubleToRawLongBits(val));
+                    double val = fio.readFloat(); s.mem.setData(idx, val);
                 } else {
                     long val = fio.readInt(); s.mem.setData(idx, val);
                 }
@@ -1313,18 +1379,24 @@ public class ChuckEmitter {
             Object val = s.reg.pop();
             
             if (dest instanceof FileIO fio) {
-                if (val instanceof Double) fio.write((Double)val);
-                else if (val instanceof Long) fio.write((Long)val);
+                if (val instanceof Double d) fio.write(d.doubleValue());
+                else if (val instanceof Long l) fio.write(l.longValue());
                 else fio.write(String.valueOf(val));
             } else if (dest instanceof ChuckIO cio) {
-                if (val instanceof Double) cio.write((Double)val);
-                else if (val instanceof Long) cio.write((Long)val);
+                if (val instanceof Double d) cio.write(d.doubleValue());
+                else if (val instanceof Long l) cio.write(l.longValue());
                 else cio.write(String.valueOf(val));
             } else {
-                String out = String.valueOf(val);
-                if ("stderr".equals(dest)) System.err.print(out);
-                else if ("stdout".equals(dest)) System.out.print(out);
-                else vm.print(out);
+                String out;
+                if (val instanceof Double d) {
+                    out = java.math.BigDecimal.valueOf(d).stripTrailingZeros().toPlainString();
+                    if (out.endsWith(".0")) out = out.substring(0, out.length() - 2);
+                } else if (val instanceof ChuckString cs) {
+                    out = cs.toString();
+                } else {
+                    out = String.valueOf(val);
+                }
+                vm.print(out);
             }
             s.reg.pushObject(dest);
         }
@@ -1439,8 +1511,24 @@ public class ChuckEmitter {
                 case "sin" -> Math.sin(v); case "cos" -> Math.cos(v);
                 case "sqrt" -> Math.sqrt(v); case "abs" -> Math.abs(v);
                 case "floor" -> Math.floor(v); case "ceil" -> Math.ceil(v);
+                case "dbtolin", "dbtopow" -> Math.pow(10.0, v / 20.0);
+                case "lintodb", "powtodb" -> (v <= 0 ? Double.NEGATIVE_INFINITY : 20.0 * Math.log10(v));
+                case "dbtorms" -> Math.sqrt(Math.pow(10.0, v / 10.0));
+                case "rmstodb" -> (v <= 0 ? Double.NEGATIVE_INFINITY : 10.0 * Math.log10(v * v));
                 default -> v;
             });
+        }
+    }
+    static class StdClamp implements ChuckInstr {
+        boolean isFloat; StdClamp(boolean f) { isFloat = f; }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            if (isFloat) {
+                double hi = s.reg.popAsDouble(), lo = s.reg.popAsDouble(), val = s.reg.popAsDouble();
+                s.reg.push(Math.max(lo, Math.min(hi, val)));
+            } else {
+                long hi = s.reg.popLong(), lo = s.reg.popLong(), val = s.reg.popLong();
+                s.reg.push(Math.max(lo, Math.min(hi, val)));
+            }
         }
     }
     static class Std2RandF implements ChuckInstr {
@@ -1713,6 +1801,7 @@ public class ChuckEmitter {
             case "Dyno" -> new Dyno();
             case "LiSa" -> new LiSa(sr);
             case "FileIO" -> new FileIO();
+            case "StringTokenizer" -> new StringTokenizer();
             default -> null;
         };
     }
@@ -1817,33 +1906,53 @@ public class ChuckEmitter {
                 }
             }
             try {
+                // Two-pass method resolution: prefer exact type match over widening
+                java.lang.reflect.Method bestMethod = null;
+                Object[] bestArgs = null;
+                int bestScore = -1;
                 for (java.lang.reflect.Method m : obj.getClass().getMethods()) {
-                    if (m.getName().equals(mName) && m.getParameterCount() == a) {
-                        Object[] coe = new Object[a]; Class<?>[] pts = m.getParameterTypes();
-                        for (int i = 0; i < a; i++) {
-                            Object val = args[i];
-                            if (val instanceof Number n) {
-                                if (pts[i] == long.class || pts[i] == Long.class) coe[i] = n.longValue();
-                                else if (pts[i] == int.class || pts[i] == Integer.class) coe[i] = n.intValue();
-                                else if (pts[i] == float.class || pts[i] == Float.class) coe[i] = n.floatValue();
-                                else if (pts[i] == double.class || pts[i] == Double.class) coe[i] = n.doubleValue();
-                                else coe[i] = val;
-                            } else if (val instanceof ChuckString cs && pts[i] == String.class) {
-                                coe[i] = cs.toString();
-                            } else coe[i] = val;
+                    if (!m.getName().equals(mName) || m.getParameterCount() != a) continue;
+                    Class<?>[] pts = m.getParameterTypes();
+                    Object[] coe = new Object[a];
+                    int score = 0;
+                    boolean valid = true;
+                    for (int i = 0; i < a; i++) {
+                        Object val = args[i];
+                        if (val instanceof Long l) {
+                            if (pts[i] == long.class || pts[i] == Long.class) { coe[i] = l; score += 3; }
+                            else if (pts[i] == int.class || pts[i] == Integer.class) { coe[i] = l.intValue(); score += 2; }
+                            else if (pts[i] == double.class || pts[i] == Double.class) { coe[i] = l.doubleValue(); score += 1; }
+                            else if (pts[i] == float.class || pts[i] == Float.class) { coe[i] = l.floatValue(); score += 1; }
+                            else if (pts[i] == String.class) { coe[i] = String.valueOf(l); score += 0; }
+                            else { valid = false; break; }
+                        } else if (val instanceof Double d) {
+                            if (pts[i] == double.class || pts[i] == Double.class) { coe[i] = d; score += 3; }
+                            else if (pts[i] == float.class || pts[i] == Float.class) { coe[i] = d.floatValue(); score += 2; }
+                            else if (pts[i] == String.class) { coe[i] = String.valueOf(d); score += 0; }
+                            else { valid = false; break; }
+                        } else if (val instanceof ChuckString cs) {
+                            if (pts[i] == String.class) { coe[i] = cs.toString(); score += 3; }
+                            else if (pts[i].isAssignableFrom(ChuckString.class)) { coe[i] = cs; score += 2; }
+                            else { valid = false; break; }
+                        } else {
+                            if (val != null && pts[i].isInstance(val)) { coe[i] = val; score += 2; }
+                            else { coe[i] = val; score += 0; }
                         }
-                        Object res = m.invoke(obj, coe);
-                        if (res != null && m.getReturnType() != void.class) {
-                            Class<?> rt = m.getReturnType();
-                            if (rt == int.class || rt == long.class) s.reg.push(((Number) res).longValue());
-                            else if (rt == char.class || rt == Character.class) s.reg.push((long) (Character) res);
-                            else if (rt == boolean.class) s.reg.push((Boolean) res ? 1L : 0L);
-                            else if (rt == float.class || rt == double.class) s.reg.push(((Number) res).doubleValue());
-                            else if (res instanceof String str) s.reg.pushObject(new ChuckString(str));
-                            else s.reg.pushObject(res);
-                        } else s.reg.pushObject(obj);
-                        return;
                     }
+                    if (valid && score > bestScore) { bestScore = score; bestMethod = m; bestArgs = coe; }
+                }
+                if (bestMethod != null) {
+                    Object res = bestMethod.invoke(obj, bestArgs);
+                    if (res != null && bestMethod.getReturnType() != void.class) {
+                        Class<?> rt = bestMethod.getReturnType();
+                        if (rt == int.class || rt == long.class) s.reg.push(((Number) res).longValue());
+                        else if (rt == char.class || rt == Character.class) s.reg.push((long) (Character) res);
+                        else if (rt == boolean.class) s.reg.push((Boolean) res ? 1L : 0L);
+                        else if (rt == float.class || rt == double.class) s.reg.push(((Number) res).doubleValue());
+                        else if (res instanceof String str) s.reg.pushObject(new ChuckString(str));
+                        else s.reg.pushObject(res);
+                    } else s.reg.pushObject(obj);
+                    return;
                 }
             } catch (Exception ignored) { }
             s.reg.pushObject(obj);

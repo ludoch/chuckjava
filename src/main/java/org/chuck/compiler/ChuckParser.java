@@ -56,9 +56,17 @@ public class ChuckParser {
         // @-directives...
         if (token.type() == ChuckLexer.TokenType.AT
                 && pos + 1 < tokens.size() && tokens.get(pos + 1).type() == ChuckLexer.TokenType.ID) {
-            // ... (keep existing directive logic)
             advance(); // consume "@"
-            if (!isAtEnd() && peek().type() == ChuckLexer.TokenType.ID) advance(); // directive name
+            ChuckLexer.Token directiveName = null;
+            if (!isAtEnd() && peek().type() == ChuckLexer.TokenType.ID) directiveName = advance();
+            // @import "path" — produce an ImportStmt
+            if (directiveName != null && directiveName.value().equals("import")
+                    && !isAtEnd() && peek().type() == ChuckLexer.TokenType.STRING) {
+                String path = advance().value();
+                match(ChuckLexer.TokenType.SEMICOLON);
+                return new ChuckAST.ImportStmt(path, token.line(), token.column());
+            }
+            // Other directives — skip
             while (!isAtEnd() && !check(ChuckLexer.TokenType.SEMICOLON)
                     && !check(ChuckLexer.TokenType.FUN) && !check(ChuckLexer.TokenType.CLASS)
                     && !check(ChuckLexer.TokenType.RBRACE) && !check(ChuckLexer.TokenType.IF)
@@ -69,6 +77,14 @@ public class ChuckParser {
             }
             match(ChuckLexer.TokenType.SEMICOLON);
             return new ChuckAST.BlockStmt(List.of(), token.line(), token.column());
+        }
+        // Check for operator overload without 'fun': e.g. public Foo @operator +(...) {...}
+        if (isType(token) && pos + 1 < tokens.size()
+                && tokens.get(pos + 1).type() == ChuckLexer.TokenType.AT
+                && pos + 2 < tokens.size()
+                && tokens.get(pos + 2).type() == ChuckLexer.TokenType.ID
+                && tokens.get(pos + 2).value().equals("operator")) {
+            return parseOperatorDef(isPublic, isStatic);
         }
         if (token.type() == ChuckLexer.TokenType.FUN) return parseFuncDef(isPublic, isStatic);
         if (token.type() == ChuckLexer.TokenType.CLASS) return parseClassDef();
@@ -662,6 +678,32 @@ public class ChuckParser {
         return new ChuckAST.ClassDefStmt(name, parentName, body, start.line(), start.column());
     }
 
+    /** Parses: ReturnType @operator Symbol ( params ) body — no 'fun' keyword */
+    private ChuckAST.Stmt parseOperatorDef(boolean isPublic, boolean isStatic) {
+        int line = peek().line(); int col = peek().column();
+        String returnType = advance().value(); // return type (e.g. "Foo")
+        advance(); // "@"
+        advance(); // "operator"
+        String prefix = isPublic ? "__pub_op__" : "__op__";
+        StringBuilder opName = new StringBuilder(prefix);
+        while (!check(ChuckLexer.TokenType.LPAREN) && !isAtEnd()) {
+            opName.append(advance().value());
+        }
+        consume(ChuckLexer.TokenType.LPAREN, "Expected '('");
+        List<String> argTypes = new ArrayList<>();
+        List<String> argNames = new ArrayList<>();
+        if (!check(ChuckLexer.TokenType.RPAREN)) {
+            do {
+                argTypes.add(advance().value()); // type
+                if (check(ChuckLexer.TokenType.AT)) advance(); // optional @ ref
+                argNames.add(check(ChuckLexer.TokenType.ID) ? advance().value() : "_");
+            } while (match(ChuckLexer.TokenType.COMMA));
+        }
+        consume(ChuckLexer.TokenType.RPAREN, "Expected ')'");
+        ChuckAST.Stmt body = parseStatement();
+        return new ChuckAST.FuncDefStmt(returnType, opName.toString(), argTypes, argNames, body, isStatic, line, col);
+    }
+
     private ChuckAST.Stmt parseFuncDef(boolean isPublic, boolean isStatic) {
         consume(ChuckLexer.TokenType.FUN, "Expected 'fun'");
         ChuckLexer.Token start = previous();
@@ -715,7 +757,8 @@ public class ChuckParser {
             advance(); // skip "@"
             if (check(ChuckLexer.TokenType.ID)) advance(); // skip "operator" word
             // skip operator symbol(s) until LPAREN
-            StringBuilder opName = new StringBuilder("__op__");
+            String opPrefix = isPublic ? "__pub_op__" : "__op__";
+            StringBuilder opName = new StringBuilder(opPrefix);
             while (!check(ChuckLexer.TokenType.LPAREN) && !isAtEnd()) {
                 opName.append(advance().value());
             }

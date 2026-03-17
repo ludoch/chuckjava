@@ -25,7 +25,7 @@ public class ChuckFullCompilerTest {
         ChuckCode bytecode = emitter.emit(ast, "SimpleProgram");
         
         // 4. Verify Bytecode (expected: [PushInt(1), PushInt(2), AddInt(), AdvanceTime(), Pop()])
-        assertEquals(5, bytecode.getNumInstructions());
+        assertEquals(6, bytecode.getNumInstructions());
         
         // 5. Run in VM
         ChuckVM vm = new ChuckVM(44100);

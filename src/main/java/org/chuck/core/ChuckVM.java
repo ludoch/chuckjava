@@ -9,7 +9,13 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 /**
  * The Virtual Machine is responsible for managing timing, shreds,
@@ -256,30 +262,130 @@ public class ChuckVM {
      */
     public int run(String source, String name) {
         try {
-            List<org.chuck.compiler.ChuckAST.Stmt> ast;
+            List<org.chuck.compiler.ChuckAST.Stmt> ast = parseSource(source);
 
-            if (antlrEnabled) {
-                org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
-                org.chuck.compiler.ChuckANTLRLexer lexer = new org.chuck.compiler.ChuckANTLRLexer(input);
-                org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
-                org.chuck.compiler.ChuckANTLRParser parser = new org.chuck.compiler.ChuckANTLRParser(tokens);
-                org.chuck.compiler.ChuckASTVisitor visitor = new org.chuck.compiler.ChuckASTVisitor();
-                ast = (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
-            } else {
-                org.chuck.compiler.ChuckLexer lexer = new org.chuck.compiler.ChuckLexer(source);
-                org.chuck.compiler.ChuckParser parser = new org.chuck.compiler.ChuckParser(lexer.tokenize());
-                ast = parser.parse();
+            // Resolve an absolute path for the file so imports can be resolved relatively
+            String absName;
+            try {
+                absName = Paths.get(name).toAbsolutePath().normalize().toString();
+            } catch (Exception ex) {
+                absName = name;
             }
 
-            org.chuck.compiler.ChuckEmitter emitter = new org.chuck.compiler.ChuckEmitter(userClassRegistry);
+            // Process @import directives before emitting
+            Map<String, ChuckCode> importedFunctions = new HashMap<>();
+            Set<String> compiledFiles = new HashSet<>();
+            LinkedHashSet<String> importStack = new LinkedHashSet<>();
+            processImports(ast, absName, importStack, compiledFiles, importedFunctions);
+
+            org.chuck.compiler.ChuckEmitter emitter = new org.chuck.compiler.ChuckEmitter(userClassRegistry, importedFunctions);
             ChuckCode code = emitter.emit(ast, name);
             ChuckShred shred = new ChuckShred(code);
             return spork(shred);
         } catch (Exception e) {
             print("Machine.run error: " + e.getMessage());
-            e.printStackTrace();
             return 0;
         }
+    }
+
+    private List<org.chuck.compiler.ChuckAST.Stmt> parseSource(String source) {
+        if (antlrEnabled) {
+            org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
+            org.chuck.compiler.ChuckANTLRLexer lexer = new org.chuck.compiler.ChuckANTLRLexer(input);
+            org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
+            org.chuck.compiler.ChuckANTLRParser parser = new org.chuck.compiler.ChuckANTLRParser(tokens);
+            org.chuck.compiler.ChuckASTVisitor visitor = new org.chuck.compiler.ChuckASTVisitor();
+            return (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
+        } else {
+            org.chuck.compiler.ChuckLexer lexer = new org.chuck.compiler.ChuckLexer(source);
+            org.chuck.compiler.ChuckParser parser = new org.chuck.compiler.ChuckParser(lexer.tokenize());
+            return parser.parse();
+        }
+    }
+
+    private String resolveImportPath(String currentFilePath, String importPath) {
+        java.nio.file.Path base = Paths.get(currentFilePath).getParent();
+        if (base == null) base = Paths.get(".");
+        java.nio.file.Path resolved = base.resolve(importPath).normalize();
+        String str = resolved.toString();
+        // Try as-is, then with .ck extension
+        if (Files.exists(Paths.get(str))) return str;
+        if (!str.endsWith(".ck")) {
+            String withExt = str + ".ck";
+            if (Files.exists(Paths.get(withExt))) return withExt;
+            return withExt; // return even if not found (will error in caller)
+        }
+        return str;
+    }
+
+    private void processImports(
+            List<org.chuck.compiler.ChuckAST.Stmt> ast,
+            String filePath,
+            LinkedHashSet<String> importStack,
+            Set<String> compiledFiles,
+            Map<String, ChuckCode> importedFunctions) throws Exception {
+
+        importStack.add(filePath);
+        for (org.chuck.compiler.ChuckAST.Stmt stmt : ast) {
+            if (stmt instanceof org.chuck.compiler.ChuckAST.ImportStmt imp) {
+                String importPath = resolveImportPath(filePath, imp.path());
+
+                // Check file exists
+                if (!Files.exists(Paths.get(importPath))) {
+                    String shortName = Paths.get(imp.path()).getFileName().toString();
+                    if (!shortName.endsWith(".ck")) shortName += ".ck";
+                    throw new RuntimeException(Paths.get(filePath).getFileName() + ":"
+                            + imp.line() + ":" + imp.column()
+                            + ": error: no such file: '" + imp.path() + "'\n"
+                            + "[" + imp.line() + "] @import \"" + imp.path() + "\"\n"
+                            + "            ^");
+                }
+
+                // Check cycle
+                if (importStack.contains(importPath)) {
+                    String cyclic = Paths.get(importPath).getFileName().toString();
+                    StringBuilder msg = new StringBuilder("[chuck]: @import error -- cycle detected:\n");
+                    msg.append("[chuck]:  |- '").append(cyclic).append("' is imported from...\n");
+                    // Walk the stack backwards to build the chain
+                    List<String> chain = new ArrayList<>(importStack);
+                    for (int i = chain.size() - 1; i >= 0; i--) {
+                        String chainFile = Paths.get(chain.get(i)).getFileName().toString();
+                        if (i == 0) {
+                            msg.append("[chuck]:  |- '").append(chainFile).append("':[line ").append(imp.line()).append("] (this is the originating file)");
+                        } else {
+                            msg.append("[chuck]:  |- '").append(chainFile).append("':[line ").append(imp.line()).append("], which is imported from...\n");
+                        }
+                    }
+                    throw new RuntimeException(msg.toString());
+                }
+
+                // Skip if already compiled (diamond dependency deduplication)
+                if (compiledFiles.contains(importPath)) continue;
+
+                // Read and parse the imported file
+                String importSource = Files.readString(Paths.get(importPath));
+                List<org.chuck.compiler.ChuckAST.Stmt> importAst = parseSource(importSource);
+
+                // Recursively process its imports first
+                processImports(importAst, importPath, importStack, compiledFiles, importedFunctions);
+
+                // Compile to extract class definitions and public operator functions
+                org.chuck.compiler.ChuckEmitter importEmitter =
+                        new org.chuck.compiler.ChuckEmitter(userClassRegistry, importedFunctions);
+                importEmitter.emit(importAst, importPath);
+
+                // Merge class definitions into VM registry
+                importEmitter.getUserClassRegistry().forEach((k, v) -> {
+                    if (!userClassRegistry.containsKey(k)) userClassRegistry.put(k, v);
+                });
+
+                // Collect public operator functions for the importing file
+                importedFunctions.putAll(importEmitter.getPublicFunctions());
+
+                compiledFiles.add(importPath);
+            }
+        }
+        importStack.remove(filePath);
     }
 
     public ChuckShred getShred(int id) {

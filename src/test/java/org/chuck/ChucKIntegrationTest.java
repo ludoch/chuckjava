@@ -8,11 +8,17 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.attribute.FileTime;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 public class ChucKIntegrationTest {
+
+    // Tracks modification times of .txt files before each test runs
+    private static final Map<String, FileTime> txtModTimeBefore = new ConcurrentHashMap<>();
 
     @TestFactory
     Stream<DynamicTest> chuckTests() throws IOException {
@@ -26,6 +32,13 @@ public class ChucKIntegrationTest {
         return Files.walk(testRoot)
                 .filter(p -> p.toString().endsWith(".ck"))
                 .filter(p -> !p.toString().endsWith(".disabled.ck") && !p.toString().contains(".disabled"))
+                .filter(p -> { // skip files inside hidden directories (e.g. .deps)
+                    for (int i = 0; i < p.getNameCount(); i++) {
+                        String part = p.getName(i).toString();
+                        if (part.startsWith(".") && !part.endsWith(".ck")) return false;
+                    }
+                    return true;
+                })
            ///     .filter(p -> p.toString().contains("01-Basic"))
                 .filter(p -> filter == null || p.toString().contains(filter))
                 .sorted()
@@ -34,11 +47,21 @@ public class ChucKIntegrationTest {
 
     private void runTest(Path ckFile) throws Exception {
         String source = Files.readString(ckFile);
+
+        // Record .txt file modification time before running the VM
+        Path txtFilePre = ckFile.resolveSibling(ckFile.getFileName().toString().replace(".ck", ".txt"));
+        String txtKey = txtFilePre.toAbsolutePath().toString();
+        if (Files.exists(txtFilePre)) {
+            txtModTimeBefore.put(txtKey, Files.getLastModifiedTime(txtFilePre));
+        } else {
+            txtModTimeBefore.remove(txtKey);
+        }
+
         ChuckVM vm = new ChuckVM(44100);
         
         final StringBuilder output = new StringBuilder();
         vm.addPrintListener(text -> {
-            if (output.length() < 100000) output.append(text).append("\n");
+            if (output.length() < 100000) output.append(text);
         });
 
         // Capture stdout and stderr
@@ -70,14 +93,27 @@ public class ChucKIntegrationTest {
                 output.append(captured);
             }
         }
-        String result = output.toString().trim();
+        String result = output.toString().stripTrailing();
         String normalizedResult = normalizeOutput(result);
-        Path txtFile = ckFile.resolveSibling(ckFile.getFileName().toString().replace(".ck", ".txt"));
-        
+        Path txtFile = txtFilePre; // same path computed before VM run
+
+        // Check if the .txt file was written by the test program itself
+        // (same base name as .ck → .txt). If so, skip expected comparison.
+        boolean useExpected = false;
+        String normalizedExpected = "";
         if (Files.exists(txtFile)) {
+            FileTime modBefore = txtModTimeBefore.get(txtFile.toAbsolutePath().toString());
+            FileTime modAfter = Files.getLastModifiedTime(txtFile);
+            boolean fileWrittenByTest = modBefore == null || !modAfter.equals(modBefore);
+            if (!fileWrittenByTest) {
+                String expected = Files.readString(txtFile);
+                normalizedExpected = normalizeOutput(expected);
+                useExpected = true;
+            }
+        }
+
+        if (useExpected) {
             String expected = Files.readString(txtFile);
-            String normalizedExpected = normalizeOutput(expected);
-            
             // Some tests might have different error message formats but should still be verified
             if (ckFile.toString().contains("06-Errors") || expected.contains("error:") || expected.contains("EXCEPTION") || expected.contains("error --")) {
                 assertFalse(normalizedResult.isEmpty(), "Error test " + ckFile + " produced no output");
@@ -86,7 +122,7 @@ public class ChucKIntegrationTest {
             }
         } else {
             // Check for "success" as per test.py
-            assertTrue(normalizedResult.contains("success"), 
+            assertTrue(normalizedResult.contains("success"),
                 "Test " + ckFile + " did not contain 'success' and no .txt file found. Output:\n" + result);
         }
     }
@@ -96,6 +132,7 @@ public class ChucKIntegrationTest {
         return out.replaceAll(" :\\(\\w+\\)", "") // Strip :(int), :(float), etc.
                 .replaceAll("\"" , "")           // Strip quotes
                 .replace("\r\n", "\n")
+                .replaceAll("[ \t]+\n", "\n")    // Strip trailing whitespace from each line
                 .stripTrailing();                // Only strip from the very end of the whole blob
     }
 }

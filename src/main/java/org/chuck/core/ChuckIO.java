@@ -39,6 +39,8 @@ public class ChuckIO extends ChuckObject {
     }
 
     public ChuckIO write(Object o) {
+        if (o instanceof Double d) return write(d.doubleValue());
+        if (o instanceof Long l) return write(l.longValue());
         stream.print(o);
         vm.print(String.valueOf(o));
         return this;
