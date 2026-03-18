@@ -11,6 +11,8 @@ import java.util.Map;
  */
 public class UserObject extends ChuckObject {
     public final String className;
+    /** Non-null if this class (or an ancestor) extends the built-in Event type. */
+    public final ChuckEvent eventDelegate;
     /** Raw-long storage for int/float fields (floats stored as Double.doubleToRawLongBits). */
     private final Map<String, Long> primitiveFields = new LinkedHashMap<>();
     /** Names of fields declared as float/double. */
@@ -24,9 +26,14 @@ public class UserObject extends ChuckObject {
      * @param fieldDefs list of [type, name] pairs from the class declaration
      */
     public UserObject(String className, List<String[]> fieldDefs, Map<String, ChuckCode> methods) {
+        this(className, fieldDefs, methods, false);
+    }
+
+    public UserObject(String className, List<String[]> fieldDefs, Map<String, ChuckCode> methods, boolean extendsEvent) {
         super(new ChuckType(className, ChuckType.OBJECT, 0, 0));
         this.className = className;
         this.methods = methods;
+        this.eventDelegate = extendsEvent ? new ChuckEvent() : null;
         for (String[] f : fieldDefs) {
             boolean isFloat = f.length > 0 && ("float".equals(f[0]) || "double".equals(f[0]));
             long initVal;

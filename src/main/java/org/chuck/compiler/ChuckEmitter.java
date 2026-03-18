@@ -2544,8 +2544,18 @@ public class ChuckEmitter {
         }
         return dest;
     }
+    static boolean extendsEvent(String t, Map<String, UserClassDescriptor> rm) {
+        for (int depth = 0; depth < 16 && t != null; depth++) {
+            if ("Event".equals(t)) return true;
+            UserClassDescriptor d = rm.get(t);
+            if (d == null) return false;
+            t = d.parentName();
+        }
+        return false;
+    }
+
     static ChuckObject instantiateType(String t, float sr, ChuckVM vm, Map<String, UserClassDescriptor> rm) {
-        if (t == null) return null; UserClassDescriptor d = rm.get(t); if (d != null) return new UserObject(t, d.fields(), d.methods());
+        if (t == null) return null; UserClassDescriptor d = rm.get(t); if (d != null) return new UserObject(t, d.fields(), d.methods(), extendsEvent(t, rm));
         return switch (t) {
             case "SinOsc" -> new SinOsc(sr); case "Gain" -> new Gain();
             case "Pan2" -> new Pan2(); case "Noise" -> new Noise();
@@ -2703,6 +2713,12 @@ public class ChuckEmitter {
                 if (mName.equals("waiting")) { s.reg.push((long) event.getWaitingCount()); return; }
             }
             if (obj instanceof UserObject uo) {
+                // Delegate built-in Event methods to embedded event delegate
+                if (uo.eventDelegate != null) {
+                    if (mName.equals("signal"))    { uo.eventDelegate.signal(vm);    s.reg.pushObject(uo); return; }
+                    if (mName.equals("broadcast")) { uo.eventDelegate.broadcast(vm); s.reg.pushObject(uo); return; }
+                    if (mName.equals("waiting"))   { s.reg.push((long) uo.eventDelegate.getWaitingCount()); return; }
+                }
                 ChuckCode target = uo.methods.get(mName);
                 if (target == null) {
                     UserClassDescriptor d = vm.getUserClass(uo.className);

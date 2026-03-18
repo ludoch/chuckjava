@@ -98,6 +98,17 @@ public abstract class ChuckUGen extends ChuckObject {
         return gain;
     }
 
+    /** ChucK-style gain(val) setter — called as p.gain(0.5) */
+    public double gain(double val) {
+        this.gain = (float) val;
+        return val;
+    }
+
+    /** ChucK-style gain() getter — called as p.gain() */
+    public double gain() {
+        return this.gain;
+    }
+
     public float getLastOut() {
         return lastOut;
     }

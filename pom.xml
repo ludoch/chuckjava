@@ -136,7 +136,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.5</version>
                 <configuration>
-                    <argLine>--enable-preview --add-modules jdk.incubator.vector -Xmx1g -Xms64m -XX:+UseSerialGC</argLine>
+                    <argLine>--enable-preview --add-modules jdk.incubator.vector -Xmx2g -Xms128m</argLine>
                     <excludes>
                         <exclude>**/ChucKIntegrationTest.java</exclude>
                     </excludes>

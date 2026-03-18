@@ -10,6 +10,8 @@ public class WaitEvent implements ChuckInstr {
         ChuckObject obj = (ChuckObject) shred.reg.popObject();
         if (obj instanceof ChuckEvent event) {
             event.waitOn(shred, vm);
+        } else if (obj instanceof UserObject uo && uo.eventDelegate != null) {
+            uo.eventDelegate.waitOn(shred, vm);
         } else {
             throw new RuntimeException("Chucked non-event object to now");
         }
