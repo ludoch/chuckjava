@@ -191,8 +191,9 @@ public class ChuckVM {
     }
 
     public void print(String text) {
+        String msg = text.endsWith("\n") ? text.substring(0, text.length() - 1) : text;
         for (PrintListener listener : printListeners) {
-            listener.onPrint(text);
+            listener.onPrint(msg);
         }
         // Also print to stdout by default
     }

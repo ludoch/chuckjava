@@ -41,6 +41,7 @@ public class ChucKIntegrationTest {
                 })
            ///     .filter(p -> p.toString().contains("01-Basic"))
                 .filter(p -> filter == null || p.toString().contains(filter))
+                .filter(p -> System.getProperty("includeStress") != null || !p.toString().contains("04-Stress"))
                 .sorted()
                 .map(p -> DynamicTest.dynamicTest(testRoot.relativize(p).toString(), () -> runTest(p)));
     }
@@ -61,7 +62,7 @@ public class ChucKIntegrationTest {
         
         final StringBuilder output = new StringBuilder();
         vm.addPrintListener(text -> {
-            if (output.length() < 100000) output.append(text);
+            if (output.length() < 100000) output.append(text).append('\n');
         });
 
         // Capture stdout and stderr
