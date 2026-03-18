@@ -47,9 +47,13 @@ public class ChuckParser {
         // Check for modifiers
         boolean isPublic = false;
         boolean isStatic = false;
-        while (!isAtEnd() && (peek().type() == ChuckLexer.TokenType.PUBLIC || peek().type() == ChuckLexer.TokenType.STATIC)) {
+        boolean isGlobal = false;
+        while (!isAtEnd() && (peek().type() == ChuckLexer.TokenType.PUBLIC
+                || peek().type() == ChuckLexer.TokenType.STATIC
+                || peek().type() == ChuckLexer.TokenType.GLOBAL)) {
             if (match(ChuckLexer.TokenType.PUBLIC)) isPublic = true;
             if (match(ChuckLexer.TokenType.STATIC)) isStatic = true;
+            if (match(ChuckLexer.TokenType.GLOBAL)) isGlobal = true;
         }
         token = peek(); // refresh token after skipping modifiers
 
@@ -100,7 +104,7 @@ public class ChuckParser {
             return new ChuckAST.ReturnStmt(exp, token.line(), token.column());
         }
 
-        if (isType(token) && isDeclStart()) return parseDecl(isPublic, isStatic, true);
+        if (isType(token) && isDeclStart()) return parseDecl(isPublic, isStatic, isGlobal, true);
 
         ChuckAST.Exp exp = parseExpression();
         match(ChuckLexer.TokenType.SEMICOLON);
@@ -133,7 +137,7 @@ public class ChuckParser {
         // UGens - effects
         "Echo", "Delay", "DelayL", "JCRev", "Chorus", "ResonZ", "Lpf", "OnePole", "OneZero",
         // IO
-        "MidiIn", "SndBuf", "WvOut", "IO",
+        "MidiIn", "SndBuf", "WvOut", "IO", "PitShift",
         // Networking
         "OscIn", "OscOut", "OscMsg",
         // HID
@@ -207,6 +211,10 @@ public class ChuckParser {
     }
 
     private ChuckAST.Stmt parseDecl(boolean isPublic, boolean isStatic, boolean allowInlineChuck) {
+        return parseDecl(isPublic, isStatic, false, allowInlineChuck);
+    }
+
+    private ChuckAST.Stmt parseDecl(boolean isPublic, boolean isStatic, boolean isGlobal, boolean allowInlineChuck) {
         ChuckLexer.Token type = advance();
         List<ChuckAST.Stmt> results = new ArrayList<>();
         // Support @ reference for the whole declaration: Gain @ h, g;
@@ -245,7 +253,7 @@ public class ChuckParser {
                         args, start.line(), start.column());
             }
 
-            ChuckAST.DeclStmt decl = new ChuckAST.DeclStmt(type.value(), nameToken.value(), arraySizes, callArgs, thisRef, isStatic,
+            ChuckAST.DeclStmt decl = new ChuckAST.DeclStmt(type.value(), nameToken.value(), arraySizes, callArgs, thisRef, isStatic, isGlobal,
                     type.line(), type.column());
 
             // Handle inline chuck after the name: SinOsc s => dac; or fc =^ unflip
@@ -283,7 +291,20 @@ public class ChuckParser {
     }
 
     private ChuckAST.Exp parseChuck() {
-        ChuckAST.Exp left = parseTernary();
+        // Handle 'global' at the start: e.g. "... => global SinOsc s => ..."
+        boolean startGlobal = match(ChuckLexer.TokenType.GLOBAL);
+        ChuckAST.Exp left;
+        if (startGlobal && isDeclNext()) {
+            ChuckAST.Stmt decl = parseDecl(false, false, true, false);
+            if (decl instanceof ChuckAST.DeclStmt ds) {
+                left = new ChuckAST.DeclExp(ds.type(), ds.name(), ds.arraySizes(), ds.callArgs(), ds.isReference(), ds.isStatic(), ds.isGlobal(), ds.line(), ds.column());
+            } else {
+                left = new ChuckAST.IdExp("__global__", peek().line(), peek().column());
+            }
+        } else {
+            if (startGlobal) pos--; // back up if not a decl
+            left = parseTernary();
+        }
         while (match(ChuckLexer.TokenType.CHUCK, ChuckLexer.TokenType.AT_CHUCK,
                      ChuckLexer.TokenType.UNCHUCK, ChuckLexer.TokenType.UPCHUCK,
                      ChuckLexer.TokenType.SWAP, ChuckLexer.TokenType.WRITE_IO,
@@ -312,14 +333,15 @@ public class ChuckParser {
                 default           -> ChuckAST.Operator.NONE;
             };
             ChuckAST.Exp right;
-            if (isDeclNext()) {
-                ChuckAST.Stmt decl = parseDecl(false, false, false);
+            boolean rhsGlobal = match(ChuckLexer.TokenType.GLOBAL);
+            if (rhsGlobal || isDeclNext()) {
+                ChuckAST.Stmt decl = parseDecl(false, false, rhsGlobal, false);
                 if (decl instanceof ChuckAST.BlockStmt) {
                     throw new RuntimeException("cannot '=>' from/to a multi-variable declaration (from parseChuck)");
                 }
                 // Wrap DeclStmt back into DeclExp for the BinaryExp
                 ChuckAST.DeclStmt ds = (ChuckAST.DeclStmt) decl;
-                right = new ChuckAST.DeclExp(ds.type(), ds.name(), ds.arraySizes(), ds.callArgs(), ds.isReference(), ds.isStatic(), ds.line(), ds.column());
+                right = new ChuckAST.DeclExp(ds.type(), ds.name(), ds.arraySizes(), ds.callArgs(), ds.isReference(), ds.isStatic(), ds.isGlobal(), ds.line(), ds.column());
             } else {
                 right = parseTernary();
             }
@@ -470,9 +492,13 @@ public class ChuckParser {
                     advance();
                 } else {
                     List<ChuckAST.Exp> indices = new ArrayList<>();
+                    int idxLine = peek().line(), idxCol = peek().column();
                     do {
                         indices.add(parseExpression());
                     } while (match(ChuckLexer.TokenType.COMMA));
+                    if (indices.size() > 1) {
+                        throw new RuntimeException(idxLine + ":" + idxCol + ": error: [..., ...] is invalid subscript syntax.");
+                    }
                     consume(ChuckLexer.TokenType.RBRACKET, "Expected ']' after array index");
                     exp = new ChuckAST.ArrayAccessExp(exp, indices, previous().line(), previous().column());
                 }
@@ -534,8 +560,8 @@ public class ChuckParser {
                         args, typeTok.line(), typeTok.column());
             }
             
-            return new ChuckAST.DeclExp(typeTok.value(), "@new_" + start.line() + "_" + start.column(), 
-                    new ArrayList<>(), callArgs, false, false, start.line(), start.column());
+            return new ChuckAST.DeclExp(typeTok.value(), "@new_" + start.line() + "_" + start.column(),
+                    new ArrayList<>(), callArgs, false, false, false, start.line(), start.column());
         }
         if (match(ChuckLexer.TokenType.INT)) {
             return new ChuckAST.IntExp(Long.parseLong(previous().value()), previous().line(), previous().column());
@@ -562,6 +588,10 @@ public class ChuckParser {
         }
         if (match(ChuckLexer.TokenType.LBRACKET)) {
             return parseArrayLiteral();
+        }
+        if (match(ChuckLexer.TokenType.MAYBE)) {
+            ChuckLexer.Token t = previous();
+            return new ChuckAST.IdExp("maybe", t.line(), t.column());
         }
         if (match(ChuckLexer.TokenType.ME)) {
             return new ChuckAST.MeExp(previous().line(), previous().column());
@@ -598,7 +628,7 @@ public class ChuckParser {
                     callArgs = new ChuckAST.CallExp(new ChuckAST.IdExp(idTok.value(), start.line(), start.column()),
                             args, start.line(), start.column());
                 }
-                return new ChuckAST.DeclExp(idTok.value(), varName.value(), arraySizes, callArgs, isRef, false, idTok.line(), idTok.column());
+                return new ChuckAST.DeclExp(idTok.value(), varName.value(), arraySizes, callArgs, isRef, false, false, idTok.line(), idTok.column());
             }
             return new ChuckAST.IdExp(name, idTok.line(), idTok.column());
         }

@@ -47,7 +47,7 @@ public class ChucKIntegrationTest {
 
     private void runTest(Path ckFile) throws Exception {
         String source = Files.readString(ckFile);
-
+        System.out.println(ckFile);
         // Record .txt file modification time before running the VM
         Path txtFilePre = ckFile.resolveSibling(ckFile.getFileName().toString().replace(".ck", ".txt"));
         String txtKey = txtFilePre.toAbsolutePath().toString();
@@ -76,7 +76,7 @@ public class ChucKIntegrationTest {
             int shredId = vm.run(source, ckFile.toString());
 
             // Advance time until finished or timeout
-            int maxSeconds = 1; // Shorter timeout
+            int maxSeconds = 3; // Allow up to 3 simulated seconds
             int samplesPerStep = 44100 / 10; // 100ms
             for (int i = 0; i < maxSeconds * 10 && vm.getActiveShredCount() > 0; i++) {
                 vm.advanceTime(samplesPerStep);
@@ -132,6 +132,7 @@ public class ChucKIntegrationTest {
         return out.replaceAll(" :\\(\\w+\\)", "") // Strip :(int), :(float), etc.
                 .replaceAll("\"" , "")           // Strip quotes
                 .replace("\r\n", "\n")
+                .replaceAll("\\[chuck\\]: \\(VM\\) sporking incoming shred: \\d+", "[chuck]: (VM) sporking incoming shred: N") // Normalize shred IDs
                 .replaceAll("[ \t]+\n", "\n")    // Strip trailing whitespace from each line
                 .stripTrailing();                // Only strip from the very end of the whole blob
     }

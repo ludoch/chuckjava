@@ -1,8 +1,19 @@
 # ChucK-Java (JDK 25 Migration)
 
-## Progress Update (2026-03-10)
+## Progress Update (2026-03-17)
 
-Significant enhancements have been made to the core engine and the JavaFX IDE, bringing the port closer to feature parity with the official ChucK environment.
+### Integration Test Coverage
+
+| Suite | Tests | Passing | Notes |
+|-------|-------|---------|-------|
+| **01-Basic** | 242 | 242 ✅ | Core language, math, control flow, arrays, strings, classes |
+| **02-UGens** | 75 | 75 ✅ | All oscillators, filters, effects, physical models |
+| **03-Modules** | 14 | 14 ✅ | FileIO (text + binary), OSC networking, seek |
+| **04-Stress** | 15 | 8 | Deep recursion, large arrays, concurrency edge cases |
+| **05-Global** | 52 | 51 | 77.ck fails: `me.dir(3)` requires 3-level path depth (test dir only 2 levels deep) |
+| **06-Errors** | 109 | 42 | Error handling and type-checking edge cases |
+| **07-Imports** | 9 | 9 ✅ | `#include` / machine imports |
+| **Total** | **516** | **441 (85%)** | |
 
 ### Bugs Fixed & Language Improvements
 
@@ -11,7 +22,7 @@ Significant enhancements have been made to the core engine and the JavaFX IDE, b
 | 1 | **Console Printing (`<<< ... >>>`)** — Added support for ChucK's standard debug printing syntax. | ✅ Fixed |
 | 2 | **Swap Operator (`<=>`)** — Implemented the value/reference swap operator. | ✅ Fixed |
 | 3 | **Unchuck Operator (`!=>`)** — Added support for disconnecting Unit Generators. | ✅ Fixed |
-| 4 | **OSC Support (`OscIn`, `OscOut`, `OscMsg`)** — Lightweight UDP implementation for networking. | ✅ Fixed |
+| 4 | **OSC Support (`OscIn`, `OscOut`, `OscMsg`)** — Full UDP networking: event-based `oin => now`, builder pattern `xmit.start().add().send()`, wildcard address matching (`/test/*`). | ✅ Fixed |
 | 5 | **Inverse FFT (`IFFT`)** — Added support for spectral resynthesis. | ✅ Fixed |
 | 6 | **HID Support (`Hid`, `HidMsg`)** — Integrated keyboard and mouse events from the IDE. | ✅ Fixed |
 | 7 | **Advanced HID** — Added Windows Joystick/Gamepad support via FFM (Panama) API. | ✅ Fixed |
@@ -32,6 +43,13 @@ Significant enhancements have been made to the core engine and the JavaFX IDE, b
 | 22 | **Chained Chuck Operators** — Support for long chains like `SinOsc s => Envelope e => dac;`. | ✅ Fixed |
 | 23 | **Improved Mixed-Type Stack** — Corrected `popAsDouble` to handle both long and double bits seamlessly. | ✅ Fixed |
 | 24 | **Array/UGen introspection** — Added support for `.size()` on arrays and `.last()` on UGens. | ✅ Fixed |
+| 25 | **Binary FileIO (`IO.INT16`, `IO.INT32`, etc.)** — Full binary read/write with typed format constants. | ✅ Fixed |
+| 26 | **Bitwise operators (`\|`, `&`)** — Added `BitwiseOrAny`/`BitwiseAndAny` instructions and emitter wiring. | ✅ Fixed |
+| 27 | **`FileIO.good()` / `more()`** — Fixed EOF detection: `filePointer < fileLength`, empty-file special case. | ✅ Fixed |
+| 28 | **`PitShift` UGen** — Added pitch-shifter UGen stub for compatibility. | ✅ Fixed |
+| 29 | **`buffered` property** — Added `buffered` boolean to `ChuckObject` base class; readable/settable via member access on all UGens and objects. | ✅ Fixed |
+| 30 | **`globalIsObject` registration** — Fixed `dac`, `blackhole`, `adc`, `chout`, `cherr`, `IO` not being registered in `globalIsObject` map; `GetGlobalObjectOrInt` was returning 0 instead of the object. | ✅ Fixed |
+| 31 | **Compile-time global type conflict** — Emitter now detects when two `global` declarations in the same file use the same name with conflicting types and throws a descriptive compile error. | ✅ Fixed |
 
 ### New Features
 
@@ -255,5 +273,5 @@ mvn org.openjfx:javafx-maven-plugin:0.0.8:run
 -   `UAnaBlob`: Data container for magnitude and phase.
 
 ### Filters, Effects & Utilities
--   `Lpf`, `ResonZ`, `Chorus`, `Echo`, `JCRev`, `OnePole`, `OneZero`.
+-   `Lpf`, `ResonZ`, `Chorus`, `Echo`, `JCRev`, `OnePole`, `OneZero`, `PitShift`.
 -   `Pan2`, `ADSR`, `Envelope`, `SndBuf`, `Gain`, `Noise`, `Step`, `Impulse`, `Blackhole`.

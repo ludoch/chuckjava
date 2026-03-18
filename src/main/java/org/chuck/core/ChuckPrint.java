@@ -24,7 +24,12 @@ public class ChuckPrint implements ChuckInstr {
         for (int i = 0; i < numArgs; i++) {
             Object v = values[i];
             if (v instanceof Double || v instanceof Float) {
-                sb.append(String.format("%.6f", ((Number) v).doubleValue()));
+                double dv = ((Number) v).doubleValue();
+                String formatted;
+                if (Double.isInfinite(dv)) formatted = dv > 0 ? "inf" : "-inf";
+                else if (Double.isNaN(dv)) formatted = "nan";
+                else formatted = String.format("%.6f", dv);
+                sb.append(formatted);
             } else if (v instanceof ChuckUGen ugen) {
                 sb.append(String.format("%.6f", ugen.getLastOut()));
             } else if (v instanceof ChuckArray arr) {

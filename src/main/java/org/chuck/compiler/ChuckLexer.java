@@ -32,7 +32,7 @@ public class ChuckLexer {
         HASH,                              // # (complex literal)
         QUESTION,                          // ? (ternary)
         IF, ELSE, WHILE, FOR, REPEAT, RETURN, BREAK, CONTINUE, DO, UNTIL,
-        NEW, SPORK, FUN, CLASS, EXTENDS, PUBLIC, STATIC, ME,
+        NEW, SPORK, FUN, CLASS, EXTENDS, PUBLIC, STATIC, GLOBAL, ME, MAYBE,
         LT, GT, LE, GE, EQ_EQ, NEQ,
         WRITE_IO,                          // <=
         TILDE, AT,
@@ -307,6 +307,8 @@ public class ChuckLexer {
             case "extends" -> TokenType.EXTENDS;
             case "public" -> TokenType.PUBLIC;
             case "static" -> TokenType.STATIC;
+            case "global", "external" -> TokenType.GLOBAL;
+            case "maybe" -> TokenType.MAYBE;
             case "me" -> TokenType.ME;
             default -> TokenType.ID;
         };

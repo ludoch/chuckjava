@@ -39,6 +39,12 @@ public class OscMsg extends org.chuck.core.ChuckObject {
     }
 
     public int numArgs() { return args.size(); }
-    
+
     public List<Object> getArgs() { return args; }
+
+    public void copyFrom(OscMsg other) {
+        this.address = other.address;
+        this.args.clear();
+        this.args.addAll(other.args);
+    }
 }

@@ -77,7 +77,19 @@ public class SetMemberIntByName implements ChuckInstr {
             Integer idx = MEMBER_OFFSETS.get(memberName);
             if (idx != null) {
                 obj.setData(idx, doubleVal);
+                called = true;
             }
+        }
+        // Final fallback: try direct public field reflection
+        if (!called && !isObjVal) {
+            try {
+                java.lang.reflect.Field f = rawObj.getClass().getField(memberName);
+                Class<?> ft = f.getType();
+                if (ft == int.class) f.setInt(rawObj, (int) doubleVal);
+                else if (ft == long.class) f.setLong(rawObj, (long) doubleVal);
+                else if (ft == float.class) f.setFloat(rawObj, (float) doubleVal);
+                else if (ft == double.class) f.setDouble(rawObj, doubleVal);
+            } catch (Exception ignored) {}
         }
 
         // Push the value back so the chuck expression can be chained

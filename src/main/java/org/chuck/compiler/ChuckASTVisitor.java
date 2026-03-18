@@ -139,7 +139,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             isRef = true;
         }
         
-        ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(typeStr, v.ID().getText(), arraySizes, null, isRef, ctx.STATIC() != null,
+        ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(typeStr, v.ID().getText(), arraySizes, null, isRef, ctx.STATIC() != null, false,
                 v.getStart().getLine(), v.getStart().getCharPositionInLine());            
         if (v.CHUCK_OP() != null) {
             ChuckAST.Exp rhs = (ChuckAST.Exp) visit(v.expression());

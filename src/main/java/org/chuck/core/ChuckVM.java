@@ -87,17 +87,17 @@ public class ChuckVM {
         }
 
         this.dac = new ChuckObject(new ChuckType("dac", ChuckType.OBJECT, 0, 0));
-        globalObjects.put("dac", dac);
+        setGlobalObject("dac", dac);
 
         this.blackhole = new Blackhole();
-        globalObjects.put("blackhole", blackhole);
+        setGlobalObject("blackhole", blackhole);
 
         this.adc = new Adc();
-        globalObjects.put("adc", adc);
+        setGlobalObject("adc", adc);
 
-        globalObjects.put("chout", new ChuckIO(System.out, this));
-        globalObjects.put("cherr", new ChuckIO(System.err, this));
-        globalObjects.put("IO", new ChuckIO(System.out, this));
+        setGlobalObject("chout", new ChuckIO(System.out, this));
+        setGlobalObject("cherr", new ChuckIO(System.err, this));
+        setGlobalObject("IO", new ChuckIO(System.out, this));
     }
 
     public ChuckUGen getDacChannel(int channel) {
@@ -222,12 +222,27 @@ public class ChuckVM {
      */
     public int spork(ChuckShred shred) {
         schedulerLock.lock();
+        boolean doLog;
         try {
-            shred.setWakeTime(currentTime.get());
+            doLog = !activeShreds.isEmpty();
+            // If sporking while other shreds are running (e.g. Machine.eval/add),
+            // schedule for next sample to avoid processing in the same runShredsAt call.
+            long wt = doLog ? currentTime.get() + 1 : currentTime.get();
+            shred.setWakeTime(wt);
             shreduler.offer(shred);
             activeShreds.put(shred.getId(), shred);
         } finally {
             schedulerLock.unlock();
+        }
+        if (doLog) {
+            ChuckCode c = shred.getCode();
+            String fname = "shred";
+            if (c != null && c.getName() != null) {
+                String n = c.getName().replace('\\', '/');
+                int slash = n.lastIndexOf('/');
+                fname = slash >= 0 ? n.substring(slash + 1) : n;
+            }
+            print("[chuck]: (VM) sporking incoming shred: " + shred.getId() + " (" + fname + ")...\n");
         }
         
         Thread.ofVirtual().name("Shred-" + shred.getId()).start(() -> {

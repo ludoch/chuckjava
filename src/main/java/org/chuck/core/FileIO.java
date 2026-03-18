@@ -85,6 +85,55 @@ public class FileIO extends ChuckObject {
         }
     }
 
+    // --- Binary read/write ---
+    public long readInt(int format) {
+        try {
+            if (file == null) { eof = true; return 0; }
+            return switch (format) {
+                case 1  -> file.readByte();   // INT8
+                case 2  -> file.readShort();  // INT16
+                case 4  -> file.readInt();    // INT32
+                case 8  -> file.readLong();   // INT64
+                default -> readInt();
+            };
+        } catch (IOException e) { eof = true; return 0; }
+    }
+
+    public void write(long value, int format) {
+        try {
+            if (file == null) return;
+            switch (format) {
+                case 1  -> file.writeByte((int) value);
+                case 2  -> file.writeShort((int) value);
+                case 4  -> file.writeInt((int) value);
+                case 8  -> file.writeLong(value);
+                default -> write(value);
+            }
+        } catch (IOException ignored) {}
+    }
+
+    public double readFloat(int format) {
+        try {
+            if (file == null) { eof = true; return 0.0; }
+            return switch (format) {
+                case 16 -> file.readFloat();
+                case 32 -> file.readDouble();
+                default -> readFloat();
+            };
+        } catch (IOException e) { eof = true; return 0.0; }
+    }
+
+    public void write(double value, int format) {
+        try {
+            if (file == null) return;
+            switch (format) {
+                case 16 -> file.writeFloat((float) value);
+                case 32 -> file.writeDouble(value);
+                default -> write(value);
+            }
+        } catch (IOException ignored) {}
+    }
+
     // --- Read operations ---
     public long readInt() {
         long v = 0;

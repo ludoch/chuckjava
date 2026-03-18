@@ -6,6 +6,14 @@ import java.io.PrintStream;
  * Represents an IO stream in ChucK (chout, cherr).
  */
 public class ChuckIO extends ChuckObject {
+    // Binary format constants (also accessible as IO.INT16 etc.)
+    public static final int INT8    = 1;
+    public static final int INT16   = 2;
+    public static final int INT32   = 4;
+    public static final int INT64   = 8;
+    public static final int FLOAT32 = 16;
+    public static final int FLOAT64 = 32;
+
     private final PrintStream stream;
     private ChuckVM vm;
 

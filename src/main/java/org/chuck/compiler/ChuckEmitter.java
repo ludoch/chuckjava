@@ -17,6 +17,8 @@ public class ChuckEmitter {
     private final Map<String, String> varTypes = new HashMap<>();
 
     private final Map<String, UserClassDescriptor> userClassRegistry = new HashMap<>();
+    /** Tracks global variable name → declared type for compile-time conflict detection. */
+    private final Map<String, String> globalVarTypes = new HashMap<>();
 
     private String currentClass = null;
     private java.util.Set<String> currentClassFields = java.util.Collections.emptySet();
@@ -79,6 +81,7 @@ public class ChuckEmitter {
     public ChuckCode emit(List<ChuckAST.Stmt> statements, String programName) {
         localScopes.clear();
         varTypes.clear();
+        globalVarTypes.clear();
         currentFile = programName;
         // Pass 1: Collect all global function signatures
         for (ChuckAST.Stmt stmt : statements) {
@@ -222,9 +225,20 @@ public class ChuckEmitter {
             int argCount = 0;
             boolean isUserClass = userClassRegistry.containsKey(s.type());
             boolean isVec = s.type().equals("vec3") || s.type().equals("vec4") || s.type().equals("complex") || s.type().equals("polar");
+            boolean forceGlobal = s.isGlobal();
+            // Compile-time check: detect global type conflicts
+            if (forceGlobal || localScopes.isEmpty()) {
+                String prevType = globalVarTypes.get(s.name());
+                if (prevType != null && !prevType.equals(s.type()) && !prevType.equals("int") && !prevType.equals("float") && !prevType.equals("string")) {
+                    throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
+                        + ": error: global " + prevType + " '" + s.name() + "' has different type '" + s.type()
+                        + "' than already existing global " + prevType + " of the same name");
+                }
+                globalVarTypes.put(s.name(), s.type());
+            }
 
             if (isUserClass && s.callArgs() instanceof ChuckAST.CallExp call) {
-                if (localScopes.isEmpty()) {
+                if (forceGlobal || localScopes.isEmpty()) {
                     code.addInstruction(new InstantiateSetAndPushGlobal(s.type(), s.name(), 0, s.isReference(), false, userClassRegistry));
                 } else {
                     Map<String, Integer> scope = localScopes.peek();
@@ -251,7 +265,7 @@ public class ChuckEmitter {
                     argCount = 1;
                 }
 
-                if (localScopes.isEmpty()) {
+                if (forceGlobal || localScopes.isEmpty()) {
                     code.addInstruction(new InstantiateSetAndPushGlobal(s.type(), s.name(), argCount, s.isReference(), !s.arraySizes().isEmpty(), userClassRegistry));
                     code.addInstruction(new Pop());
                 } else {
@@ -452,6 +466,46 @@ public class ChuckEmitter {
             for (int jump : continueJumps.pop()) {
                 code.replaceInstruction(jump, new Jump(updateStart));
             }
+        } else if (stmt instanceof ChuckAST.RepeatStmt s) {
+            if (localScopes.isEmpty()) localScopes.push(new HashMap<>());
+            Map<String, Integer> scope = localScopes.peek();
+            String cntName = "__repeat_cnt_" + s.line() + "_" + s.column();
+            int cntOffset = scope.size();
+            scope.put(cntName, cntOffset);
+
+            // Store count in local
+            emitExpression(s.count(), code);
+            code.addInstruction(new StoreLocal(cntOffset));
+            code.addInstruction(new Pop());
+
+            int startPc = code.getNumInstructions();
+            continueJumps.push(new ArrayList<>());
+            breakJumps.push(new ArrayList<>());
+
+            // Condition: counter > 0
+            code.addInstruction(new LoadLocal(cntOffset));
+            code.addInstruction(new PushInt(0));
+            code.addInstruction(new GreaterThanAny());
+            int jumpIdx = code.getNumInstructions();
+            code.addInstruction(null); // placeholder for JumpIfFalse
+
+            // Body
+            emitStatement(s.body(), code);
+
+            // Decrement counter
+            int updateStart = code.getNumInstructions();
+            code.addInstruction(new LoadLocal(cntOffset));
+            code.addInstruction(new PushInt(1));
+            code.addInstruction(new MinusAny());
+            code.addInstruction(new StoreLocal(cntOffset));
+            code.addInstruction(new Pop());
+            code.addInstruction(new Jump(startPc));
+
+            int endPc = code.getNumInstructions();
+            code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
+
+            for (int jump : breakJumps.pop()) code.replaceInstruction(jump, new Jump(endPc));
+            for (int jump : continueJumps.pop()) code.replaceInstruction(jump, new Jump(updateStart));
         }
     }
 
@@ -476,12 +530,23 @@ public class ChuckEmitter {
             varTypes.put(e.name(), e.type()); // track variable type
             int argCount = 0;
             boolean isUserClass = userClassRegistry.containsKey(e.type());
+            boolean forceGlobal = e.isGlobal();
+            // Compile-time check: detect global type conflicts
+            if (forceGlobal || localScopes.isEmpty()) {
+                String prevType = globalVarTypes.get(e.name());
+                if (prevType != null && !prevType.equals(e.type()) && !prevType.equals("int") && !prevType.equals("float") && !prevType.equals("string")) {
+                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                        + ": error: global " + prevType + " '" + e.name() + "' has different type '" + e.type()
+                        + "' than already existing global " + prevType + " of the same name");
+                }
+                globalVarTypes.put(e.name(), e.type());
+            }
 
             if (isUserClass && e.callArgs() instanceof ChuckAST.CallExp call) {
-                Integer localOffset = getLocalOffset(e.name());
+                Integer localOffset = forceGlobal ? null : getLocalOffset(e.name());
                 if (localOffset != null) {
                     code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, 0, e.isReference(), false, userClassRegistry));
-                } else if (!localScopes.isEmpty()) {
+                } else if (!forceGlobal && !localScopes.isEmpty()) {
                     Map<String, Integer> scope = localScopes.peek();
                     localOffset = scope.size();
                     scope.put(e.name(), localOffset);
@@ -502,10 +567,10 @@ public class ChuckEmitter {
                     argCount = e.arraySizes().size();
                 }
 
-                Integer localOffset = getLocalOffset(e.name());
+                Integer localOffset = forceGlobal ? null : getLocalOffset(e.name());
                 if (localOffset != null) {
                     code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), !e.arraySizes().isEmpty(), userClassRegistry));
-                } else if (!localScopes.isEmpty()) {
+                } else if (!forceGlobal && !localScopes.isEmpty()) {
                     Map<String, Integer> scope = localScopes.peek();
                     localOffset = scope.size();
                     scope.put(e.name(), localOffset);
@@ -552,8 +617,8 @@ public class ChuckEmitter {
                     case PERCENT_CHUCK -> ChuckAST.Operator.PERCENT;
                     default -> ChuckAST.Operator.PLUS;
                 };
-                emitExpression(e.lhs(), code);
-                emitExpression(e.rhs(), code);
+                emitExpression(e.rhs(), code);  // push current value of target
+                emitExpression(e.lhs(), code);  // push the operand
                 switch (arith) {
                     case PLUS    -> code.addInstruction(new AddAny());
                     case MINUS   -> code.addInstruction(new MinusAny());
@@ -637,6 +702,8 @@ public class ChuckEmitter {
                     case TIMES   -> code.addInstruction(new TimesAny());
                     case DIVIDE  -> code.addInstruction(new DivideAny());
                     case PERCENT -> code.addInstruction(new ModuloAny());
+                    case S_OR    -> code.addInstruction(new BitwiseOrAny());
+                    case S_AND   -> code.addInstruction(new BitwiseAndAny());
                     case LT      -> code.addInstruction(new LessThanAny());
                     case GT      -> code.addInstruction(new GreaterThanAny());
                     case EQ      -> code.addInstruction(new EqualsAny());
@@ -671,6 +738,7 @@ public class ChuckEmitter {
             else if (e.name().equals("cherr")) code.addInstruction(new PushCherr());
             else if (e.name().equals("chout")) code.addInstruction(new PushChout());
             else if (e.name().equals("Machine")) code.addInstruction(new PushMachine());
+            else if (e.name().equals("maybe")) code.addInstruction(new PushMaybe());
             else if (e.name().equals("second") || e.name().equals("ms") || e.name().equals("samp")
                     || e.name().equals("minute") || e.name().equals("hour")) {
                 code.addInstruction(new PushInt(1));
@@ -681,9 +749,25 @@ public class ChuckEmitter {
                 code.addInstruction(new GetGlobalObjectOrInt(e.name()));
             }
         } else if (exp instanceof ChuckAST.DotExp e) {
-            if (e.base() instanceof ChuckAST.IdExp id && id.name().equals("IO") && (e.member().equals("nl") || e.member().equals("newline"))) {
-                code.addInstruction(new PushString("\n"));
+            if (e.base() instanceof ChuckAST.IdExp id && id.name().equals("IO")) {
+                if (e.member().equals("nl") || e.member().equals("newline")) {
+                    code.addInstruction(new PushString("\n"));
+                } else {
+                    code.addInstruction(new GetBuiltinStatic("org.chuck.core.ChuckIO", e.member()));
+                }
                 return;
+            }
+            if (e.base() instanceof ChuckAST.IdExp id && id.name().equals("Math")) {
+                switch (e.member()) {
+                    case "INFINITY", "infinity" -> { code.addInstruction(new PushFloat(Double.POSITIVE_INFINITY)); return; }
+                    case "NEGATIVE_INFINITY"    -> { code.addInstruction(new PushFloat(Double.NEGATIVE_INFINITY)); return; }
+                    case "NaN", "nan"           -> { code.addInstruction(new PushFloat(Double.NaN)); return; }
+                    case "PI"                   -> { code.addInstruction(new PushFloat(Math.PI)); return; }
+                    case "TWO_PI"               -> { code.addInstruction(new PushFloat(2.0 * Math.PI)); return; }
+                    case "HALF_PI"              -> { code.addInstruction(new PushFloat(Math.PI / 2.0)); return; }
+                    case "E"                    -> { code.addInstruction(new PushFloat(Math.E)); return; }
+                    case "SQRT2"                -> { code.addInstruction(new PushFloat(Math.sqrt(2.0))); return; }
+                }
             }
             if (e.member().equals("size")) {
                 emitExpression(e.base(), code);
@@ -813,6 +897,14 @@ public class ChuckEmitter {
                     case "ceil" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("ceil")); } }
                     case "equal" -> { if(e.args().size() >= 2) { emitExpression(e.args().get(0), code); emitExpression(e.args().get(1), code); code.addInstruction(new MathFunc("equal")); } }
                     case "euclidean" -> { if(e.args().size() >= 2) { emitExpression(e.args().get(0), code); emitExpression(e.args().get(1), code); code.addInstruction(new MathFunc("euclidean")); } }
+                    case "isinf" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("isinf")); } }
+                    case "isnan" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("isnan")); } }
+                    case "log"   -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("log")); } }
+                    case "log2"  -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("log2")); } }
+                    case "log10" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("log10")); } }
+                    case "exp"   -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("exp")); } }
+                    case "round" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("round")); } }
+                    case "trunc" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("trunc")); } }
                     case "help" -> code.addInstruction(new MathHelp());
                     default     -> {
                         if (!e.args().isEmpty()) {
@@ -824,12 +916,28 @@ public class ChuckEmitter {
                     }
                 }
             } else if (e.base() instanceof ChuckAST.DotExp dot && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("Machine")) {
-                if (dot.member().equals("realtime")) code.addInstruction(new PushInt(0));
-                else if (dot.member().equals("silent")) code.addInstruction(new PushInt(1));
-                else code.addInstruction(new PushInt(0));
-            } else if (e.base() instanceof ChuckAST.DotExp dot && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("me")) {
+                String machMember = dot.member();
+                if (machMember.equals("realtime")) { code.addInstruction(new PushInt(0)); }
+                else if (machMember.equals("silent")) { code.addInstruction(new PushInt(1)); }
+                else {
+                    for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                    code.addInstruction(new MachineCall(machMember, e.args().size()));
+                }
+            } else if (e.base() instanceof ChuckAST.DotExp dot
+                    && (dot.base() instanceof ChuckAST.MeExp || (dot.base() instanceof ChuckAST.IdExp idMe && idMe.name().equals("me")))) {
                 if (dot.member().equals("yield")) {
                     code.addInstruction(new Yield());
+                } else if (dot.member().equals("dir")) {
+                    if (!e.args().isEmpty()) emitExpression(e.args().get(0), code);
+                    else code.addInstruction(new PushInt(0));
+                    code.addInstruction(new MeDir(currentFile));
+                } else if (dot.member().equals("args")) {
+                    code.addInstruction(new PushInt(0)); // no CLI args in test mode
+                } else if (dot.member().equals("arg")) {
+                    if (!e.args().isEmpty()) emitExpression(e.args().get(0), code);
+                    code.addInstruction(new PushString(""));
+                } else if (dot.member().equals("exit")) {
+                    code.addInstruction(new MeExit());
                 } else {
                     code.addInstruction(new PushMe());
                     for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
@@ -928,6 +1036,15 @@ public class ChuckEmitter {
                 code.addInstruction(new StdMtof());
             } else if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Std") && e.member().equals("ftom")) {
                 code.addInstruction(new StdFtom());
+            } else if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Math")) {
+                // val => Math.func: apply math function to the value on stack
+                switch (e.member()) {
+                    case "isinf", "isnan", "sin", "cos", "sqrt", "abs", "floor", "ceil",
+                         "log", "log2", "log10", "exp", "round", "trunc",
+                         "dbtolin", "dbtopow", "lintodb", "powtodb", "dbtorms", "rmstodb"
+                        -> code.addInstruction(new MathFunc(e.member()));
+                    default -> code.addInstruction(new MathFunc(e.member()));
+                }
             } else if (e.base() instanceof ChuckAST.IdExp id && userClassRegistry.containsKey(id.name())) {
                 UserClassDescriptor d = userClassRegistry.get(id.name());
                 if (d.staticInts().containsKey(e.member()) || d.staticObjects().containsKey(e.member())) {
@@ -1056,7 +1173,7 @@ public class ChuckEmitter {
             if (s.reg.isDouble(0) || s.reg.isDouble(1)) {
                 double r = s.reg.popAsDouble(), l = s.reg.popAsDouble(); s.reg.push(l / r);
             } else {
-                long r = s.reg.popLong(), l = s.reg.popLong(); if (r != 0) s.reg.push(l / r); else s.reg.push(0L);
+                long r = s.reg.popLong(), l = s.reg.popLong(); if (r != 0) s.reg.push(l / r); else throw new RuntimeException("DivideByZero");
             }
         }
     }
@@ -1068,6 +1185,18 @@ public class ChuckEmitter {
             } else {
                 long r = s.reg.popLong(), l = s.reg.popLong(); if (r != 0) s.reg.push(l % r); else s.reg.push(0L);
             }
+        }
+    }
+
+    static class BitwiseOrAny implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            long r = s.reg.popLong(), l = s.reg.popLong(); s.reg.push(l | r);
+        }
+    }
+
+    static class BitwiseAndAny implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            long r = s.reg.popLong(), l = s.reg.popLong(); s.reg.push(l & r);
         }
     }
 
@@ -1184,6 +1313,9 @@ public class ChuckEmitter {
     }
     static class PushMe implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(s); }
+    }
+    static class PushMaybe implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.push(Math.random() < 0.5 ? 1L : 0L); }
     }
     static class PushMachine implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(new MachineObject()); }
@@ -1359,9 +1491,17 @@ public class ChuckEmitter {
         @Override public void execute(ChuckVM vm, ChuckShred s) { vm.advanceTime(0); }
     }
     static class AdvanceTime implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) { 
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            if (s.reg.isObject(0)) {
+                Object obj = s.reg.popObject();
+                if (obj instanceof ChuckEvent event) {
+                    event.waitOn(s, vm);
+                }
+                s.reg.push(vm.getCurrentTime());
+                return;
+            }
             long samples = s.reg.popLong();
-            s.yield(samples); 
+            s.yield(samples);
             s.reg.push(vm.getCurrentTime());
         }
     }
@@ -1506,15 +1646,28 @@ public class ChuckEmitter {
                 } else s.reg.push(0.0);
                 return;
             }
+            if (fn.equals("isinf")) { double v2 = s.reg.popAsDouble(); s.reg.push(Double.isInfinite(v2) ? 1L : 0L); return; }
+            if (fn.equals("isnan")) { double v2 = s.reg.popAsDouble(); s.reg.push(Double.isNaN(v2) ? 1L : 0L); return; }
+            if (fn.equals("pow")) {
+                double exp2 = s.reg.popAsDouble(), base2 = s.reg.popAsDouble();
+                s.reg.push(Math.pow(base2, exp2));
+                return;
+            }
             double v = s.reg.popAsDouble();
             s.reg.push(switch (fn) {
                 case "sin" -> Math.sin(v); case "cos" -> Math.cos(v);
                 case "sqrt" -> Math.sqrt(v); case "abs" -> Math.abs(v);
                 case "floor" -> Math.floor(v); case "ceil" -> Math.ceil(v);
+                case "log" -> Math.log(v); case "log2" -> Math.log(v) / Math.log(2);
+                case "log10" -> Math.log10(v); case "exp" -> Math.exp(v);
+                case "round" -> (double) Math.round(v); case "trunc" -> (double) (long) v;
                 case "dbtolin", "dbtopow" -> Math.pow(10.0, v / 20.0);
                 case "lintodb", "powtodb" -> (v <= 0 ? Double.NEGATIVE_INFINITY : 20.0 * Math.log10(v));
                 case "dbtorms" -> Math.sqrt(Math.pow(10.0, v / 10.0));
                 case "rmstodb" -> (v <= 0 ? Double.NEGATIVE_INFINITY : 10.0 * Math.log10(v * v));
+                case "tan" -> Math.tan(v); case "asin" -> Math.asin(v); case "acos" -> Math.acos(v);
+                case "atan" -> Math.atan(v); case "sinh" -> Math.sinh(v); case "cosh" -> Math.cosh(v);
+                case "tanh" -> Math.tanh(v);
                 default -> v;
             });
         }
@@ -1643,7 +1796,16 @@ public class ChuckEmitter {
                 else if (n.equals("left") && obj instanceof Pan2 p) s.reg.pushObject(p.left);
                 else if (n.equals("right") && obj instanceof Pan2 p) s.reg.pushObject(p.right);
                 else s.reg.push(0L);
-            } else s.reg.push(0L);
+            } else {
+                // Reflection fallback for public fields (e.g. MidiMsg.data1)
+                try {
+                    java.lang.reflect.Field f = obj.getClass().getField(n);
+                    Object val = f.get(obj);
+                    if (val instanceof Number num) s.reg.push(num.longValue());
+                    else if (val instanceof ChuckObject co) s.reg.pushObject(co);
+                    else s.reg.push(0L);
+                } catch (Exception ignored) { s.reg.push(0L); }
+            }
         }
     }
     static class GetUserField implements ChuckInstr {
@@ -1684,6 +1846,10 @@ public class ChuckEmitter {
                     else if (t.equals("vec4")) obj = new ChuckArray(ChuckType.ARRAY, 4);
                     else if (t.equals("complex") || t.equals("polar")) obj = new ChuckArray(ChuckType.ARRAY, 2);
                     else obj = null;
+                } else if (a > 1) {
+                    long[] dims = new long[a];
+                    for (int di = 0; di < a; di++) dims[di] = ((Number) args[di]).longValue();
+                    obj = buildMultiDimArray(dims, 0, t, vm, s, rm);
                 } else {
                     ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
                     for (int i = 0; i < sz; i++) {
@@ -1695,7 +1861,9 @@ public class ChuckEmitter {
             } else obj = instantiateType(t, vm.getSampleRate(), vm, rm);
 
             if (obj instanceof ChuckObject co) {
-                s.mem.setRef(fp + o, co); if (co instanceof ChuckUGen u) s.registerUGen(u);
+                s.mem.setRef(fp + o, co);
+                if (co instanceof ChuckUGen u) s.registerUGen(u);
+                if (co instanceof AutoCloseable ac) s.registerCloseable(ac);
                 s.reg.pushObject(co);
             } else {
                 if (t.equals("float")) {
@@ -1718,6 +1886,17 @@ public class ChuckEmitter {
                 else args[i] = s.reg.popLong();
             }
             if (r) { vm.setGlobalObject(n, null); s.reg.pushObject(null); return; }
+            // If global already exists, reuse it (or throw on type mismatch)
+            if (vm.isGlobalObject(n)) {
+                Object existing = vm.getGlobalObject(n);
+                if (existing != null) {
+                    String existingType = existing instanceof UserObject uo2 ? uo2.className : existing.getClass().getSimpleName();
+                    if (!existingType.equals(t) && !t.equals("string") && !t.equals("int") && !t.equals("float")) {
+                        throw new RuntimeException(n + "': has different type '" + existingType + "' than already existing global Object of the same name");
+                    }
+                    s.reg.pushObject(existing); return;
+                }
+            }
             Object obj;
             if (ar) {
                 int sz = ((Number) args[0]).intValue();
@@ -1726,6 +1905,10 @@ public class ChuckEmitter {
                     else if (t.equals("vec4")) obj = new ChuckArray(ChuckType.ARRAY, 4);
                     else if (t.equals("complex") || t.equals("polar")) obj = new ChuckArray(ChuckType.ARRAY, 2);
                     else obj = null;
+                } else if (a > 1) {
+                    long[] dims = new long[a];
+                    for (int di = 0; di < a; di++) dims[di] = ((Number) args[di]).longValue();
+                    obj = buildMultiDimArray(dims, 0, t, vm, s, rm);
                 } else {
                     ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
                     for (int i = 0; i < sz; i++) {
@@ -1737,7 +1920,9 @@ public class ChuckEmitter {
             } else obj = instantiateType(t, vm.getSampleRate(), vm, rm);
 
             if (obj instanceof ChuckObject co) {
-                vm.setGlobalObject(n, co); if (co instanceof ChuckUGen u) s.registerUGen(u);
+                vm.setGlobalObject(n, co);
+                if (co instanceof ChuckUGen u) s.registerUGen(u);
+                if (co instanceof AutoCloseable ac) s.registerCloseable(ac);
                 s.reg.pushObject(co);
             } else {
                 if (t.equals("float")) {
@@ -1750,6 +1935,20 @@ public class ChuckEmitter {
             }
         }
     }
+    private static ChuckArray buildMultiDimArray(long[] dims, int dimIdx, String elemType, ChuckVM vm, ChuckShred s, Map<String, UserClassDescriptor> rm) {
+        int sz = (int) dims[dimIdx];
+        ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
+        if (dimIdx + 1 < dims.length) {
+            for (int i = 0; i < sz; i++) arr.setObject(i, buildMultiDimArray(dims, dimIdx + 1, elemType, vm, s, rm));
+        } else {
+            for (int i = 0; i < sz; i++) {
+                ChuckObject elem = instantiateType(elemType, vm.getSampleRate(), vm, rm);
+                if (elem != null) { arr.setObject(i, elem); if (elem instanceof ChuckUGen u) s.registerUGen(u); }
+            }
+        }
+        return arr;
+    }
+
     private static Object connectAny(Object src, Object dest, ChuckVM vm) {
         if (src instanceof ChuckUGen su && dest instanceof ChuckUGen du) {
             if (su.getNumOutputs() > 1 && du.getNumInputs() == 1) {
@@ -1797,11 +1996,18 @@ public class ChuckEmitter {
             case "Echo" -> new Echo((int) (sr * 2)); case "Delay" -> new Delay((int) (sr * 2), sr);
             case "DelayL" -> new DelayL((int) (sr * 2), sr); case "JCRev", "NRev" -> new JCRev(sr);
             case "Chorus" -> new Chorus(sr); case "Lpf", "LPF" -> new Lpf(sr);
-            case "SndBuf" -> new SndBuf(); 
+            case "SndBuf" -> new SndBuf();
+            case "PitShift" -> new PitShift();
             case "Dyno" -> new Dyno();
             case "LiSa" -> new LiSa(sr);
             case "FileIO" -> new FileIO();
             case "StringTokenizer" -> new StringTokenizer();
+            case "Event" -> new ChuckEvent();
+            case "OscIn" -> new org.chuck.network.OscIn(vm);
+            case "OscOut" -> new org.chuck.network.OscOut();
+            case "OscMsg" -> new org.chuck.network.OscMsg();
+            case "MidiMsg" -> new org.chuck.midi.MidiMsg();
+            case "HidMsg" -> new org.chuck.hid.HidMsg();
             default -> null;
         };
     }
@@ -1885,7 +2091,13 @@ public class ChuckEmitter {
                 else if (s.reg.isDouble(0)) args[i] = s.reg.popAsDouble();
                 else args[i] = s.reg.popLong();
             }
-            Object obj = s.reg.popObject(); if (obj == null) { s.reg.push(0L); return; }
+            Object obj = s.reg.popObject(); if (obj == null) throw new RuntimeException("NullPointerException in method call: " + mName);
+            // Special event methods that need the VM reference
+            if (obj instanceof ChuckEvent event) {
+                if (mName.equals("signal")) { event.signal(vm); s.reg.pushObject(event); return; }
+                if (mName.equals("broadcast")) { event.broadcast(vm); s.reg.pushObject(event); return; }
+                if (mName.equals("waiting")) { s.reg.push((long) event.getWaitingCount()); return; }
+            }
             if (obj instanceof UserObject uo) {
                 ChuckCode target = uo.methods.get(mName);
                 if (target == null) {
@@ -1959,5 +2171,43 @@ public class ChuckEmitter {
         }
     }
     static class ShredObject extends ChuckObject { ShredObject() { super(new ChuckType("Shred", ChuckType.OBJECT, 0, 0)); } public String dir() { return "examples/data/"; } }
+    static class MeDir implements ChuckInstr {
+        String file; MeDir(String f) { file = f; }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            long level = s.reg.popLong();
+            // Normalize to forward slashes
+            String normalized = file.replace('\\', '/');
+            int slashIdx = normalized.lastIndexOf('/');
+            String dir = slashIdx >= 0 ? normalized.substring(0, slashIdx + 1) : "";
+            // level 0 = dir itself; level N = N directories up, keeping trailing slash
+            for (long i = 0; i < level; i++) {
+                if (dir.endsWith("/")) dir = dir.substring(0, dir.length() - 1);
+                int last = dir.lastIndexOf('/');
+                dir = last >= 0 ? dir.substring(0, last + 1) : "";
+            }
+            s.reg.pushObject(new ChuckString(dir));
+        }
+    }
+    static class MeExit implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.abort(); }
+    }
     static class MachineObject extends ChuckObject { MachineObject() { super(new ChuckType("Machine", ChuckType.OBJECT, 0, 0)); } public int add(String p, ChuckVM v) { return v.add(p); } public void remove(int i, ChuckVM v) { v.removeShred(i); } public void clear(ChuckVM v) { v.clear(); } public int refcount(Object o) { return 1; } }
+    static class MachineCall implements ChuckInstr {
+        String method; int argc;
+        MachineCall(String m, int a) { method = m; argc = a; }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            Object[] args = new Object[argc];
+            for (int i = argc - 1; i >= 0; i--) {
+                if (s.reg.isObject(0)) args[i] = s.reg.popObject();
+                else if (s.reg.isDouble(0)) args[i] = s.reg.popAsDouble();
+                else args[i] = s.reg.popLong();
+            }
+            switch (method) {
+                case "add" -> { String path = args.length > 0 ? String.valueOf(args[0]) : ""; s.reg.push((long) vm.add(path)); }
+                case "remove" -> { long id = args.length > 0 ? ((Number)args[0]).longValue() : 0; vm.removeShred((int)id); s.reg.push(0L); }
+                case "eval" -> { String src = args.length > 0 ? String.valueOf(args[0]) : ""; s.reg.push((long) vm.run(src, "<eval>")); }
+                default -> s.reg.push(0L);
+            }
+        }
+    }
 }

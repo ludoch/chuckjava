@@ -1,7 +1,6 @@
 package org.chuck.network;
 
 import org.chuck.core.ChuckVM;
-import java.io.File;
 
 public class ChuckMachineServer {
     private final ChuckVM vm;
@@ -14,52 +13,43 @@ public class ChuckMachineServer {
     }
 
     public void start() {
+        oscIn.addAddress("/chuck/add");
+        oscIn.addAddress("/chuck/remove");
+        oscIn.addAddress("/chuck/replace");
+        oscIn.addAddress("/chuck/status");
+        oscIn.addAddress("/chuck/kill");
         oscIn.port(port);
         System.out.println("Machine Server listening on port " + port);
 
-        setupHandlers();
-    }
-
-    private void setupHandlers() {
-        // We use a separate thread to poll for events from OscIn
         Thread.ofVirtual().name("Machine-Command-Handler").start(() -> {
-            OscIn.OscEvent addEvent = oscIn.event("/chuck/add");
-            OscIn.OscEvent removeEvent = oscIn.event("/chuck/remove");
-            OscIn.OscEvent replaceEvent = oscIn.event("/chuck/replace");
-            OscIn.OscEvent statusEvent = oscIn.event("/chuck/status");
-            OscIn.OscEvent killEvent = oscIn.event("/chuck/kill");
-
             while (true) {
                 try {
-                    OscMsg addMsg = addEvent.nextMsg();
-                    if (addMsg != null) {
-                        String file = (String) addMsg.getArgs().get(0);
-                        System.out.println("Received OSC: add " + file);
-                        vm.add(file);
+                    OscMsg msg = new OscMsg();
+                    if (oscIn.recv(msg)) {
+                        switch (msg.address) {
+                            case "/chuck/add" -> {
+                                String file = msg.getString(0);
+                                System.out.println("Received OSC: add " + file);
+                                vm.add(file);
+                            }
+                            case "/chuck/remove" -> {
+                                int id = msg.getInt(0);
+                                System.out.println("Received OSC: remove " + id);
+                                vm.removeShred(id);
+                            }
+                            case "/chuck/replace" -> {
+                                int id = msg.getInt(0);
+                                String file = msg.getString(1);
+                                System.out.println("Received OSC: replace " + id + " with " + file);
+                                vm.removeShred(id);
+                                vm.add(file);
+                            }
+                            case "/chuck/kill" -> {
+                                System.out.println("Received OSC: kill");
+                                System.exit(0);
+                            }
+                        }
                     }
-
-                    OscMsg removeMsg = removeEvent.nextMsg();
-                    if (removeMsg != null) {
-                        int id = (int) removeMsg.getArgs().get(0);
-                        System.out.println("Received OSC: remove " + id);
-                        vm.removeShred(id);
-                    }
-
-                    OscMsg replaceMsg = replaceEvent.nextMsg();
-                    if (replaceMsg != null) {
-                        int id = (int) replaceMsg.getArgs().get(0);
-                        String file = (String) replaceMsg.getArgs().get(1);
-                        System.out.println("Received OSC: replace " + id + " with " + file);
-                        vm.removeShred(id);
-                        vm.add(file);
-                    }
-                    
-                    OscMsg killMsg = killEvent.nextMsg();
-                    if (killMsg != null) {
-                        System.out.println("Received OSC: kill");
-                        System.exit(0);
-                    }
-
                     Thread.sleep(10);
                 } catch (Exception e) {
                     e.printStackTrace();

@@ -44,6 +44,8 @@ public class ChuckEvent extends ChuckObject {
         }
     }
 
+    public int getWaitingCount() { return waitingShreds.size(); }
+
     public void broadcast(ChuckVM vm) {
         eventLock.lock();
         try {

@@ -5,7 +5,8 @@ package org.chuck.core;
  */
 public class ChuckObject {
     private final ChuckType type;
-    
+    private boolean buffered = false;
+
     // Member data for user-defined classes
     private final long[] data;
     private final boolean[] isDouble;
@@ -21,6 +22,9 @@ public class ChuckObject {
     public ChuckType getType() {
         return type;
     }
+
+    public boolean buffered() { return buffered; }
+    public void setBuffered(boolean b) { this.buffered = b; }
 
     public void setData(int index, long value) {
         if (index < data.length) {

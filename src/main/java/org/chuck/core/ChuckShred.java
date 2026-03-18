@@ -31,6 +31,9 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     private final Set<org.chuck.audio.ChuckUGen> ownedUGens = ConcurrentHashMap.newKeySet();
     public void registerUGen(org.chuck.audio.ChuckUGen ugen) { ownedUGens.add(ugen); }
     public Set<org.chuck.audio.ChuckUGen> getOwnedUGens() { return ownedUGens; }
+    /** Closeable resources (e.g. OscIn sockets) to close when shred exits. */
+    private final java.util.List<AutoCloseable> ownedCloseables = new java.util.ArrayList<>();
+    public void registerCloseable(AutoCloseable c) { ownedCloseables.add(c); }
     
     // Execution state
     private ChuckCode code;
@@ -91,6 +94,10 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
             ugen.disconnectAll();
         }
         ownedUGens.clear();
+        for (AutoCloseable c : ownedCloseables) {
+            try { c.close(); } catch (Exception ignored) {}
+        }
+        ownedCloseables.clear();
     }
 
     public void abort() {
