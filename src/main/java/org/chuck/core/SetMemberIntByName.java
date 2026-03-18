@@ -68,6 +68,7 @@ public class SetMemberIntByName implements ChuckInstr {
         // Handle UserObject (user-defined ChucK classes) with named fields
         if (!called && rawObj instanceof UserObject uo) {
             if (isObjVal) uo.setObjectField(memberName, valObj instanceof ChuckObject ? (ChuckObject) valObj : null);
+            else if (uo.isFloatField(memberName)) uo.setFloatField(memberName, doubleVal);
             else uo.setPrimitiveField(memberName, (long) doubleVal);
             called = true;
         }
@@ -94,6 +95,7 @@ public class SetMemberIntByName implements ChuckInstr {
 
         // Push the value back so the chuck expression can be chained
         if (isObjVal) shred.reg.pushObject(valObj);
+        else if (rawObj instanceof UserObject uo2 && !uo2.isFloatField(memberName)) shred.reg.push((long) doubleVal);
         else shred.reg.push(doubleVal);
     }
 

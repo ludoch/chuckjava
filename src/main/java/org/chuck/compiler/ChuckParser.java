@@ -70,17 +70,9 @@ public class ChuckParser {
                 match(ChuckLexer.TokenType.SEMICOLON);
                 return new ChuckAST.ImportStmt(path, token.line(), token.column());
             }
-            // Other directives — skip
-            while (!isAtEnd() && !check(ChuckLexer.TokenType.SEMICOLON)
-                    && !check(ChuckLexer.TokenType.FUN) && !check(ChuckLexer.TokenType.CLASS)
-                    && !check(ChuckLexer.TokenType.RBRACE) && !check(ChuckLexer.TokenType.IF)
-                    && !check(ChuckLexer.TokenType.WHILE) && !check(ChuckLexer.TokenType.FOR)) {
-                boolean wasString = check(ChuckLexer.TokenType.STRING);
-                advance();
-                if (wasString) break;
-            }
-            match(ChuckLexer.TokenType.SEMICOLON);
-            return new ChuckAST.BlockStmt(List.of(), token.line(), token.column());
+            // Unknown directives are syntax errors
+            String dname = directiveName != null ? directiveName.value() : "?";
+            throw new RuntimeException(token.line() + ":" + token.column() + ": syntax error -- unexpected '@" + dname + "'");
         }
         // Check for operator overload without 'fun': e.g. public Foo @operator +(...) {...}
         if (isType(token) && pos + 1 < tokens.size()
@@ -472,16 +464,14 @@ public class ChuckParser {
         while (true) {
             if (match(ChuckLexer.TokenType.PLUS_PLUS)) {
                 ChuckLexer.Token t = previous();
-                // exp++ -> (1 +=> exp) — compound assignment performs the increment
                 exp = new ChuckAST.BinaryExp(
                         new ChuckAST.IntExp(1, t.line(), t.column()),
-                        ChuckAST.Operator.PLUS_CHUCK, exp, t.line(), t.column());
+                        ChuckAST.Operator.POSTFIX_PLUS_PLUS, exp, t.line(), t.column());
             } else if (match(ChuckLexer.TokenType.MINUS_MINUS)) {
                 ChuckLexer.Token t = previous();
-                // exp-- -> (1 -=> exp)
                 exp = new ChuckAST.BinaryExp(
                         new ChuckAST.IntExp(1, t.line(), t.column()),
-                        ChuckAST.Operator.MINUS_CHUCK, exp, t.line(), t.column());
+                        ChuckAST.Operator.POSTFIX_MINUS_MINUS, exp, t.line(), t.column());
             } else if (match(ChuckLexer.TokenType.DOT)) {
                 consume(ChuckLexer.TokenType.ID, "Expected member name after '.'");
                 ChuckLexer.Token member = previous();
@@ -535,7 +525,7 @@ public class ChuckParser {
             // new Type[size]
             if (match(ChuckLexer.TokenType.LBRACKET)) {
                 ChuckAST.Exp size = check(ChuckLexer.TokenType.RBRACKET)
-                        ? new ChuckAST.IntExp(0, start.line(), start.column())
+                        ? new ChuckAST.IntExp(-1, start.line(), start.column())
                         : parseExpression();
                 consume(ChuckLexer.TokenType.RBRACKET, "Expected ']'");
                 // additional dims like [2]
@@ -572,8 +562,32 @@ public class ChuckParser {
         if (match(ChuckLexer.TokenType.STRING)) {
             return new ChuckAST.StringExp(previous().value(), previous().line(), previous().column());
         }
-        // skip static/public in expression context (e.g. 1 => static int x)
-        if (match(ChuckLexer.TokenType.STATIC, ChuckLexer.TokenType.PUBLIC)) {
+        // Handle 'static' in expression context (e.g. 5 => static int X)
+        if (match(ChuckLexer.TokenType.STATIC)) {
+            // Parse the following type+name as a DeclExp with isStatic=true
+            if (match(ChuckLexer.TokenType.ID)) {
+                ChuckLexer.Token idTok = previous();
+                if (isType(idTok) && (check(ChuckLexer.TokenType.ID) || check(ChuckLexer.TokenType.AT))) {
+                    boolean isRef = match(ChuckLexer.TokenType.AT);
+                    ChuckLexer.Token varName = consume(ChuckLexer.TokenType.ID, "Expected variable name after 'static type'");
+                    List<ChuckAST.Exp> arraySizes = new ArrayList<>();
+                    while (check(ChuckLexer.TokenType.LBRACKET)) {
+                        advance();
+                        ChuckAST.Exp dim = check(ChuckLexer.TokenType.RBRACKET)
+                                ? new ChuckAST.IntExp(-1, idTok.line(), idTok.column())
+                                : parseExpression();
+                        consume(ChuckLexer.TokenType.RBRACKET, "Expected ']'");
+                        arraySizes.add(dim);
+                    }
+                    return new ChuckAST.DeclExp(idTok.value(), varName.value(), arraySizes, null, isRef, true, false, idTok.line(), idTok.column());
+                }
+                // Not a type+name, just return as IdExp
+                return new ChuckAST.IdExp(idTok.value(), idTok.line(), idTok.column());
+            }
+            return parsePrimary(); // fallback
+        }
+        // skip public in expression context
+        if (match(ChuckLexer.TokenType.PUBLIC)) {
             return parsePrimary(); // recurse with modifier consumed
         }
         // #(re, im) or %(mag, angle) — complex/polar literals; treat as FloatExp(0)
@@ -730,6 +744,10 @@ public class ChuckParser {
             } while (match(ChuckLexer.TokenType.COMMA));
         }
         consume(ChuckLexer.TokenType.RPAREN, "Expected ')'");
+        // Skip optional postfix operator token(s) (e.g. public Foo @operator (Foo foo) ++)
+        if (!check(ChuckLexer.TokenType.LBRACE)) {
+            while (!check(ChuckLexer.TokenType.LBRACE) && !isAtEnd()) advance();
+        }
         ChuckAST.Stmt body = parseStatement();
         return new ChuckAST.FuncDefStmt(returnType, opName.toString(), argTypes, argNames, body, isStatic, line, col);
     }
@@ -786,11 +804,19 @@ public class ChuckParser {
             // fun ReturnType @operator symbol (...) — operator overload with @operator keyword
             advance(); // skip "@"
             if (check(ChuckLexer.TokenType.ID)) advance(); // skip "operator" word
-            // skip operator symbol(s) until LPAREN
             String opPrefix = isPublic ? "__pub_op__" : "__op__";
             StringBuilder opName = new StringBuilder(opPrefix);
-            while (!check(ChuckLexer.TokenType.LPAREN) && !isAtEnd()) {
-                opName.append(advance().value());
+            // Handle formal (op_symbol) notation: @operator(%)
+            if (check(ChuckLexer.TokenType.LPAREN) && pos + 1 < tokens.size()
+                    && tokens.get(pos + 1).type() != ChuckLexer.TokenType.ID) {
+                advance(); // consume (
+                while (!check(ChuckLexer.TokenType.RPAREN) && !isAtEnd()) opName.append(advance().value());
+                advance(); // consume )
+            } else {
+                // skip operator symbol(s) until LPAREN
+                while (!check(ChuckLexer.TokenType.LPAREN) && !isAtEnd()) {
+                    opName.append(advance().value());
+                }
             }
             funcName = opName.toString();
         } else if (check(ChuckLexer.TokenType.ID)) {

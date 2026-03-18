@@ -22,7 +22,7 @@ public class ChucKIntegrationTest {
 
     @TestFactory
     Stream<DynamicTest> chuckTests() throws IOException {
-        Path testRoot = Paths.get("test");
+        Path testRoot = Paths.get("src/test");
         if (!Files.exists(testRoot)) {
             return Stream.empty();
         }

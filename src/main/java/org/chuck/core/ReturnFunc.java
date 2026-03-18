@@ -26,7 +26,8 @@ public class ReturnFunc implements ChuckInstr {
         
         // Capture return value from top of reg stack if it was pushed AFTER savedRegSp
         int savedRegSp = (int) shred.mem.getData(currentFP - 1);
-        if (shred.reg.getSp() > savedRegSp && shred.reg.getSp() > 0) {
+        boolean hasReturn = shred.reg.getSp() > savedRegSp && shred.reg.getSp() > 0;
+        if (hasReturn) {
             retIsDouble = shred.reg.isDouble(0);
             retPrim = shred.reg.peekLong(0);
             retObj = shred.reg.peekObject(0);
@@ -39,21 +40,23 @@ public class ReturnFunc implements ChuckInstr {
         int savedFP = (int) shred.mem.getData(currentFP - 2);
         int oldPc = (int) shred.mem.getData(currentFP - 3);
         ChuckCode oldCode = (ChuckCode) shred.mem.getRef(currentFP - 4);
-        
+
         shred.setCode(oldCode);
         shred.setPc(oldPc);
         shred.setFramePointer(savedFP);
-        
+
         // Shrink mem stack to before the frame
         shred.mem.setSp(currentFP - 4);
 
-        // Push return value back onto reg stack
-        if (retObj != null) {
-            shred.reg.pushObject(retObj);
-        } else if (retIsDouble) {
-            shred.reg.push(Double.longBitsToDouble(retPrim));
-        } else {
-            if (retObj != null || retPrim != 0) shred.reg.push(retPrim);
+        // Push return value back onto reg stack (including 0 — a valid int/float return)
+        if (hasReturn) {
+            if (retObj != null) {
+                shred.reg.pushObject(retObj);
+            } else if (retIsDouble) {
+                shred.reg.push(Double.longBitsToDouble(retPrim));
+            } else {
+                shred.reg.push(retPrim);
+            }
         }
     }
 }

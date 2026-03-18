@@ -259,10 +259,24 @@ public class ChuckVM {
         return shred.getId();
     }
 
-    public int add(String path) {
+    public int add(String pathWithArgs) {
         try {
-            String source = java.nio.file.Files.readString(java.nio.file.Paths.get(path));
-            return run(source, path);
+            // Support "path/to/file.ck:arg0:arg1" format (ChucK Machine.add convention)
+            String filePath = pathWithArgs;
+            String[] shredArgs = new String[0];
+            int colonIdx = pathWithArgs.indexOf(':');
+            if (colonIdx >= 0) {
+                filePath = pathWithArgs.substring(0, colonIdx);
+                String argStr = pathWithArgs.substring(colonIdx + 1);
+                shredArgs = argStr.isEmpty() ? new String[0] : argStr.split(":");
+            }
+            String source = java.nio.file.Files.readString(java.nio.file.Paths.get(filePath));
+            int shredId = run(source, filePath);
+            if (shredArgs.length > 0) {
+                ChuckShred shred = getShred(shredId);
+                if (shred != null) shred.setArgs(shredArgs);
+            }
+            return shredId;
         } catch (Exception e) {
             print("Machine.add error: " + e.getMessage());
             return 0;

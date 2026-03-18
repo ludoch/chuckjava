@@ -1,19 +1,19 @@
 # ChucK-Java (JDK 25 Migration)
 
-## Progress Update (2026-03-17)
+## Progress Update (2026-03-18)
 
 ### Integration Test Coverage
 
 | Suite | Tests | Passing | Notes |
 |-------|-------|---------|-------|
-| **01-Basic** | 242 | 242 ✅ | Core language, math, control flow, arrays, strings, classes |
+| **01-Basic** | 242 | 230 | Core language, math, control flow, arrays, classes, operator overloading |
 | **02-UGens** | 75 | 75 ✅ | All oscillators, filters, effects, physical models |
 | **03-Modules** | 14 | 14 ✅ | FileIO (text + binary), OSC networking, seek |
 | **04-Stress** | 15 | 8 | Deep recursion, large arrays, concurrency edge cases |
 | **05-Global** | 52 | 51 | 77.ck fails: `me.dir(3)` requires 3-level path depth (test dir only 2 levels deep) |
 | **06-Errors** | 109 | 42 | Error handling and type-checking edge cases |
 | **07-Imports** | 9 | 9 ✅ | `#include` / machine imports |
-| **Total** | **516** | **441 (85%)** | |
+| **Total** | **516** | **429 (83%)** | |
 
 ### Bugs Fixed & Language Improvements
 
@@ -50,6 +50,10 @@
 | 29 | **`buffered` property** — Added `buffered` boolean to `ChuckObject` base class; readable/settable via member access on all UGens and objects. | ✅ Fixed |
 | 30 | **`globalIsObject` registration** — Fixed `dac`, `blackhole`, `adc`, `chout`, `cherr`, `IO` not being registered in `globalIsObject` map; `GetGlobalObjectOrInt` was returning 0 instead of the object. | ✅ Fixed |
 | 31 | **Compile-time global type conflict** — Emitter now detects when two `global` declarations in the same file use the same name with conflicting types and throws a descriptive compile error. | ✅ Fixed |
+| 32 | **Operator overloading dispatch** — User-defined classes can now override `+`, `-`, `*`, `/`, `==`, `!=`, `<`, `>`, `!`, `++`, `--` via `op` functions. Tests 203–204, 207–209 all pass. | ✅ Fixed |
+| 33 | **`ReturnFunc` zero-return bug** — Return value `0` was never re-pushed onto the reg stack after a function returned, causing stack underflow for callers expecting a result. | ✅ Fixed |
+| 34 | **Class field literal initializers (`5 => int n;`)** — Class body statements of the form `<literal> => <type> <name>;` are now recognized as field declarations with initial values and correctly set on every new instance. | ✅ Fixed |
+| 35 | **`SetMemberIntByName` push-back type** — After setting an `int` field on a `UserObject`, the instruction was pushing a `double` value back onto the stack, causing fields to print as floats (e.g. `1.000000` instead of `1`). | ✅ Fixed |
 
 ### New Features
 
@@ -68,6 +72,10 @@
 - **Oscilloscope**: Real-time time-domain waveform visualization (Cyan).
 - **Master Controls**: Integrated Global Volume slider and live VM Logical Time display.
 - **Console Clear**: Added a dedicated button to clear the output log.
+
+---
+
+> **Full language reference:** see [LANGUAGE.md](LANGUAGE.md) — operators, types, built-ins, all UGen parameters, CLI flags, and IDE shortcuts.
 
 ---
 
