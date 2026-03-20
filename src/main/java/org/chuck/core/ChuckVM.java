@@ -3,6 +3,7 @@ package org.chuck.core;
 import org.chuck.audio.Adc;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.Blackhole;
+import org.chuck.chugin.ChuginLoader;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.PriorityQueue;
 import java.util.concurrent.locks.ReentrantLock;
@@ -58,6 +59,7 @@ public class ChuckVM {
 
     public ChuckVM(int sampleRate) {
         this.sampleRate = sampleRate;
+        ChuginLoader.loadChugins("chugins");
 
         // Initialize dac channels as virtual summing nodes
         for (int i = 0; i < numChannels; i++) {
@@ -279,7 +281,7 @@ public class ChuckVM {
             }
             String source = java.nio.file.Files.readString(java.nio.file.Paths.get(filePath));
             int shredId = run(source, filePath);
-            if (shredArgs.length > 0) {
+            if (shredId > 0 && shredArgs.length > 0) {
                 ChuckShred shred = getShred(shredId);
                 if (shred != null) shred.setArgs(shredArgs);
             }
@@ -436,6 +438,36 @@ public class ChuckVM {
         }
     }
 
+    public int replace(int id, String path) {
+        removeShred(id);
+        return add(path);
+    }
+
+    public void status() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\n[chuck]: (VM) status (").append(activeShreds.size()).append(" shreds active):\n");
+        sb.append("  | id | name       | wakeTime | args |\n");
+        sb.append("  |----|------------|----------|------|\n");
+        for (ChuckShred s : activeShreds.values()) {
+            String n = s.getName();
+            if (n == null || n.isEmpty()) n = "eval";
+            else {
+                n = n.replace('\\', '/');
+                int slash = n.lastIndexOf('/');
+                if (slash >= 0) n = n.substring(slash + 1);
+            }
+            if (n.length() > 10) n = n.substring(0, 10);
+            
+            sb.append(String.format("  | %2d | %-10s | %8d | %s |\n", 
+                s.getId(), n, s.getWakeTime(), String.join(":", s.getArgs())));
+        }
+        print(sb.toString());
+    }
+
+    public int eval(String source) {
+        return run(source, "eval");
+    }
+
     public void clear() {
         activeShreds.values().forEach(ChuckShred::abort);
         activeShreds.clear();
@@ -461,6 +493,9 @@ public class ChuckVM {
      * Advance logical time by computing audio samples and waking shreds.
      */
     public void advanceTime(int samplesToCompute) {
+        // Run any shreds scheduled for the current time before advancing
+        runShredsAt(currentTime.get());
+
         for (int s = 0; s < samplesToCompute; s++) {
             long now = currentTime.incrementAndGet();
             runShredsAt(now);

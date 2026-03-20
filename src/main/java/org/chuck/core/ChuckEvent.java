@@ -30,33 +30,92 @@ public class ChuckEvent extends ChuckObject {
         shred.suspendOnEvent();
     }
 
-    public void signal(ChuckVM vm) {
+    public void removeWaitingShred(ChuckShred shred) {
         eventLock.lock();
         try {
-            if (!waitingShreds.isEmpty()) {
-                ChuckShred shred = waitingShreds.remove(0);
-                shred.setWakeTime(vm.getCurrentTime());
-                vm.schedule(shred);
-                shred.resume(vm);
+            waitingShreds.remove(shred);
+        } finally {
+            eventLock.unlock();
+        }
+    }
+
+    /**
+     * Internal version of waitOn that doesn't suspend the shred.
+     * Used by compound events.
+     */
+    public void waitOnNoSuspend(ChuckShred shred, ChuckVM vm) {
+        eventLock.lock();
+        try {
+            waitingShreds.add(shred);
+        } finally {
+            eventLock.unlock();
+        }
+    }
+
+    public void signal(ChuckVM vm) {
+        ChuckShred toWake = null;
+        eventLock.lock();
+        try {
+            while (!waitingShreds.isEmpty()) {
+                ChuckShred shred = waitingShreds.get(0);
+                if (shred.isWaiting()) {
+                    if (shred.notifyTriggered(this, vm)) {
+                        toWake = waitingShreds.remove(0);
+                        break;
+                    } else {
+                        // Conjunction: triggered THIS event, but still waiting for others.
+                        // We remove it from this event's list.
+                        waitingShreds.remove(0);
+                        break; 
+                    }
+                } else {
+                    waitingShreds.remove(0);
+                }
             }
         } finally {
             eventLock.unlock();
+        }
+        
+        if (toWake != null) {
+            toWake.setWakeTime(vm.getCurrentTime());
+            toWake.resume(vm);
+            if (!toWake.isDone() && !toWake.isWaiting()) {
+                vm.schedule(toWake);
+            }
         }
     }
 
     public int getWaitingCount() { return waitingShreds.size(); }
 
     public void broadcast(ChuckVM vm) {
+        List<ChuckShred> toWake = new ArrayList<>();
         eventLock.lock();
         try {
-            for (ChuckShred shred : waitingShreds) {
-                shred.setWakeTime(vm.getCurrentTime());
-                vm.schedule(shred);
-                shred.resume(vm);
+            java.util.Iterator<ChuckShred> it = waitingShreds.iterator();
+            while (it.hasNext()) {
+                ChuckShred shred = it.next();
+                if (shred.isWaiting()) {
+                    if (shred.notifyTriggered(this, vm)) {
+                        toWake.add(shred);
+                        it.remove();
+                    } else {
+                        // Conjunction
+                        it.remove();
+                    }
+                } else {
+                    it.remove();
+                }
             }
-            waitingShreds.clear();
         } finally {
             eventLock.unlock();
+        }
+        
+        for (ChuckShred s : toWake) {
+            s.setWakeTime(vm.getCurrentTime());
+            s.resume(vm);
+            if (!s.isDone() && !s.isWaiting()) {
+                vm.schedule(s);
+            }
         }
     }
 }

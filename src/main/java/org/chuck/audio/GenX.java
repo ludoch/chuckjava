@@ -21,6 +21,17 @@ public abstract class GenX extends ChuckUGen {
 
     public void freq(double f) { this.freq = f; }
 
+    /** ChucK-style: [1.0, 0.5] => gen.coeffs; */
+    public void coeffs(org.chuck.core.ChuckArray arr) {
+        float[] c = new float[arr.size()];
+        for (int i = 0; i < c.length; i++) {
+            c[i] = (float) arr.getFloat(i);
+        }
+        coeffs(c);
+    }
+
+    public abstract void coeffs(float[] c);
+
     public float lookup(float index) {
         if (table.length == 0) return 0.0f;
         // Normalised lookup (0.0 to 1.0)

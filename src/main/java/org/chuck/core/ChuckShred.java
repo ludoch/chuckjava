@@ -61,10 +61,39 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
         this.code = code;
     }
     
+    private ChuckEvent eventWaitingOn = null;
+    private final Set<ChuckEvent> conjunctionTriggered = new java.util.HashSet<>();
+
+    public void setEventWaitingOn(ChuckEvent e) {
+        this.eventWaitingOn = e;
+        this.conjunctionTriggered.clear();
+    }
+
+    /**
+     * Called by an event when it signals this shred.
+     * @return true if the shred should be woken up and removed from the event's waiting list.
+     */
+    public boolean notifyTriggered(ChuckEvent e, ChuckVM vm) {
+        if (eventWaitingOn == null) return true; // Normal wait
+        
+        if (eventWaitingOn instanceof ChuckEventDisjunction) {
+            return true;
+        }
+        
+        if (eventWaitingOn instanceof ChuckEventConjunction conj) {
+            conjunctionTriggered.add(e);
+            return conjunctionTriggered.containsAll(conj.getEvents());
+        }
+        
+        return true;
+    }
+
     public int getId() { return id; }
     public long getWakeTime() { return wakeTime; }
     public void setWakeTime(long time) { this.wakeTime = time; }
     public boolean isDone() { return isDone; }
+    /** ChucK-style: s.done() */
+    public int done() { return isDone ? 1 : 0; }
     public boolean isWaiting() { return isWaiting; }
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
@@ -79,10 +108,20 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     public int numArgs() { return args.length; }
 
     public String dir() {
-        if (code != null && code.getName() != null) {
-            java.io.File f = new java.io.File(code.getName());
-            String parent = f.getParent();
-            if (parent != null) return parent + "/";
+        return dir(0);
+    }
+
+    public String dir(int n) {
+        if (code == null || code.getName() == null) return "./";
+        java.io.File f = new java.io.File(code.getName());
+        java.io.File parent = f.getParentFile();
+        for (int i = 0; i < n && parent != null; i++) {
+            parent = parent.getParentFile();
+        }
+        if (parent != null) {
+            String p = parent.getAbsolutePath().replace('\\', '/');
+            if (!p.endsWith("/")) p += "/";
+            return p;
         }
         return "./";
     }

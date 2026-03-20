@@ -7,6 +7,7 @@ package org.chuck.audio;
 public class Gen10 extends GenX {
     public Gen10(float sampleRate) { super(sampleRate); }
 
+    @Override
     public void coeffs(float[] c) {
         if (c.length == 0) return;
         

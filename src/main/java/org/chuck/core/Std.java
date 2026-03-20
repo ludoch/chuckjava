@@ -30,8 +30,74 @@ public class Std {
         return Math.pow(10.0, db / 20.0);
     }
 
-    public static double lintodb(double lin) {
-        if (lin <= 0) return Double.NEGATIVE_INFINITY;
-        return 20.0 * Math.log10(lin);
+    public static long atoi(String s) {
+        try { return Long.parseLong(s.trim()); } catch (Exception e) { return 0; }
+    }
+
+    public static double atof(String s) {
+        try { return Double.parseDouble(s.trim()); } catch (Exception e) { return 0.0; }
+    }
+
+    public static long rand2(long min, long max) {
+        if (min > max) { long t = min; min = max; max = t; }
+        return min + (long) (Math.random() * (max - min + 1));
+    }
+
+    public static double rand2f(double min, double max) {
+        if (min > max) { double t = min; min = max; max = t; }
+        return min + Math.random() * (max - min);
+    }
+
+    public static double fabs(double v) {
+        return Math.abs(v);
+    }
+
+    public static void srand(long seed) {
+        // Java's Math.random() doesn't expose seed easily, 
+        // but for now we'll just ignore or use a shared Random instance.
+    }
+
+    public static long systemTime() {
+        return System.nanoTime();
+    }
+
+    public static String getenv(String key) {
+        if (key == null) return null;
+        String v = System.getenv(key);
+        if (v == null) v = System.getProperty(key);
+        return v;
+    }
+
+    public static String getenv(String key, String defaultValue) {
+        String v = getenv(key);
+        return v != null ? v : defaultValue;
+    }
+
+    public static void setenv(String key, String value) {
+        // System.setProperty is the Java equivalent for most cases
+        System.setProperty(key, value);
+    }
+
+    /** ChucK 1.5.1.1+: Std.range(n) -> [0, 1, ..., n-1] */
+    public static ChuckArray range(long n) {
+        int sz = (int) Math.max(0, n);
+        ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
+        for (int i = 0; i < sz; i++) arr.setInt(i, i);
+        return arr;
+    }
+
+    public static ChuckArray range(long start, long end) {
+        int sz = (int) Math.max(0, end - start);
+        ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
+        for (int i = 0; i < sz; i++) arr.setInt(i, start + i);
+        return arr;
+    }
+
+    public static ChuckArray range(long start, long end, long step) {
+        if (step == 0) return new ChuckArray(ChuckType.ARRAY, 0);
+        int sz = (int) Math.max(0, (end - start) / step);
+        ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
+        for (int i = 0; i < sz; i++) arr.setInt(i, start + i * step);
+        return arr;
     }
 }

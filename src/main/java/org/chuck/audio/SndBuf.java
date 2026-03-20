@@ -9,9 +9,15 @@ public class SndBuf extends ChuckUGen {
     private double pos = 0.0;
     private double rate = 1.0;
     private boolean loop = false;
+    private float sampleRate = 44100.0f;
 
     public SndBuf() {
         this.samples = new float[0];
+    }
+
+    public SndBuf(float sampleRate) {
+        this.samples = new float[0];
+        this.sampleRate = sampleRate;
     }
 
     public void setSamples(float[] samples) {
