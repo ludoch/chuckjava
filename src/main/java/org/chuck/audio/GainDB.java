@@ -20,5 +20,5 @@ public class GainDB extends ChuckUGen {
     @Override public double gain()         { return gain; }
 
     @Override
-    protected float compute(float input) { return input; }
+    protected float compute(float input, long systemTime) { return input; }
 }

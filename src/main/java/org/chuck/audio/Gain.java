@@ -14,7 +14,7 @@ public class Gain extends ChuckUGen {
     private static final VectorSpecies<Float> SPECIES = FloatVector.SPECIES_PREFERRED;
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         // Gain just passes the input through (it's multiplied by this.gain in the base class)
         return input;
     }

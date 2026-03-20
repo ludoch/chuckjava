@@ -24,7 +24,7 @@ public class OneZero extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         float out = b0 * input + b1 * lastInput;
         lastInput = input;
         return out;

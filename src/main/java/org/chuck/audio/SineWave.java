@@ -17,7 +17,7 @@ public class SineWave extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         // SineWave is a source, it ignores input unless used for FM/etc.
         float out = (float) Math.sin(phase);
         phase += 2.0 * Math.PI * frequency / sampleRate;

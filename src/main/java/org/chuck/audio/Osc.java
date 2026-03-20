@@ -104,55 +104,32 @@ public abstract class Osc extends ChuckUGen {
     }
 
     @Override
-    public float tick(long systemTime) {
-        if (systemTime != -1 && systemTime == lastTickTime) {
-            return lastOut;
+    protected float compute(float in, long systemTime) {
+        boolean incPhase = true;
+        double effectiveFreq = freq;
+        if (getNumSources() > 0) {
+            if (sync == 0) {
+                effectiveFreq = in;
+            } else if (sync == 1) {
+                phase = in % 1.0;
+                if (phase < 0) phase += 1.0;
+                incPhase = false;
+            } else if (sync == 2) {
+                effectiveFreq = freq + in;
+            }
+        }
+
+        if (incPhase) {
+            phase += effectiveFreq / sampleRate;
         }
         
-        if (isTicking) return lastOut;
-        isTicking = true;
+        phase = phase % 1.0;
+        if (phase < 0) phase += 1.0;
 
-        try {
-            float in = 0.0f;
-            for (ChuckUGen src : sources) {
-                in += src.tick(systemTime);
-            }
-
-            boolean incPhase = true;
-            double effectiveFreq = freq;
-            if (getNumSources() > 0) {
-                if (sync == 0) {
-                    // Input IS the frequency (audio-rate freq control); don't clobber stored freq
-                    effectiveFreq = in;
-                } else if (sync == 1) {
-                    phase = in % 1.0;
-                    if (phase < 0) phase += 1.0;
-                    incPhase = false;
-                } else if (sync == 2) {
-                    // FM: add input to base freq
-                    effectiveFreq = freq + in;
-                }
-            }
-
-            if (incPhase) {
-                phase += effectiveFreq / sampleRate;
-            }
-            
-            phase = phase % 1.0;
-            if (phase < 0) phase += 1.0;
-
-            lastOut = (float) (computeOsc(phase) * gain);
-            lastTickTime = systemTime;
-            
-            return lastOut;
-        } finally {
-            isTicking = false;
+        float out = (float) computeOsc(phase);
+        if (systemTime > 0) {
         }
-    }
-
-    @Override
-    protected float compute(float input) {
-        return 0.0f;
+        return out;
     }
 
     protected abstract double computeOsc(double phase);

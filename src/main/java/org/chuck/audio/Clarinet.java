@@ -46,15 +46,15 @@ public class Clarinet extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
-        float breathPressure = envelope.tick();
-        breathPressure += breathPressure * noiseGain * noise.tick();
-        breathPressure += breathPressure * vibratoGain * vibrato.tick();
+    protected float compute(float input, long systemTime) {
+        float breathPressure = envelope.tick(systemTime);
+        breathPressure += breathPressure * noiseGain * noise.tick(systemTime);
+        breathPressure += breathPressure * vibratoGain * vibrato.tick(systemTime);
 
-        float pressureDiff = -0.95f * filter.tick(delayLine.getLastOut());
+        float pressureDiff = -0.95f * filter.tick(delayLine.getLastOut(), systemTime);
         pressureDiff = pressureDiff - breathPressure;
 
-        float out = delayLine.tick(breathPressure + pressureDiff * reedTable.tick(pressureDiff));
+        float out = delayLine.tick(breathPressure + pressureDiff * reedTable.tick(pressureDiff), systemTime);
         return out * outputGain;
     }
 }

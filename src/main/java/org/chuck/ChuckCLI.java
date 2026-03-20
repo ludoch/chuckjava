@@ -163,6 +163,7 @@ public class ChuckCLI {
 
             ChuckVM vm = new ChuckVM(sampleRate);
             vm.setAntlrEnabled(useAntlr);
+            vm.addPrintListener(System.out::println);
             
             if (loop) {
                 org.chuck.network.ChuckMachineServer server = new org.chuck.network.ChuckMachineServer(vm);

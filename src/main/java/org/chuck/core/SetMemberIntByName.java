@@ -56,6 +56,7 @@ public class SetMemberIntByName implements ChuckInstr {
                 + Character.toUpperCase(memberName.charAt(0))
                 + memberName.substring(1);
 
+
         boolean called = false;
         if (isObjVal) {
             called = tryInvokeObj(rawObj, setter, valObj);
@@ -63,6 +64,9 @@ public class SetMemberIntByName implements ChuckInstr {
         } else {
             called = tryInvoke(rawObj, setter, doubleVal);
             if (!called) called = tryInvoke(rawObj, memberName, doubleVal);
+        }
+        
+        if (!called) {
         }
 
         // Handle UserObject (user-defined ChucK classes) with named fields
@@ -104,11 +108,19 @@ public class SetMemberIntByName implements ChuckInstr {
             if (!m.getName().equals(setter)) continue;
             Class<?>[] params = m.getParameterTypes();
             if (params.length != 1) continue;
-            if (val != null && !params[0].isAssignableFrom(val.getClass())) continue;
+            
+            Object finalVal = val;
+            if (val instanceof ChuckString && params[0] == String.class) {
+                finalVal = val.toString();
+            } else if (val instanceof Number && (params[0] == float.class || params[0] == Float.class)) {
+                finalVal = ((Number) val).floatValue();
+            } else if (val != null && !params[0].isAssignableFrom(val.getClass())) {
+                continue;
+            }
             if (val == null && params[0].isPrimitive()) continue;
             
             try {
-                m.invoke(obj, val); return true;
+                m.invoke(obj, finalVal); return true;
             } catch (Exception ignored) {}
         }
         return false;

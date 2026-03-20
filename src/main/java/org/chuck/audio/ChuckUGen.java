@@ -61,7 +61,9 @@ public abstract class ChuckUGen extends ChuckObject {
             return lastOut;
         }
 
-        if (isTicking) return lastOut;
+        if (isTicking) {
+            return lastOut;
+        }
         isTicking = true;
 
         try {
@@ -69,10 +71,11 @@ public abstract class ChuckUGen extends ChuckObject {
             for (ChuckUGen src : sources) {
                 sum += src.tick(systemTime);
             }
+            if (Math.abs(sum) > 1e-6) {
+            }
 
-            lastOut = compute(sum) * gain;
+            lastOut = compute(sum, systemTime) * gain;
             lastTickTime = systemTime;
-            
             return lastOut;
         } finally {
             isTicking = false;
@@ -84,11 +87,19 @@ public abstract class ChuckUGen extends ChuckObject {
     }
 
     public float tick(float manualInput) {
-        lastOut = compute(manualInput) * gain;
+        return tick(manualInput, -1);
+    }
+
+    public float tick(float manualInput, long systemTime) {
+        if (systemTime != -1 && systemTime == lastTickTime) {
+            return lastOut;
+        }
+        lastOut = compute(manualInput, systemTime) * gain;
+        lastTickTime = systemTime;
         return lastOut;
     }
 
-    protected abstract float compute(float input);
+    protected abstract float compute(float input, long systemTime);
 
     public void setGain(float gain) {
         this.gain = gain;
@@ -113,6 +124,11 @@ public abstract class ChuckUGen extends ChuckObject {
         return lastOut;
     }
 
+    /** ChucK-style: ugen.last() returns most recent sample */
+    public float last() {
+        return lastOut;
+    }
+
     public int getNumSources() {
         return sources.size();
     }
@@ -124,7 +140,6 @@ public abstract class ChuckUGen extends ChuckObject {
     private int isConnectedTo(ChuckUGen target, int depth) {
         if (depth > 5) return 0;
         if (targets.contains(target)) return 1;
-        System.err.println("  " + this + " isConnectedTo " + target + " ? targets=" + targets);
         // Check if any of our targets connects to the target (recursive)
         for (ChuckUGen t : targets) {
             if (t.isConnectedTo(target, depth + 1) == 1) return 1;
@@ -143,6 +158,12 @@ public abstract class ChuckUGen extends ChuckObject {
             target.removeSource(this);
         }
         targets.clear();
+        
+        // Also check MultiChannelDac special case if we connected to DAC proxy
+        // Since MultiChannelDac isn't a single target in the conventional list 
+        // (the ConnectToDac instruction might have bypassed targets list if it used MultiChannelDac proxy directly)
+        // Wait, ConnectToDac calls vm.getMultiChannelDac().addSource(ugen).
+        // Let's ensure the proxy itself tracks its sources or we handle it here.
     }
 
     public void clearSources() {

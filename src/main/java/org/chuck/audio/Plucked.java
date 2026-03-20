@@ -40,10 +40,10 @@ public class Plucked extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         float loopIn = delayLine.getLastOut();
-        float filtered = loopFilter.tick(loopIn);
-        float out = delayLine.tick(excitation.tick() + filtered);
+        float filtered = loopFilter.tick(loopIn, systemTime);
+        float out = delayLine.tick(excitation.tick(systemTime, systemTime) + filtered, systemTime);
         return out;
     }
 }

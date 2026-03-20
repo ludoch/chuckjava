@@ -27,6 +27,13 @@ public class BiQuad extends ChuckUGen {
     public void setPfreq(double f) { this.pfreq = f;         updateCoeffs(); }
     public void setEqzs(double v)  { this.eqzs  = v != 0.0; updateCoeffs(); }
 
+    /** ChucK-style: z.radius(0.99) */
+    public double radius(double r) { setPrad(r); return r; }
+    /** ChucK-style: z.freq(440) */
+    public double freq(double f) { setPfreq(f); return f; }
+    /** ChucK-style: z.norm(1) */
+    public double norm(double v) { setEqzs(v); return v; }
+
     public double getPrad()  { return prad; }
     public double getPfreq() { return pfreq; }
 
@@ -46,7 +53,7 @@ public class BiQuad extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         double x0 = input;
         double y0 = b0*x0 + b1*x1 + b2*x2 - a1*y1 - a2*y2;
         x2 = x1; x1 = x0;

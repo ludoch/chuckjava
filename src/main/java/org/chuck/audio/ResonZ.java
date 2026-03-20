@@ -42,7 +42,7 @@ public class ResonZ extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         float y0 = input + b1 * y1 + b2 * y2;
         float result = a0 * (y0 - y2);
         y2 = y1;

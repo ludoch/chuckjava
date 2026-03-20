@@ -30,7 +30,7 @@ public class IFFT extends UAna {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         // Output the next sample from the resynthesized buffer
         float out = buffer[readPos];
         readPos = (readPos + 1) % size;

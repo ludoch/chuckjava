@@ -9,7 +9,19 @@ public class AdvanceTime implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
         if (shred.reg.getSp() == 0) return;
-        long samples = shred.reg.popLong();
+        
+        if (shred.reg.isObject(0)) {
+            Object obj = shred.reg.popObject();
+            if (obj instanceof ChuckDuration cd) {
+                shred.yield(cd.samples());
+            } else if (obj instanceof ChuckEvent event) {
+                event.waitOn(shred, vm);
+            }
+            shred.reg.push(vm.getCurrentTime());
+            return;
+        }
+        
+        long samples = shred.reg.popAsLong();
         shred.yield(samples);
         shred.reg.push(vm.getCurrentTime());
     }

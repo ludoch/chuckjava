@@ -41,8 +41,8 @@ public class Brass extends ChuckUGen {
     public void lip(float val) { this.lipFilter = val; }
 
     @Override
-    protected float compute(float input) {
-        float env = adsr.tick();
+    protected float compute(float input, long systemTime) {
+        float env = adsr.tick(systemTime, systemTime);
         float breath = pressure * env;
         
         float boreRes = delayLine.getLastOut();
@@ -51,7 +51,7 @@ public class Brass extends ChuckUGen {
         // Non-linear lip function (simplified)
         float lipOutput = jawRes * (1.0f - (jawRes * jawRes));
         
-        float out = delayLine.tick(breath + filter.tick(lipOutput));
+        float out = delayLine.tick(breath + filter.tick(lipOutput, systemTime));
         
         lastOut = out;
         return out;

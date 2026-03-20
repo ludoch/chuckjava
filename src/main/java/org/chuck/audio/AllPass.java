@@ -17,12 +17,10 @@ public class AllPass extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         float temp = delayLine.getLastOut();
-        float out = -coefficient * input + temp + coefficient * (input + coefficient * temp);
-        // Simplified STK implementation
         float inner = input + coefficient * temp;
-        delayLine.tick(inner);
+        delayLine.tick(inner, systemTime);
         return -coefficient * inner + temp;
     }
 }

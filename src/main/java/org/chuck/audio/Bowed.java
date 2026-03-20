@@ -52,21 +52,21 @@ public class Bowed extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         // Simple vibrato
         double vibrato = Math.sin(phase) * vibratoGain;
         phase += 2.0 * Math.PI * vibratoFreq / sampleRate;
         if (phase > 2.0 * Math.PI) phase -= 2.0 * Math.PI;
         
         // This is a simplified waveguide bow model
-        float bridgeReflection = -bridgeDelay.tick(0.0f); // Use tick(0) to pull last out
-        float neckReflection = -filter.tick(neckDelay.tick(0.0f));
+        float bridgeReflection = -bridgeDelay.tick(0.0f, systemTime); // Use tick(0) to pull last out
+        float neckReflection = -filter.tick(neckDelay.tick(0.0f, systemTime), systemTime);
         
         float bowDiff = bowVelocity - (bridgeReflection + neckReflection);
         float newVel = bowDiff * bowTable.lookup(bowDiff);
         
-        bridgeDelay.tick(neckReflection + newVel);
-        neckDelay.tick(bridgeReflection + newVel);
+        bridgeDelay.tick(neckReflection + newVel, systemTime);
+        neckDelay.tick(bridgeReflection + newVel, systemTime);
         
         lastOut = bridgeReflection;
         return lastOut;

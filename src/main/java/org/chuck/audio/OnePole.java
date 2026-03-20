@@ -24,7 +24,7 @@ public class OnePole extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         lastOutput = b0 * input - a1 * lastOutput;
         return lastOutput;
     }

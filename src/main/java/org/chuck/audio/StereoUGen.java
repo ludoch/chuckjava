@@ -7,6 +7,11 @@ public abstract class StereoUGen extends ChuckUGen {
     protected float lastOutLeft = 0.0f;
     protected float lastOutRight = 0.0f;
 
+    public StereoUGen() {
+        super();
+        this.numOutputs = 2;
+    }
+
     public float getLastOutLeft() {
         return lastOutLeft;
     }
@@ -30,14 +35,14 @@ public abstract class StereoUGen extends ChuckUGen {
                 sum += src.tick(systemTime);
             }
 
-            computeStereo(sum);
+            computeStereo(sum, systemTime);
             
-            // Apply gain to stereo outputs
+            // Apply gain to stereo components
             lastOutLeft *= gain;
             lastOutRight *= gain;
             
-            // For mono output of a stereo UGen, average the channels
-            lastOut = (lastOutLeft + lastOutRight) * 0.5f;
+            // Return left channel as the 'primary' output for mono-listeners
+            lastOut = lastOutLeft;
             
             lastTickTime = systemTime;
             
@@ -53,5 +58,11 @@ public abstract class StereoUGen extends ChuckUGen {
         return tick(-1);
     }
 
-    protected abstract void computeStereo(float input);
+    @Override
+    protected float compute(float input, long systemTime) {
+        computeStereo(input, systemTime);
+        return (lastOutLeft + lastOutRight) * 0.5f;
+    }
+
+    protected abstract void computeStereo(float input, long systemTime);
 }

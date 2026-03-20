@@ -12,8 +12,10 @@ import java.io.IOException;
 public class ChuckAudio {
     private final ChuckVM vm;
     private final int bufferSize;
-    private final int numChannels;
+    private int numChannels;
+    private int numInputChannels;
     private final float sampleRate;
+
     private SourceDataLine outputLine;
     private TargetDataLine inputLine;   // null if no mic available
     private boolean running = false;
@@ -27,6 +29,7 @@ public class ChuckAudio {
         this.vm = vm;
         this.bufferSize = bufferSize;
         this.numChannels = numChannels;
+        this.numInputChannels = numChannels; // Default to same as output
         this.sampleRate = sampleRate;
         initJavaSound();
     }
@@ -52,11 +55,23 @@ public class ChuckAudio {
         // Input (microphone) — optional
         try {
             DataLine.Info inInfo = new DataLine.Info(TargetDataLine.class, format);
-            if (AudioSystem.isLineSupported(inInfo)) {
+            if (!AudioSystem.isLineSupported(inInfo)) {
+                // Try mono if stereo not supported
+                AudioFormat monoFormat = new AudioFormat(sampleRate, 16, 1, true, false);
+                inInfo = new DataLine.Info(TargetDataLine.class, monoFormat);
+                if (AudioSystem.isLineSupported(inInfo)) {
+                    inputLine = (TargetDataLine) AudioSystem.getLine(inInfo);
+                    inputLine.open(monoFormat, bufferSize * 1 * 4);
+                    numInputChannels = 1;
+                    System.out.println("[Audio] Microphone input line opened (MONO): " + monoFormat);
+                }
+            } else {
                 inputLine = (TargetDataLine) AudioSystem.getLine(inInfo);
                 inputLine.open(format, bufferSize * numChannels * 4);
+                System.out.println("[Audio] Microphone input line opened: " + format);
             }
         } catch (LineUnavailableException | SecurityException e) {
+            System.out.println("[Audio] Microphone access failed: " + e.getMessage());
             // No mic access — adc will produce silence
             inputLine = null;
         }
@@ -78,8 +93,9 @@ public class ChuckAudio {
                     // ── Capture: read only if available to avoid blocking output
                     if (inputLine != null && inBuf != null) {
                         int available = inputLine.available();
-                        if (available >= inBuf.length) {
-                            inputLine.read(inBuf, 0, inBuf.length);
+                        int bytesNeeded = bufferSize * numInputChannels * 2;
+                        if (available >= bytesNeeded) {
+                            inputLine.read(inBuf, 0, bytesNeeded);
                         }
                     }
 
@@ -89,7 +105,9 @@ public class ChuckAudio {
                         // Feed ADC with captured frame
                         if (inBuf != null) {
                             for (int c = 0; c < numChannels; c++) {
-                                int idx = (i * numChannels + c) * 2;
+                                // If input is mono, use channel 0 for all output channels
+                                int inputChan = Math.min(c, numInputChannels - 1);
+                                int idx = (i * numInputChannels + inputChan) * 2;
                                 short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
                                 vm.adc.setInputSample(c, pcm / 32768.0f);
                             }
@@ -100,7 +118,9 @@ public class ChuckAudio {
                         // Interleave Left/Right for stereo output
                         for (int c = 0; c < numChannels; c++) {
                             float sample = vm.getChannelLastOut(c) * masterGain;
-                            sumSq += sample * sample;
+                            if (i < 5 && vm.getCurrentTime() < 10) {
+                            }
+                            sumSq += (double)sample * sample;
                             short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
                             int idx = (i * numChannels + c) * 2;
                             outBuf[idx]     = (byte)  (s16 & 0xFF);

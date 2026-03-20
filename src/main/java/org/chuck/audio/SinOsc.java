@@ -10,6 +10,7 @@ public class SinOsc extends Osc {
 
     @Override
     protected double computeOsc(double phase) {
-        return Math.sin(phase * 2.0 * Math.PI);
+        double out = Math.sin(phase * 2.0 * Math.PI);
+        return out;
     }
 }

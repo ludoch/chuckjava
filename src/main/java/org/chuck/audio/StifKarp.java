@@ -40,9 +40,9 @@ public class StifKarp extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         // Karplus-Strong loop
-        float out = delayLine.tick(input + lastInput + filter.tick(delayLine.getLastOut() * 0.99f));
+        float out = delayLine.tick(input + lastInput + filter.tick(delayLine.getLastOut() * 0.99f, systemTime), systemTime);
         lastInput *= 0.95f; // Decay pluck
         lastOut = out;
         return out;

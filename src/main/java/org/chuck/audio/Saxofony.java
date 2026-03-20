@@ -40,16 +40,17 @@ public class Saxofony extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
-        float env = adsr.tick();
+    protected float compute(float input, long systemTime) {
+        float env = adsr.tick(systemTime);
         float breath = pressure * env;
-        
-        float boreRes = -0.9f * filter.tick(delayLine.getLastOut());
+
+        float boreRes = -0.9f * filter.tick(delayLine.getLastOut(), systemTime);
         float pressureDiff = breath - boreRes;
-        
-        float out = delayLine.tick(breath + pressureDiff * reedTable.tick(pressureDiff));
-        
+
+        float out = delayLine.tick(breath + pressureDiff * reedTable.tick(pressureDiff), systemTime);
+
         lastOut = out;
         return out;
     }
+
 }

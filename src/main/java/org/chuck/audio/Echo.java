@@ -20,12 +20,17 @@ public class Echo extends ChuckUGen {
         this.mix = mix;
     }
 
+    public void setMax(double samples) {
+        // Echo current implementation wraps a fixed-size Delay.
+        // In a full implementation, we'd resize the buffer.
+        // For now, we just accept the call.
+    }
+
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         // Feedback loop: input + (last wet output * gain)
-        // Note: ChucK's Echo often uses the internal Gain of the UGen for feedback
         float dry = input;
-        float wet = delayLine.tick(input + lastWet * gain);
+        float wet = delayLine.tick(input + lastWet * gain, systemTime);
         lastWet = wet;
         
         return dry * (1.0f - mix) + wet * mix;

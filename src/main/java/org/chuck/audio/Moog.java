@@ -42,14 +42,14 @@ public class Moog extends ChuckUGen {
     public void filterSweep(float s) { this.filterSweep = s; }
 
     @Override
-    protected float compute(float input) {
-        float sum = (oscillators[0].tick() + oscillators[1].tick()) * 0.5f;
-        float env = adsr.tick();
+    protected float compute(float input, long systemTime) {
+        float sum = (oscillators[0].tick(systemTime, systemTime) + oscillators[1].tick(systemTime, systemTime)) * 0.5f;
+        float env = adsr.tick(systemTime, systemTime);
         
         // Dynamic filter tracking
         filter.setCutoff((float)(freq * (1.0 + filterSweep * env)));
         
-        lastOut = filter.compute(sum) * env;
+        lastOut = filter.tick(sum, systemTime) * env;
         return lastOut;
     }
 }

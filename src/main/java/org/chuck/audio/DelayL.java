@@ -33,7 +33,7 @@ public class DelayL extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         // Linear interpolation
         double readPos = writePos - delaySamples;
         while (readPos < 0) readPos += buffer.length;

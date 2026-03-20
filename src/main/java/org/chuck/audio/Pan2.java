@@ -34,12 +34,29 @@ public class Pan2 extends StereoUGen {
         return pan;
     }
 
+    /** ChucK-style: p.pan(0.5) */
+    public float pan(float p) {
+        this.pan = p;
+        return p;
+    }
+
+    /** ChucK-style: p.pan() */
+    public float pan() {
+        return pan;
+    }
+
     public void setPanType(int type) {
         this.panType = type;
     }
 
+    /** ChucK-style: p.panType(1) */
+    public int panType(int t) {
+        this.panType = t;
+        return t;
+    }
+
     @Override
-    protected void computeStereo(float input) {
+    protected void computeStereo(float input, long systemTime) {
         // We need to handle individual inputs for true stereo-to-stereo
         float in0 = inputChannels[0].lastOut;
         float in1 = inputChannels[1].lastOut;
@@ -59,10 +76,5 @@ public class Pan2 extends StereoUGen {
         // Send to output proxies
         left.lastOut = lastOutLeft;
         right.lastOut = lastOutRight;
-    }
-
-    @Override
-    protected float compute(float input) {
-        return 0.0f;
     }
 }

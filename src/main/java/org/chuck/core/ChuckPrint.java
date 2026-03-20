@@ -30,6 +30,9 @@ public class ChuckPrint implements ChuckInstr {
                 else if (Double.isNaN(dv)) formatted = "nan";
                 else formatted = String.format("%.6f", dv);
                 sb.append(formatted);
+            } else if (v instanceof Long) {
+                // Check if it might be a double hidden in a long (though ChuckStack should handle this)
+                sb.append(v.toString());
             } else if (v instanceof ChuckUGen ugen) {
                 sb.append(String.format("%.6f", ugen.getLastOut()));
             } else if (v instanceof ChuckArray arr) {

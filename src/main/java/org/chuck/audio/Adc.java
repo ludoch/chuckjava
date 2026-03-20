@@ -26,7 +26,7 @@ public class Adc extends ChuckUGen {
     public float getInputRight() { return inputR; }
 
     @Override
-    protected float compute(float ignored) {
+    protected float compute(float input, long systemTime) {
         // Mono mix of stereo input, scaled by gain
         return ((inputL + inputR) * 0.5f) * gain;
     }

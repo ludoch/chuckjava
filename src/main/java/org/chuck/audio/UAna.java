@@ -21,7 +21,7 @@ public abstract class UAna extends ChuckUGen {
     protected abstract void computeUAna();
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         // UAna usually passes input through to output for monitoring
         return input;
     }

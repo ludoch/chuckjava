@@ -100,7 +100,20 @@ public class Adsr extends ChuckUGen {
     public double getReleaseTime() { return releaseTime * sampleRate; }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
+        update(systemTime);
+        return input * currentLevel;
+    }
+
+    public float tick(long systemTime) {
+        update(systemTime);
+        return currentLevel;
+    }
+
+    private void update(long systemTime) {
+        if (systemTime != -1 && systemTime == lastTickTime) return;
+        lastTickTime = systemTime;
+
         switch (state) {
             case ATTACK_ENUM:
                 currentLevel += attackInc;
@@ -130,7 +143,6 @@ public class Adsr extends ChuckUGen {
                 currentLevel = 0.0f;
                 break;
         }
-        return input * currentLevel;
     }
     
     public float getCurrentLevel() {

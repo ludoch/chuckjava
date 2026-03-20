@@ -31,14 +31,14 @@ public class Chorus extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         // LFO outputs -1 to 1, we want to oscillate around baseDelay
-        float lfoOut = lfo.tick();
+        float lfoOut = lfo.tick(systemTime, systemTime);
         double currentDelay = baseDelaySamples * (1.0 + modDepth * lfoOut);
         delayLine.setDelay(currentDelay);
         
         float dry = input;
-        float wet = delayLine.tick(input);
+        float wet = delayLine.tick(input, systemTime);
         
         return dry * (1.0f - mix) + wet * mix;
     }

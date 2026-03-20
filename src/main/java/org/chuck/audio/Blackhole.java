@@ -5,7 +5,7 @@ package org.chuck.audio;
  */
 public class Blackhole extends ChuckUGen {
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         return 0.0f;
     }
 }

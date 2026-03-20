@@ -17,10 +17,10 @@ public class Comb extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         float temp = delayLine.getLastOut();
         float out = input + coefficient * temp;
-        delayLine.tick(out);
+        delayLine.tick(out, systemTime);
         return temp;
     }
 }

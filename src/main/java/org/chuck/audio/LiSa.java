@@ -46,7 +46,7 @@ public class LiSa extends ChuckUGen {
     public void loop(int v, int state) { if(v>=0 && v<10) voices[v].looping = (state != 0); }
     
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         if (isRecording && buffer.length > 0) {
             buffer[recPos] = input;
             recPos = (recPos + 1) % buffer.length;

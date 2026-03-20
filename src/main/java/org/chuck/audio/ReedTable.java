@@ -16,7 +16,7 @@ public class ReedTable extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         // Differential pressure across the reed
         float out = offset + (slope * input);
         // Symmetrical saturation

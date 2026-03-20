@@ -33,7 +33,7 @@ public class Shakers extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         // Stochastic "collision" probability
         float coll = 0.0f;
         if (random.nextFloat() < (shakeLevel * numObjects / 1000.0f)) {
@@ -42,7 +42,7 @@ public class Shakers extends ChuckUGen {
         
         shakeLevel *= systemDecay;
         
-        lastOut = filter.tick(coll);
+        lastOut = filter.tick(coll, systemTime);
         return lastOut;
     }
 }

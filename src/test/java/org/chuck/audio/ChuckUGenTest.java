@@ -57,7 +57,7 @@ public class ChuckUGenTest {
         // Initial state should be silent/0.0 until first tick
         // But in my Adsr::compute, it increments on the first tick.
         
-        float firstLevel = adsr.compute(1.0f);
+        float firstLevel = adsr.compute(1.0f, -1);
         assertTrue(firstLevel > 0.0f && firstLevel < 1.0f);
         
         // Fast forward to steady state (sustain)

@@ -21,7 +21,7 @@ public class Lpf extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         // Simple 1-pole low pass for demonstration
         float alpha = (float) (2.0 * Math.PI * cutoff / sampleRate);
         alpha = Math.min(Math.max(alpha, 0.0f), 1.0f);

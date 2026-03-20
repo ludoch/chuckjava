@@ -55,7 +55,7 @@ public class Envelope extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         if (value < target) {
             value += rate;
             if (value > target) value = target;

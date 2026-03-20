@@ -23,8 +23,8 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     private String[] args = new String[0];
     
     // Virtual Machine stacks
-    public final ChuckStack reg = new ChuckStack(65536);
-    public final ChuckStack mem = new ChuckStack(65536);
+    public final ChuckStack reg = new ChuckStack(1024 * 1024);
+    public final ChuckStack mem = new ChuckStack(1024 * 1024);
     /** Stack of 'this' references for active user-defined method calls. */
     public final Deque<UserObject> thisStack = new ArrayDeque<>();
     /** UGens created by this shred, so they can be disconnected on stop. */

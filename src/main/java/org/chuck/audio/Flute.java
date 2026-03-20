@@ -46,9 +46,9 @@ public class Flute extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
-        float env = adsr.tick();
-        float breath = pressure * env + noise.tick() * noiseGain;
+    protected float compute(float input, long systemTime) {
+        float env = adsr.tick(systemTime, systemTime);
+        float breath = pressure * env + noise.tick(systemTime, systemTime) * noiseGain;
         
         float boreRes = delayLine.getLastOut();
         float jetRes = breath + boreRes * jetReflection;
@@ -56,7 +56,7 @@ public class Flute extends ChuckUGen {
         // Non-linear jet function (simplified)
         float jetOutput = jetRes - (jetRes * jetRes * jetRes);
         
-        float out = delayLine.tick(breath + filter.tick(jetOutput * endReflection));
+        float out = delayLine.tick(breath + filter.tick(jetOutput * endReflection, systemTime), systemTime);
         
         lastOut = out;
         return out;

@@ -1716,7 +1716,18 @@ public class ChuckEmitter {
 
     static class TimesAny implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isDouble(0) || s.reg.isDouble(1)) {
+            if (s.reg.isObject(0) || s.reg.isObject(1)) {
+                Object r = s.reg.pop(); Object l = s.reg.pop();
+                if (r instanceof ChuckDuration rd && l instanceof Number ln) {
+                    s.reg.pushObject(new ChuckDuration((long) (rd.samples() * ln.doubleValue())));
+                } else if (l instanceof ChuckDuration ld && r instanceof Number rn) {
+                    s.reg.pushObject(new ChuckDuration((long) (ld.samples() * rn.doubleValue())));
+                } else if (r instanceof ChuckDuration rd && l instanceof ChuckDuration ld) {
+                    s.reg.pushObject(new ChuckDuration(ld.samples() * rd.samples()));
+                } else {
+                    s.reg.push(0L); // Default fallback
+                }
+            } else if (s.reg.isDouble(0) || s.reg.isDouble(1)) {
                 double r = s.reg.popAsDouble(), l = s.reg.popAsDouble(); s.reg.push(l * r);
             } else {
                 long r = s.reg.popLong(), l = s.reg.popLong(); s.reg.push(l * r);
@@ -1784,8 +1795,9 @@ public class ChuckEmitter {
     static class ConnectToDac implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             Object src = s.reg.peekObject(0);
-            connectAny(src, vm.getDacChannel(0), vm);
-            if (vm.getNumChannels() > 1) connectAny(src, vm.getDacChannel(1), vm);
+            if (src instanceof org.chuck.audio.ChuckUGen ugen) {
+                ugen.chuckTo(vm.getMultiChannelDac());
+            }
         }
     }
 
@@ -1859,7 +1871,7 @@ public class ChuckEmitter {
         @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.push(vm.getCurrentTime()); }
     }
     static class PushDac implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(vm.getDacChannel(0)); }
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(vm.getMultiChannelDac()); }
     }
     static class PushBlackhole implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(vm.blackhole); }
@@ -2003,7 +2015,11 @@ public class ChuckEmitter {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             if (s.reg.isObject(0) || s.reg.isObject(1)) {
                 Object r = s.reg.pop(); Object l = s.reg.pop();
-                s.reg.pushObject(new ChuckString(String.valueOf(l) + String.valueOf(r)));
+                if (r instanceof ChuckDuration rd && l instanceof ChuckDuration ld) {
+                    s.reg.pushObject(new ChuckDuration(ld.samples() + rd.samples()));
+                } else {
+                    s.reg.pushObject(new ChuckString(String.valueOf(l) + String.valueOf(r)));
+                }
             } else if (s.reg.isDouble(0) || s.reg.isDouble(1)) {
                 double r = s.reg.popAsDouble(), l = s.reg.popAsDouble(); 
                 s.reg.push(l + r);
@@ -2045,21 +2061,6 @@ public class ChuckEmitter {
     }
     static class Yield implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) { vm.advanceTime(0); }
-    }
-    static class AdvanceTime implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isObject(0)) {
-                Object obj = s.reg.popObject();
-                if (obj instanceof ChuckEvent event) {
-                    event.waitOn(s, vm);
-                }
-                s.reg.push(vm.getCurrentTime());
-                return;
-            }
-            long samples = s.reg.popLong();
-            s.yield(samples);
-            s.reg.push(vm.getCurrentTime());
-        }
     }
     static class ChuckUnchuck implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
@@ -2168,8 +2169,12 @@ public class ChuckEmitter {
             double v = s.reg.popAsDouble(); long smp = 0;
             if (unit.equals("ms")) smp = Math.round(v * vm.getSampleRate() / 1000.0);
             else if (unit.equals("second")) smp = Math.round(v * vm.getSampleRate());
+            else if (unit.equals("minute")) smp = Math.round(v * vm.getSampleRate() * 60.0);
+            else if (unit.equals("hour")) smp = Math.round(v * vm.getSampleRate() * 3600.0);
+            else if (unit.equals("day")) smp = Math.round(v * vm.getSampleRate() * 3600.0 * 24.0);
+            else if (unit.equals("week")) smp = Math.round(v * vm.getSampleRate() * 3600.0 * 24.0 * 7.0);
             else if (unit.equals("samp")) smp = Math.round(v);
-            s.reg.push(smp);
+            s.reg.pushObject(new ChuckDuration(smp));
         }
     }
     static class StdMtof implements ChuckInstr {
@@ -2765,6 +2770,10 @@ public class ChuckEmitter {
                         } else if (val instanceof ChuckString cs) {
                             if (pts[i] == String.class) { coe[i] = cs.toString(); score += 3; }
                             else if (pts[i].isAssignableFrom(ChuckString.class)) { coe[i] = cs; score += 2; }
+                            else { valid = false; break; }
+                        } else if (val instanceof ChuckDuration cd) {
+                            if (pts[i] == double.class || pts[i] == Double.class) { coe[i] = (double)cd.samples(); score += 2; }
+                            else if (pts[i] == long.class || pts[i] == Long.class) { coe[i] = cd.samples(); score += 3; }
                             else { valid = false; break; }
                         } else {
                             if (val != null && pts[i].isInstance(val)) { coe[i] = val; score += 2; }

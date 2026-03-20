@@ -32,15 +32,15 @@ public class Sitar extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
-        float excitation = noise.tick() * ampmult;
+    protected float compute(float input, long systemTime) {
+        float excitation = noise.tick(systemTime) * ampmult;
         ampmult *= 0.95f; // Decay the pluck excitation
-        
-        float out = delayLine.tick(excitation + filter.tick(delayLine.getLastOut() * loopGain));
-        
+
+        float out = delayLine.tick(excitation + filter.tick(delayLine.getLastOut() * loopGain, systemTime), systemTime);
+
         // Sitar bridge non-linearity (simplified)
         if (out > 0.1f) out *= 0.9f; 
-        
+
         lastOut = out;
         return out;
     }

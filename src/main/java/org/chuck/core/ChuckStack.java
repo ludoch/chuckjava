@@ -88,13 +88,35 @@ public class ChuckStack {
 
     public double popAsDouble() {
         if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow");
-        if (isObject[sp - 1]) {
+        int idx = sp - 1;
+        if (isObject[idx]) {
             Object o = popObject();
+            if (o instanceof ChuckDuration cd) return (double) cd.samples();
             if (o instanceof Number) return ((Number) o).doubleValue();
             if (o instanceof FileIO fio) return fio.good() ? 1.0 : 0.0;
             return o != null ? 1.0 : 0.0;
         }
-        return popDouble();
+        if (isDouble[idx]) {
+            return popDouble();
+        } else {
+            return (double) popLong();
+        }
+    }
+
+    public long popAsLong() {
+        if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow");
+        int idx = sp - 1;
+        if (isObject[idx]) {
+            Object o = popObject();
+            if (o instanceof ChuckDuration cd) return cd.samples();
+            if (o instanceof Number) return ((Number) o).longValue();
+            return o != null ? 1L : 0L;
+        }
+        if (isDouble[idx]) {
+            return (long) popDouble();
+        } else {
+            return popLong();
+        }
     }
 
     public int getSp() { return sp; }

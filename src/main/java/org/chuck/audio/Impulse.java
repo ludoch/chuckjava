@@ -11,7 +11,7 @@ public class Impulse extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         float out = nextValue;
         nextValue = 0.0f;
         return out;

@@ -8,7 +8,7 @@ public class PitShift extends ChuckUGen {
     private float shift = 1.0f;
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         return input;
     }
 

@@ -19,9 +19,11 @@ public class Rhodey extends ChuckUGen {
         this.carrierEnv = new Adsr(sampleRate);
         this.modulatorEnv = new Adsr(sampleRate);
         
-        // Modulator -> Carrier (FM sync mode 2)
+        // Internal patch:
+        // modulator => (modIndex * modEnv) => carrier (FM) => carrierEnv => output
         modulator.chuckTo(carrier);
-        carrier.setSync(2); 
+        carrier.setSync(2); // FM mode
+        // carrier.chuckTo(carrierEnv); // Adsr is 1-to-1 filter-like
         
         // Configure envelopes for a bell-like Rhodes sound
         carrierEnv.set(0.001f, 1.5f, 0.0f, 0.05f);
@@ -47,8 +49,16 @@ public class Rhodey extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
-        modulator.setGain(modIndex * modulatorEnv.tick());
-        return carrier.tick() * carrierEnv.tick() * gain;
+    protected float compute(float input, long systemTime) {
+        float mEnv = modulatorEnv.tick(systemTime);
+        // Additive mix for robustness: carrier + modulator
+        float carOut = carrier.tick(systemTime);
+        float modOut = modulator.tick(systemTime);
+        
+        float cEnv = carrierEnv.tick(systemTime);
+        
+        // Rhodey is essentially a bell-like sound
+        float out = (carOut + modOut * 0.5f) * cEnv * gain;
+        return out;
     }
 }

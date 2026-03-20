@@ -30,7 +30,7 @@ public abstract class GenX extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         if (table.length == 0) return 0.0f;
 
         if (freq != 0) {

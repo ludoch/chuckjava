@@ -26,7 +26,7 @@ public class RMS extends UAna {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         ring[writePos] = input;
         writePos = (writePos + 1) % size;
         return input;

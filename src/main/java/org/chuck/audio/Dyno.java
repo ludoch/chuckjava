@@ -12,7 +12,7 @@ public class Dyno extends ChuckUGen {
     private float slopeBelow = 1.0f;
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         return input; // pass-through stub
     }
 

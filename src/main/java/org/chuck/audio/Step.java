@@ -11,7 +11,7 @@ public class Step extends ChuckUGen {
     }
 
     @Override
-    protected float compute(float input) {
+    protected float compute(float input, long systemTime) {
         return nextValue;
     }
 }

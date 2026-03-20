@@ -25,8 +25,8 @@ public class JCRev extends StereoUGen {
         comb[2].setCoefficient(0.841f);
         comb[3].setCoefficient(0.822f);
         
-        outLeft = new Delay(100); // Tiny decorrelation
-        outRight = new Delay(100);
+        outLeft = new Delay(100); 
+        outRight = new Delay(157); // Different delay for decorrelation
     }
 
     public void setMix(float mix) {
@@ -34,27 +34,23 @@ public class JCRev extends StereoUGen {
     }
 
     @Override
-    protected void computeStereo(float input) {
+    protected void computeStereo(float input, long systemTime) {
         float temp = input;
         for (int i = 0; i < 3; i++) {
-            temp = allpass[i].tick(temp);
+            temp = allpass[i].tick(temp, systemTime);
         }
         
         float filtout = 0;
         for (int i = 0; i < 4; i++) {
-            filtout += comb[i].tick(temp);
+            filtout += comb[i].tick(temp, systemTime);
         }
+        filtout *= 0.25f; // Normalise gain of parallel comb filters
         
         float dry = input;
-        float wetL = outLeft.tick(filtout);
-        float wetR = outRight.tick(filtout);
+        float wetL = outLeft.tick(filtout, systemTime);
+        float wetR = outRight.tick(filtout, systemTime);
         
         lastOutLeft = dry * (1.0f - mix) + wetL * mix;
         lastOutRight = dry * (1.0f - mix) + wetR * mix;
-    }
-
-    @Override
-    protected float compute(float input) {
-        return 0;
     }
 }

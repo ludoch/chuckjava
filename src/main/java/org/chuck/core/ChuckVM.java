@@ -63,11 +63,14 @@ public class ChuckVM {
         for (int i = 0; i < numChannels; i++) {
             final int channelIndex = i;
             dacChannels[i] = new ChuckUGen() {
-                @Override protected float compute(float input) { return input; }
+                @Override protected float compute(float input, long systemTime) { return input; }
                 @Override public float tick(long systemTime) {
                     if (systemTime != -1 && systemTime == lastTickTime) {
                         return lastOut;
                     }
+                    if (systemTime == 2050) {
+                    }
+                    lastTickTime = systemTime;
                     float sum = 0.0f;
                     for (ChuckUGen src : sources) {
                         // Crucially, tick the source once per sample (the first dac channel handles this)
@@ -79,7 +82,7 @@ public class ChuckVM {
                             sum += src.getLastOut();
                         }
                     }
-                    lastOut = compute(sum) * gain;
+                    lastOut = compute(sum, systemTime) * gain;
                     lastTickTime = systemTime;
                     return lastOut;
                 }
@@ -102,6 +105,10 @@ public class ChuckVM {
 
     public ChuckUGen getDacChannel(int channel) {
         return dacChannels[channel % numChannels];
+    }
+
+    public ChuckUGen getMultiChannelDac() {
+        return new org.chuck.audio.MultiChannelDac(dacChannels);
     }
 
     public float getChannelLastOut(int channel) {
@@ -250,7 +257,6 @@ public class ChuckVM {
             try {
                 shred.execute(this);
             } catch (Throwable t) {
-                print("Error: Shred-" + shred.getId() + " (" + shred.getName() + ") crashed: " + t.getMessage());
                 t.printStackTrace();
             } finally {
                 shred.cleanup();
@@ -455,13 +461,8 @@ public class ChuckVM {
      * Advance logical time by computing audio samples and waking shreds.
      */
     public void advanceTime(int samplesToCompute) {
-        // First, run any shreds scheduled for NOW (handles yield behavior)
-        runShredsAt(currentTime.get());
-
-        // Then, advance time and compute samples
         for (int s = 0; s < samplesToCompute; s++) {
-            currentTime.incrementAndGet();
-            long now = currentTime.get();
+            long now = currentTime.incrementAndGet();
             runShredsAt(now);
             
             // DRIVE THE UGEN GRAPH: Pull samples through the dac channels
@@ -489,7 +490,6 @@ public class ChuckVM {
 
             if (nextShred == null) break;
             if (++loopGuard > 10000) {
-                System.err.println("[ChucK] Infinite loop detected at time " + now + " - forcing sample advance");
                 break;
             }
 
