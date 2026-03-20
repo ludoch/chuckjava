@@ -76,6 +76,39 @@ public class OscOut extends org.chuck.core.ChuckObject {
         } catch (IOException ignored) {}
     }
 
+    /** Send an OscBundle object. */
+    public void send(OscBundle bundle) {
+        if (targetAddress == null) return;
+        try {
+            ByteBuffer buf = ByteBuffer.allocate(4096);
+            serializeBundle(bundle, buf);
+            byte[] result = new byte[buf.position()];
+            buf.flip();
+            buf.get(result);
+            DatagramPacket packet = new DatagramPacket(result, result.length, targetAddress, targetPort);
+            socket.send(packet);
+        } catch (IOException ignored) {}
+    }
+
+    private void serializeBundle(OscBundle bundle, ByteBuffer buf) {
+        writeOscString(buf, "#bundle");
+        buf.putLong(1L); // Timetag: immediate (1)
+
+        for (Object element : bundle.getElements()) {
+            if (element instanceof OscMsg msg) {
+                byte[] data = serialize(msg);
+                buf.putInt(data.length);
+                buf.put(data);
+            } else if (element instanceof OscBundle sub) {
+                ByteBuffer subBuf = ByteBuffer.allocate(2048);
+                serializeBundle(sub, subBuf);
+                subBuf.flip();
+                buf.putInt(subBuf.remaining());
+                buf.put(subBuf);
+            }
+        }
+    }
+
     private byte[] serialize(OscMsg msg) {
         ByteBuffer buf = ByteBuffer.allocate(2048);
 

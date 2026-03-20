@@ -24,6 +24,10 @@ public class UAnaBlob {
         }
     }
 
+    public void setFvals(float[] fvals) {
+        this.fvals = fvals;
+    }
+
     public List<Complex> getCvals() {
         return cvals;
     }

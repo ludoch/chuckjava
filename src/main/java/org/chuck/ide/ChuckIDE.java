@@ -646,6 +646,16 @@ public class ChuckIDE extends Application {
         openItem.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.CONTROL_DOWN));
         openItem.setOnAction(e -> openFile(stage));
 
+        MenuItem openProj = new MenuItem("Open Project...");
+        openProj.setOnAction(e -> {
+            javafx.stage.DirectoryChooser dc = new javafx.stage.DirectoryChooser();
+            dc.setTitle("Select Project Directory");
+            File dir = dc.showDialog(stage);
+            if (dir != null) {
+                fileBrowser.setRoot(buildTreeItem(dir));
+            }
+        });
+
         MenuItem saveItem = new MenuItem("Save");
         saveItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN));
         saveItem.setOnAction(e -> saveFile(stage));
@@ -668,7 +678,7 @@ public class ChuckIDE extends Application {
         MenuItem exitItem = new MenuItem("Exit");
         exitItem.setOnAction(e -> Platform.exit());
 
-        fileMenu.getItems().addAll(newItem, openItem, saveItem, saveAsItem, closeTabItem, new SeparatorMenuItem(), exitItem);
+        fileMenu.getItems().addAll(newItem, openItem, openProj, saveItem, saveAsItem, closeTabItem, new SeparatorMenuItem(), exitItem);
 
         // Edit
         Menu editMenu = new Menu("_Edit");
@@ -728,7 +738,27 @@ public class ChuckIDE extends Application {
         });
         helpMenu.getItems().add(aboutItem);
 
-        mb.getMenus().addAll(fileMenu, editMenu, optionsMenu, examplesMenu, helpMenu);
+        Menu vizMenu = new Menu("Visualizer");
+        MenuItem fftSize = new MenuItem("FFT Size...");
+        fftSize.setOnAction(e -> {
+            List<Integer> choices = List.of(256, 512, 1024, 2048, 4096);
+            ChoiceDialog<Integer> dialog = new ChoiceDialog<>(analyzer.getSize(), choices);
+            dialog.setTitle("FFT Size");
+            dialog.setHeaderText("Select FFT analysis size");
+            dialog.showAndWait().ifPresent(size -> analyzer.setSize(size));
+        });
+        MenuItem scopeSize = new MenuItem("Oscilloscope Window...");
+        scopeSize.setOnAction(e -> {
+            TextInputDialog dialog = new TextInputDialog(String.valueOf(scope.getWindowSize()));
+            dialog.setTitle("Scope Window");
+            dialog.setHeaderText("Enter window size in samples");
+            dialog.showAndWait().ifPresent(s -> {
+                try { scope.setWindowSize(Integer.parseInt(s)); } catch (Exception ignored) {}
+            });
+        });
+        vizMenu.getItems().addAll(fftSize, scopeSize);
+
+        mb.getMenus().addAll(fileMenu, editMenu, optionsMenu, vizMenu, examplesMenu, helpMenu);
         return mb;
     }
 
@@ -781,21 +811,65 @@ public class ChuckIDE extends Application {
     private TreeView<File> createFileBrowser() {
         File rootDir = new File(".");
         TreeItem<File> rootItem = buildTreeItem(rootDir);
-        TreeView<File> tree = new TreeView<>(rootItem);
-        tree.setShowRoot(false);
-        tree.setCellFactory(tv -> new TreeCell<>() {
+        fileBrowser = new TreeView<>(rootItem);
+        fileBrowser.setShowRoot(false);
+        fileBrowser.setCellFactory(tv -> new TreeCell<>() {
             @Override protected void updateItem(File item, boolean empty) {
                 super.updateItem(item, empty);
-                setText(empty || item == null ? null : item.getName());
+                if (empty || item == null) {
+                    setText(null);
+                    setContextMenu(null);
+                } else {
+                    setText(item.getName());
+                    ContextMenu cm = new ContextMenu();
+                    MenuItem refresh = new MenuItem("Refresh");
+                    refresh.setOnAction(e -> refreshFileBrowser());
+                    MenuItem delete = new MenuItem("Delete");
+                    delete.setOnAction(e -> deleteFile(item));
+                    MenuItem newFile = new MenuItem("New File...");
+                    newFile.setOnAction(e -> createNewFile(item.isDirectory() ? item : item.getParentFile()));
+                    cm.getItems().addAll(refresh, newFile, new SeparatorMenuItem(), delete);
+                    setContextMenu(cm);
+                }
             }
         });
-        tree.setOnMouseClicked(event -> {
+        fileBrowser.setOnMouseClicked(event -> {
             if (event.getClickCount() == 2) {
-                TreeItem<File> sel = tree.getSelectionModel().getSelectedItem();
+                TreeItem<File> sel = fileBrowser.getSelectionModel().getSelectedItem();
                 if (sel != null && sel.getValue().isFile()) loadFileIntoEditor(sel.getValue());
             }
         });
-        return tree;
+        return fileBrowser;
+    }
+
+    private void refreshFileBrowser() {
+        TreeItem<File> root = fileBrowser.getRoot();
+        if (root != null) {
+            File rootDir = root.getValue();
+            fileBrowser.setRoot(buildTreeItem(rootDir));
+        }
+    }
+
+    private void deleteFile(File f) {
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION, "Delete " + f.getName() + "?", ButtonType.YES, ButtonType.NO);
+        alert.showAndWait().ifPresent(response -> {
+            if (response == ButtonType.YES) {
+                if (f.delete()) refreshFileBrowser();
+            }
+        });
+    }
+
+    private void createNewFile(File dir) {
+        TextInputDialog dialog = new TextInputDialog("untitled.ck");
+        dialog.setHeaderText("Create New File in " + dir.getName());
+        dialog.showAndWait().ifPresent(name -> {
+            try {
+                File f = new File(dir, name);
+                if (f.createNewFile()) refreshFileBrowser();
+            } catch (IOException e) {
+                print("Error creating file: " + e.getMessage());
+            }
+        });
     }
 
     private TreeItem<File> buildTreeItem(File file) {

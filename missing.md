@@ -31,30 +31,30 @@ This document tracks the features from the original [Stanford ChucK](https://chu
 | **HalfRect / FullRect** | Done | Signal rectification UGens implemented. |
 | **ZeroX** | Done | Zero-crossing detector implemented. |
 | **SubNoise** | Done | Sub-sampled noise generator implemented. |
-| **Modulate** | ? | Vibrato/Tremolo modulation UGen. |
-| **WarpTable / CurveTable** | ? | Advanced lookup table UGens. |
+| **Modulate** | Done | Vibrato/Tremolo modulation UGen implemented. |
+| **WarpTable / CurveTable** | Done | Advanced lookup table UGens implemented. |
 
 ## 3. I/O & Networking
 
 | Feature | Status | Description |
 |:---|:---|:---|
 | **FileIO** | Done | Fully implemented ASCII and Binary modes, including support for the `<=` streaming operator. |
-| **MidiOut** | ? | Support for sending MIDI messages using javax.sound.midi. |
-| **SerialIO** | ? | Functional stub implemented. |
-| **OscBundle** | ? | Support for grouping OSC messages. |
+| **MidiOut** | Done | Implemented with support for sending MIDI messages using `javax.sound.midi`. |
+| **SerialIO** | Done | Functional stub implemented for debugging. |
+| **OscBundle** | Done | Implemented support for grouping and sending OSC messages. |
 
 ## 4. Standard Libraries
 
 | Library | Status | Description |
 |:---|:---|:---|
 | **Std Methods** | Done | Implemented `atoi`, `atof`, `rand2`, `rand2f`, `fabs`, `srand`, `systemTime`, `getenv`, `setenv`, and `range`. |
-| **RegEx** | ? | Pattern matching using java.util.regex. |
-| **Reflect** | ? | Shred and object introspection. |
-| **UAna (Flux/Rolloff)** | ? | Spectral feature extractors. |
+| **RegEx** | Done | Pattern matching using `java.util.regex`. |
+| **Reflect** | Done | Shred and object introspection implemented. |
+| **UAna (Flux/Rolloff)** | Done | Spectral feature extractors implemented. |
 
 ## 5. IDE & UI
 
 | Feature | Status | Description |
 |:---|:---|:---|
-| **Visualizer Config** | ? | UI controls for FFT and oscilloscope settings. |
-| **Project View** | ? | File system management via context menu. |
+| **Visualizer Config** | Done | Added UI controls to adjust FFT size and oscilloscope window size. |
+| **Project View** | Done | Added file system management (new file, delete, refresh) and project directory support. |

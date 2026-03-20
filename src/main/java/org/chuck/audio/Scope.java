@@ -26,6 +26,9 @@ public class Scope extends UAna {
         this.writePos = 0;
     }
 
+    public int getWindowSize() { return size; }
+    public void setWindowSize(int size) { setSize(size); }
+
     @Override
     protected float compute(float input, long systemTime) {
         ring[writePos] = input;

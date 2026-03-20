@@ -1259,6 +1259,18 @@ public class ChuckEmitter {
                     code.addInstruction(new GetBuiltinStatic("org.chuck.core.Std", e.member()));
                     return;
                 }
+                if (id.name().equals("RegEx")) {
+                    code.addInstruction(new GetBuiltinStatic("org.chuck.core.RegEx", e.member()));
+                    return;
+                }
+                if (id.name().equals("Reflect")) {
+                    code.addInstruction(new GetBuiltinStatic("org.chuck.core.Reflect", e.member()));
+                    return;
+                }
+                if (id.name().equals("SerialIO")) {
+                    code.addInstruction(new GetBuiltinStatic("org.chuck.core.SerialIO", e.member()));
+                    return;
+                }
                 if (id.name().equals("FileIO")) {
                     code.addInstruction(new GetBuiltinStatic("org.chuck.core.FileIO", e.member()));
                     return;
@@ -1376,6 +1388,18 @@ public class ChuckEmitter {
                     for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
                     code.addInstruction(new CallBuiltinStatic("org.chuck.core.Std", dot.member(), e.args().size()));
                 }
+            } else if (e.base() instanceof ChuckAST.DotExp dot
+                    && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("RegEx")) {
+                for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                code.addInstruction(new CallBuiltinStatic("org.chuck.core.RegEx", dot.member(), e.args().size()));
+            } else if (e.base() instanceof ChuckAST.DotExp dot
+                    && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("Reflect")) {
+                for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                code.addInstruction(new CallBuiltinStatic("org.chuck.core.Reflect", dot.member(), e.args().size()));
+            } else if (e.base() instanceof ChuckAST.DotExp dot
+                    && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("SerialIO")) {
+                for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                code.addInstruction(new CallBuiltinStatic("org.chuck.core.SerialIO", dot.member(), e.args().size()));
             } else if (e.base() instanceof ChuckAST.DotExp dot && dot.member().equals("last")) {
                 emitExpression(dot.base(), code);
                 code.addInstruction(new GetLastOut());
@@ -2724,6 +2748,8 @@ public class ChuckEmitter {
             // UAna
             case "FFT" -> new FFT();
             case "IFFT" -> new IFFT();
+            case "Flux" -> new Flux();
+            case "Rolloff" -> new Rolloff();
             case "RMS" -> new RMS();
             case "Centroid" -> new Centroid();
             // GenX table oscillators
@@ -2747,6 +2773,14 @@ public class ChuckEmitter {
             case "Shakers" -> new Shakers(sr);
             case "Rhodey" -> new Rhodey(sr);
             // I/O
+            case "WarpTable" -> new WarpTable(sr);
+            case "CurveTable" -> new CurveTable(sr);
+            case "Modulate" -> new Modulate(sr);
+            case "MidiOut" -> new org.chuck.midi.MidiOut();
+            case "SerialIO" -> new SerialIO();
+            case "OscBundle" -> new org.chuck.network.OscBundle();
+            case "RegEx" -> new RegEx();
+            case "Reflect" -> new Reflect();
             case "FileIO" -> new FileIO();
             case "StringTokenizer" -> new StringTokenizer();
             case "Event" -> new ChuckEvent();
