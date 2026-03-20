@@ -20,7 +20,7 @@ This document tracks the features from the original [Stanford ChucK](https://chu
 |:---|:---|:---|
 | **Dyno** | Done | Fully implemented with Envelope Follower and Gain Computer supporting Compressor, Limiter, Expander, and Gate modes. |
 | **Chugraph** | Done | Implemented as a base class with `inlet` and `outlet` support. |
-| **ChuGen** | In Progress | Framework implemented; synchronous execution of ChucK `tick()` logic is being refined. |
+| **ChuGen** | Done | Implemented with synchronous `tick()` logic execution within the audio thread. |
 | **WvIn / WaveLoop** | Done | Fully implemented with support for loading and looping WAV/AIFF files. |
 | **WvOut** | Done | Implemented as `WvOut` UGen for recording audio to WAV files from within ChucK. |
 | **NRev / PRCRev** | Done | Classic STK reverbs implemented. |
@@ -40,6 +40,7 @@ This document tracks the features from the original [Stanford ChucK](https://chu
 |:---|:---|:---|
 | **FileIO** | Done | Fully implemented ASCII and Binary modes, including support for the `<=` streaming operator. |
 | **MidiOut** | Done | Implemented with support for sending MIDI messages using `javax.sound.midi`. |
+| **MidiIn** | Done | Implemented with `RtMidi` binding via FFM API and `recv(MidiMsg)` support. |
 | **SerialIO** | Done | Functional stub implemented for debugging. |
 | **OscBundle** | Done | Implemented support for grouping and sending OSC messages. |
 

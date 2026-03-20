@@ -108,7 +108,7 @@ public class ChuckStack {
         int idx = sp - 1;
         if (isObject[idx]) {
             Object o = popObject();
-            if (o instanceof ChuckDuration cd) return cd.samples();
+            if (o instanceof ChuckDuration cd) return (long) cd.samples();
             if (o instanceof Number) return ((Number) o).longValue();
             return o != null ? 1L : 0L;
         }

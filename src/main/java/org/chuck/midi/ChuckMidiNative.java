@@ -5,6 +5,7 @@ import org.chuck.core.ChuckVM;
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * A cross-platform MIDI input implementation using JDK 25 FFM API (Panama).
@@ -12,8 +13,10 @@ import java.util.Optional;
  */
 public class ChuckMidiNative {
     private final ChuckVM vm;
-    private final ChuckEvent midiEvent;
+    private final ChuckEvent event;
     private final Arena arena;
+    
+    private final ConcurrentLinkedDeque<MidiMsg> queue;
     
     private MemorySegment rtmidiIn = MemorySegment.NULL;
     
@@ -22,10 +25,11 @@ public class ChuckMidiNative {
     private MethodHandle getMessage;
     private MethodHandle closeIn;
 
-    public ChuckMidiNative(ChuckVM vm) {
+    public ChuckMidiNative(ChuckVM vm, ChuckEvent event, ConcurrentLinkedDeque<MidiMsg> queue) {
         this.vm = vm;
-        this.midiEvent = new ChuckEvent();
+        this.event = event;
         this.arena = Arena.ofShared();
+        this.queue = queue;
         initBindings();
     }
 
@@ -61,10 +65,6 @@ public class ChuckMidiNative {
             .orElseThrow(() -> new RuntimeException("Symbol not found: " + name));
     }
 
-    public ChuckEvent getMidiEvent() {
-        return midiEvent;
-    }
-
     public void open(int portNumber) {
         if (createIn == null) return;
         try {
@@ -88,12 +88,13 @@ public class ChuckMidiNative {
                     long size = sizePtr.get(ValueLayout.JAVA_LONG, 0);
                     
                     if (size > 0) {
-                        int b1 = buffer.get(ValueLayout.JAVA_BYTE, 0) & 0xFF;
-                        int b2 = size > 1 ? buffer.get(ValueLayout.JAVA_BYTE, 1) & 0xFF : 0;
+                        MidiMsg msg = new MidiMsg();
+                        msg.data1 = buffer.get(ValueLayout.JAVA_BYTE, 0) & 0xFF;
+                        msg.data2 = size > 1 ? buffer.get(ValueLayout.JAVA_BYTE, 1) & 0xFF : 0;
+                        msg.data3 = size > 2 ? buffer.get(ValueLayout.JAVA_BYTE, 2) & 0xFF : 0;
                         
-                        vm.setGlobalInt("midi_b1", b1);
-                        vm.setGlobalInt("midi_b2", b2);
-                        midiEvent.broadcast(vm);
+                        queue.addLast(msg);
+                        event.broadcast(vm);
                     }
                     Thread.sleep(1);
                 } catch (Throwable t) {

@@ -175,6 +175,14 @@ public class ChuckCLI {
                 audio = new ChuckAudio(vm, bufferSize, numChannels, sampleRate);
                 audio.setVerbose(verbose);
                 audio.start();
+            } else {
+                // Silent engine: advance time as fast as possible (or nearly so)
+                Thread.ofVirtual().name("ChucK-Silent-Engine").start(() -> {
+                    while (true) {
+                        vm.advanceTime(64); // Advance in blocks for efficiency
+                        try { Thread.sleep(0); } catch (InterruptedException e) { break; }
+                    }
+                });
             }
 
             List<ChuckShred> initialShreds = new ArrayList<>();

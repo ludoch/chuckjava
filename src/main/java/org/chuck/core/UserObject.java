@@ -4,12 +4,13 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.chuck.audio.ChuGen;
+
 /**
  * Runtime instance of a user-defined ChucK class.
- * Holds primitive fields (int/float stored as raw long bits) and object fields,
- * plus a reference to the compiled method bytecodes shared across all instances.
+ * Extends ChuGen so all user objects can be Unit Generators.
  */
-public class UserObject extends ChuckObject {
+public class UserObject extends ChuGen {
     public final String className;
     /** Non-null if this class (or an ancestor) extends the built-in Event type. */
     public final ChuckEvent eventDelegate;
@@ -22,18 +23,12 @@ public class UserObject extends ChuckObject {
     /** Compiled method bodies, shared across all instances of this class. */
     public final Map<String, ChuckCode> methods;
 
-    /**
-     * @param fieldDefs list of [type, name] pairs from the class declaration
-     */
-    public UserObject(String className, List<String[]> fieldDefs, Map<String, ChuckCode> methods) {
-        this(className, fieldDefs, methods, false);
-    }
-
     public UserObject(String className, List<String[]> fieldDefs, Map<String, ChuckCode> methods, boolean extendsEvent) {
         super(new ChuckType(className, ChuckType.OBJECT, 0, 0));
         this.className = className;
         this.methods = methods;
         this.eventDelegate = extendsEvent ? new ChuckEvent() : null;
+        
         for (String[] f : fieldDefs) {
             boolean isFloat = f.length > 0 && ("float".equals(f[0]) || "double".equals(f[0]));
             long initVal;

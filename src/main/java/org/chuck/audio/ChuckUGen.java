@@ -99,6 +99,12 @@ public abstract class ChuckUGen extends ChuckObject {
         return lastOut;
     }
 
+    /** ChucK-style: ugen.next(val) sets manual input for this tick */
+    public double next(double val) {
+        lastOut = compute((float) val, -1) * gain;
+        return val;
+    }
+
     protected abstract float compute(float input, long systemTime);
 
     public void setGain(float gain) {

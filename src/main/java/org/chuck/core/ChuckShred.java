@@ -244,6 +244,40 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
             lock.unlock();
         }
     }
+
+    /**
+     * Executes the given code synchronously in the current thread.
+     * Used by ChuGen.tick() which runs in the audio thread.
+     */
+    public void executeSynchronous(ChuckVM vm, ChuckCode tickCode) {
+        if (tickCode == null) return;
+        ChuckCode oldCode = this.code;
+        int oldPc = this.pc;
+        int oldFp = this.framePointer;
+        int oldMemSp = this.mem.getSp();
+        
+        // Push a fake return frame to the mem stack so ReturnMethod works
+        mem.pushObject(null); // savedCode
+        mem.push(-1L);        // savedPc
+        mem.push((long)oldFp); // savedFp
+        mem.push((long)reg.getSp()); // savedSp
+        
+        this.framePointer = mem.getSp();
+        this.code = tickCode;
+        this.pc = 0;
+        
+        while (code != null && pc >= 0 && pc < code.getNumInstructions()) {
+            ChuckInstr instr = code.getInstruction(pc);
+            if (instr == null) break;
+            instr.execute(vm, this);
+            pc++;
+        }
+        
+        this.code = oldCode;
+        this.pc = oldPc;
+        this.framePointer = oldFp;
+        this.mem.setSp(oldMemSp);
+    }
     
     @Override
     public int compareTo(ChuckShred other) {

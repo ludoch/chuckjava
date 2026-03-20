@@ -13,7 +13,7 @@ public class AdvanceTime implements ChuckInstr {
         if (shred.reg.isObject(0)) {
             Object obj = shred.reg.popObject();
             if (obj instanceof ChuckDuration cd) {
-                shred.yield(cd.samples());
+                shred.yield(Math.round(cd.samples()));
             } else if (obj instanceof ChuckEvent event) {
                 event.waitOn(shred, vm);
             }

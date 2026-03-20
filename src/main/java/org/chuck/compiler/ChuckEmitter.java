@@ -587,7 +587,7 @@ public class ChuckEmitter {
                 if (m.isStatic()) {
                     staticMethodCodes.put(methodName + ":" + m.argNames().size(), methodCode);
                 } else {
-                    methodCodes.put(methodName, methodCode);
+                    methodCodes.put(methodName + ":" + m.argNames().size(), methodCode);
                 }
                 localScopes.pop();
             }
@@ -1768,10 +1768,11 @@ public class ChuckEmitter {
             if (s.reg.isObject(0) || s.reg.isObject(1)) {
                 Object r = s.reg.pop(); Object l = s.reg.pop();
                 if (r instanceof ChuckDuration rd && l instanceof Number ln) {
-                    s.reg.pushObject(new ChuckDuration((long) (rd.samples() * ln.doubleValue())));
+                    s.reg.pushObject(new ChuckDuration(rd.samples() * ln.doubleValue()));
                 } else if (l instanceof ChuckDuration ld && r instanceof Number rn) {
-                    s.reg.pushObject(new ChuckDuration((long) (ld.samples() * rn.doubleValue())));
-                } else if (r instanceof ChuckDuration rd && l instanceof ChuckDuration ld) {
+                    s.reg.pushObject(new ChuckDuration(ld.samples() * rn.doubleValue()));
+                }
+ else if (r instanceof ChuckDuration rd && l instanceof ChuckDuration ld) {
                     s.reg.pushObject(new ChuckDuration(ld.samples() * rd.samples()));
                 } else {
                     s.reg.push(0L); // Default fallback
@@ -1793,7 +1794,7 @@ public class ChuckEmitter {
                     s.reg.push((double) ld.samples() / rd.samples());
                 } else if (l instanceof ChuckDuration ld && r instanceof Number rn) {
                     if (rn.doubleValue() == 0) throw new RuntimeException("DivideByZero");
-                    s.reg.pushObject(new ChuckDuration((long) (ld.samples() / rn.doubleValue())));
+                    s.reg.pushObject(new ChuckDuration(ld.samples() / rn.doubleValue()));
                 } else if (r instanceof ChuckDuration rd && l instanceof Number ln) {
                     // samples / dur -> float ratio
                     if (rd.samples() == 0) throw new RuntimeException("DivideByZero");
@@ -2036,8 +2037,8 @@ public class ChuckEmitter {
             else s.reg.push(s.reg.peekLong(depth));
         }
     }
-    static class LoadLocal implements ChuckInstr {
-        int offset; LoadLocal(int o) { offset = o; }
+    public static class LoadLocal implements ChuckInstr {
+        int offset; public LoadLocal(int o) { offset = o; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             int idx = s.getFramePointer() + offset;
             if (s.mem.isObjectAt(idx)) s.reg.pushObject(s.mem.getRef(idx));
@@ -2045,8 +2046,8 @@ public class ChuckEmitter {
             else s.reg.push(s.mem.getData(idx));
         }
     }
-    static class StoreLocal implements ChuckInstr {
-        int offset; StoreLocal(int o) { offset = o; }
+    public static class StoreLocal implements ChuckInstr {
+        int offset; public StoreLocal(int o) { offset = o; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             if (s.reg.getSp() == 0) return;
             int fp = s.getFramePointer(); int idx = fp + offset;
@@ -2298,14 +2299,14 @@ public class ChuckEmitter {
     static class CreateDuration implements ChuckInstr {
         String unit; CreateDuration(String u) { unit = u; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            double v = s.reg.popAsDouble(); long smp = 0;
-            if (unit.equals("ms")) smp = Math.round(v * vm.getSampleRate() / 1000.0);
-            else if (unit.equals("second")) smp = Math.round(v * vm.getSampleRate());
-            else if (unit.equals("minute")) smp = Math.round(v * vm.getSampleRate() * 60.0);
-            else if (unit.equals("hour")) smp = Math.round(v * vm.getSampleRate() * 3600.0);
-            else if (unit.equals("day")) smp = Math.round(v * vm.getSampleRate() * 3600.0 * 24.0);
-            else if (unit.equals("week")) smp = Math.round(v * vm.getSampleRate() * 3600.0 * 24.0 * 7.0);
-            else if (unit.equals("samp")) smp = Math.round(v);
+            double v = s.reg.popAsDouble(); double smp = 0;
+            if (unit.equals("ms")) smp = v * vm.getSampleRate() / 1000.0;
+            else if (unit.equals("second")) smp = v * vm.getSampleRate();
+            else if (unit.equals("minute")) smp = v * vm.getSampleRate() * 60.0;
+            else if (unit.equals("hour")) smp = v * vm.getSampleRate() * 3600.0;
+            else if (unit.equals("day")) smp = v * vm.getSampleRate() * 3600.0 * 24.0;
+            else if (unit.equals("week")) smp = v * vm.getSampleRate() * 3600.0 * 24.0 * 7.0;
+            else if (unit.equals("samp")) smp = v;
             s.reg.pushObject(new ChuckDuration(smp));
         }
     }
@@ -2468,7 +2469,8 @@ public class ChuckEmitter {
                 retD = s.reg.isDouble(0); retP = s.reg.peekLong(0); retO = s.reg.peekObject(0);
             }
             s.reg.setSp(savedSp); s.setPc(savedPc); s.setCode(savedCode);
-            UserObject uo = s.thisStack.pop(); boolean isCtor = uo.className.equals(savedCode.getName());
+            UserObject uo = s.thisStack.isEmpty() ? null : s.thisStack.pop();
+            boolean isCtor = (uo != null && savedCode != null && uo.className.equals(savedCode.getName()));
             s.setFramePointer(savedFp); s.mem.setSp(fp - 4);
             if (retO != null || retP != 0 || retD) {
                 if (retO != null) s.reg.pushObject(retO);
@@ -2552,12 +2554,12 @@ public class ChuckEmitter {
                 } else {
                     ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
                     for (int i = 0; i < sz; i++) {
-                        ChuckObject elem = instantiateType(t, vm.getSampleRate(), vm, rm);
+                        ChuckObject elem = instantiateType(t, vm.getSampleRate(), vm, s, rm);
                         if (elem != null) { arr.setObject(i, elem); if (elem instanceof ChuckUGen u) s.registerUGen(u); }
                     }
                     obj = arr;
                 }
-            } else obj = instantiateType(t, vm.getSampleRate(), vm, rm);
+            } else obj = instantiateType(t, vm.getSampleRate(), vm, s, rm);
 
             if (obj instanceof ChuckObject co) {
                 s.mem.setRef(fp + o, co);
@@ -2611,12 +2613,12 @@ public class ChuckEmitter {
                 } else {
                     ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
                     for (int i = 0; i < sz; i++) {
-                        ChuckObject elem = instantiateType(t, vm.getSampleRate(), vm, rm);
+                        ChuckObject elem = instantiateType(t, vm.getSampleRate(), vm, s, rm);
                         if (elem != null) { arr.setObject(i, elem); if (elem instanceof ChuckUGen u) s.registerUGen(u); }
                     }
                     obj = arr;
                 }
-            } else obj = instantiateType(t, vm.getSampleRate(), vm, rm);
+            } else obj = instantiateType(t, vm.getSampleRate(), vm, s, rm);
 
             if (obj instanceof ChuckObject co) {
                 vm.setGlobalObject(n, co);
@@ -2641,7 +2643,7 @@ public class ChuckEmitter {
             for (int i = 0; i < sz; i++) arr.setObject(i, buildMultiDimArray(dims, dimIdx + 1, elemType, vm, s, rm));
         } else {
             for (int i = 0; i < sz; i++) {
-                ChuckObject elem = instantiateType(elemType, vm.getSampleRate(), vm, rm);
+                ChuckObject elem = instantiateType(elemType, vm.getSampleRate(), vm, s, rm);
                 if (elem != null) { arr.setObject(i, elem); if (elem instanceof ChuckUGen u) s.registerUGen(u); }
             }
         }
@@ -2693,10 +2695,29 @@ public class ChuckEmitter {
         return false;
     }
 
-    static ChuckObject instantiateType(String t, float sr, ChuckVM vm, Map<String, UserClassDescriptor> rm) {
+    static ChuckCode findMethod(String className, String methodName, Map<String, UserClassDescriptor> rm, ChuckVM vm) {
+        String t = className;
+        for (int depth = 0; depth < 16 && t != null; depth++) {
+            UserClassDescriptor d = (rm != null && rm.containsKey(t)) ? rm.get(t) : (vm != null ? vm.getUserClass(t) : null);
+            if (d == null) {
+                break;
+            }
+            if (d.methods().containsKey(methodName)) {
+                return d.methods().get(methodName);
+            }
+            t = d.parentName();
+        }
+        return null;
+    }
+
+    static ChuckObject instantiateType(String t, float sr, ChuckVM vm, ChuckShred s, Map<String, UserClassDescriptor> rm) {
         if (t == null) return null; 
-        UserClassDescriptor d = rm.get(t); 
-        if (d != null) return new UserObject(t, d.fields(), d.methods(), extendsEvent(t, rm));
+        UserClassDescriptor d = (rm != null && rm.containsKey(t)) ? rm.get(t) : (vm != null ? vm.getUserClass(t) : null);
+        if (d != null) {
+            UserObject uo = new UserObject(t, d.fields(), d.methods(), extendsEvent(t, rm));
+            uo.setTickCode(findMethod(t, "tick:1", rm, vm), s, vm);
+            return uo;
+        }
         
         ChuckObject chugin = ChuginLoader.instantiateChugin(t, sr, vm);
         if (chugin != null) return chugin;
@@ -2773,6 +2794,7 @@ public class ChuckEmitter {
             case "Shakers" -> new Shakers(sr);
             case "Rhodey" -> new Rhodey(sr);
             // I/O
+            case "ChuGen" -> new ChuGen();
             case "WarpTable" -> new WarpTable(sr);
             case "CurveTable" -> new CurveTable(sr);
             case "Modulate" -> new Modulate(sr);
@@ -2944,7 +2966,32 @@ public class ChuckEmitter {
                 else args[i] = s.reg.popLong();
             }
             Object obj = s.reg.popObject(); if (obj == null) throw new RuntimeException("NullPointerException in method call: " + mName);
-            // Special event methods that need the VM reference
+            
+            // 1. Try User-defined methods (they now have :argc suffix)
+            if (obj instanceof UserObject uo) {
+                String key = mName + ":" + a;
+                ChuckCode target = null;
+                String t = uo.className;
+                for (int depth = 0; depth < 16 && t != null; depth++) {
+                    UserClassDescriptor desc = vm.getUserClass(t);
+                    if (desc == null) break;
+                    if (desc.methods().containsKey(key)) { target = desc.methods().get(key); break; }
+                    t = desc.parentName();
+                }
+                if (target != null) {
+                    s.thisStack.push(uo);
+                    s.setCode(target);
+                    s.setPc(-1); // will be incremented to 0 by interpreter
+                    for (Object arg : args) {
+                        if (arg instanceof ChuckObject co) s.reg.pushObject(co);
+                        else if (arg instanceof Double d) s.reg.push(d);
+                        else s.reg.push((Long) arg);
+                    }
+                    return;
+                }
+            }
+
+            // 2. Special event methods that need the VM reference
             if (obj instanceof ChuckEvent event) {
                 if (mName.equals("signal")) { event.signal(vm); s.reg.pushObject(event); return; }
                 if (mName.equals("broadcast")) { event.broadcast(vm); s.reg.pushObject(event); return; }
@@ -2957,11 +3004,17 @@ public class ChuckEmitter {
                     if (mName.equals("broadcast")) { uo.eventDelegate.broadcast(vm); s.reg.pushObject(uo); return; }
                     if (mName.equals("waiting"))   { s.reg.push((long) uo.eventDelegate.getWaitingCount()); return; }
                 }
-                ChuckCode target = uo.methods.get(mName);
-                if (target == null) {
-                    UserClassDescriptor d = vm.getUserClass(uo.className);
-                    if (d != null) target = d.staticMethods().get(mName + ":" + a);
+                
+                String key = mName + ":" + a;
+                ChuckCode target = null;
+                String t = uo.className;
+                for (int depth = 0; depth < 16 && t != null; depth++) {
+                    UserClassDescriptor desc = vm.getUserClass(t);
+                    if (desc == null) break;
+                    if (desc.methods().containsKey(key)) { target = desc.methods().get(key); break; }
+                    t = desc.parentName();
                 }
+
                 if (target != null) {
                     s.mem.pushObject(s.getCode()); s.mem.push(s.getPc()); s.mem.push(s.getFramePointer()); s.mem.push(s.reg.getSp());
                     s.setFramePointer(s.mem.getSp());
@@ -2971,7 +3024,7 @@ public class ChuckEmitter {
                         else if (arg instanceof Long l) s.mem.push(l);
                         else s.mem.pushObject(arg);
                     }
-                    if (uo.methods.containsKey(mName)) s.thisStack.push(uo);
+                    s.thisStack.push(uo);
                     s.setCode(target); s.setPc(-1); return;
                 }
             }

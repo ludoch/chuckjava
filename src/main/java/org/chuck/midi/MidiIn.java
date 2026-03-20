@@ -1,22 +1,35 @@
 package org.chuck.midi;
 
-import org.chuck.core.ChuckObject;
+import org.chuck.core.ChuckEvent;
 import org.chuck.core.ChuckType;
 import org.chuck.core.ChuckVM;
+
+import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
  * The ChucK MidiIn object.
  */
-public class MidiIn extends ChuckObject {
+public class MidiIn extends ChuckEvent {
     private final ChuckMidiNative driver;
+    private final ConcurrentLinkedDeque<MidiMsg> queue = new ConcurrentLinkedDeque<>();
 
     public MidiIn(ChuckVM vm) {
-        super(ChuckType.OBJECT); // In a real VM this would be type MIDI_IN
-        this.driver = new ChuckMidiNative(vm);
+        this.driver = new ChuckMidiNative(vm, this, this.queue);
     }
 
     public void open(int port) {
         driver.open(port);
+    }
+
+    public boolean recv(MidiMsg msg) {
+        MidiMsg m = queue.pollFirst();
+        if (m != null) {
+            msg.data1 = m.data1;
+            msg.data2 = m.data2;
+            msg.data3 = m.data3;
+            return true;
+        }
+        return false;
     }
 
     public void close() {
@@ -25,6 +38,6 @@ public class MidiIn extends ChuckObject {
 
     // Expose the event for 'min => now'
     public Object getEvent() {
-        return driver.getMidiEvent();
+        return this;
     }
 }

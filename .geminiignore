@@ -1,0 +1,9 @@
+target/
+.git/
+.claude/
+.gemini/
+node_modules/
+dist/
+build/
+*.log
+*.tmp
