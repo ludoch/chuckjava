@@ -59,6 +59,17 @@ public class ChuckString extends ChuckObject {
     public long rfind(Object val) { return sb.lastIndexOf(valToString(val)); }
     public long rfind(Object val, long start) { return sb.lastIndexOf(valToString(val), (int)start); }
     
+    public ChuckString lower() { return new ChuckString(sb.toString().toLowerCase()); }
+    public ChuckString upper() { return new ChuckString(sb.toString().toUpperCase()); }
+    public ChuckString trim() { return new ChuckString(sb.toString().trim()); }
+    public ChuckString ltrim() { return new ChuckString(sb.toString().stripLeading()); }
+    public ChuckString rtrim() { return new ChuckString(sb.toString().stripTrailing()); }
+    
+    public void set(Object val) {
+        sb.setLength(0);
+        sb.append(valToString(val));
+    }
+
     @Override
     public String toString() {
         return sb.toString();

@@ -23,6 +23,7 @@ public class CallFunc implements ChuckInstr {
         for (int i = argCount - 1; i >= 0; i--) {
             isD[i] = shred.reg.isDouble(0);
             if (shred.reg.isObject(0)) objs[i] = shred.reg.popObject();
+            else if (isD[i]) prims[i] = Double.doubleToRawLongBits(shred.reg.popDouble());
             else prims[i] = shred.reg.popLong();
         }
 

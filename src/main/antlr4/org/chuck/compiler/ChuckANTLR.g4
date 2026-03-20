@@ -1,13 +1,13 @@
 grammar ChuckANTLR;
 
 /*
- * ChucK ANTLR4 Grammar - Ultra Hardened Production Version
+ * ChucK ANTLR4 Grammar - Cleaned up for non-combined usage
  */
 
 program : (directive | statement | functionDef | classDef)* EOF ;
 
 directive
-    : REFERENCE_TAG 'import' STRING                        // @import "file.ck"
+    : REFERENCE_TAG IMPORT STRING                        // @import "file.ck"
     | REFERENCE_TAG ID STRING?                             // @doc "...", @global, etc.
     ;
 
@@ -22,44 +22,44 @@ statement
     | returnStatement                                      # returnStmt
     | printStatement                                       # printStmt
     | blockStatement                                       # blockStmt
-    | expression ';'                                       # expressionStmt
-    | 'break' ';'                                          # breakStmt
-    | 'continue' ';'                                       # continueStmt
-    | ';'                                                  # emptyStmt
+    | expression SEMI                                      # expressionStmt
+    | BREAK SEMI                                           # breakStmt
+    | CONTINUE SEMI                                        # continueStmt
+    | SEMI                                                 # emptyStmt
     ;
 
-ifStatement: 'if' '(' expression ')' statement ('else' statement)? ;
-whileStatement: 'while' '(' expression ')' statement ;
-untilStatement: 'until' '(' expression ')' statement ;
+ifStatement: IF LPAREN expression RPAREN statement (ELSE statement)? ;
+whileStatement: WHILE LPAREN expression RPAREN statement ;
+untilStatement: UNTIL LPAREN expression RPAREN statement ;
 forStatement
-    : 'for' '(' (expression? ';') (expression? ';') expression? ')' statement
-    | 'for' '(' (type|'auto') REFERENCE_TAG? ID (arrayDimension)* ':' expression ')' statement
+    : FOR LPAREN (expression? SEMI) (expression? SEMI) expression? RPAREN statement
+    | FOR LPAREN (type|AUTO) REFERENCE_TAG? ID (arrayDimension)* COLON expression RPAREN statement
     ;
-repeatStatement: 'repeat' '(' expression ')' statement ;
-doStatement: 'do' statement ('while'|'until') '(' expression ')' ';' ;
-returnStatement: 'return' expression? ';' ;
-printStatement: '<<<' expressionList? '>>>' ';' ;
-blockStatement: '{' (statement)* '}' ;
+repeatStatement: REPEAT LPAREN expression RPAREN statement ;
+doStatement: DO statement (WHILE|UNTIL) LPAREN expression RPAREN SEMI ;
+returnStatement: RETURN expression? SEMI ;
+printStatement: LTRIPLE expressionList? RTRIPLE SEMI ;
+blockStatement: LBRACE (statement)* RBRACE ;
 
 variableDecl
-    : REFERENCE_TAG? ID ('(' expressionList? ')')? (arrayDimension)* (CHUCK_OP expression)?
+    : REFERENCE_TAG? ID (LPAREN expressionList? RPAREN)? (arrayDimension)* (CHUCK_OP expression)?
     ;
 
 accessModifier
-    : 'public' | 'private' | 'protected' | 'global'
+    : PUBLIC | PRIVATE | PROTECTED | GLOBAL
     ;
 
 arrayDimension
-    : '[' expression? ']'
+    : LBRACK expression? RBRACK
     ;
 
 expressionList
-    : expression (',' expression)*
+    : expression (COMMA expression)*
     ;
 
 // --- Definitions ---
 functionDef
-    : (accessModifier? ('static'? 'fun' | 'fun' 'static'?) | 'public') type? functionName '(' formalParameters? ')' postfixOpToken? statement
+    : (accessModifier? (STATIC? FUN | FUN STATIC?) | PUBLIC) type? functionName LPAREN formalParameters? RPAREN postfixOpToken? statement
     ;
 
 postfixOpToken : PLUS_PLUS | MINUS_MINUS ;
@@ -67,7 +67,7 @@ postfixOpToken : PLUS_PLUS | MINUS_MINUS ;
 functionName
     : ID
     | REFERENCE_TAG ID
-    | REFERENCE_TAG 'operator' operatorToken?
+    | REFERENCE_TAG OPERATOR operatorToken?
     ;
 
 operatorToken
@@ -77,7 +77,7 @@ operatorToken
     ;
 
 formalParameters
-    : formalParameter (',' formalParameter)*
+    : formalParameter (COMMA formalParameter)*
     ;
 
 formalParameter
@@ -85,7 +85,7 @@ formalParameter
     ;
 
 classDef
-    : accessModifier? 'class' ID ('extends' typeName)? '{' (directive | statement | functionDef)* '}'
+    : accessModifier? CLASS ID (EXTENDS typeName)? LBRACE (directive | statement | functionDef)* RBRACE
     ;
 
 type
@@ -93,22 +93,22 @@ type
     ;
 
 typeName
-    : 'int' | 'float' | 'time' | 'dur' | 'void' | 'complex' | 'polar' | 'string' | 'Event' | 'auto' | ID
+    : INT_TYPE | FLOAT_TYPE | TIME_TYPE | DUR_TYPE | VOID_TYPE | COMPLEX_TYPE | POLAR_TYPE | STRING_TYPE | EVENT_TYPE | AUTO | ID
     ;
 
 // Any keyword or ID usable as a member name after '.'
 memberName
     : ID
-    | 'int' | 'float' | 'time' | 'dur' | 'void' | 'complex' | 'polar' | 'string' | 'Event' | 'auto'
-    | 'if' | 'else' | 'while' | 'until' | 'for' | 'repeat' | 'do' | 'return' | 'break' | 'continue'
-    | 'fun' | 'class' | 'extends' | 'public' | 'private' | 'static' | 'protected' | 'global'
-    | 'spork' | 'now' | 'me' | 'new'
+    | INT_TYPE | FLOAT_TYPE | TIME_TYPE | DUR_TYPE | VOID_TYPE | COMPLEX_TYPE | POLAR_TYPE | STRING_TYPE | EVENT_TYPE | AUTO
+    | IF | ELSE | WHILE | UNTIL | FOR | REPEAT | DO | RETURN | BREAK | CONTINUE
+    | FUN | CLASS | EXTENDS | PUBLIC | PRIVATE | STATIC | PROTECTED | GLOBAL
+    | SPORK | NOW | ME | NEW
     ;
 
 // --- Expressions ---
 expression
     : primary                                              # primaryExp
-    | accessModifier? 'static'? type variableDecl (',' variableDecl)* # declExp
+    | accessModifier? STATIC? type variableDecl (COMMA variableDecl)* # declExp
     | prefixOp expression                                   # unaryOp
     | expression CAST type                                 # castExp
     | expression COLON_COLON expression                   # durationOp
@@ -131,22 +131,22 @@ primary
     | FLOAT                                                # floatLit
     | STRING                                               # stringLit
     | CHAR_LIT                                             # intLit
-    | 'true'                                               # trueLit
-    | 'false'                                              # falseLit
-    | 'null'                                               # nullLit
-    | 'now'                                                # nowExp
-    | 'me'                                                 # meExp
+    | TRUE                                                 # trueLit
+    | FALSE                                                # falseLit
+    | NULL                                                 # nullLit
+    | NOW                                                  # nowExp
+    | ME                                                   # meExp
     | ID                                                   # idExp
     | REFERENCE_TAG ID                                     # idExp
-    | primary '.' memberName                               # memberExp
-    | primary '[' expressionList ']'                       # arrayAccessExp
-    | primary '(' expressionList? ')'                      # callExp
-    | '(' expressionList? ')'                              # parenExp
-    | '[' expressionList? ']'                              # arrayLitExp
-    | REFERENCE_TAG '(' expressionList? ')'                # vectorLitExp
-    | 'new' type ('(' expressionList? ')')? (arrayDimension)* # newExp
-    | HASH '(' expression ',' expression ')'               # complexLit
-    | MOD '(' expression ',' expression ')'                # polarLit
+    | primary DOT memberName                               # memberExp
+    | primary LBRACK expressionList RBRACK                 # arrayAccessExp
+    | primary LPAREN expressionList? RPAREN                # callExp
+    | LPAREN expressionList? RPAREN                        # parenExp
+    | LBRACK expressionList? RBRACK                        # arrayLitExp
+    | REFERENCE_TAG LPAREN expressionList? RPAREN          # vectorLitExp
+    | NEW type (LPAREN expressionList? RPAREN)? (arrayDimension)* # newExp
+    | HASH LPAREN expression COMMA expression RPAREN       # complexLit
+    | MOD LPAREN expression COMMA expression RPAREN        # polarLit
     ;
 
 // --- Lexer Rules ---
@@ -175,7 +175,23 @@ ME      : 'me';
 NEW     : 'new';
 AUTO    : 'auto';
 
-CHUCK_OP     : '=>' | '@=>' | '!=>' | '=^' | '<=>' | '<=' | '=<' | '+=>' | '-=>' | '*=>' | '/=>' | '%=>' | '&=>' | '|=>' | '^=>' | '<<=>' | '>>=>' | '-->' ;
+INT_TYPE     : 'int';
+FLOAT_TYPE   : 'float';
+TIME_TYPE    : 'time';
+DUR_TYPE     : 'dur';
+VOID_TYPE    : 'void';
+COMPLEX_TYPE : 'complex';
+POLAR_TYPE   : 'polar';
+STRING_TYPE  : 'string';
+EVENT_TYPE   : 'Event';
+
+IMPORT       : 'import';
+OPERATOR     : 'operator';
+TRUE         : 'true';
+FALSE        : 'false';
+NULL         : 'null';
+
+CHUCK_OP     : '=>' | '@=>' | '!=>' | '=^' | '<=>' | '=<' | '+=>' | '-=>' | '*=>' | '/=>' | '%=>' | '&=>' | '|=>' | '^=>' | '<<=>' | '>>=>' | '-->' ;
 
 PLUS         : '+';
 MINUS        : '-';
@@ -192,6 +208,7 @@ PIPE         : '|';
 CARET        : '^';
 LT           : '<';
 GT           : '>';
+LE           : '<=';
 GE           : '>=';
 EQ           : '==';
 NEQ          : '!=';
@@ -205,6 +222,18 @@ RSHIFT       : '>>';
 HASH         : '#';
 REFERENCE_TAG : '@';
 
+SEMI         : ';';
+COMMA        : ',';
+LPAREN       : '(';
+RPAREN       : ')';
+LBRACE       : '{';
+RBRACE       : '}';
+LBRACK       : '[';
+RBRACK       : ']';
+DOT          : '.';
+LTRIPLE      : '<<<';
+RTRIPLE      : '>>>';
+
 ID : [a-zA-Z_] [a-zA-Z0-9_]* ;
 INT : '0x' [0-9a-fA-F]+ | [0-9]+ ;
 FLOAT : [0-9]* '.' [0-9]+ | [0-9]+ '.' [0-9]* ;
@@ -216,5 +245,3 @@ fragment ESC : '\\' . ;
 WS : [ \t\r\n]+ -> skip ;
 COMMENT : '//' ~[\r\n]* -> skip ;
 MULTILINE_COMMENT : '/*' .*? '*/' -> skip ;
-
-LE : '<-never->' ;

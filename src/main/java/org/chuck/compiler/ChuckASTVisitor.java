@@ -38,6 +38,15 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     @Override 
     public ChuckAST.Stmt visitExpressionStmt(ExpressionStmtContext ctx) { 
         Object result = visit(ctx.expression());
+        if (result instanceof List<?> list) {
+            List<ChuckAST.Stmt> stmts = new ArrayList<>();
+            for (Object item : list) {
+                if (item instanceof ChuckAST.Exp exp) {
+                    stmts.add(new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()));
+                }
+            }
+            return new ChuckAST.BlockStmt(stmts, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        }
         if (result instanceof ChuckAST.Stmt) {
             return (ChuckAST.Stmt) result;
         } else if (result instanceof ChuckAST.Exp) {
@@ -123,31 +132,43 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     @Override
     public Object visitDeclExp(DeclExpContext ctx) {
         String typeStr = ctx.type().getText();
-        VariableDeclContext v = ctx.variableDecl(0);
+        List<ChuckAST.Exp> decls = new ArrayList<>();
         
-        List<ChuckAST.Exp> arraySizes = new ArrayList<>();
-        for (ChuckANTLRParser.ArrayDimensionContext ad : v.arrayDimension()) {
-            if (ad.expression() != null) {
-                arraySizes.add((ChuckAST.Exp) visit(ad.expression()));
+        for (VariableDeclContext v : ctx.variableDecl()) {
+            List<ChuckAST.Exp> arraySizes = new ArrayList<>();
+            for (ChuckANTLRParser.ArrayDimensionContext ad : v.arrayDimension()) {
+                if (ad.expression() != null) {
+                    arraySizes.add((ChuckAST.Exp) visit(ad.expression()));
+                } else {
+                    arraySizes.add(new ChuckAST.IntExp(-1, ad.getStart().getLine(), ad.getStart().getCharPositionInLine()));
+                }
+            }
+            
+            boolean isRef = v.REFERENCE_TAG() != null;
+            // Also inherit global reference tag if present on the first one or type?
+            // Actually in ChucK 'Gain @ h, g' makes both refs.
+            if (ctx.variableDecl(0).REFERENCE_TAG() != null) isRef = true;
+
+            if (typeStr.equals("vec3") || typeStr.equals("vec4") || typeStr.equals("complex") || typeStr.equals("polar")) {
+                isRef = true;
+            }
+            
+            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(typeStr, v.ID().getText(), arraySizes, null, isRef, ctx.STATIC() != null, false,
+                    v.getStart().getLine(), v.getStart().getCharPositionInLine());            
+            
+            if (v.CHUCK_OP() != null) {
+                ChuckAST.Exp rhs = (ChuckAST.Exp) visit(v.expression());
+                ChuckAST.Operator op = mapChuckOp(v.CHUCK_OP().getText());
+                decls.add(new ChuckAST.BinaryExp(declExp, op, rhs, v.getStart().getLine(), v.getStart().getCharPositionInLine()));
             } else {
-                arraySizes.add(new ChuckAST.IntExp(-1, ad.getStart().getLine(), ad.getStart().getCharPositionInLine()));
+                decls.add(declExp);
             }
         }
         
-        boolean isRef = v.REFERENCE_TAG() != null;
-        if (typeStr.equals("vec3") || typeStr.equals("vec4") || typeStr.equals("complex") || typeStr.equals("polar")) {
-            isRef = true;
-        }
-        
-        ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(typeStr, v.ID().getText(), arraySizes, null, isRef, ctx.STATIC() != null, false,
-                v.getStart().getLine(), v.getStart().getCharPositionInLine());            
-        if (v.CHUCK_OP() != null) {
-            ChuckAST.Exp rhs = (ChuckAST.Exp) visit(v.expression());
-            ChuckAST.Operator op = mapChuckOp(v.CHUCK_OP().getText());
-            return new ChuckAST.BinaryExp(declExp, op, rhs, v.getStart().getLine(), v.getStart().getCharPositionInLine());
-        }
-        
-        return declExp;
+        if (decls.size() == 1) return decls.get(0);
+        // If multiple, Return a specialized list or just the last one? 
+        // For emission, we need to emit all. Let's return a list and handle it in Emitter.
+        return decls;
     }
 
     private ChuckAST.Operator mapChuckOp(String opText) {
@@ -193,6 +214,21 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     }
 
     @Override
+    public ChuckAST.Exp visitCompareOp(CompareOpContext ctx) {
+        ChuckAST.Operator op = switch (ctx.getChild(1).getText()) {
+            case "<" -> ChuckAST.Operator.LT;
+            case ">" -> ChuckAST.Operator.GT;
+            case "<=" -> ChuckAST.Operator.LE;
+            case ">=" -> ChuckAST.Operator.GE;
+            case "==" -> ChuckAST.Operator.EQ;
+            case "!=" -> ChuckAST.Operator.NEQ;
+            default -> ChuckAST.Operator.NONE;
+        };
+        return new ChuckAST.BinaryExp((ChuckAST.Exp) visit(ctx.expression(0)), op, (ChuckAST.Exp) visit(ctx.expression(1)),
+            ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
+
+    @Override
     public ChuckAST.Exp visitBinaryOp(BinaryOpContext ctx) {
         ChuckAST.Operator op = switch (ctx.getChild(1).getText()) {
             case "+" -> ChuckAST.Operator.PLUS;
@@ -204,6 +240,9 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             case "||" -> ChuckAST.Operator.OR;
             case "<<" -> ChuckAST.Operator.SHIFT_LEFT;
             case ">>" -> ChuckAST.Operator.SHIFT_RIGHT;
+            case "&" -> ChuckAST.Operator.S_AND;
+            case "|" -> ChuckAST.Operator.S_OR;
+            case "^" -> ChuckAST.Operator.NONE;
             default -> ChuckAST.Operator.NONE;
         };
         return new ChuckAST.BinaryExp((ChuckAST.Exp) visit(ctx.expression(0)), op, (ChuckAST.Exp) visit(ctx.expression(1)),
