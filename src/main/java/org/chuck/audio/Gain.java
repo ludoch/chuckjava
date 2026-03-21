@@ -36,26 +36,32 @@ public class Gain extends ChuckUGen {
      * SIMD Optimized block processing using the JDK 25 Vector API.
      */
     @Override
-    public void tick(float[] buffer) {
+    public void tick(float[] buffer, int offset, int length, long systemTime) {
         int i = 0;
-        int upperBound = SPECIES.loopBound(buffer.length);
+        int upperBound = SPECIES.loopBound(length);
         
         // Multiplier vector
         FloatVector vGain = FloatVector.broadcast(SPECIES, this.gain);
 
         // Vectorized loop
         for (; i < upperBound; i += SPECIES.length()) {
-            // Load block from buffer (which might have been filled by previous UGens)
-            var vIn = FloatVector.fromArray(SPECIES, buffer, i);
+            // Load block from buffer
+            var vIn = FloatVector.fromArray(SPECIES, buffer, offset + i);
             // Apply gain
             var vOut = vIn.mul(vGain);
             // Store back
-            vOut.intoArray(buffer, i);
+            vOut.intoArray(buffer, offset + i);
         }
 
         // Tail loop for remaining elements
-        for (; i < buffer.length; i++) {
-            buffer[i] *= this.gain;
+        for (; i < length; i++) {
+            buffer[offset + i] *= this.gain;
+        }
+        
+        // Update lastOut for potential scalar callers
+        if (length > 0) {
+            lastOut = buffer[offset + length - 1];
+            lastTickTime = (systemTime == -1) ? -1 : systemTime + length - 1;
         }
     }
 }

@@ -2707,12 +2707,12 @@ public class ChuckEmitter {
                 } else {
                     ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
                     for (int i = 0; i < sz; i++) {
-                        ChuckObject elem = instantiateType(t, vm.getSampleRate(), vm, s, rm);
+                        ChuckObject elem = instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
                         if (elem != null) { arr.setObject(i, elem); if (elem instanceof ChuckUGen u) s.registerUGen(u); }
                     }
                     obj = arr;
                 }
-            } else obj = instantiateType(t, vm.getSampleRate(), vm, s, rm);
+            } else obj = instantiateType(t, a, args, vm.getSampleRate(), vm, s, rm);
 
             if (obj instanceof ChuckObject co) {
                 s.mem.setRef(fp + o, co);
@@ -2766,12 +2766,12 @@ public class ChuckEmitter {
                 } else {
                     ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
                     for (int i = 0; i < sz; i++) {
-                        ChuckObject elem = instantiateType(t, vm.getSampleRate(), vm, s, rm);
+                        ChuckObject elem = instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
                         if (elem != null) { arr.setObject(i, elem); if (elem instanceof ChuckUGen u) s.registerUGen(u); }
                     }
                     obj = arr;
                 }
-            } else obj = instantiateType(t, vm.getSampleRate(), vm, s, rm);
+            } else obj = instantiateType(t, a, args, vm.getSampleRate(), vm, s, rm);
 
             if (obj instanceof ChuckObject co) {
                 vm.setGlobalObject(n, co);
@@ -2796,7 +2796,7 @@ public class ChuckEmitter {
             for (int i = 0; i < sz; i++) arr.setObject(i, buildMultiDimArray(dims, dimIdx + 1, elemType, vm, s, rm));
         } else {
             for (int i = 0; i < sz; i++) {
-                ChuckObject elem = instantiateType(elemType, vm.getSampleRate(), vm, s, rm);
+                ChuckObject elem = instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
                 if (elem != null) { arr.setObject(i, elem); if (elem instanceof ChuckUGen u) s.registerUGen(u); }
             }
         }
@@ -2863,7 +2863,7 @@ public class ChuckEmitter {
         return null;
     }
 
-    static ChuckObject instantiateType(String t, float sr, ChuckVM vm, ChuckShred s, Map<String, UserClassDescriptor> rm) {
+    static ChuckObject instantiateType(String t, int argc, Object[] args, float sr, ChuckVM vm, ChuckShred s, Map<String, UserClassDescriptor> rm) {
         if (t == null) return null; 
         UserClassDescriptor d = (rm != null && rm.containsKey(t)) ? rm.get(t) : (vm != null ? vm.getUserClass(t) : null);
         if (d != null) {
@@ -2872,6 +2872,42 @@ public class ChuckEmitter {
             return uo;
         }
         
+        // Handle common built-in types with constructors via reflection
+        try {
+            Class<?> clazz = null;
+            if (t.equals("GainDB")) clazz = org.chuck.audio.GainDB.class;
+            else if (t.equals("SinOsc")) clazz = org.chuck.audio.SinOsc.class;
+            // ... add others as needed, or use a general lookup
+            
+            if (clazz != null) {
+                for (java.lang.reflect.Constructor<?> c : clazz.getConstructors()) {
+                    if (c.getParameterCount() == argc) {
+                        Class<?>[] pts = c.getParameterTypes();
+                        Object[] coe = new Object[argc];
+                        boolean valid = true;
+                        for (int i = 0; i < argc; i++) {
+                            Object val = args[i];
+                            if (val instanceof Long l) {
+                                if (pts[i] == long.class || pts[i] == Long.class) coe[i] = l;
+                                else if (pts[i] == int.class || pts[i] == Integer.class) coe[i] = l.intValue();
+                                else if (pts[i] == double.class || pts[i] == Double.class) coe[i] = l.doubleValue();
+                                else if (pts[i] == float.class || pts[i] == Float.class) coe[i] = l.floatValue();
+                                else { valid = false; break; }
+                            } else if (val instanceof Double dv) {
+                                if (pts[i] == double.class || pts[i] == Double.class) coe[i] = dv;
+                                else if (pts[i] == float.class || pts[i] == Float.class) coe[i] = dv.floatValue();
+                                else { valid = false; break; }
+                            } else {
+                                if (val != null && pts[i].isInstance(val)) coe[i] = val;
+                                else { coe[i] = val; }
+                            }
+                        }
+                        if (valid) return (ChuckObject) c.newInstance(coe);
+                    }
+                }
+            }
+        } catch (Exception ignored) {}
+
         ChuckObject chugin = ChuginLoader.instantiateChugin(t, sr, vm);
         if (chugin != null) return chugin;
 
@@ -2888,6 +2924,7 @@ public class ChuckEmitter {
             case "PitShift" -> new PitShift();
             case "Dyno" -> new Dyno(sr);
             case "LiSa" -> new LiSa(sr);
+            case "GainDB" -> argc > 0 && args[0] instanceof Number n ? new GainDB(n.doubleValue()) : new GainDB();
             // Oscillators
             case "TriOsc" -> new TriOsc(sr);
             case "SawOsc" -> new SawOsc(sr);

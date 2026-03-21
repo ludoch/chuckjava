@@ -145,9 +145,13 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             }
             
             boolean isRef = v.REFERENCE_TAG() != null;
+            // A declaration like 'GainDB g(-18)' is NOT a reference declaration,
+            // it's an instantiation.
+            if (v.LPAREN() != null) isRef = false;
+            
             // Also inherit global reference tag if present on the first one or type?
-            // Actually in ChucK 'Gain @ h, g' makes both refs.
             if (ctx.variableDecl(0).REFERENCE_TAG() != null) isRef = true;
+            if (v.LPAREN() != null) isRef = false; // Constructor call always overrides ref
 
             if (typeStr.equals("vec3") || typeStr.equals("vec4") || typeStr.equals("complex") || typeStr.equals("polar")) {
                 isRef = true;

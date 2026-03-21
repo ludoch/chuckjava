@@ -1,5 +1,10 @@
 package org.chuck.audio;
 
+import jdk.incubator.vector.FloatVector;
+import jdk.incubator.vector.VectorSpecies;
+import static org.chuck.audio.VectorAudio.SPECIES;
+import static org.chuck.audio.VectorAudio.OFFSETS;
+
 /**
  * An Attack, Decay, Sustain, Release envelope generator.
  */
@@ -105,9 +110,33 @@ public class Adsr extends ChuckUGen {
         return input * currentLevel;
     }
 
+    @Override
     public float tick(long systemTime) {
         update(systemTime);
         return currentLevel;
+    }
+
+    @Override
+    public void tick(float[] buffer, int offset, int length, long systemTime) {
+        // Optimization: if we are in SUSTAIN or DONE, the gain is constant
+        if (state == State.SUSTAIN_ENUM || state == State.DONE_ENUM) {
+            float gainVal = (state == State.SUSTAIN_ENUM) ? sustainLevel : 0.0f;
+            int i = 0;
+            int bound = SPECIES.loopBound(length);
+            FloatVector vGain = FloatVector.broadcast(SPECIES, gainVal);
+            for (; i < bound; i += SPECIES.length()) {
+                var vIn = FloatVector.fromArray(SPECIES, buffer, offset + i);
+                vIn.mul(vGain).intoArray(buffer, offset + i);
+            }
+            for (; i < length; i++) buffer[offset + i] *= gainVal;
+            currentLevel = gainVal;
+            lastTickTime = (systemTime == -1) ? -1 : systemTime + length - 1;
+            lastOut = buffer[offset + length - 1];
+            return;
+        }
+
+        // Otherwise, fallback to scalar for state-transition accuracy
+        super.tick(buffer, offset, length, systemTime);
     }
 
     private void update(long systemTime) {

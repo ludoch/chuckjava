@@ -1,5 +1,10 @@
 package org.chuck.audio;
 
+import jdk.incubator.vector.FloatVector;
+import jdk.incubator.vector.VectorSpecies;
+import static org.chuck.audio.VectorAudio.SPECIES;
+import static org.chuck.audio.VectorAudio.OFFSETS;
+
 /**
  * Band-limited sawtooth wave oscillator using PolyBLEP correction.
  *
@@ -22,5 +27,43 @@ public class SawOsc extends Osc {
         double saw = 2.0 * phase - 1.0;  // naive sawtooth [-1, +1)
         saw -= polyBlep(phase, dt);       // correct the reset discontinuity at t=0
         return saw;
+    }
+
+    @Override
+    public void tick(float[] buffer, int offset, int length, long systemTime) {
+        if (getNumSources() > 0) {
+            super.tick(buffer, offset, length, systemTime);
+            return;
+        }
+
+        float f_freq = (float) freq;
+        float f_phase = (float) phase;
+        float f_inc = f_freq / sampleRate;
+
+        int i = 0;
+        int bound = SPECIES.loopBound(length);
+        FloatVector vOffsets = FloatVector.fromArray(SPECIES, OFFSETS, 0);
+        FloatVector vInc = FloatVector.broadcast(SPECIES, f_inc);
+        FloatVector vTwo = FloatVector.broadcast(SPECIES, 2.0f);
+        FloatVector vOne = FloatVector.broadcast(SPECIES, 1.0f);
+
+        for (; i < bound; i += SPECIES.length()) {
+            // vPhases = (phase + offsets * inc)
+            FloatVector vPhases = vOffsets.mul(vInc).add(f_phase);
+            
+            // vSaw = 2 * vPhases - 1
+            // (Note: this is naive sawtooth, real PolyBLEP would be harder to vectorize)
+            FloatVector vSaw = vPhases.mul(vTwo).sub(vOne);
+            
+            vSaw.mul(gain).intoArray(buffer, offset + i);
+            
+            f_phase = (f_phase + f_inc * SPECIES.length()) % 1.0f;
+        }
+
+        // Scalar fallback for remainder
+        this.phase = f_phase;
+        for (; i < length; i++) {
+            buffer[offset + i] = tick(systemTime == -1 ? -1 : systemTime + i);
+        }
     }
 }

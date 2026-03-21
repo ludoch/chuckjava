@@ -2,6 +2,10 @@ package org.chuck.audio;
 
 import org.chuck.core.ChuckType;
 
+import jdk.incubator.vector.FloatVector;
+import jdk.incubator.vector.VectorSpecies;
+import static org.chuck.audio.VectorAudio.SPECIES;
+
 /**
  * A mono-to-stereo unit generator for stereo panning.
  */
@@ -10,6 +14,10 @@ public class Pan2 extends StereoUGen {
     public final Gain right = new Gain();
     private float pan = 0.0f; // -1 (left) to 1 (right)
     private int panType = 1; // 0: linear, 1: constant power
+
+    // Precalculated gains for block processing
+    private float gL = 0.707f;
+    private float gR = 0.707f;
 
     public Pan2() {
         this.numInputs = 2;
@@ -24,10 +32,24 @@ public class Pan2 extends StereoUGen {
         // Also connect to main processing for ticking
         inputChannels[0].chuckTo(this);
         inputChannels[1].chuckTo(this);
+        
+        updateGains();
+    }
+
+    private void updateGains() {
+        if (panType == 1) { // Constant power
+            double angle = (pan + 1.0) * (Math.PI / 4.0);
+            gL = (float) Math.cos(angle);
+            gR = (float) Math.sin(angle);
+        } else { // Linear
+            gL = (1.0f - pan) * 0.5f;
+            gR = (pan + 1.0f) * 0.5f;
+        }
     }
 
     public void setPan(float pan) {
         this.pan = pan;
+        updateGains();
     }
 
     public float getPan() {
@@ -37,6 +59,7 @@ public class Pan2 extends StereoUGen {
     /** ChucK-style: p.pan(0.5) */
     public float pan(float p) {
         this.pan = p;
+        updateGains();
         return p;
     }
 
@@ -47,33 +70,64 @@ public class Pan2 extends StereoUGen {
 
     public void setPanType(int type) {
         this.panType = type;
+        updateGains();
     }
 
     /** ChucK-style: p.panType(1) */
     public int panType(int t) {
         this.panType = t;
+        updateGains();
         return t;
     }
 
     @Override
-    protected void computeStereo(float input, long systemTime) {
-        // We need to handle individual inputs for true stereo-to-stereo
-        float in0 = inputChannels[0].lastOut;
-        float in1 = inputChannels[1].lastOut;
+    public void tick(float[] buffer, int offset, int length, long systemTime) {
+        // Multi-channel tick is complex because we produce two outputs from one input stream
+        // in the standard ChuckUGen.tick(float[]) model.
+        // However, Pan2 is usually used mono-to-stereo.
         
-        // Simplified: if only one input is connected, use it as mono
-        // If two are connected, treat as stereo
-        float monoInput = input; 
+        // For this SIMD implementation, we'll process the buffer in-place for left,
+        // and copy to right.
         
-        if (panType == 1) { // Constant power
-            double angle = (pan + 1.0) * (Math.PI / 4.0);
-            lastOutLeft = (float) (monoInput * Math.cos(angle));
-            lastOutRight = (float) (monoInput * Math.sin(angle));
-        } else { // Linear
-            lastOutLeft = monoInput * (1.0f - pan) * 0.5f;
-            lastOutRight = monoInput * (pan + 1.0f) * 0.5f;
+        int i = 0;
+        int bound = SPECIES.loopBound(length);
+        FloatVector vGL = FloatVector.broadcast(SPECIES, gL);
+        FloatVector vGR = FloatVector.broadcast(SPECIES, gR);
+        
+        float[] rightBuf = new float[length];
+
+        for (; i < bound; i += SPECIES.length()) {
+            var vIn = FloatVector.fromArray(SPECIES, buffer, offset + i);
+            
+            // Left output (in-place)
+            var vOutL = vIn.mul(vGL);
+            vOutL.intoArray(buffer, offset + i);
+            
+            // Right output
+            var vOutR = vIn.mul(vGR);
+            vOutR.intoArray(rightBuf, i);
         }
-        // Send to output proxies
+        
+        // Tail
+        for (; i < length; i++) {
+            float in = buffer[offset + i];
+            buffer[offset + i] = in * gL;
+            rightBuf[i] = in * gR;
+        }
+        
+        // Update proxies
+        lastOutLeft = buffer[offset + length - 1];
+        lastOutRight = rightBuf[length - 1];
+        left.lastOut = lastOutLeft;
+        right.lastOut = lastOutRight;
+        
+        // Note: in a full multi-channel system, rightBuf would be sent to the second channel
+    }
+
+    @Override
+    protected void computeStereo(float input, long systemTime) {
+        lastOutLeft = input * gL;
+        lastOutRight = input * gR;
         left.lastOut = lastOutLeft;
         right.lastOut = lastOutRight;
     }

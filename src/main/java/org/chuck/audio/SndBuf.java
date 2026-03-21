@@ -182,4 +182,8 @@ public class SndBuf extends ChuckUGen {
     public boolean isDone() {
         return !loop && (pos >= samples.length || pos < 0);
     }
+
+    public int ready() {
+        return samples != null && samples.length > 0 ? 1 : 0;
+    }
 }

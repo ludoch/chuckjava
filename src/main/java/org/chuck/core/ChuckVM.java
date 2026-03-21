@@ -296,7 +296,6 @@ public class ChuckVM {
             ChuckShred shred = new ChuckShred(code);
             return spork(shred);
         } catch (Exception e) {
-            System.err.println("Machine.run error: " + e.getMessage());
             e.printStackTrace();
             print("Machine.run error: " + e.getMessage());
             return 0;
