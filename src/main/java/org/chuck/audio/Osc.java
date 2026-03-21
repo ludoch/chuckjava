@@ -29,6 +29,8 @@ public abstract class Osc extends ChuckUGen {
         return f;
     }
 
+    public double freq() { return freq; }
+
     public double getFreq() {
         return freq;
     }
@@ -44,6 +46,8 @@ public abstract class Osc extends ChuckUGen {
         return this.phase;
     }
 
+    public double phase() { return phase; }
+
     public double getPhase() {
         return phase;
     }
@@ -57,6 +61,8 @@ public abstract class Osc extends ChuckUGen {
         this.width = w;
         return w;
     }
+
+    public double width() { return width; }
 
     public double getWidth() {
         return width;
@@ -72,9 +78,12 @@ public abstract class Osc extends ChuckUGen {
         return s;
     }
 
+    public int sync() { return sync; }
+
     public int getSync() {
         return sync;
     }
+
 
     public void init(double f) {
         setFreq(f);
