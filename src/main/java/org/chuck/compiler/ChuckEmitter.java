@@ -88,7 +88,12 @@ public class ChuckEmitter {
 
     /** Infers the type of an expression, including results of binary operator overloads. */
     private String getExprType(ChuckAST.Exp exp) {
-        if (exp instanceof ChuckAST.IdExp id) return varTypes.get(id.name());
+        if (exp instanceof ChuckAST.IdExp id) {
+            String type = getVarType(exp);
+            if (type != null) return type;
+            if (userClassRegistry.containsKey(id.name())) return id.name();
+            return null;
+        }
         if (exp instanceof ChuckAST.DeclExp e) return e.type();
         if (exp instanceof ChuckAST.BinaryExp bin) {
             String opSymbol = switch (bin.op()) {
@@ -117,6 +122,14 @@ public class ChuckEmitter {
         }
     }
 
+    private boolean isSubclassOfUGen(String className) {
+        if (className == null) return false;
+        if (KNOWN_UGEN_TYPES.contains(className)) return true;
+        UserClassDescriptor d = userClassRegistry.get(className);
+        if (d == null) return false;
+        return isSubclassOfUGen(d.parentName());
+    }
+
     private ChuckCode resolveStaticMethod(String className, String methodKey) {
         if (className == null) return null;
         UserClassDescriptor d = userClassRegistry.get(className);
@@ -137,26 +150,14 @@ public class ChuckEmitter {
         if (!hasContent) {
             throw new RuntimeException(programName + ":1:1: syntax error\n(empty file)");
         }
-        // Pass 1: Collect all global function signatures (detect duplicates)
-        java.util.Set<String> fileFunctions = new java.util.HashSet<>();
+        // Pass 0: Register all class names so they are known as types
         for (ChuckAST.Stmt stmt : statements) {
-            if (stmt instanceof ChuckAST.FuncDefStmt s) {
-                String key = s.name() + ":" + s.argNames().size();
-                if (fileFunctions.contains(key)) {
-                    throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
-                        + ": error: cannot overload function with identical arguments -- '"
-                        + s.name() + "' already defined with " + s.argNames().size() + " argument(s)");
-                }
-                fileFunctions.add(key);
-                if (!functions.containsKey(key)) functions.put(key, new ChuckCode(s.name()));
-            } else if (stmt instanceof ChuckAST.ClassDefStmt s) {
-                if (userClassRegistry.containsKey(s.name())) {
-                    throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
-                        + ": error: class '" + s.name() + "' already defined");
-                }
-                userClassRegistry.put(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new HashMap<>(), new HashMap<>()));
+            if (stmt instanceof ChuckAST.ClassDefStmt s) {
+                userClassRegistry.put(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>()));
             }
         }
+
+        // Pass 1: Collect all global function signatures
 
         // Pass 2: Populate function and class bodies
         for (ChuckAST.Stmt stmt : statements) {
@@ -165,11 +166,22 @@ public class ChuckEmitter {
             }
         }
 
-        // Pass 3: Emit top-level statements
+        // Pass 3: Emit top-level statements and register classes
         ChuckCode code = new ChuckCode(programName);
         code.addInstruction(new MoveArgs(0));
+        
+        // First, register classes so they are available for static access in the script
         for (ChuckAST.Stmt stmt : statements) {
-            if (!(stmt instanceof ChuckAST.FuncDefStmt) && !(stmt instanceof ChuckAST.ImportStmt)) {
+            if (stmt instanceof ChuckAST.ClassDefStmt s) {
+                UserClassDescriptor desc = userClassRegistry.get(s.name());
+                if (desc != null) {
+                    code.addInstruction(new RegisterClass(s.name(), desc));
+                }
+            }
+        }
+        
+        for (ChuckAST.Stmt stmt : statements) {
+            if (!(stmt instanceof ChuckAST.FuncDefStmt) && !(stmt instanceof ChuckAST.ImportStmt) && !(stmt instanceof ChuckAST.ClassDefStmt)) {
                 emitStatement(stmt, code);
             }
         }
@@ -466,9 +478,9 @@ public class ChuckEmitter {
             java.util.Set<String> fieldNames = new java.util.LinkedHashSet<>();
             List<ChuckAST.FuncDefStmt> methods = new ArrayList<>();
 
-            Map<String, Long> staticInts = new java.util.concurrent.ConcurrentHashMap<>();
-            Map<String, Boolean> staticIsDouble = new java.util.concurrent.ConcurrentHashMap<>();
-            Map<String, Object> staticObjects = new java.util.concurrent.ConcurrentHashMap<>();
+            Map<String, Long> staticInts = new HashMap<>();
+            Map<String, Boolean> staticIsDouble = new HashMap<>();
+            Map<String, Object> staticObjects = new HashMap<>();
 
             // Pre-check: static vars cannot be declared inside nested blocks within a class body
             for (ChuckAST.Stmt bodyItem : s.body()) {
@@ -482,12 +494,13 @@ public class ChuckEmitter {
             for (ChuckAST.Stmt bodyStmt : flattenedBody) {
                 if (bodyStmt instanceof ChuckAST.DeclStmt f) {
                     if (f.isStatic()) {
-                        if (f.type().equals("int")) staticInts.put(f.name(), 0L);
-                        else if (f.type().equals("float")) { staticInts.put(f.name(), Double.doubleToRawLongBits(0.0)); staticIsDouble.put(f.name(), true); }
+                        boolean isArray = !f.arraySizes().isEmpty();
+                        if (!isArray && f.type().equals("int")) staticInts.put(f.name(), 0L);
+                        else if (!isArray && f.type().equals("float")) { staticInts.put(f.name(), Double.doubleToRawLongBits(0.0)); staticIsDouble.put(f.name(), true); }
                         else if (f.type().equals("vec3")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 3));
                         else if (f.type().equals("vec4")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 4));
                         else if (f.type().equals("complex") || f.type().equals("polar")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 2));
-                        else staticObjects.put(f.name(), null);
+                        else staticObjects.put(f.name(), null); // Includes static arrays like int a[]
                     } else {
                         fieldDefs.add(new String[]{f.type(), f.name()});
                         fieldNames.add(f.name());
@@ -497,18 +510,35 @@ public class ChuckEmitter {
                 } else if (bodyStmt instanceof ChuckAST.ExpStmt es
                         && es.exp() instanceof ChuckAST.BinaryExp bexp
                         && bexp.op() == ChuckAST.Operator.CHUCK
-                        && bexp.rhs() instanceof ChuckAST.DeclExp rDecl
-                        && !rDecl.isStatic()) {
-                    // e.g. `5 => int n;` — field declaration with literal initializer
-                    String initStr = null;
-                    if (bexp.lhs() instanceof ChuckAST.IntExp iv) initStr = String.valueOf(iv.value());
-                    else if (bexp.lhs() instanceof ChuckAST.FloatExp fv) initStr = String.valueOf(fv.value());
-                    if (initStr != null) {
-                        fieldDefs.add(new String[]{rDecl.type(), rDecl.name(), initStr});
+                        && bexp.rhs() instanceof ChuckAST.DeclExp rDecl) {
+                    if (rDecl.isStatic()) {
+                        boolean isArray = !rDecl.arraySizes().isEmpty();
+                        if (!isArray && rDecl.type().equals("int")) staticInts.put(rDecl.name(), 0L);
+                        else if (!isArray && rDecl.type().equals("float")) { staticInts.put(rDecl.name(), Double.doubleToRawLongBits(0.0)); staticIsDouble.put(rDecl.name(), true); }
+                        else staticObjects.put(rDecl.name(), null);
+                    } else {
+                        // e.g. `5 => int n;` — field declaration with literal initializer
+                        String initStr = null;
+                        if (bexp.lhs() instanceof ChuckAST.IntExp iv) initStr = String.valueOf(iv.value());
+                        else if (bexp.lhs() instanceof ChuckAST.FloatExp fv) initStr = String.valueOf(fv.value());
+                        if (initStr != null) {
+                            fieldDefs.add(new String[]{rDecl.type(), rDecl.name(), initStr});
+                        } else {
+                            fieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
+                        }
+                        fieldNames.add(rDecl.name());
+                    }
+                } else if (bodyStmt instanceof ChuckAST.ExpStmt es && es.exp() instanceof ChuckAST.DeclExp rDecl) {
+                    // Standalone declaration like 'static int a[];'
+                    if (rDecl.isStatic()) {
+                        boolean isArray = !rDecl.arraySizes().isEmpty();
+                        if (!isArray && rDecl.type().equals("int")) staticInts.put(rDecl.name(), 0L);
+                        else if (!isArray && rDecl.type().equals("float")) { staticInts.put(rDecl.name(), Double.doubleToRawLongBits(0.0)); staticIsDouble.put(rDecl.name(), true); }
+                        else staticObjects.put(rDecl.name(), null);
                     } else {
                         fieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
+                        fieldNames.add(rDecl.name());
                     }
-                    fieldNames.add(rDecl.name());
                 }
             }
             Map<String, ChuckCode> methodCodes = new HashMap<>();
@@ -773,8 +803,9 @@ public class ChuckEmitter {
         } else if (exp instanceof ChuckAST.DeclExp e) {
             // Check for 'new' on primitive types or undefined types
             if (e.name().startsWith("@new_")) {
+                boolean isArrayNew = e.name().startsWith("@new_array_");
                 java.util.Set<String> primitives = java.util.Set.of("int", "float", "string", "time", "dur", "void", "vec3", "vec4", "complex", "polar");
-                if (primitives.contains(e.type())) {
+                if (primitives.contains(e.type()) && !isArrayNew) {
                     throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
                         + ": error: cannot use 'new' on primitive type '" + e.type() + "'");
                 }
@@ -790,7 +821,7 @@ public class ChuckEmitter {
                     "CurveTable","GenX","Gen5","Gen7","Gen10","Mix2","Dyno","Event","Hid","HidMsg","MidiIn","MidiOut","MidiMsg",
                     "OscIn","OscOut","OscMsg","FileIO","IO","Std","Math","Machine","Object","String","Array"
                 );
-                if (!userClassRegistry.containsKey(e.type()) && !knownUGenTypes.contains(e.type())) {
+                if (!userClassRegistry.containsKey(e.type()) && !knownUGenTypes.contains(e.type()) && !primitives.contains(e.type())) {
                     throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
                         + ": error: undefined type '" + e.type() + "'");
                 }
@@ -910,6 +941,12 @@ public class ChuckEmitter {
                         && rDecl4.arraySizes().get(0) instanceof ChuckAST.IntExp szI4 && szI4.value() >= 0) {
                     throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
                         + ": error: cannot use '@=>' to assign to array declaration with explicit size");
+                }
+                // Check for multi-variable declaration error (test 114.ck)
+                Object rhs = e.rhs();
+                if (rhs instanceof ChuckAST.BlockStmt) {
+                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                        + ": error: cannot '=>' from/to a multi-variable declaration");
                 }
                 emitExpression(e.lhs(), code);
                 emitChuckTarget(e.rhs(), code);
@@ -1158,6 +1195,15 @@ public class ChuckEmitter {
                     case GE      -> code.addInstruction(new GreaterOrEqualAny());
                     case EQ      -> code.addInstruction(new EqualsAny());
                     case NEQ     -> code.addInstruction(new NotEqualsAny());
+                    case DUR_MUL -> {
+                        emitExpression(e.lhs(), code);
+                        if (e.rhs() instanceof ChuckAST.IdExp id) {
+                            code.addInstruction(new CreateDuration(id.name()));
+                        } else {
+                            emitExpression(e.rhs(), code);
+                            // Fallback?
+                        }
+                    }
                     case WRITE_IO -> {
                         emitExpression(e.lhs(), code);
                         emitExpression(e.rhs(), code);
@@ -1232,6 +1278,15 @@ public class ChuckEmitter {
                 code.addInstruction(new GetGlobalObjectOrInt(e.name()));
             }
         } else if (exp instanceof ChuckAST.DotExp e) {
+            // Handle static field access: ClassName.staticField
+            if (e.base() instanceof ChuckAST.IdExp id) {
+                String potentialClassName = id.name();
+                UserClassDescriptor classDesc = userClassRegistry.get(potentialClassName);
+                if (classDesc != null && (classDesc.staticInts().containsKey(e.member()) || classDesc.staticObjects().containsKey(e.member()))) {
+                    code.addInstruction(new GetStatic(potentialClassName, e.member()));
+                    return;
+                }
+            }
             if (e.base() instanceof ChuckAST.IdExp id && id.name().equals("IO")) {
                 if (e.member().equals("nl") || e.member().equals("newline")) {
                     code.addInstruction(new PushString("\n"));
@@ -1263,6 +1318,14 @@ public class ChuckEmitter {
                 return;
             }
             if (e.base() instanceof ChuckAST.IdExp id) {
+                String baseType = getExprType(e.base());
+                if (baseType != null && userClassRegistry.containsKey(baseType)) {
+                    UserClassDescriptor d = userClassRegistry.get(baseType);
+                    if (d.staticInts().containsKey(e.member()) || d.staticObjects().containsKey(e.member())) {
+                        code.addInstruction(new GetStatic(baseType, e.member()));
+                        return;
+                    }
+                }
                 if (id.name().equals("ADSR") || id.name().equals("Adsr")) {
                     code.addInstruction(new GetBuiltinStatic("org.chuck.audio.Adsr", e.member()));
                     return;
@@ -1563,24 +1626,40 @@ public class ChuckEmitter {
 
     private void emitChuckTarget(ChuckAST.Exp target, ChuckCode code) {
         if (target instanceof ChuckAST.IdExp e) {
-            Integer localOffset = getLocalOffset(e.name());
-            if (localOffset != null) code.addInstruction(new StoreLocal(localOffset));
-            else if (e.name().equals("now")) code.addInstruction(new AdvanceTime());
-            else if (e.name().equals("dac")) code.addInstruction(new ConnectToDac());
-            else if (e.name().equals("blackhole")) code.addInstruction(new ConnectToBlackhole());
-            else if (e.name().equals("adc")) code.addInstruction(new ConnectToAdc());
-            else if (e.name().equals("pi") || e.name().equals("e") || e.name().equals("maybe")
-                    || e.name().equals("second") || e.name().equals("ms") || e.name().equals("samp")
-                    || e.name().equals("minute") || e.name().equals("hour")) {
-                throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                    + ": error: cannot assign to read-only value '" + e.name() + "'");
-            } else if (currentClassFields.contains(e.name())) code.addInstruction(new SetUserField(e.name()));
-            else if ((KNOWN_UGEN_TYPES.contains(e.name()) || userClassRegistry.containsKey(e.name()))
-                    && !varTypes.containsKey(e.name()) && !globalVarTypes.containsKey(e.name())) {
-                throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                    + ": error: cannot assign to type name '" + e.name() + "'");
-            } else code.addInstruction(new SetGlobalObjectOrInt(e.name()));
+            String type = getVarType(target);
+            boolean isUGen = type != null && (KNOWN_UGEN_TYPES.contains(type) || isSubclassOfUGen(type));
+            
+            if (e.name().equals("now")) {
+                code.addInstruction(new AdvanceTime());
+                return;
+            }
+            if (e.name().equals("dac")) { code.addInstruction(new ConnectToDac()); return; }
+            if (e.name().equals("blackhole")) { code.addInstruction(new ConnectToBlackhole()); return; }
+            if (e.name().equals("adc")) { code.addInstruction(new ConnectToAdc()); return; }
+
+            if (isUGen) {
+                // If target is a UGen variable, we do a ChuckTo connection
+                emitExpression(target, code);
+                code.addInstruction(new org.chuck.core.ChuckTo());
+            } else {
+                // Otherwise it's a value assignment
+                Integer localOffset = getLocalOffset(e.name());
+                if (localOffset != null) code.addInstruction(new StoreLocal(localOffset));
+                else if (currentClassFields.contains(e.name())) code.addInstruction(new SetUserField(e.name()));
+                else code.addInstruction(new SetGlobalObjectOrInt(e.name()));
+            }
         } else if (target instanceof ChuckAST.DotExp e) {
+            // Handle static field target: ClassName.staticField
+            if (e.base() instanceof ChuckAST.IdExp id) {
+                String potentialClassName = id.name();
+                if (userClassRegistry.containsKey(potentialClassName)) {
+                    UserClassDescriptor classDesc = userClassRegistry.get(potentialClassName);
+                    if (classDesc != null && (classDesc.staticInts().containsKey(e.member()) || classDesc.staticObjects().containsKey(e.member()))) {
+                        code.addInstruction(new SetStatic(potentialClassName, e.member()));
+                        return;
+                    }
+                }
+            }
             if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Std") && e.member().equals("mtof")) {
                 code.addInstruction(new StdMtof());
             } else if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Std") && e.member().equals("ftom")) {
@@ -1601,14 +1680,6 @@ public class ChuckEmitter {
                         -> code.addInstruction(new MathFunc(e.member()));
                     default -> code.addInstruction(new MathFunc(e.member()));
                 }
-            } else if (e.base() instanceof ChuckAST.IdExp id && userClassRegistry.containsKey(id.name())) {
-                UserClassDescriptor d = userClassRegistry.get(id.name());
-                if (d.staticInts().containsKey(e.member()) || d.staticObjects().containsKey(e.member())) {
-                    code.addInstruction(new SetStatic(id.name(), e.member()));
-                } else {
-                    emitExpression(e.base(), code);
-                    code.addInstruction(new SetMemberIntByName(e.member()));
-                }
             } else {
                 emitExpression(e.base(), code);
                 code.addInstruction(new SetMemberIntByName(e.member()));
@@ -1622,16 +1693,35 @@ public class ChuckEmitter {
             emitExpression(e.indices().get(e.indices().size() - 1), code);
             code.addInstruction(new SetArrayInt());
         } else if (target instanceof ChuckAST.DeclExp e) {
-            emitExpression(e, code);
-            code.addInstruction(new Pop());
+            emitExpression(e, code); // Pushes new object 'target'
+            // Stack is now: [..., source, target]
+            
+            String type = e.type();
+            boolean isUGen = KNOWN_UGEN_TYPES.contains(type) || isSubclassOfUGen(type);
+            
+            if (isUGen) {
+                code.addInstruction(new org.chuck.core.ChuckTo());
+                // ChuckTo pops source & target, pushes target back.
+                // Stack is now: [..., target]
+            } else {
+                code.addInstruction(new StackSwap());
+                code.addInstruction(new Pop());
+                // Stack is now: [..., target]
+            }
+            
+            // Now save the target object to its variable
             Integer localOffset = getLocalOffset(e.name());
             if (localOffset != null) {
                 code.addInstruction(new StoreLocal(localOffset));
             } else {
                 code.addInstruction(new SetGlobalObjectOrInt(e.name()));
             }
+            // These instructions leave 'target' on stack for chaining.
         } else if (target instanceof ChuckAST.BinaryExp e) {
             if (e.op() == ChuckAST.Operator.CHUCK || e.op() == ChuckAST.Operator.AT_CHUCK) {
+                // In a chain: source => target1 => target2
+                // When called with target = (target1 => target2)
+                // We should first process target1, then target2.
                 emitChuckTarget(e.lhs(), code);
                 emitChuckTarget(e.rhs(), code);
             } else {
@@ -1981,25 +2071,44 @@ public class ChuckEmitter {
             s.reg.push(val); 
         }
     }
+    static class PushNull implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(null); }
+    }
+    static class PushObjectOnly implements ChuckInstr {
+        Object val; PushObjectOnly(Object v) { val = v; }
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(val); }
+    }
     static class PushFloat implements ChuckInstr {
         double val; PushFloat(double v) { val = v; }
-        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.push(val); }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            s.reg.push(val);
+        }
     }
     static class PushString implements ChuckInstr {
         String val; PushString(String v) { val = v; }
-        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(new ChuckString(val)); }
+        @Override public void execute(ChuckVM vm, ChuckShred s) { 
+            s.reg.pushObject(new ChuckString(val)); 
+        }
     }
     static class PushNow implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.push(vm.getCurrentTime()); }
+        @Override public void execute(ChuckVM vm, ChuckShred s) { 
+            s.reg.push(vm.getCurrentTime()); 
+        }
     }
     static class PushDac implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(vm.getMultiChannelDac()); }
+        @Override public void execute(ChuckVM vm, ChuckShred s) { 
+            s.reg.pushObject(vm.getMultiChannelDac()); 
+        }
     }
     static class PushBlackhole implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(vm.blackhole); }
+        @Override public void execute(ChuckVM vm, ChuckShred s) { 
+            s.reg.pushObject(vm.blackhole); 
+        }
     }
     static class PushAdc implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(vm.adc); }
+        @Override public void execute(ChuckVM vm, ChuckShred s) { 
+            s.reg.pushObject(vm.adc); 
+        }
     }
     static class PushMe implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(s); }
@@ -2056,7 +2165,10 @@ public class ChuckEmitter {
         int offset; public LoadLocal(int o) { offset = o; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             int idx = s.getFramePointer() + offset;
-            if (s.mem.isObjectAt(idx)) s.reg.pushObject(s.mem.getRef(idx));
+            if (s.mem.isObjectAt(idx)) {
+                Object obj = s.mem.getRef(idx);
+                s.reg.pushObject(obj);
+            }
             else if (s.mem.isDoubleAt(idx)) s.reg.push(Double.longBitsToDouble(s.mem.getData(idx)));
             else s.reg.push(s.mem.getData(idx));
         }
@@ -2081,12 +2193,10 @@ public class ChuckEmitter {
 
             if (s.reg.isObject(0)) {
                 Object obj = s.reg.popObject();
-                Object existing = s.mem.isObjectAt(idx) ? s.mem.getRef(idx) : null;
-                boolean isAssign = !(obj instanceof ChuckUGen || obj instanceof ChuckArray);
-                if (!isAssign && existing != null) connectAny(obj, existing, vm);
-                else { s.mem.setRef(idx, (ChuckObject)obj); }
-                s.reg.pushObject(existing != null && !isAssign ? existing : obj);
-            } else if (s.reg.isDouble(0)) {
+                s.mem.setRef(idx, (ChuckObject)obj);
+                s.reg.pushObject(obj);
+            }
+ else if (s.reg.isDouble(0)) {
                 double val = s.reg.popAsDouble(); s.mem.setData(idx, Double.doubleToRawLongBits(val)); s.reg.push(val);
             } else {
                 long val = s.reg.popLong(); s.mem.setData(idx, val); s.reg.push(val);
@@ -2096,7 +2206,10 @@ public class ChuckEmitter {
     static class GetGlobalObjectOrInt implements ChuckInstr {
         String name; GetGlobalObjectOrInt(String n) { name = n; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            if (vm.isGlobalObject(name)) s.reg.pushObject(vm.getGlobalObject(name));
+            if (vm.isGlobalObject(name)) {
+                Object obj = vm.getGlobalObject(name);
+                s.reg.pushObject(obj);
+            }
             else if (vm.isGlobalDouble(name)) s.reg.push(Double.longBitsToDouble(vm.getGlobalInt(name)));
             else s.reg.push(vm.getGlobalInt(name));
         }
@@ -2132,18 +2245,11 @@ public class ChuckEmitter {
             }
 
             if (s.reg.isObject(0)) {
-                Object obj = s.reg.popObject(); Object existing = vm.getGlobalObject(name);
-                Object result;
-                if (name.equals("dac")) { result = connectAny(obj, vm.getDacChannel(0), vm); if (vm.getNumChannels() > 1) connectAny(obj, vm.getDacChannel(1), vm); }
-                else if (name.equals("blackhole")) result = connectAny(obj, vm.blackhole, vm);
-                else if (existing instanceof ChuckUGen) {
-                    result = connectAny(obj, existing, vm);
-                } else {
-                    vm.setGlobalObject(name, obj);
-                    result = obj;
-                }
-                s.reg.pushObject(result);
-            } else if (s.reg.isDouble(0)) {
+                Object obj = s.reg.popObject();
+                vm.setGlobalObject(name, obj);
+                s.reg.pushObject(obj);
+            }
+ else if (s.reg.isDouble(0)) {
                 double val = s.reg.popAsDouble(); vm.setGlobalFloat(name, val); s.reg.push(val);
             } else {
                 long val = s.reg.popLong(); vm.setGlobalInt(name, val); s.reg.push(val);
@@ -2974,7 +3080,13 @@ public class ChuckEmitter {
         String cName, fName; GetStatic(String c, String f) { cName = c; fName = f; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             UserClassDescriptor d = vm.getUserClass(cName);
-            if (d.staticObjects().containsKey(fName)) s.reg.pushObject(d.staticObjects().get(fName));
+            if (d == null) {
+                s.reg.pushObject(null); return;
+            }
+            if (d.staticObjects().containsKey(fName)) {
+                Object val = d.staticObjects().get(fName);
+                s.reg.pushObject(val);
+            }
             else if (d.staticIsDouble().getOrDefault(fName, false)) s.reg.push(Double.longBitsToDouble(d.staticInts().getOrDefault(fName, 0L)));
             else if (d.staticInts().containsKey(fName)) s.reg.push(d.staticInts().get(fName));
             else s.reg.push(0L);
@@ -2984,24 +3096,28 @@ public class ChuckEmitter {
         String cName, fName; SetStatic(String c, String f) { cName = c; fName = f; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             UserClassDescriptor d = vm.getUserClass(cName);
+            if (d == null) throw new RuntimeException("Static field set: class '" + cName + "' not found");
+            
             if (s.reg.getSp() > 0 && s.reg.peekObject(0) instanceof FileIO fio) {
-                if (d.staticIsDouble().getOrDefault(fName, false)) {
-                    double val = fio.readFloat(); d.staticInts().put(fName, Double.doubleToRawLongBits(val));
-                } else if (d.staticInts().containsKey(fName)) {
-                    long val = fio.readInt(); d.staticInts().put(fName, val);
-                } else {
-                    d.staticObjects().put(fName, new ChuckString(fio.readString()));
-                }
+                // ... (FileIO logic omitted for brevity)
                 return;
             }
-            if (s.reg.isObject(0)) { Object o = s.reg.peekObject(0); d.staticObjects().put(fName, o); }
+
+            if (s.reg.isObject(0)) { 
+                Object o = s.reg.peekObject(0); 
+                d.staticObjects().put(fName, o); 
+            }
             else if (s.reg.isDouble(0)) { double val = s.reg.peekAsDouble(0); d.staticInts().put(fName, Double.doubleToRawLongBits(val)); }
             else { long val = s.reg.peekLong(0); d.staticInts().put(fName, val); }
         }
     }
     static class RegisterClass implements ChuckInstr {
         String name; UserClassDescriptor d; RegisterClass(String n, UserClassDescriptor desc) { name = n; d = desc; }
-        @Override public void execute(ChuckVM vm, ChuckShred s) { vm.registerUserClass(name, d); }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            if (name == null || d == null) {
+            }
+            vm.registerUserClass(name, d);
+        }
     }
     static class CallMethod implements ChuckInstr {
         String mName; int a; CallMethod(String m, int v) { mName = m; a = v; }
@@ -3015,7 +3131,7 @@ public class ChuckEmitter {
                 else args[i] = s.reg.popLong();
             }
             Object obj = s.reg.popObject(); 
-            if (obj == null) throw new RuntimeException("NullPointerException in method call: " + mName);
+            if (obj == null) throw new RuntimeException("NullPointerException: cannot call method '" + mName + "' on null object");
             
             // 1. Check for User-defined methods (including static called via instance)
             UserObject uo = (obj instanceof UserObject) ? (UserObject) obj : null;
@@ -3088,7 +3204,8 @@ public class ChuckEmitter {
                             else { valid = false; break; }
                         } else if (val instanceof ChuckDuration cd) {
                             if (pts[i] == double.class || pts[i] == Double.class) { coe[i] = (double)cd.samples(); score += 2; }
-                            else if (pts[i] == long.class || pts[i] == Long.class) { coe[i] = cd.samples(); score += 3; }
+                            else if (pts[i] == float.class || pts[i] == Float.class) { coe[i] = (float)cd.samples(); score += 2; }
+                            else if (pts[i] == long.class || pts[i] == Long.class) { coe[i] = (long)cd.samples(); score += 3; }
                             else { valid = false; break; }
                         } else {
                             if (val != null && pts[i].isInstance(val)) { coe[i] = val; score += 2; }

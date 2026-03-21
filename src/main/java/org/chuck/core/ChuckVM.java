@@ -63,32 +63,7 @@ public class ChuckVM {
 
         // Initialize dac channels as virtual summing nodes
         for (int i = 0; i < numChannels; i++) {
-            final int channelIndex = i;
-            dacChannels[i] = new ChuckUGen() {
-                @Override protected float compute(float input, long systemTime) { return input; }
-                @Override public float tick(long systemTime) {
-                    if (systemTime != -1 && systemTime == lastTickTime) {
-                        return lastOut;
-                    }
-                    if (systemTime == 2050) {
-                    }
-                    lastTickTime = systemTime;
-                    float sum = 0.0f;
-                    for (ChuckUGen src : sources) {
-                        // Crucially, tick the source once per sample (the first dac channel handles this)
-                        // Subsequent channels will use the cached value.
-                        src.tick(systemTime);
-                        if (src instanceof org.chuck.audio.StereoUGen s) {
-                            sum += (channelIndex == 0) ? s.getLastOutLeft() : s.getLastOutRight();
-                        } else {
-                            sum += src.getLastOut();
-                        }
-                    }
-                    lastOut = compute(sum, systemTime) * gain;
-                    lastTickTime = systemTime;
-                    return lastOut;
-                }
-            };
+            dacChannels[i] = new org.chuck.audio.DacChannel(i);
         }
 
         this.dac = new ChuckObject(new ChuckType("dac", ChuckType.OBJECT, 0, 0));
@@ -321,6 +296,8 @@ public class ChuckVM {
             ChuckShred shred = new ChuckShred(code);
             return spork(shred);
         } catch (Exception e) {
+            System.err.println("Machine.run error: " + e.getMessage());
+            e.printStackTrace();
             print("Machine.run error: " + e.getMessage());
             return 0;
         }

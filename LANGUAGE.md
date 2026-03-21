@@ -496,6 +496,9 @@ s.rfind(val, start)             // int: search backward from start
 s.upper()                       // string: uppercase copy
 s.lower()                       // string: lowercase copy
 s.trim()                        // string: whitespace-trimmed copy
+s.ltrim()                       // string: leading whitespace-trimmed copy
+s.rtrim()                       // string: trailing whitespace-trimmed copy
+s.set(val)                      // set string content from any value
 ```
 
 String concatenation via `+`:
@@ -760,7 +763,20 @@ buf.pos()               // int: current read position
 1 => buf.loop;          // int: 0=no loop, 1=loop
 2.0 => buf.rate;        // float: playback rate multiplier (1.0 = normal)
 0 => buf.pos;           // seek to beginning
+buf.db(val)             // set gain in dB
 ```
+
+**ChuGen** (Custom Unit Generator)
+Extend this class to define your own sample-rate logic in ChucK:
+```chuck
+public class MyFilter extends ChuGen {
+    fun float tick(float in) {
+        // custom DSP logic here
+        return in * 0.5;
+    }
+}
+```
+`ChuGen` provides a synchronous `tick()` that runs inside the audio thread for sample-accurate custom synthesis.
 
 **LiSa** (Live Sampling — granular / loop / multi-voice)
 ```chuck
@@ -1025,12 +1041,13 @@ MidiMsg msg;
 
 min.open(0);            // open MIDI device at index 0
 
-// Poll for messages
-min => now;
-while (min.recv(msg)) {
-    msg.data1           // int: status byte (e.g., 0x90 = note on)
-    msg.data2           // int: note number
-    msg.data3           // int: velocity
+// Poll for messages (min is an Event)
+while (min => now) {
+    while (min.recv(msg)) {
+        msg.data1           // int: status byte (e.g., 0x90 = note on)
+        msg.data2           // int: note number
+        msg.data3           // int: velocity
+    }
 }
 
 min.close();

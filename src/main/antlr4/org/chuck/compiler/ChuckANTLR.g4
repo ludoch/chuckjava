@@ -144,7 +144,7 @@ primary
     | LPAREN expressionList? RPAREN                        # parenExp
     | LBRACK expressionList? RBRACK                        # arrayLitExp
     | REFERENCE_TAG LPAREN expressionList? RPAREN          # vectorLitExp
-    | NEW type (LPAREN expressionList? RPAREN)? (arrayDimension)* # newExp
+    | NEW typeName (LPAREN expressionList? RPAREN)? (arrayDimension)* # newExp
     | HASH LPAREN expression COMMA expression RPAREN       # complexLit
     | MOD LPAREN expression COMMA expression RPAREN        # polarLit
     ;

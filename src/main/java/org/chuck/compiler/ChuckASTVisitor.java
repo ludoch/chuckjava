@@ -191,7 +191,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
     @Override
     public ChuckAST.Exp visitDurationOp(DurationOpContext ctx) {
-        return new ChuckAST.BinaryExp((ChuckAST.Exp) visit(ctx.expression(0)), ChuckAST.Operator.NONE, (ChuckAST.Exp) visit(ctx.expression(1)),
+        return new ChuckAST.BinaryExp((ChuckAST.Exp) visit(ctx.expression(0)), ChuckAST.Operator.DUR_MUL, (ChuckAST.Exp) visit(ctx.expression(1)),
             ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
@@ -379,5 +379,31 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     public ChuckAST.Exp visitVectorLitExp(ChuckANTLRParser.VectorLitExpContext ctx) {
         List<ChuckAST.Exp> elements = ctx.expressionList() != null ? (List<ChuckAST.Exp>) visit(ctx.expressionList()) : new ArrayList<>();
         return new ChuckAST.VectorLitExp(elements, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
+
+    @Override
+    public ChuckAST.Exp visitNewExp(NewExpContext ctx) {
+        String typeStr = ctx.typeName().getText();
+        List<ChuckAST.Exp> arraySizes = new ArrayList<>();
+        boolean isArray = ctx.arrayDimension() != null && !ctx.arrayDimension().isEmpty();
+        
+        for (ChuckANTLRParser.ArrayDimensionContext ad : ctx.arrayDimension()) {
+            if (ad.expression() != null) {
+                arraySizes.add((ChuckAST.Exp) visit(ad.expression()));
+            } else {
+                arraySizes.add(new ChuckAST.IntExp(-1, ad.getStart().getLine(), ad.getStart().getCharPositionInLine()));
+            }
+        }
+        List<ChuckAST.Exp> argList = ctx.expressionList() != null ? (List<ChuckAST.Exp>) visit(ctx.expressionList()) : null;
+        ChuckAST.Exp callArgs = null;
+        if (argList != null) {
+            callArgs = new ChuckAST.ArrayLitExp(argList, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        }
+        
+        // Special prefix to signal emitter this is a 'new' expression
+        String namePrefix = isArray ? "@new_array_" : "@new_";
+        return new ChuckAST.DeclExp(typeStr, namePrefix + ctx.getStart().getLine() + "_" + ctx.getStart().getCharPositionInLine(), 
+                arraySizes, callArgs, false, false, false, 
+                ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 }

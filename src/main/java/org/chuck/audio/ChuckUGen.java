@@ -180,8 +180,13 @@ public abstract class ChuckUGen extends ChuckObject {
     }
 
     public void tick(float[] buffer) {
-        for (int i = 0; i < buffer.length; i++) {
-            buffer[i] = tick();
+        tick(buffer, 0, buffer.length, -1);
+    }
+
+    public void tick(float[] buffer, int offset, int length, long systemTime) {
+        // Default implementation is scalar fallback
+        for (int i = 0; i < length; i++) {
+            buffer[offset + i] = tick(systemTime == -1 ? -1 : systemTime + i);
         }
     }
     

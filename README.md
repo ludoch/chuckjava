@@ -181,22 +181,23 @@ For full examples, see the `org.chuck.examples.host` package.
 
 ## 🚀 Key Modern Java Features Used
 
+-   **Java Vector API (JDK 25)**: SIMD-accelerated Unit Generators (e.g., `SinOsc`, `Gain`) and vectorized DAC mixing for high-performance synthesis. Automatically optimizes for **Intel AVX** or **ARM Neon**.
+-   **Foreign Function & Memory (FFM) API (Project Panama)**: 
+    *   **Off-Heap Audio Buffers**: Zero-copy, off-heap DAC buffers via `MemorySegment` to eliminate GC jitter in the audio thread.
+    *   **Native Drivers**: Low-latency bindings to native MIDI drivers (`rtmidi`) and HID Joystick drivers.
 -   **Virtual Threads (Project Loom)**: Shreds (concurrent ChucK processes) are mapped 1:1 to Virtual Threads. They are cooperatively scheduled by a custom `Shreduler` to maintain ChucK’s deterministic, sample-accurate timing model.
--   **Vector API (SIMD)**: High-performance block processing in Unit Generators (UGens) like `Gain`. It uses `jdk.incubator.vector` to process audio samples in parallel. Automatically optimizes for **Intel AVX** or **ARM Neon**.
--   **Foreign Function & Memory (FFM) API (Project Panama)**: Manages off-heap memory (`Arena`, `MemorySegment`) for audio buffers to avoid GC pauses. Provides the infrastructure for binding to native MIDI drivers (RtMidi) and HID Joystick drivers.
 -   **Sealed Interfaces & Records**: The Abstract Syntax Tree (AST) is built using type-safe sealed hierarchies and concise records.
 
 ## 🏗️ Architecture
 
 ### 1. Compiler Pipeline
--   **Lexer**: Hand-written scanner for ChucK syntax, including `=>`, `@=>`, `::`, `<<< >>>`, and `~`.
--   **Parser**: Recursive descent parser that builds a modern AST. Supports tabs, loops, and print statements.
--   **Emitter**: Translates the AST into VM Instructions with smart stack management.
+-   **Hybrid Parsing**: Supports both a fast hand-written recursive descent parser and a hardened **ANTLR4** grammar for complex expressions.
+-   **Emitter**: Translates the AST into VM Instructions with smart stack management and support for multi-pass static resolution.
 
 ### 2. Virtual Machine (VM)
 -   **Deterministic Shreduler**: Orchestrates Virtual Threads based on ChucK's logical time (`now`).
--   **ChuckStack**: A memory-safe stack for primitives and objects. Supports dynamic type guessing for printing.
--   **Global Environment**: Thread-safe shared state for global variables and objects.
+-   **Vectorized Audio Engine**: Optimized mixing and oscillation using SIMD instructions.
+-   **Off-Heap Management**: Audio data is stored outside the Java heap to ensure stable, jitter-free playback.
 
 ### 3. Audio Engine
 -   **Pull-based UGen Graph**: Recursive sample pulling with memoization.

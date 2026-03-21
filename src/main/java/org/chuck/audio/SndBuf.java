@@ -145,6 +145,15 @@ public class SndBuf extends ChuckUGen {
         return (long) pos;
     }
 
+    public float db(float db) {
+        this.gain = (float) Math.pow(10.0, db / 20.0);
+        return db;
+    }
+
+    public float db() {
+        return (float) (20.0 * Math.log10(this.gain));
+    }
+
     @Override
     protected float compute(float input, long systemTime) {
         if (samples.length == 0 || pos >= samples.length || pos < 0) {

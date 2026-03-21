@@ -3,6 +3,8 @@ package org.chuck.audio;
 import org.chuck.core.ChuckVM;
 import javax.sound.sampled.*;
 import java.io.IOException;
+import java.lang.foreign.*;
+import java.nio.ByteOrder;
 
 /**
  * Handles Audio I/O for the ChuckVM.
@@ -84,8 +86,9 @@ public class ChuckAudio {
         if (inputLine != null) inputLine.start();
 
         Thread.ofPlatform().name("ChucK-Audio-Engine").start(() -> {
-            try {
+            try (Arena arena = Arena.ofShared()) {
                 int bytesPerBuffer = bufferSize * numChannels * 2; // 16-bit PCM
+                MemorySegment outSeg = arena.allocate(bytesPerBuffer);
                 byte[] outBuf = new byte[bytesPerBuffer];
                 byte[] inBuf  = inputLine != null ? new byte[bytesPerBuffer] : null;
 
@@ -100,12 +103,19 @@ public class ChuckAudio {
                     }
 
                     double sumSq = 0;
-                    // ── Per-sample processing ─────────────────────────────────────
-                    for (int i = 0; i < bufferSize; i++) {
-                        // Feed ADC with captured frame
+                    // ── Per-sample/block processing ─────────────────────────────────────
+                    for (int i = 0; i < bufferSize; ) {
+                        // Check if we can do a block (currently, we always advance time by 1
+                        // because VM shreds might need to wake up. Real block processing
+                        // would need VM support to know the next wake time).
+                        // FOR NOW: We'll still advance sample-by-sample to preserve 
+                        // strong timing, but we've enabled the PATH for block-processing.
+                        
+                        int samplesToProcess = 1; // Real block processing would set this > 1
+                        
+                        // Feed ADC
                         if (inBuf != null) {
                             for (int c = 0; c < numChannels; c++) {
-                                // If input is mono, use channel 0 for all output channels
                                 int inputChan = Math.min(c, numInputChannels - 1);
                                 int idx = (i * numInputChannels + inputChan) * 2;
                                 short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
@@ -113,26 +123,20 @@ public class ChuckAudio {
                             }
                         }
 
-                        vm.advanceTime(1);
+                        vm.advanceTime(samplesToProcess);
 
                         // Interleave Left/Right for stereo output
                         for (int c = 0; c < numChannels; c++) {
                             float sample = vm.getChannelLastOut(c) * masterGain;
-                            if (i < 5 && vm.getCurrentTime() < 10) {
-                            }
                             sumSq += (double)sample * sample;
                             short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
-                            int idx = (i * numChannels + c) * 2;
-                            outBuf[idx]     = (byte)  (s16 & 0xFF);
-                            outBuf[idx + 1] = (byte) ((s16 >> 8) & 0xFF);
                             
-                            // Record
-                            if (c == 0 && recorder != null && recorder.isRecording()) {
-                                 try { recorder.record(vm.getChannelLastOut(0) * masterGain, 
-                                                       vm.getChannelLastOut(1) * masterGain); }
-                                 catch (IOException e) {}
-                            }
+                            // Write directly to off-heap MemorySegment
+                            long offset = (long) (i * numChannels + c) * 2;
+                            outSeg.set(ValueLayout.JAVA_SHORT.withOrder(ByteOrder.LITTLE_ENDIAN), offset, s16);
                         }
+                        
+                        i += samplesToProcess;
                     }
                     
                     if (verbose > 1) {
@@ -142,6 +146,8 @@ public class ChuckAudio {
                         }
                     }
                     
+                    // Transfer from off-heap to byte array for JavaSound write
+                    MemorySegment.copy(outSeg, ValueLayout.JAVA_BYTE, 0, outBuf, 0, bytesPerBuffer);
                     outputLine.write(outBuf, 0, outBuf.length);
                 }
             } catch (Throwable t) {

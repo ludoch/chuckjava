@@ -12,7 +12,9 @@ This document tracks the features from the original [Stanford ChucK](https://chu
 | **Chugins System** | Done | Dynamic plugin architecture implemented via `ChuginLoader`. Loads `.jar` files from the `chugins/` directory. |
 | **Machine Control** | Done | `Machine.add()`, `Machine.remove()`, `Machine.replace()`, `Machine.status()`, `Machine.eval()`, and `Machine.clear()` are fully implemented. |
 | **me.dir(n)** | Done | Multi-level directory access implemented in `ChuckShred` and `ChuckEmitter`. |
-| **Duration Arithmetic** | Done | Fixed `dur * float`, `dur / float`, and `dur / dur` operations to work correctly with literals and variables. |
+| **Duration Arithmetic** | Done | Fixed `dur * float`, `dur / float`, and `dur / dur` operations to work correctly with sub-sample precision (double). |
+| **Vectorized Audio** | Done | SIMD-accelerated mixing and oscillators using Java Vector API. |
+| **Off-heap Audio** | Done | Off-heap DAC buffers via Project Panama (FFM) to eliminate GC jitter. |
 
 ## 2. Unit Generators (UGens)
 
@@ -40,7 +42,7 @@ This document tracks the features from the original [Stanford ChucK](https://chu
 |:---|:---|:---|
 | **FileIO** | Done | Fully implemented ASCII and Binary modes, including support for the `<=` streaming operator. |
 | **MidiOut** | Done | Implemented with support for sending MIDI messages using `javax.sound.midi`. |
-| **MidiIn** | Done | Implemented with `RtMidi` binding via FFM API and `recv(MidiMsg)` support. |
+| **MidiIn** | Done | Implemented with `RtMidi` binding via FFM API. Full support for `recv(MidiMsg)` and `Event` waiting (`min => now`). |
 | **SerialIO** | Done | Functional stub implemented for debugging. |
 | **OscBundle** | Done | Implemented support for grouping and sending OSC messages. |
 
