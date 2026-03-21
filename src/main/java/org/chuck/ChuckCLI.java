@@ -176,10 +176,22 @@ public class ChuckCLI {
                 audio.setVerbose(verbose);
                 audio.start();
             } else {
-                // Silent engine: advance time as fast as possible (or nearly so)
+                // Silent engine: advance time as fast as possible
                 Thread.ofVirtual().name("ChucK-Silent-Engine").start(() -> {
                     while (true) {
-                        vm.advanceTime(64); // Advance in blocks for efficiency
+                        vm.advanceTime(1);
+                        
+                        // Periodic RMS monitoring if verbose
+                        if (verbose >= 2 && vm.getCurrentTime() % 44100 == 0) {
+                            double sumSq = 0;
+                            for (int c = 0; c < numChannels; c++) {
+                                float s = vm.getDacChannel(c).tick(vm.getCurrentTime());
+                                sumSq += (double)s * s;
+                            }
+                            double rms = Math.sqrt(sumSq / numChannels);
+                            System.out.printf("[Silent Engine] RMS: %.9f at time %d\n", rms, vm.getCurrentTime());
+                        }
+                        
                         try { Thread.sleep(0); } catch (InterruptedException e) { break; }
                     }
                 });

@@ -20,17 +20,19 @@ public class DacChannel extends ChuckUGen {
     }
 
     @Override
+    public void addSource(ChuckUGen src) {
+        super.addSource(src);
+    }
+
+    @Override
     public float tick(long systemTime) {
-        if (systemTime != -1 && systemTime == lastTickTime) {
-            return lastOut;
-        }
+        // We MUST iterate and sum all sources every sample.
+        // Memoization must be handled PER SOURCE (which ChuckUGen.tick does).
         
         float sum = 0.0f;
         for (ChuckUGen src : sources) {
-            // First DAC channel ticks the source; others use cached value
-            if (channelIndex == 0) {
-                src.tick(systemTime);
-            }
+            // Trigger tick on source. ChuckUGen.tick ensures it only computes once per sample.
+            src.tick(systemTime);
             
             if (src instanceof StereoUGen s) {
                 sum += (channelIndex == 0) ? s.getLastOutLeft() : s.getLastOutRight();

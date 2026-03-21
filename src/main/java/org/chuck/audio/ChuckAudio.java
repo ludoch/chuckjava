@@ -123,11 +123,14 @@ public class ChuckAudio {
                             }
                         }
 
+                        // IMPORTANT: Advance time BEFORE ticking DAC to ensure shreds run
                         vm.advanceTime(samplesToProcess);
 
                         // Interleave Left/Right for stereo output
                         for (int c = 0; c < numChannels; c++) {
-                            float sample = vm.getChannelLastOut(c) * masterGain;
+                            // IMPORTANT: Explicitly tick the DAC channel to trigger the UGen graph computation
+                            float sample = vm.getDacChannel(c).tick(vm.getCurrentTime()) * masterGain;
+                            
                             sumSq += (double)sample * sample;
                             short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
                             

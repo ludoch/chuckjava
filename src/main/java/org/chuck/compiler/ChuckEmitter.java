@@ -141,6 +141,9 @@ public class ChuckEmitter {
 
     public ChuckCode emit(List<ChuckAST.Stmt> statements, String programName) {
         localScopes.clear();
+        // Push a top-level local scope so script variables are shred-local
+        localScopes.push(new HashMap<>());
+        
         varTypes.clear();
         globalVarTypes.clear();
         currentFile = programName;
@@ -2193,9 +2196,12 @@ public class ChuckEmitter {
 
             if (s.reg.isObject(0)) {
                 Object obj = s.reg.popObject();
-                s.mem.setRef(idx, (ChuckObject)obj);
+                s.mem.setRef(idx, (org.chuck.core.ChuckObject)obj);
+                if (obj instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
+                if (obj instanceof AutoCloseable ac) s.registerCloseable(ac);
                 s.reg.pushObject(obj);
             }
+
  else if (s.reg.isDouble(0)) {
                 double val = s.reg.popAsDouble(); s.mem.setData(idx, Double.doubleToRawLongBits(val)); s.reg.push(val);
             } else {
@@ -2247,6 +2253,8 @@ public class ChuckEmitter {
             if (s.reg.isObject(0)) {
                 Object obj = s.reg.popObject();
                 vm.setGlobalObject(name, obj);
+                if (obj instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
+                if (obj instanceof AutoCloseable ac) s.registerCloseable(ac);
                 s.reg.pushObject(obj);
             }
  else if (s.reg.isDouble(0)) {
@@ -2748,6 +2756,8 @@ public class ChuckEmitter {
                     if (!existingType.equals(t) && !t.equals("string") && !t.equals("int") && !t.equals("float")) {
                         throw new RuntimeException(n + "': has different type '" + existingType + "' than already existing global Object of the same name");
                     }
+                    if (existing instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
+                    if (existing instanceof AutoCloseable ac) s.registerCloseable(ac);
                     s.reg.pushObject(existing); return;
                 }
             }
@@ -3143,6 +3153,8 @@ public class ChuckEmitter {
             if (s.reg.isObject(0)) { 
                 Object o = s.reg.peekObject(0); 
                 d.staticObjects().put(fName, o); 
+                if (o instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
+                if (o instanceof AutoCloseable ac) s.registerCloseable(ac);
             }
             else if (s.reg.isDouble(0)) { double val = s.reg.peekAsDouble(0); d.staticInts().put(fName, Double.doubleToRawLongBits(val)); }
             else { long val = s.reg.peekLong(0); d.staticInts().put(fName, val); }

@@ -55,6 +55,13 @@ public class ChuckHost {
     }
 
     /**
+     * Sporks a Java-based shred from a Runnable.
+     */
+    public int spork(Runnable task) {
+        return vm.spork(task);
+    }
+
+    /**
      * Removes a running shred by its ID.
      */
     public void remove(int shredId) {

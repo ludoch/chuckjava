@@ -12,6 +12,9 @@ import java.util.concurrent.atomic.AtomicInteger;
  * Represents a concurrent execution context in ChucK.
  */
 public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
+    /** The ScopedValue holding the current shred for this thread. */
+    public static final ScopedValue<ChuckShred> CURRENT_SHRED = ScopedValue.newInstance();
+    
     private static final AtomicInteger ID_GENERATOR = new AtomicInteger(1);
     
     private final int id;
@@ -127,17 +130,6 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     }
 
     public String sourceDir() { return dir(); }
-
-    public void cleanup() {
-        for (org.chuck.audio.ChuckUGen ugen : ownedUGens) {
-            ugen.disconnectAll();
-        }
-        ownedUGens.clear();
-        for (AutoCloseable c : ownedCloseables) {
-            try { c.close(); } catch (Exception ignored) {}
-        }
-        ownedCloseables.clear();
-    }
 
     public void abort() {
         this.isDone = true;
@@ -279,6 +271,23 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
         this.mem.setSp(oldMemSp);
     }
     
+    public void cleanup() {
+        isRunning = false;
+        isDone = true;
+        // System.out.println("DEBUG Shred " + id + " cleaning up " + ownedUGens.size() + " UGens");
+        // Disconnect all UGens created by this shred
+        for (org.chuck.audio.ChuckUGen ugen : ownedUGens) {
+            // System.out.println("DEBUG Shred " + id + " unchucking " + ugen);
+            ugen.unchuckAll();
+        }
+        ownedUGens.clear();
+        // Close resources (OSC sockets, etc)
+        for (AutoCloseable c : ownedCloseables) {
+            try { c.close(); } catch (Exception ignored) {}
+        }
+        ownedCloseables.clear();
+    }
+
     @Override
     public int compareTo(ChuckShred other) {
         return Long.compare(this.wakeTime, other.wakeTime);

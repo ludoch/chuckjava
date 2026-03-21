@@ -13,8 +13,12 @@ This document tracks the features from the original [Stanford ChucK](https://chu
 | **Machine Control** | Done | `Machine.add()`, `Machine.remove()`, `Machine.replace()`, `Machine.status()`, `Machine.eval()`, and `Machine.clear()` are fully implemented. |
 | **me.dir(n)** | Done | Multi-level directory access implemented in `ChuckShred` and `ChuckEmitter`. |
 | **Duration Arithmetic** | Done | Fixed `dur * float`, `dur / float`, and `dur / dur` operations to work correctly with sub-sample precision (double). |
-| **Vectorized Audio** | Done | SIMD-accelerated mixing and oscillators using Java Vector API. |
+| **Vectorized Audio** | Done | SIMD-accelerated mixing and oscillators (Sin, Saw, Tri, Pulse, Sqr) using Java Vector API. |
 | **Off-heap Audio** | Done | Off-heap DAC buffers via Project Panama (FFM) to eliminate GC jitter. |
+| **Java Fluent DSL** | Done | Fluent `.chuck(target)` API for UGen chaining in Java. |
+| **Scoped Value Time** | Done | Shred-local logical time context via Scoped Values (JEP 481). |
+| **Java Machine** | Done | Hot-reloading runner for dynamic Java sporking in IDE and CLI. |
+| **Shred Interface** | Done | Standard interface for Java-based shreds. |
 
 ## 2. Unit Generators (UGens)
 

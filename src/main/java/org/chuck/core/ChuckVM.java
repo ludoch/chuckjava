@@ -23,9 +23,14 @@ import java.nio.file.Paths;
  * and sample-accurate execution.
  */
 public class ChuckVM {
+    /** The ScopedValue holding the active VM for the current scope. */
+    public static final ScopedValue<ChuckVM> CURRENT_VM = ScopedValue.newInstance();
     
     // Global logical time in samples
     private final AtomicLong currentTime = new AtomicLong(0);
+    
+    // Shared Emitter to preserve class registry and metadata across shreds
+    private final org.chuck.compiler.ChuckEmitter emitter;
     
     // Shreduler queue: orders shreds by wake-up time
     private final PriorityQueue<ChuckShred> shreduler = new PriorityQueue<>();
@@ -40,7 +45,8 @@ public class ChuckVM {
     private final Map<String, Boolean> globalIsDouble = new ConcurrentHashMap<>();
     private final Map<String, Boolean> globalIsObject = new ConcurrentHashMap<>();
     private final Map<String, Object> globalObjects = new ConcurrentHashMap<>();
-    private final Map<String, UserClassDescriptor> userClassRegistry = new ConcurrentHashMap<>();
+    private Map<String, UserClassDescriptor> userClassRegistry = new ConcurrentHashMap<>();
+    private Map<String, ChuckCode> importedFunctions = new ConcurrentHashMap<>();
 
     public void registerUserClass(String name, UserClassDescriptor descriptor) {
         userClassRegistry.put(name, descriptor);
@@ -59,6 +65,7 @@ public class ChuckVM {
 
     public ChuckVM(int sampleRate) {
         this.sampleRate = sampleRate;
+        this.emitter = new org.chuck.compiler.ChuckEmitter(userClassRegistry, importedFunctions);
         ChuginLoader.loadChugins("chugins");
 
         // Initialize dac channels as virtual summing nodes
@@ -203,6 +210,38 @@ public class ChuckVM {
     }
 
     /**
+     * Spawns a new Java-based shred from a Runnable.
+     */
+    public int spork(Runnable task) {
+        ChuckShred shred = new ChuckShred(null); // No bytecode for Java shreds
+        schedulerLock.lock();
+        try {
+            shred.setWakeTime(currentTime.get());
+            shreduler.offer(shred);
+            activeShreds.put(shred.getId(), shred);
+        } finally {
+            schedulerLock.unlock();
+        }
+
+        Thread.ofVirtual().name("JavaShred-" + shred.getId()).start(() -> {
+            ScopedValue.where(ChuckVM.CURRENT_VM, this)
+                       .where(ChuckShred.CURRENT_SHRED, shred)
+                       .run(() -> {
+                try {
+                    // Java shreds are expected to block using ChuckDSL.advance()
+                    task.run();
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                } finally {
+                    shred.cleanup();
+                    activeShreds.remove(shred.getId());
+                }
+            });
+        });
+        return shred.getId();
+    }
+
+    /**
      * Spawns a new shred and starts its Virtual Thread.
      */
     public int spork(ChuckShred shred) {
@@ -231,14 +270,18 @@ public class ChuckVM {
         }
         
         Thread.ofVirtual().name("Shred-" + shred.getId()).start(() -> {
-            try {
-                shred.execute(this);
-            } catch (Throwable t) {
-                t.printStackTrace();
-            } finally {
-                shred.cleanup();
-                activeShreds.remove(shred.getId());
-            }
+            ScopedValue.where(ChuckVM.CURRENT_VM, this)
+                       .where(ChuckShred.CURRENT_SHRED, shred)
+                       .run(() -> {
+                try {
+                    shred.execute(this);
+                } catch (Throwable t) {
+                    t.printStackTrace();
+                } finally {
+                    shred.cleanup();
+                    activeShreds.remove(shred.getId());
+                }
+            });
         });
         return shred.getId();
     }
@@ -254,6 +297,15 @@ public class ChuckVM {
                 String argStr = pathWithArgs.substring(colonIdx + 1);
                 shredArgs = argStr.isEmpty() ? new String[0] : argStr.split(":");
             }
+
+            if (filePath.endsWith(".java")) {
+                Runnable task = ChuckDSL.load(java.nio.file.Paths.get(filePath));
+                int id = spork(task);
+                ChuckShred shred = getShred(id);
+                if (shred != null && shredArgs.length > 0) shred.setArgs(shredArgs);
+                return id;
+            }
+
             String source = java.nio.file.Files.readString(java.nio.file.Paths.get(filePath));
             int shredId = run(source, filePath);
             if (shredId > 0 && shredArgs.length > 0) {
@@ -286,17 +338,16 @@ public class ChuckVM {
             }
 
             // Process @import directives before emitting
-            Map<String, ChuckCode> importedFunctions = new HashMap<>();
+            Map<String, ChuckCode> fileImportedFunctions = new HashMap<>();
             Set<String> compiledFiles = new HashSet<>();
             LinkedHashSet<String> importStack = new LinkedHashSet<>();
-            processImports(ast, absName, importStack, compiledFiles, importedFunctions);
+            processImports(ast, absName, importStack, compiledFiles, fileImportedFunctions);
+            importedFunctions.putAll(fileImportedFunctions);
 
-            org.chuck.compiler.ChuckEmitter emitter = new org.chuck.compiler.ChuckEmitter(userClassRegistry, importedFunctions);
             ChuckCode code = emitter.emit(ast, name);
             ChuckShred shred = new ChuckShred(code);
             return spork(shred);
         } catch (Exception e) {
-            e.printStackTrace();
             print("Machine.run error: " + e.getMessage());
             return 0;
         }

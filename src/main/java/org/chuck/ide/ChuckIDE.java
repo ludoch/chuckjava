@@ -954,12 +954,32 @@ public class ChuckIDE extends Application {
         CodeArea editor = getCurrentEditor();
         if (editor == null) return;
         
-        String source = editor.getText();
+        File currentFile = getCurrentFile();
+        String path = currentFile != null ? currentFile.getName() : "Untitled.ck";
         statusLabel.setText("  Compiling…");
+
         try {
+            if (path.endsWith(".java")) {
+                if (currentFile == null) {
+                    throw new RuntimeException("Please save the .java file before sporking.");
+                }
+                // Save first to ensure the compiler sees the latest changes
+                Files.writeString(currentFile.toPath(), editor.getText());
+                
+                Runnable task = ChuckDSL.load(currentFile.toPath());
+                int id = vm.spork(task);
+                
+                ChuckShred shredObj = vm.getShred(id);
+                ShredInfo info = new ShredInfo(id, currentFile.getName(), shredObj);
+                shredListView.getItems().add(info);
+                print("Sporked Java Shred " + id + " (" + currentFile.getName() + ")");
+                updateStatus();
+                return;
+            }
+
+            // --- Existing ChucK compilation logic ---
+            String source = editor.getText();
             List<org.chuck.compiler.ChuckAST.Stmt> ast;
-            File currentFile = getCurrentFile();
-            String path = currentFile != null ? currentFile.getName() : "Untitled";
 
             if (vm.isAntlrEnabled()) {
                 org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
@@ -1053,7 +1073,7 @@ public class ChuckIDE extends Application {
     private void updateShredList() {
         List<ShredInfo> toRemove = new java.util.ArrayList<>();
         for (ShredInfo si : shredListView.getItems()) {
-            if (si.shred.isDone()) {
+            if (si.shred == null || si.shred.isDone()) {
                 toRemove.add(si);
             } else {
                 si.updateDuration();
@@ -1178,7 +1198,11 @@ public class ChuckIDE extends Application {
 
     private void openFile(Stage stage) {
         FileChooser fc = new FileChooser();
-        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("ChucK Files (*.ck)", "*.ck"));
+        fc.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("ChucK and Java Files", "*.ck", "*.java"),
+            new FileChooser.ExtensionFilter("ChucK Files (*.ck)", "*.ck"),
+            new FileChooser.ExtensionFilter("Java Files (*.java)", "*.java")
+        );
         File file = fc.showOpenDialog(stage);
         if (file != null) loadFileIntoEditor(file);
     }
@@ -1200,7 +1224,11 @@ public class ChuckIDE extends Application {
 
     private void saveFileAs(Stage stage) {
         FileChooser fc = new FileChooser();
-        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("ChucK Files (*.ck)", "*.ck"));
+        fc.getExtensionFilters().addAll(
+            new FileChooser.ExtensionFilter("ChucK and Java Files", "*.ck", "*.java"),
+            new FileChooser.ExtensionFilter("ChucK Files (*.ck)", "*.ck"),
+            new FileChooser.ExtensionFilter("Java Files (*.java)", "*.java")
+        );
         File file = fc.showSaveDialog(stage);
         if (file != null) {
             try {

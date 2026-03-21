@@ -576,12 +576,14 @@ ugen.buffered(bool)     // enable/disable buffering
 
 All oscillators inherit from `Osc`:
 ```chuck
-freq => osc.freq         // float: frequency in Hz
-osc.freq()               // get frequency
-phase => osc.phase       // float: phase 0.0–1.0
-osc.phase()              // get phase
-width => osc.width       // float: pulse width (SqrOsc, PulseOsc)
-sync => osc.sync         // int: 0=freq mode, 1=phase mode, 2=FM input mode
+freq => osc.freq         // float: set frequency in Hz
+osc.freq()               // float: get current frequency
+phase => osc.phase       // float: set phase 0.0–1.0
+osc.phase()              // float: get current phase
+width => osc.width       // float: set pulse width (SqrOsc, PulseOsc, TriOsc)
+osc.width()              // float: get current pulse width
+sync => osc.sync         // int: set sync mode (0=freq, 1=phase, 2=FM)
+osc.sync()               // int: get current sync mode
 ```
 
 | UGen | Description |

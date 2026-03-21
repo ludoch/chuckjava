@@ -179,6 +179,73 @@ host.setGlobalInt("playerHealth", 100);
 
 For full examples, see the `org.chuck.examples.host` package.
 
+## 🎸 Java Fluent DSL
+
+ChucK-Java provides a pure-Java Fluent API that allows you to write synthesis logic with the same evocative "chucking" flow as the original language, leveraging **Scoped Values** (JEP 481) for shred-local logical time.
+
+### 1. Chaining UGens
+All UGens support the `.chuck(target)` method, which connects the unit and returns the target for further chaining. Note that ChucK-style setters (like `.freq(440)`) return the value set, which breaks the chain. Configure your units before or after connecting them.
+
+```java
+SinOsc s = new SinOsc(440);
+LPF f = new Lpf(1000);
+
+// Correct: Connect then configure, or vice versa
+s.chuck(f).chuck(dac());
+s.freq(440);
+```
+
+### 2. Scoped Time Context
+When running inside a shred (Virtual Thread), logical time is managed automatically via Scoped Values. You can use the `ChuckDSL` utility to advance time without passing around VM or Shred references.
+
+```java
+host.spork(() -> {
+    SinOsc s = new SinOsc(440).chuck(host.getDac());
+    
+    while (true) {
+        s.freq(Math.random() * 800 + 200);
+        
+        // Equivalent to ChucK's: 100::ms => now;
+        ChuckDSL.advance(ChuckDSL.ms(100));
+    }
+});
+```
+
+### 3. The Java Machine (Hot-Reloading)
+For a lightweight development experience, you can run the **Java Machine**, which watches your Java source files and hot-reloads them instantly without restarting the JVM.
+
+**Start the machine:**
+```bash
+./run_dsl.sh --machine examples_dsl
+```
+
+**Write a hot-reloadable shred (`MyShred.java`):**
+Java DSL files do not require a `package` declaration. Implementing the `Shred` interface ensures compatibility with the dynamic loader.
+
+```java
+import org.chuck.audio.*;
+import org.chuck.core.Shred;
+import static org.chuck.core.ChuckDSL.*;
+
+public class MyShred implements Shred {
+    @Override
+    public void shred() {
+        SinOsc s = new SinOsc(44100).chuck(dac());
+        while (true) {
+            s.freq(440 + Math.random() * 440);
+            advance(second(1));
+        }
+    }
+}
+```
+Every time you save the file, the `JavaMachine` (or the IDE via `Ctrl+Enter`) will automatically compile it, stop the old shred, and spork the new one.
+
+### 4. Benefits
+- **Zero Overhead**: Scoped Values are optimized for massive concurrency in Virtual Threads.
+- **Fast Iteration**: Hot-reload Java logic just like `.ck` scripts.
+- **Readability**: Synthesis graphs in Java now mirror the structure of `.ck` scripts.
+- **Idiomatic**: Integrate ChucK logic into larger Java applications while keeping the code evocative and clean.
+
 ## 🚀 Key Modern Java Features Used
 
 -   **Java Vector API (JDK 25)**: SIMD-accelerated Unit Generators (e.g., `SinOsc`, `Gain`) and vectorized DAC mixing for high-performance synthesis. Automatically optimizes for **Intel AVX** or **ARM Neon**.
@@ -263,10 +330,19 @@ mvn org.openjfx:javafx-maven-plugin:0.0.8:run
 
 ### 2. Multi-Tab Editor
 -   `Ctrl+N`: New Tab.
--   `Ctrl+O`: Open File (into new tab).
+-   `Ctrl+O`: Open File (into new tab). Supports both **`.ck`** and **`.java`** files.
 -   `Ctrl+S`: Save current tab.
 -   `Ctrl+W`: Close current tab.
 -   `Ctrl+Enter`: Spork current tab into VM.
+    *   **ChucK files**: Compiled via the internal emitter.
+    *   **Java files**: Dynamically compiled via the Java Compiler API and sporked as Java-based shreds.
+
+### 3. Java DSL in the IDE
+You can now write and run pure-Java ChucK logic directly in the IDE. 
+1. Create or open a `.java` file.
+2. Define a class with a `public void shred()` method.
+3. Use `import static org.chuck.core.ChuckDSL.*;` for ChucK-like syntax.
+4. Press `Ctrl+Enter` to hot-reload your Java logic into the running audio engine.
 
 ## 🎹 Implemented Unit Generators (UGens)
 

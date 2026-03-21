@@ -24,10 +24,24 @@ public abstract class ChuckUGen extends ChuckObject {
 
     public ChuckUGen(ChuckType type) {
         super(type);
+        // Auto-register with current shred if running in a VM context
+        try {
+            org.chuck.core.ChuckShred current = org.chuck.core.ChuckShred.CURRENT_SHRED.get();
+            if (current != null) {
+                current.registerUGen(this);
+            }
+        } catch (Exception ignored) {}
     }
 
     public ChuckUGen() {
         super(new ChuckType("UGen", ChuckType.OBJECT, 0, 0));
+        // Auto-register with current shred if running in a VM context
+        try {
+            org.chuck.core.ChuckShred current = org.chuck.core.ChuckShred.CURRENT_SHRED.get();
+            if (current != null) {
+                current.registerUGen(this);
+            }
+        } catch (Exception ignored) {}
     }
 
     public void addSource(ChuckUGen src) {
@@ -49,11 +63,29 @@ public abstract class ChuckUGen extends ChuckObject {
         }
     }
 
+    /**
+     * Fluent API for ChucK-style connections in Java.
+     * Usage: osc.chuck(filter).chuck(dac);
+     * @return the target UGen for chaining
+     */
+    public <T extends ChuckUGen> T chuck(T target) {
+        chuckTo(target);
+        return target;
+    }
+
     public void unchuck(ChuckUGen target) {
         if (target != null) {
             target.removeSource(this);
             targets.remove(target);
         }
+    }
+
+    /** Disconnect from all targets. */
+    public void unchuckAll() {
+        for (ChuckUGen target : targets) {
+            target.removeSource(this);
+        }
+        targets.clear();
     }
 
     public float tick(long systemTime) {
