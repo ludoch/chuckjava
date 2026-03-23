@@ -9,7 +9,9 @@ public class Rhodey extends ChuckUGen {
     private final Adsr carrierEnv;
     private final Adsr modulatorEnv;
     private double baseFreq = 440.0;
+    @SuppressWarnings("unused")
     private float modIndex = 0.5f;
+    @SuppressWarnings("unused")
     private final float sampleRate;
 
     public Rhodey(float sampleRate) {
@@ -50,6 +52,7 @@ public class Rhodey extends ChuckUGen {
 
     @Override
     protected float compute(float input, long systemTime) {
+        @SuppressWarnings("unused")
         float mEnv = modulatorEnv.tick(systemTime);
         // Additive mix for robustness: carrier + modulator
         float carOut = carrier.tick(systemTime);

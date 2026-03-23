@@ -1,6 +1,5 @@
 package org.chuck.compiler;
 
-import org.antlr.v4.runtime.tree.TerminalNode;
 import org.chuck.compiler.ChuckANTLRParser.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +9,7 @@ import java.util.stream.Collectors;
  * Maps ANTLR4 Parse Tree to ChuckAST.
  * Production Grade Visitor.
  */
+@SuppressWarnings("unchecked")
 public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
     @Override
@@ -24,6 +24,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     // --- Statements ---
 
     @Override public ChuckAST.Stmt visitIfStmt(IfStmtContext ctx) { return (ChuckAST.Stmt) visit(ctx.ifStatement()); }
+    @Override public ChuckAST.Stmt visitSwitchStmt(SwitchStmtContext ctx) { return (ChuckAST.Stmt) visit(ctx.switchStatement()); }
     @Override public ChuckAST.Stmt visitWhileStmt(WhileStmtContext ctx) { return (ChuckAST.Stmt) visit(ctx.whileStatement()); }
     @Override public ChuckAST.Stmt visitUntilStmt(UntilStmtContext ctx) { return (ChuckAST.Stmt) visit(ctx.untilStatement()); }
     @Override public ChuckAST.Stmt visitForStmt(ForStmtContext ctx) { return (ChuckAST.Stmt) visit(ctx.forStatement()); }
@@ -47,15 +48,37 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             }
             return new ChuckAST.BlockStmt(stmts, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
         }
-        if (result instanceof ChuckAST.Stmt) {
-            return (ChuckAST.Stmt) result;
-        } else if (result instanceof ChuckAST.Exp) {
-            return new ChuckAST.ExpStmt((ChuckAST.Exp) result, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        switch (result) {
+            case ChuckAST.Stmt stmt -> {
+                return stmt;
+            }
+            case ChuckAST.Exp exp -> {
+                return new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+            }
+            default -> {
+            }
         }
         return null;
     }
 
     // --- Statement Implementations ---
+
+    @Override
+    public ChuckAST.Stmt visitSwitchStatement(SwitchStatementContext ctx) {
+        ChuckAST.Exp cond = (ChuckAST.Exp) visit(ctx.expression());
+        List<ChuckAST.CaseStmt> cases = new ArrayList<>();
+        for (SwitchCaseContext cctx : ctx.switchCase()) {
+            ChuckAST.Exp match = cctx.expression() != null ? (ChuckAST.Exp) visit(cctx.expression()) : null;
+            boolean isDefault = cctx.DEFAULT() != null;
+            List<ChuckAST.Stmt> body = new ArrayList<>();
+            for (StatementContext sctx : cctx.statement()) {
+                ChuckAST.Stmt s = (ChuckAST.Stmt) visit(sctx);
+                if (s != null) body.add(s);
+            }
+            cases.add(new ChuckAST.CaseStmt(match, isDefault, body, cctx.getStart().getLine(), cctx.getStart().getCharPositionInLine()));
+        }
+        return new ChuckAST.SwitchStmt(cond, cases, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
 
     @Override
     public ChuckAST.Stmt visitIfStatement(IfStatementContext ctx) {
@@ -153,9 +176,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             if (ctx.variableDecl(0).REFERENCE_TAG() != null) isRef = true;
             if (v.LPAREN() != null) isRef = false; // Constructor call always overrides ref
 
-            if (typeStr.equals("vec3") || typeStr.equals("vec4") || typeStr.equals("complex") || typeStr.equals("polar")) {
-                isRef = true;
-            }
+            // vec/complex/polar are value types stored as ChuckArrays — instantiate, don't treat as null reference
             
             ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(typeStr, v.ID().getText(), arraySizes, null, isRef, ctx.STATIC() != null, false,
                     v.getStart().getLine(), v.getStart().getCharPositionInLine());            
@@ -203,6 +224,15 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     public ChuckAST.Exp visitPostfixOp(PostfixOpContext ctx) {
         ChuckAST.Operator op = ctx.getChild(1).getText().equals("++") ? ChuckAST.Operator.PLUS : ChuckAST.Operator.MINUS;
         return new ChuckAST.UnaryExp(op, (ChuckAST.Exp) visit(ctx.expression()), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
+
+    @Override
+    public ChuckAST.Exp visitConditionalOp(ConditionalOpContext ctx) {
+        ChuckAST.Exp condition = (ChuckAST.Exp) visit(ctx.expression(0));
+        ChuckAST.Exp thenExp   = (ChuckAST.Exp) visit(ctx.expression(1));
+        ChuckAST.Exp elseExp   = (ChuckAST.Exp) visit(ctx.expression(2));
+        return new ChuckAST.TernaryExp(condition, thenExp, elseExp,
+            ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     @Override
@@ -267,8 +297,8 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         
         ChuckAST.Exp subExp = (ChuckAST.Exp) visit(ctx.expression());
         if (opStr.startsWith("spork")) {
-            if (subExp instanceof ChuckAST.CallExp) {
-                return new ChuckAST.SporkExp((ChuckAST.CallExp) subExp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+            if (subExp instanceof ChuckAST.CallExp callExp) {
+                return new ChuckAST.SporkExp(callExp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
             }
         }
         return new ChuckAST.UnaryExp(op, subExp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
@@ -281,7 +311,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             if (text.startsWith("0x")) val = Long.parseLong(text.substring(2), 16);
             else if (text.startsWith("'")) val = text.charAt(1);
             else val = Long.parseLong(text);
-        } catch (Exception e) { val = 0; }
+        } catch (NumberFormatException e) { val = 0; }
         return new ChuckAST.IntExp(val, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); 
     }
     @Override public ChuckAST.Exp visitFloatLit(FloatLitContext ctx) { return new ChuckAST.FloatExp(Double.parseDouble(ctx.getText()), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); }

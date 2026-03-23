@@ -8,6 +8,7 @@ public class Brass extends ChuckUGen {
     private final OnePole filter;
     private final Adsr adsr;
     
+    @SuppressWarnings("unused")
     private float lipFilter = 0.0f;
     private float pressure = 0.0f;
     private final float sampleRate;

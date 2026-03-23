@@ -3,7 +3,6 @@ package org.chuck.audio;
 // Note: Requires --add-modules jdk.incubator.vector
 // In JDK 25, this is still the standard location for Vector API.
 import jdk.incubator.vector.FloatVector;
-import jdk.incubator.vector.VectorOperators;
 import jdk.incubator.vector.VectorSpecies;
 
 /**

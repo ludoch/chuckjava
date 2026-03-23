@@ -2,7 +2,6 @@ package org.chuck.audio;
 
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorMask;
-import jdk.incubator.vector.VectorSpecies;
 import static org.chuck.audio.VectorAudio.SPECIES;
 import static org.chuck.audio.VectorAudio.OFFSETS;
 
@@ -49,6 +48,7 @@ public class TriOsc extends Osc {
         FloatVector vInc = FloatVector.broadcast(SPECIES, f_inc);
         FloatVector vWidth = FloatVector.broadcast(SPECIES, f_width);
         FloatVector vOne = FloatVector.broadcast(SPECIES, 1.0f);
+        @SuppressWarnings("unused")
         FloatVector vTwo = FloatVector.broadcast(SPECIES, 2.0f);
         FloatVector vZero = FloatVector.zero(SPECIES);
         

@@ -4,7 +4,6 @@ import org.chuck.core.ChuckEvent;
 import org.chuck.core.ChuckVM;
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentLinkedDeque;
 
 /**
@@ -34,6 +33,7 @@ public class ChuckMidiNative {
     }
 
     private void initBindings() {
+        @SuppressWarnings("unused")
         Linker linker = Linker.nativeLinker();
         String os = System.getProperty("os.name").toLowerCase();
         String libName = os.contains("win") ? "rtmidi.dll" : 
@@ -84,6 +84,7 @@ public class ChuckMidiNative {
             
             while (!rtmidiIn.equals(MemorySegment.NULL)) {
                 try {
+                    @SuppressWarnings("unused")
                     double stamp = (double) getMessage.invoke(rtmidiIn, buffer, sizePtr);
                     long size = sizePtr.get(ValueLayout.JAVA_LONG, 0);
                     

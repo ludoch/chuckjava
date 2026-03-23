@@ -22,9 +22,6 @@ import javafx.stage.Stage;
 import org.chuck.audio.ChuckAudio;
 import org.chuck.audio.FFT;
 import org.chuck.audio.UAnaBlob;
-import org.chuck.compiler.ChuckEmitter;
-import org.chuck.compiler.ChuckLexer;
-import org.chuck.compiler.ChuckParser;
 import org.chuck.core.*;
 import org.chuck.hid.HidMsg;
 import org.fxmisc.richtext.CodeArea;
@@ -41,7 +38,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -140,6 +136,7 @@ public class ChuckIDE extends Application {
     private final Map<Tab, File> tabToFile = new java.util.HashMap<>();
 
     // Visualizers
+    @SuppressWarnings("unused")
     private Pane visContainer; // Container for dynamic resizing
     private Canvas visualizerCanvas;
     private Canvas scopeCanvas;
@@ -486,6 +483,7 @@ public class ChuckIDE extends Application {
     }
 
     private void showCompletionPopup(CodeArea editor) {
+        @SuppressWarnings("unused")
         String fullText = editor.getText();
         int caretPos = editor.getCaretPosition();
         String textBefore = editor.getText(0, caretPos);

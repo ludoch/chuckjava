@@ -1,6 +1,5 @@
 package org.chuck.core;
 
-import org.chuck.audio.ChuckUGen;
 import java.lang.reflect.Method;
 
 /**

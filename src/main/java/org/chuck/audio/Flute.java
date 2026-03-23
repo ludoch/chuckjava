@@ -10,6 +10,7 @@ public class Flute extends ChuckUGen {
     private final Adsr adsr;
     private final Noise noise;
     
+    @SuppressWarnings("unused")
     private float jetDelay;
     private float noiseGain = 0.05f;
     private float endReflection = 0.5f;

@@ -23,6 +23,7 @@ statement
     | printStatement                                       # printStmt
     | blockStatement                                       # blockStmt
     | expression SEMI                                      # expressionStmt
+    | switchStatement                                      # switchStmt
     | BREAK SEMI                                           # breakStmt
     | CONTINUE SEMI                                        # continueStmt
     | SEMI                                                 # emptyStmt
@@ -40,6 +41,8 @@ doStatement: DO statement (WHILE|UNTIL) LPAREN expression RPAREN SEMI ;
 returnStatement: RETURN expression? SEMI ;
 printStatement: LTRIPLE expressionList? RTRIPLE SEMI ;
 blockStatement: LBRACE (statement)* RBRACE ;
+switchStatement: SWITCH LPAREN expression RPAREN LBRACE switchCase* RBRACE ;
+switchCase: (CASE expression COLON | DEFAULT COLON) statement* ;
 
 variableDecl
     : REFERENCE_TAG? ID (LPAREN expressionList? RPAREN)? (arrayDimension)* (CHUCK_OP expression)?
@@ -100,7 +103,7 @@ typeName
 memberName
     : ID
     | INT_TYPE | FLOAT_TYPE | TIME_TYPE | DUR_TYPE | VOID_TYPE | COMPLEX_TYPE | POLAR_TYPE | STRING_TYPE | EVENT_TYPE | AUTO
-    | IF | ELSE | WHILE | UNTIL | FOR | REPEAT | DO | RETURN | BREAK | CONTINUE
+    | IF | ELSE | WHILE | UNTIL | FOR | REPEAT | DO | RETURN | BREAK | CONTINUE | SWITCH | CASE | DEFAULT
     | FUN | CLASS | EXTENDS | PUBLIC | PRIVATE | STATIC | PROTECTED | GLOBAL
     | SPORK | NOW | ME | NEW
     ;
@@ -119,8 +122,8 @@ expression
     | expression (EQ | NEQ) expression                     # compareOp
     | expression (AND | OR) expression                     # logicalOp
     | expression (AMP | PIPE | CARET) expression           # binaryOp
-    | expression CHUCK_OP expression                       # chuckOp
     | expression QUESTION expression COLON expression      # conditionalOp
+    | expression CHUCK_OP expression                       # chuckOp
     | expression (PLUS_PLUS | MINUS_MINUS)                 # postfixOp
     ;
 
@@ -161,6 +164,9 @@ DO      : 'do';
 RETURN  : 'return';
 BREAK   : 'break';
 CONTINUE: 'continue';
+SWITCH  : 'switch';
+CASE    : 'case';
+DEFAULT : 'default';
 FUN     : 'fun';
 CLASS   : 'class';
 EXTENDS : 'extends';

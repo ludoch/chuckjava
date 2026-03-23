@@ -1,6 +1,5 @@
 package org.chuck.audio;
 
-import org.chuck.core.ChuckType;
 
 /**
  * LiSa: Live Sampling Utility.
@@ -9,6 +8,7 @@ public class LiSa extends ChuckUGen {
     private float[] buffer;
     private int recPos = 0;
     private boolean isRecording = false;
+    @SuppressWarnings("unused")
     private final float sampleRate;
     
     private final Voice[] voices;

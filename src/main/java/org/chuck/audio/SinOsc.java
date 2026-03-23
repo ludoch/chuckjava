@@ -1,7 +1,6 @@
 package org.chuck.audio;
 
 import jdk.incubator.vector.FloatVector;
-import jdk.incubator.vector.VectorSpecies;
 import static org.chuck.audio.VectorAudio.SPECIES;
 import static org.chuck.audio.VectorAudio.OFFSETS;
 
@@ -38,6 +37,7 @@ public class SinOsc extends Osc {
         int i = 0;
         int bound = SPECIES.loopBound(length);
         FloatVector vOffsets = FloatVector.fromArray(SPECIES, OFFSETS, 0);
+        @SuppressWarnings("unused")
         FloatVector vTwoPi = FloatVector.broadcast(SPECIES, twoPi);
         FloatVector vInc = FloatVector.broadcast(SPECIES, f_inc);
 

@@ -6,6 +6,7 @@ package org.chuck.audio;
 public class StifKarp extends ChuckUGen {
     private final DelayL delayLine;
     private final OnePole filter;
+    @SuppressWarnings("unused")
     private float pickupPos = 0.667f;
     private float lastInput = 0.0f;
     private final float sampleRate;

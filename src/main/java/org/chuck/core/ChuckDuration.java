@@ -1,6 +1,5 @@
 package org.chuck.core;
 
-import java.util.concurrent.TimeUnit;
 
 /**
  * Represents a duration in ChucK (e.g., 10::ms).

@@ -1,6 +1,5 @@
 package org.chuck.chugin;
 
-import org.chuck.audio.ChuckUGen;
 import org.chuck.core.ChuckObject;
 import org.chuck.core.ChuckVM;
 
@@ -39,6 +38,7 @@ public class ChuginLoader {
 
     private static void loadChugin(File jarFile) throws Exception {
         URL[] urls = { jarFile.toURI().toURL() };
+        @SuppressWarnings("resource")
         URLClassLoader classLoader = new URLClassLoader(urls, ChuginLoader.class.getClassLoader());
 
         try (JarFile jar = new JarFile(jarFile)) {
@@ -50,7 +50,9 @@ public class ChuginLoader {
                     try {
                         Class<?> cls = classLoader.loadClass(className);
                         if (ChuckObject.class.isAssignableFrom(cls) && !cls.isInterface() && (cls.getModifiers() & java.lang.reflect.Modifier.ABSTRACT) == 0) {
-                            chuginRegistry.put(cls.getSimpleName(), (Class<? extends ChuckObject>) cls);
+                            @SuppressWarnings("unchecked")
+                            Class<? extends ChuckObject> chuckCls = (Class<? extends ChuckObject>) cls;
+                            chuginRegistry.put(cls.getSimpleName(), chuckCls);
                             // System.out.println("Loaded Chugin type: " + cls.getSimpleName());
                         }
                     } catch (ClassNotFoundException | NoClassDefFoundError ignored) {

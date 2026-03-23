@@ -1,9 +1,7 @@
 package org.chuck.audio;
 
 import jdk.incubator.vector.FloatVector;
-import jdk.incubator.vector.VectorSpecies;
 import static org.chuck.audio.VectorAudio.SPECIES;
-import static org.chuck.audio.VectorAudio.OFFSETS;
 
 /**
  * An Attack, Decay, Sustain, Release envelope generator.
@@ -87,11 +85,17 @@ public class Adsr extends ChuckUGen {
     
     public void keyOff() {
         state = State.RELEASE_ENUM;
+        releaseInc = (releaseTime > 0) ? currentLevel / (releaseTime * sampleRate) : currentLevel;
     }
 
     public void keyOff(int off) {
-        if (off != 0) state = State.RELEASE_ENUM;
-        else state = State.ATTACK_ENUM;
+        if (off != 0) {
+            state = State.RELEASE_ENUM;
+            releaseInc = (releaseTime > 0) ? currentLevel / (releaseTime * sampleRate) : currentLevel;
+        }
+        else {
+            state = State.ATTACK_ENUM;
+        }
     }
 
     public double attackTime() { return attackTime * sampleRate; }

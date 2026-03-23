@@ -8,13 +8,16 @@ import java.util.Random;
  */
 public class Shakers extends ChuckUGen {
     private final Random random = new Random();
+    @SuppressWarnings("unused")
     private int type = 0;
+    @SuppressWarnings("unused")
     private float energy = 0.0f;
     private float shakeLevel = 0.0f;
     private int numObjects = 20;
     private float systemDecay = 0.999f;
     
     private final ResonZ filter;
+    @SuppressWarnings("unused")
     private final float sampleRate;
 
     public Shakers(float sampleRate) {

@@ -80,6 +80,7 @@ public class ChuckDSL {
         String className = fileName.substring(0, fileName.lastIndexOf('.'));
         
         // Use the same class loader parent to ensure ScopedValues and static dac() etc. are shared
+        @SuppressWarnings("resource")
         var loader = new java.net.URLClassLoader(
             new java.net.URL[]{tempDir.toUri().toURL()}, 
             ChuckDSL.class.getClassLoader()

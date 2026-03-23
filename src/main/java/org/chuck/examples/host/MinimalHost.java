@@ -25,6 +25,7 @@ public class MinimalHost {
         System.out.println("Host: Sporking ChucK code...");
         
         // 3. Run the code string
+        @SuppressWarnings("unused")
         int shredId = vm.run(code, "minimal-host-example");
 
         // 4. Manually drive the VM clock

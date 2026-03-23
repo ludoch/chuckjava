@@ -19,6 +19,7 @@ public class Dyno extends ChuckUGen {
     private float slopeBelow = 1.0f;
     private float attackTime = 0.005f; // in seconds
     private float releaseTime = 0.05f; // in seconds
+    @SuppressWarnings("unused")
     private float knee = 0.0f;
     private float externalGain = 1.0f;
 

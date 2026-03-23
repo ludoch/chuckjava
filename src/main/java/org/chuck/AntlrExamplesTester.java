@@ -2,8 +2,6 @@ package org.chuck;
 
 import org.antlr.v4.runtime.*;
 import org.chuck.compiler.*;
-import org.chuck.core.*;
-import java.io.File;
 import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -61,6 +59,7 @@ public class AntlrExamplesTester {
 
                     // 2. Visit (Map to AST)
                     ChuckASTVisitor visitor = new ChuckASTVisitor();
+                    @SuppressWarnings("unchecked")
                     List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
                     
                     // 3. Emit (Optional but good for full check)

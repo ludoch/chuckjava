@@ -9,10 +9,12 @@ public class Bowed extends ChuckUGen {
     private final BowTable bowTable;
     private final OnePole filter;
     
+    @SuppressWarnings("unused")
     private float bowPressure = 0.0f;
     private float bowVelocity = 0.0f;
     private float vibratoFreq = 6.125f;
     private float vibratoGain = 0.0f;
+    @SuppressWarnings("unused")
     private double freq = 220.0;
     private float sampleRate;
     
@@ -54,6 +56,7 @@ public class Bowed extends ChuckUGen {
     @Override
     protected float compute(float input, long systemTime) {
         // Simple vibrato
+        @SuppressWarnings("unused")
         double vibrato = Math.sin(phase) * vibratoGain;
         phase += 2.0 * Math.PI * vibratoFreq / sampleRate;
         if (phase > 2.0 * Math.PI) phase -= 2.0 * Math.PI;

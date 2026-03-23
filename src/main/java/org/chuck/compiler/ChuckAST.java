@@ -1,7 +1,6 @@
 
 package org.chuck.compiler;
 
-import org.chuck.core.ChuckType;
 
 /**
  * Base interface for all Abstract Syntax Tree nodes.
@@ -53,6 +52,7 @@ public sealed interface ChuckAST {
     record ArrayAccessExp(Exp base, java.util.List<Exp> indices, int line, int column) implements Exp {}
     record SporkExp(CallExp call, int line, int column) implements Exp {}
     record DeclExp(String type, String name, java.util.List<Exp> arraySizes, Exp callArgs, boolean isReference, boolean isStatic, boolean isGlobal, int line, int column) implements Exp {}
+    record TernaryExp(Exp condition, Exp thenExp, Exp elseExp, int line, int column) implements Exp {}
 
     // --- Statement Nodes ---
 
@@ -82,6 +82,10 @@ public sealed interface ChuckAST {
     record RepeatStmt(Exp count, Stmt body, int line, int column) implements Stmt {}
 
     record ForEachStmt(String iterType, String iterName, Exp collection, Stmt body, int line, int column) implements Stmt {}
+
+    record SwitchStmt(Exp condition, java.util.List<CaseStmt> cases, int line, int column) implements Stmt {}
+    
+    record CaseStmt(Exp match, boolean isDefault, java.util.List<Stmt> body, int line, int column) implements Stmt {}
 
     record BreakStmt(int line, int column) implements Stmt {}
 

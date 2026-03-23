@@ -1,7 +1,6 @@
 package org.chuck.compiler;
 
 import org.chuck.core.*;
-import org.chuck.audio.*;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.ArrayList;

@@ -1,7 +1,6 @@
 package org.chuck;
 
 import org.chuck.audio.ChuckAudio;
-import org.chuck.compiler.*;
 import org.chuck.core.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -14,6 +13,7 @@ public class ChuckCLI {
     private int numChannels = 2;
     private boolean silent = false;
     private boolean loop = false;
+    @SuppressWarnings("unused")
     private boolean dump = false;
     private boolean useAntlr = false;
     private boolean syntaxOnly = false;

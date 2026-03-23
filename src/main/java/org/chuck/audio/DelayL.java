@@ -7,6 +7,7 @@ public class DelayL extends ChuckUGen {
     private final float[] buffer;
     private int writePos = 0;
     private double delaySamples;
+    @SuppressWarnings("unused")
     private final float sampleRate;
 
     public DelayL(int maxDelaySamples) {

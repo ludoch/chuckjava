@@ -5,11 +5,13 @@ package org.chuck.audio;
  */
 public class Lpf extends ChuckUGen {
     private float cutoff = 1000.0f;
+    @SuppressWarnings("unused")
     private float resonance = 1.0f;
     private float sampleRate;
     
     // Filter state
     private float v0 = 0.0f;
+    @SuppressWarnings("unused")
     private float v1 = 0.0f;
 
     public Lpf(float sampleRate) {

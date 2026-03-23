@@ -1,9 +1,7 @@
 package org.chuck.audio;
 
-import org.chuck.core.ChuckType;
 
 import jdk.incubator.vector.FloatVector;
-import jdk.incubator.vector.VectorSpecies;
 import static org.chuck.audio.VectorAudio.SPECIES;
 
 /**

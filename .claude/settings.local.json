@@ -14,7 +14,17 @@
       "Bash(cd C:/Users/ludo/a/chuckjava && java --enable-preview --add-modules jdk.incubator.vector -cp \"target/classes:/c/Users/ludo/.m2/repository/org/antlr/antlr4-runtime/4.13.2/antlr4-runtime-4.13.2.jar\" org.chuck.AntlrExamplesTester 2>&1 | grep -v \"^Testing:\" | grep -v \"^WARNING\" | grep -v \"^$\")",
       "Bash(for f:*)",
       "Bash(ls C:/Users/ludo/a/chuckjava/src/main/java/org/chuck/ | grep -v \"/\\\\|\\\\.java$\" ; ls C:/Users/ludo/a/chuckjava/src/main/java/org/chuck/*.java 2>/dev/null)",
-      "Bash(mvn dependency:build-classpath -q -DincludeScope=compile -Dmdep.outputFile=cp.txt && cat cp.txt | head -c 200)"
+      "Bash(mvn dependency:build-classpath -q -DincludeScope=compile -Dmdep.outputFile=cp.txt && cat cp.txt | head -c 200)",
+      "Bash(ls -1 /c/Users/ludo/a/chuck/src/core/*.cpp)",
+      "Bash(grep -h \"t_UGEN_CTRL\" /c/Users/ludo/a/chuck/src/core/*.cpp)",
+      "Bash(grep -h \"^struct Chuck_UGen\\\\|^struct.*UGEN\\\\|define_ugen\\\\|UGEN_REGISTER\" /c/Users/ludo/a/chuck/src/core/*.h)",
+      "Bash(grep -h \"define_ugen\\\\|UGEN_REGISTER\" /c/Users/ludo/a/chuck/src/core/*.cpp)",
+      "Bash(grep -h \"type_engine_import_ugen_begin\\\\|type_engine_import_mfun\\\\|type_engine_import_sfun\" /c/Users/ludo/a/chuck/src/core/ugen_*.cpp)",
+      "Bash(grep -h \"type_engine_import_ugen_begin\" /c/Users/ludo/a/chuck/src/core/*.cpp)",
+      "Bash(grep -h \"^public class\\\\|^public static class\" /c/Users/ludo/a/chuckjava/src/main/java/org/chuck/audio/*.java)",
+      "Bash(xargs -I {} basename {})",
+      "Bash(ls:*)",
+      "Bash(grep -h \"DelayA\\\\|DelayP\\\\|TwoZero\\\\|TwoPole\\\\|PoleZero\\\\|BLT\\\\|Blit\\\\|BlitSaw\\\\|BlitSquare\\\\|CNoise\\\\|SubNoise\\\\|WvOut2\\\\|SndBuf2\\\\|Mesh2D\\\\|Identity2\" /c/Users/ludo/a/chuck/src/core/ugen_*.cpp)"
     ]
   }
 }

@@ -18,7 +18,9 @@ public class ChuckArray extends ChuckObject {
     
     // For associative behavior
     private final Map<String, Long> assocInt = new HashMap<>();
+    @SuppressWarnings("unused")
     private final Map<String, Double> assocFloat = new HashMap<>();
+    @SuppressWarnings("unused")
     private final Map<String, Object> assocObject = new HashMap<>();
 
     public ChuckArray(ChuckType type, int size) {

@@ -65,3 +65,109 @@ This document tracks the features from the original [Stanford ChucK](https://chu
 |:---|:---|:---|
 | **Visualizer Config** | Done | Added UI controls to adjust FFT size and oscilloscope window size. |
 | **Project View** | Done | Added file system management (new file, delete, refresh) and project directory support. |
+
+---
+
+## 6. Gap Analysis vs C++ Reference (`../chuck/`)
+
+### 6.1 Language / Parser / Emitter
+
+| Feature | Status | Notes |
+|:---|:---|:---|
+| `switch`/`case` | ✅ Implemented | AST + ANTLR grammar + emitter (equality-chain) |
+| `goto` / label | ❌ Missing | Not in AST or parser |
+| Ternary `? :` | ✅ Implemented | AST + ANTLR grammar + emitter; precedence above `=>` |
+| `complex` / `polar` types | ✅ Implemented | Field accessors `.re/.im/.mag/.phase`; built-in `+`,`-`,`*`,`/` with correct complex/polar math |
+| `vec2` / `vec3` / `vec4` types | ✅ Implemented | Field accessors `.x/.y/.z/.w`; element-wise `+`,`-`; scalar `*`; dot product |
+| Operator overloading (user classes) | ✅ Implemented | Arithmetic + comparison (`<`,`<=`,`>`,`>=`,`==`,`!=`) + unary + `++`/`--` |
+| `public`/`private`/`protected` on class members | ❌ Missing | No access modifiers |
+| `static` variables in classes | ⚠️ Partial | Not fully initialized |
+| Doc comments | ❌ Missing | Not in AST or parser |
+
+### 6.2 UGens — Missing
+
+**Filters:** `TwoPole`, `TwoZero`, `PoleZero`, ~~`HPF`~~, ~~`BPF`~~, ~~`BRF`~~ ✅, `DelayA` (allpass-interp), `DelayP`
+
+**Oscillators / Generators:** `Blit`, ~~`BlitSaw`~~, ~~`BlitSquare`~~ ✅ (band-limited PolyBLEP), `CNoise` (colored noise)
+
+**FM Instruments (STK):** ~~`BeeThree`~~, ~~`FMVoices`~~, ~~`HevyMetl`~~, `HnkyTonk`, `FrencHrn`, `KrstlChr`, ~~`PercFlut`~~, ~~`TubeBell`~~, ~~`Wurley`~~ ✅
+
+**Multichannel:** `LiSa2/4/6/8/10/16`, `WvOut2`, `SndBuf2`, `UGen_Multi`, `UGen_Stereo`, `Identity2`
+
+**Spatial:** `Mesh2D` (2D mesh physical model)
+
+### 6.3 Unit Analyzers (UAna) — Missing
+
+Java has: `FFT`, `IFFT`, `RMS`, `Centroid`, `Flux`, `ZeroX`, `ZCR`, `MFCC`, `SFM`, `Kurtosis`, `Rolloff`
+
+| UAna | Status |
+|:---|:---|
+| `MFCC` — Mel-Frequency Cepstral Coefficients | ✅ Implemented (mel filterbank + DCT-II, 13 coeffs) |
+| `Kurtosis` | ✅ Implemented (4th central moment of spectrum) |
+| `SFM` — Spectral Flatness Measure | ✅ Implemented (geometric/arithmetic mean ratio) |
+| `ZCR` — Zero Crossing Rate | ✅ Implemented (frame-based, configurable window) |
+
+### 6.4 Machine API — Missing Functions
+
+| Function | Status |
+|:---|:---|
+| `Machine.crash()` | ✅ Implemented |
+| `Machine.removeAll()` | ✅ Implemented |
+| `Machine.resetID()` | ❌ Missing |
+| `Machine.clearVM()` | ❌ Missing |
+| `Machine.shreds()` / `numShreds()` | ✅ Implemented |
+| `Machine.shredExists(id)` | ✅ Implemented |
+| `Machine.setloglevel()` / `getloglevel()` | ❌ Missing |
+| `Machine.gc()` | ❌ Missing |
+| `Type` / `Function` introspection classes | ❌ Missing |
+
+### 6.5 AI / ML Library — Completely Absent
+
+From C++ `ulib_ai.cpp`:
+
+| Feature | Status |
+|:---|:---|
+| `SVM` — Support Vector Machine (train, predict, save, load) | ❌ Missing |
+| `KNN` / `KNN2` — K-Nearest Neighbor | ❌ Missing |
+| `HMM` — Hidden Markov Model (train, viterbi, forward) | ❌ Missing |
+
+### 6.6 Event System
+
+| Feature | Status |
+|:---|:---|
+| `Event.can_wait()` | ❌ Missing |
+| `OscEvent` — event triggered by incoming OSC | ❌ Missing |
+
+### 6.7 Type System
+
+| Feature | Status |
+|:---|:---|
+| `complex` as first-class type (`#(re, im)`) | ✅ Implemented — literals, field accessors, arithmetic |
+| `polar` as first-class type (`%(mag, phase)`) | ✅ Implemented — literals, field accessors, arithmetic |
+| `vec2`/`vec3`/`vec4` with `.x/.y/.z/.w` | ✅ Implemented — literals, field read/write, arithmetic |
+| Arrays of complex / vec types | ⚠️ Partial — `complex arr[N]` allocates but element-wise ops untested |
+
+---
+
+### Priority
+
+**High** — common in real ChucK programs:
+1. ~~`switch`/`case`~~ ✅ Done
+2. ~~Ternary `? :`~~ ✅ Done
+3. ~~`BPF`, `HPF`, `BRF`~~ ✅ Done
+4. ~~`BlitSaw`, `BlitSquare`~~ ✅ Done
+5. ~~Full `Machine` shred API (`shreds()`, `removeAll()`, etc.)~~ ✅ Done
+
+**Medium** — used in analysis / spatial audio:
+- ~~`vec2`/`vec3`/`vec4`~~ ✅ Done (field accessors + arithmetic)
+- ~~`MFCC`~~ ✅ Done
+- ~~FM instrument variants~~ ✅ Done (`Wurley`, `BeeThree`, `HevyMetl`, `PercFlut`, `TubeBell`, `FMVoices`)
+- ~~`ZCR`~~ ✅ Done
+- ~~Operator overloading~~ ✅ Done (arithmetic + comparison + unary)
+- ~~`SFM`, `Kurtosis`~~ ✅ Done
+
+**Lower** — niche or advanced:
+- AI/ML library (`SVM`, `KNN`, `HMM`)
+- `goto`/label
+- `HnkyTonk`, `FrencHrn`, `KrstlChr` FM instruments
+- `Machine.resetID()`, `Machine.gc()`

@@ -1,8 +1,6 @@
 package org.chuck.audio;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.ArrayList;
 
 /**
  * A Unit Analyzer that captures raw time-domain samples for an Oscilloscope.

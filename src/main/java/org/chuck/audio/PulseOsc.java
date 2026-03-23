@@ -2,7 +2,6 @@ package org.chuck.audio;
 
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorMask;
-import jdk.incubator.vector.VectorSpecies;
 import static org.chuck.audio.VectorAudio.SPECIES;
 import static org.chuck.audio.VectorAudio.OFFSETS;
 

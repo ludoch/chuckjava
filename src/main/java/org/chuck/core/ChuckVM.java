@@ -163,6 +163,10 @@ public class ChuckVM {
         return activeShreds.size();
     }
 
+    public boolean shredExists(int id) {
+        return activeShreds.containsKey(id);
+    }
+
     public void registerHid(org.chuck.hid.Hid hid) {
         openHidDevices.add(hid);
     }
@@ -360,7 +364,9 @@ public class ChuckVM {
             org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
             org.chuck.compiler.ChuckANTLRParser parser = new org.chuck.compiler.ChuckANTLRParser(tokens);
             org.chuck.compiler.ChuckASTVisitor visitor = new org.chuck.compiler.ChuckASTVisitor();
-            return (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
+            @SuppressWarnings("unchecked")
+            List<org.chuck.compiler.ChuckAST.Stmt> result = (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
+            return result;
         } else {
             org.chuck.compiler.ChuckLexer lexer = new org.chuck.compiler.ChuckLexer(source);
             org.chuck.compiler.ChuckParser parser = new org.chuck.compiler.ChuckParser(lexer.tokenize());
@@ -455,6 +461,14 @@ public class ChuckVM {
 
     public ChuckShred getShred(int id) {
         return activeShreds.get(id);
+    }
+    
+    public int getNumShreds() {
+        return activeShreds.size();
+    }
+    
+    public int[] getActiveShredIds() {
+        return activeShreds.keySet().stream().mapToInt(Integer::intValue).toArray();
     }
 
     public void removeShred(int id) {

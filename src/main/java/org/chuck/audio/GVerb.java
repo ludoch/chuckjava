@@ -8,6 +8,7 @@ public class GVerb extends StereoUGen {
     private final Delay[] delays = new Delay[8];
     private float mix = 0.1f;
     private float roomSize = 0.5f;
+    @SuppressWarnings("unused")
     private float damping = 0.5f;
 
     public GVerb(float sampleRate) {

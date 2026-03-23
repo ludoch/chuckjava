@@ -9,6 +9,7 @@ public class SndBuf extends ChuckUGen {
     private double pos = 0.0;
     private double rate = 1.0;
     private boolean loop = false;
+    @SuppressWarnings("unused")
     private float sampleRate = 44100.0f;
 
     public SndBuf() {

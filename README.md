@@ -13,7 +13,9 @@
 | **05-Global** | 52 | 51 | 77.ck fails: `me.dir(3)` requires 3-level path depth (test dir only 2 levels deep) |
 | **06-Errors** | 109 | 42 | Error handling and type-checking edge cases |
 | **07-Imports** | 9 | 9 ✅ | `#include` / machine imports |
-| **Total** | **516** | **429 (83%)** | |
+| **ChuckAntlrNewFeaturesTest** | 23 | 23 ✅ | Ternary, switch/case, HPF/BPF/BRF, BlitSaw/BlitSquare |
+| **ChuckMachineApiTest** | 16 | 16 ✅ | Full `me.*` and `Machine.*` shred API |
+| **Total** | **555** | **468 (84%)** | |
 
 ### Bugs Fixed & Language Improvements
 
@@ -54,6 +56,25 @@
 | 33 | **`ReturnFunc` zero-return bug** — Return value `0` was never re-pushed onto the reg stack after a function returned, causing stack underflow for callers expecting a result. | ✅ Fixed |
 | 34 | **Class field literal initializers (`5 => int n;`)** — Class body statements of the form `<literal> => <type> <name>;` are now recognized as field declarations with initial values and correctly set on every new instance. | ✅ Fixed |
 | 35 | **`SetMemberIntByName` push-back type** — After setting an `int` field on a `UserObject`, the instruction was pushing a `double` value back onto the stack, causing fields to print as floats (e.g. `1.000000` instead of `1`). | ✅ Fixed |
+| 36 | **`emitChuckTarget` assignment bug** — `<value> => <type> <name>` was storing the default value (0) instead of the source value due to a `StackSwap+Pop` sequencing error. Fixed by replacing with a single `Pop` before `StoreLocal`. | ✅ Fixed |
+| 37 | **Ternary `? :` operator** — `conditionalOp` was listed below `chuckOp` in the ANTLR grammar, giving it lower precedence than `=>`. Swapped ordering so `a ? b : c => x` assigns `(a ? b : c)` to `x`. | ✅ Fixed |
+| 38 | **Band-limited oscillators (`BlitSaw`, `BlitSquare`)** — Added PolyBLEP anti-aliased sawtooth and square wave oscillators; configurable pulse width on `BlitSquare`. | ✅ Fixed |
+| 39 | **Butterworth filters (`HPF`, `BPF`, `BRF`)** — High-pass, band-pass, and band-reject filters added alongside the existing `LPF`. | ✅ Fixed |
+| 40 | **`switch`/`case` statement** — Full `switch`/`case`/`default` control flow with fall-through support and `break`. | ✅ Fixed |
+| 41 | **Full Machine shred API** — Added `Machine.numShreds()`, `Machine.shreds()`, `Machine.shredExists(id)`, `Machine.crash()`, `Machine.removeAll()`. | ✅ Fixed |
+| 42 | **Full `me.*` shred API** — Added `me.path()`, `me.source()`, `me.sourcePath()`, `me.running()`, `me.done()` methods. | ✅ Fixed |
+| 43 | **`SwapLocal` type-tag corruption** — `ChuckSwap` called `setRef(idx, null)` on int-typed slots, marking them as objects; reads then returned `null`. Fixed by copying all four parallel arrays (primitive, isDouble, isObject, objects) while respecting the source slot's type. | ✅ Fixed |
+| 44 | **Root-scope array globals** — Top-level array declarations (`int scale[3]`) were stored as shred-local variables, making `vm.getGlobalObject("scale")` return `null`. Fixed by routing root-scope array declarations to global storage. | ✅ Fixed |
+| 45 | **`vec2` type** — Added `vec2` as a 2-element vector type alongside `vec3`/`vec4`. | ✅ Fixed |
+| 46 | **Vector field accessors** — `.x/.y/.z/.w`, `.re/.im`, `.mag/.phase` now work as read and write expressions on `vec2`/`vec3`/`vec4`/`complex`/`polar` values. | ✅ Fixed |
+| 47 | **`ZCR` (Zero Crossing Rate) UAna** — Frame-based zero crossing rate analyzer (0.0–1.0); configurable `frameSize`; `upchuck()` compatible. | ✅ Fixed |
+| 48 | **`MFCC` UAna** — Full Mel-Frequency Cepstral Coefficients pipeline: DFT magnitude → 26-band mel triangular filterbank → log compression → DCT-II → 13 cepstral coefficients. `computeFromSpectrum()` accepts external FFT magnitudes. | ✅ Fixed |
+| 49 | **FM instrument variants** — Implemented `Wurley` (Wurlitzer EP), `BeeThree` (Hammond organ), `HevyMetl` (heavy metal), `PercFlut` (percussive flute), `TubeBell` (tubular bells), `FMVoices` (singing voice). All expose `noteOn`, `noteOff`, `setFreq`. | ✅ Fixed |
+| 50 | **Comparison operator overloading** — `<`, `<=`, `>`, `>=`, `==`, `!=` now dispatch to user-defined `fun int operator<(T other)` functions, completing the full operator overload suite. | ✅ Fixed |
+| 51 | **Built-in `complex`/`polar` arithmetic** — `+`, `-`, `*`, `/` use proper complex number math (rectangular) and polar-native multiply/divide. `+`/`-` on polar converts via rectangular. | ✅ Fixed |
+| 52 | **Built-in `vec2`/`vec3`/`vec4` arithmetic** — Element-wise `+`, `-`; scalar `*`; dot product (`vec * vec → float`). | ✅ Fixed |
+| 53 | **`SFM` (Spectral Flatness Measure) UAna** — Geometric/arithmetic mean ratio of the magnitude spectrum; 0 = tonal, 1 = noisy. Chains after `FFT`. | ✅ Fixed |
+| 54 | **`Kurtosis` UAna** — Normalized 4th central moment of the magnitude spectrum; high = impulsive, low = sustained. Chains after `FFT`. | ✅ Fixed |
 
 ### New Features
 
@@ -348,6 +369,7 @@ You can now write and run pure-Java ChucK logic directly in the IDE.
 
 ### Oscillators & Physical Models
 -   `SinOsc`, `SawOsc`, `TriOsc`, `PulseOsc`, `SqrOsc`, `Phasor`.
+-   `BlitSaw` (band-limited sawtooth, PolyBLEP), `BlitSquare` (band-limited square, PolyBLEP).
 -   `Clarinet`, `Mandolin`, `Plucked`, `Rhodey`, `Bowed`, `StifKarp`, `Moog`, `Flute`, `Sitar`.
 
 ### Analysis (UAna)
@@ -358,5 +380,5 @@ You can now write and run pure-Java ChucK logic directly in the IDE.
 -   `UAnaBlob`: Data container for magnitude and phase.
 
 ### Filters, Effects & Utilities
--   `Lpf`, `ResonZ`, `Chorus`, `Echo`, `JCRev`, `OnePole`, `OneZero`, `PitShift`.
+-   `LPF`, `HPF`, `BPF`, `BRF` (Butterworth), `ResonZ`, `Chorus`, `Echo`, `JCRev`, `OnePole`, `OneZero`, `PitShift`.
 -   `Pan2`, `ADSR`, `Envelope`, `SndBuf`, `Gain`, `Noise`, `Step`, `Impulse`, `Blackhole`.

@@ -44,11 +44,11 @@ Complete reference for the ChucK-Java implementation — operators, types, built
 | Type | Description |
 |------|-------------|
 | `string` | Mutable text string |
-| `vec2` | 2D vector (`x`, `y`) |
-| `vec3` | 3D vector (`x`, `y`, `z`) |
-| `vec4` | 4D vector (`x`, `y`, `z`, `w`) |
-| `complex` | Complex number (`re`, `im`); literal: `#(re, im)` |
-| `polar` | Polar form (`mag`, `phase`); literal: `%(mag, phase)` |
+| `vec2` | 2D vector (`x`, `y`); element-wise `+`, `-`; scalar `*`; dot product `*` vec |
+| `vec3` | 3D vector (`x`, `y`, `z`); element-wise `+`, `-`; scalar `*`; dot product `*` vec |
+| `vec4` | 4D vector (`x`, `y`, `z`, `w`); element-wise `+`, `-`; scalar `*`; dot product `*` vec |
+| `complex` | Complex number (`re`, `im`); literal: `#(re, im)`; supports `+`, `-`, `*`, `/` |
+| `polar` | Polar form (`mag`, `phase`); literal: `%(mag, phase)`; `*` and `/` are polar-native; `+`/`-` convert via rectangular |
 | `Object` | Base object type |
 | `UGen` | Base unit generator |
 | `Event` | Synchronization event |
@@ -109,6 +109,35 @@ auto x = 5;             // type inferred from right-hand side
 | `*` | Multiplication |
 | `/` | Division |
 | `%` | Modulo |
+
+### Vector & Complex Arithmetic
+
+`vec2`/`vec3`/`vec4`, `complex`, and `polar` types have built-in operator support:
+
+```chuck
+// complex arithmetic (rectangular)
+#(1.0, 2.0) => complex a;
+#(3.0, 4.0) => complex b;
+a + b   // #(4.0, 6.0)
+a * b   // #(-5.0, 10.0)  — (1+2i)(3+4i) = -5+10i
+a / b   // proper complex division
+
+// polar arithmetic
+%(2.0, Math.PI/4) => polar p1;
+%(3.0, Math.PI/4) => polar p2;
+p1 * p2   // %(6.0, PI/2)  — magnitudes multiply, phases add
+p1 / p2   // %(0.666, 0.0) — magnitudes divide, phases subtract
+
+// vec element-wise
+@(1.0, 2.0, 3.0) => vec3 u;
+@(4.0, 5.0, 6.0) => vec3 v;
+u + v       // @(5.0, 7.0, 9.0)
+u - v       // @(-3.0, -3.0, -3.0)
+2.0 => u.x; // field write
+u.x         // field read
+u * v       // dot product → float (1*4 + 2*5 + 3*6 = 32.0)
+2.5 * u     // VecScale — note: scalar must be RHS in emitter dispatch
+```
 
 ### Comparison
 
@@ -209,10 +238,35 @@ for (auto x : arr) { ... }          // type-inferred iteration
 repeat (10) { ... }                 // execute body N times
 ```
 
+### Switch / Case
+
+```chuck
+switch (expr) {
+    case 1:
+        <<< "one" >>>;
+        break;
+    case 2:
+    case 3:
+        <<< "two or three" >>>;
+        break;
+    default:
+        <<< "other" >>>;
+}
+```
+
+### Ternary Operator
+
+```chuck
+condition ? valueIfTrue : valueIfFalse => int x;
+x > 0 ? "pos" : "neg" => string s;
+```
+
+The ternary operator has higher precedence than `=>`, so the expression is evaluated first and then chucked to the target.
+
 ### Break / Continue / Return
 
 ```chuck
-break;              // exit innermost loop
+break;              // exit innermost loop or switch
 continue;           // skip to next loop iteration
 return;             // return from function (void)
 return val;         // return value from function
@@ -303,7 +357,9 @@ class Vec2 {
 }
 ```
 
-Overloadable operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `>`, `<=`, `>=`, `==`, `!=`, `&&`, `||`, `!`, `++`, `--`
+Overloadable operators: `+`, `-`, `*`, `/`, `%`, `&`, `|`, `<`, `<=`, `>`, `>=`, `==`, `!=`, `&&`, `||`, `!`, `++`, `--`
+
+Comparison operators (`<`, `<=`, `>`, `>=`, `==`, `!=`) are fully dispatched: if the LHS type defines `fun int operator<(T other)`, it is called instead of the built-in comparison.
 
 ### Public Classes
 
@@ -438,22 +494,42 @@ Std.fabs(x)             // float absolute value
 ### Machine
 
 ```chuck
+// Shred lifecycle
 Machine.add("path/to/file.ck")          // compile and spork file; returns shred ID
 Machine.add("file.ck:arg0:arg1")        // pass arguments to file
 Machine.remove(shredId)                 // stop a shred by ID
-Machine.eval("<<< 42 >>>;")             // compile and run source string
+Machine.replace(shredId, "new.ck")      // replace shred in-place
+Machine.eval("<<< 42 >>>;")             // compile and run source string; returns shred ID
+Machine.removeAll()                     // stop all running shreds (alias: clear())
+Machine.crash()                         // immediately terminate the VM (for testing)
+
+// Shred inspection
+Machine.numShreds()                     // int: number of currently active shreds
+Machine.shredExists(id)                 // int: 1 if shred with given ID is active, else 0
+Machine.shreds() @=> int ids[];         // array of all active shred IDs
+Machine.status()                        // print VM status to output
+
+// VM properties (read-only)
+Machine.realtime                        // int: 1 if running in real-time mode
+Machine.silent                          // int: 1 if audio output is disabled
 ```
 
 ### Shred (`me`)
 
 ```chuck
-me.id()             // int: this shred's ID
-me.exit()           // terminate this shred
+me.id()             // int: this shred's unique ID
+me.exit()           // terminate this shred immediately
+me.done()           // int: 1 if this shred has finished (use on Shred references)
+me.running()        // int: 1 if this shred is currently executing
 me.args()           // int: number of arguments passed to this shred
 me.numArgs()        // alias for args()
 me.arg(i)           // string: get argument at index i
-me.dir()            // string: directory of this shred's source file
+me.dir()            // string: directory of this shred's source file (with trailing /)
+me.dir(n)           // string: n levels up from the source file's directory
 me.sourceDir()      // alias for dir()
+me.path()           // string: full absolute path to this shred's source file
+me.source()         // alias for path()
+me.sourcePath()     // alias for path()
 ```
 
 ### IO / chout / cherr
@@ -594,6 +670,8 @@ osc.sync()               // int: get current sync mode
 | `SqrOsc` | Square wave |
 | `PulseOsc` | Variable-width pulse |
 | `Phasor` | Linear ramp 0→1 (phase signal) |
+| `BlitSaw` | Band-limited sawtooth (PolyBLEP anti-aliased) |
+| `BlitSquare` | Band-limited square wave (PolyBLEP; supports `width` parameter) |
 
 ---
 
@@ -930,6 +1008,77 @@ SinOsc s => FFT fft =^ Centroid c =^ UAnaBlob blob;
 c =^ blob;
 blob.fvals()[0]     // float: spectral centroid frequency
 ```
+
+### ZCR (Zero Crossing Rate)
+
+Counts zero crossings per analysis frame and outputs a normalized rate (0.0–1.0).
+
+```chuck
+adc => ZCR zcr => blackhole;
+1024 => zcr.frameSize;          // set frame size (default 1024)
+zcr.getZCR()                    // float: crossings per sample
+zcr.upchuck();
+```
+
+High ZCR → noisy/percussive signal. Low ZCR → tonal/pitched signal.
+
+### MFCC (Mel-Frequency Cepstral Coefficients)
+
+Full pipeline: DFT magnitude spectrum → mel triangular filterbank → log → DCT-II → cepstral coefficients.
+
+```chuck
+adc => MFCC mfcc => blackhole;
+
+// configuration (set before use)
+13 => mfcc.numCoeffs;       // number of cepstral coefficients (default 13)
+26 => mfcc.numFilters;      // mel filterbank bands (default 26)
+512 => mfcc.fftSize;        // internal FFT/DFT size (default 512)
+
+// retrieve coefficients after upchuck
+mfcc.upchuck();
+mfcc.getCoeff(0)            // float: energy coefficient (index 0)
+mfcc.getCoeff(1)            // float: 1st spectral shape coefficient
+mfcc.getCoefficients()      // float[]: all numCoeffs coefficients
+
+// or feed an external FFT spectrum
+FFT fft => mfcc => blackhole;
+mfcc.computeFromSpectrum(blob.fvals());
+```
+
+Typical use: speech/music feature extraction, instrument recognition, phoneme classification.
+
+### SFM (Spectral Flatness Measure)
+
+Ratio of geometric mean to arithmetic mean of the magnitude spectrum. Value near 0 = tonal (peaky spectrum), near 1 = noisy (flat spectrum).
+
+```chuck
+adc => FFT fft =^ SFM sfm;
+fft => blackhole;
+
+// upchuck triggers FFT then SFM
+sfm.upchuck();
+sfm.getResult()         // float: SFM value 0.0 (tonal) – 1.0 (noisy)
+
+// or via blob
+sfm.upchuck() @=> UAnaBlob blob;
+blob.fvals()[0]         // same SFM value
+```
+
+SFM = `exp(mean(log|X[k]|)) / mean(|X[k]|)`
+
+### Kurtosis (Spectral Kurtosis)
+
+Normalized 4th central moment of the spectral distribution. High = impulsive/transient; low = sustained/tonal.
+
+```chuck
+adc => FFT fft =^ Kurtosis kurt;
+fft => blackhole;
+
+kurt.upchuck();
+kurt.getResult()        // float: kurtosis value (typically 1.0–10.0+ for real signals)
+```
+
+Kurtosis = `E[(X-μ)^4] / σ^4`
 
 ---
 

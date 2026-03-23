@@ -51,7 +51,7 @@ public class ChuckEmitter {
         "TubeBell","Wurley","ModalBar","Shakers","BandedWG","SubNoise","FullRect","HalfRect","ZeroX","WarpTable",
         "CurveTable","GenX","Gen5","Gen7","Gen10","Mix2","Dyno","Event","Hid","HidMsg","MidiIn","MidiOut","MidiMsg",
         "OscIn","OscOut","OscMsg","FileIO","IO","Std","Math","Machine","Object","String","Array","UGen",
-        "UAna","Shred","Thread","ChucK"
+        "UAna","Shred","Thread","ChucK","ZCR","MFCC","SFM","Kurtosis","vec2"
     );
 
     public ChuckEmitter() {
@@ -284,6 +284,61 @@ public class ChuckEmitter {
                 continueJumps.peek().add(code.getNumInstructions());
                 code.addInstruction(null); // placeholder for Jump
             }
+        } else if (stmt instanceof ChuckAST.SwitchStmt s) {
+            emitExpression(s.condition(), code);
+            
+            breakJumps.push(new ArrayList<>());
+            List<Integer> caseConditionJumps = new ArrayList<>();
+            ChuckAST.CaseStmt defaultCase = null;
+            int defaultBodyStartIndex = -1;
+            
+            for (ChuckAST.CaseStmt c : s.cases()) {
+                if (c.isDefault()) {
+                    defaultCase = c;
+                } else {
+                    code.addInstruction(new Duplicate());
+                    emitExpression(c.match(), code);
+                    code.addInstruction(new EqualAny());
+                    caseConditionJumps.add(code.getNumInstructions());
+                    code.addInstruction(null); // JumpIfTrue
+                }
+            }
+            
+            code.addInstruction(new Pop()); // pop switch value if no match
+            int jumpToDefaultOrEnd = code.getNumInstructions();
+            code.addInstruction(null); // Jump to default or end
+            
+            int caseIdx = 0;
+            for (ChuckAST.CaseStmt c : s.cases()) {
+                if (c.isDefault()) {
+                    defaultBodyStartIndex = code.getNumInstructions();
+                } else {
+                    code.replaceInstruction(caseConditionJumps.get(caseIdx++), new JumpIfTrue(code.getNumInstructions()));
+                    code.addInstruction(new Pop()); // pop switch value before body executes
+                }
+                for (ChuckAST.Stmt b : c.body()) {
+                    emitStatement(b, code);
+                }
+                // Implicit break: add jump-to-end unless body ends with explicit break
+                java.util.List<ChuckAST.Stmt> body = c.body();
+                boolean endsWithBreak = !body.isEmpty() && body.get(body.size() - 1) instanceof ChuckAST.BreakStmt;
+                if (!endsWithBreak) {
+                    breakJumps.peek().add(code.getNumInstructions());
+                    code.addInstruction(null); // implicit jump to end (no fall-through)
+                }
+            }
+
+            int endPc = code.getNumInstructions();
+
+            if (defaultCase != null) {
+                code.replaceInstruction(jumpToDefaultOrEnd, new Jump(defaultBodyStartIndex));
+            } else {
+                code.replaceInstruction(jumpToDefaultOrEnd, new Jump(endPc));
+            }
+
+            for (int jump : breakJumps.pop()) {
+                code.replaceInstruction(jump, new Jump(endPc));
+            }
         } else if (stmt instanceof ChuckAST.ForStmt s) {
             emitStatement(s.init(), code);
             int startPc = code.getNumInstructions();
@@ -337,7 +392,7 @@ public class ChuckEmitter {
             varTypes.put(s.name(), s.type()); // track variable type for operator dispatch
             int argCount = 0;
             boolean isUserClass = userClassRegistry.containsKey(s.type());
-            boolean isVec = s.type().equals("vec3") || s.type().equals("vec4") || s.type().equals("complex") || s.type().equals("polar");
+            boolean isVec = s.type().equals("vec2") || s.type().equals("vec3") || s.type().equals("vec4") || s.type().equals("complex") || s.type().equals("polar");
             boolean forceGlobal = s.isGlobal();
             // Compile-time check: detect global type conflicts
             if (forceGlobal || localScopes.isEmpty()) {
@@ -378,8 +433,11 @@ public class ChuckEmitter {
                     argCount = 1;
                 }
 
-                if (forceGlobal || localScopes.isEmpty()) {
-                    code.addInstruction(new InstantiateSetAndPushGlobal(s.type(), s.name(), argCount, s.isReference(), !s.arraySizes().isEmpty(), userClassRegistry));
+                boolean isArrayDecl = !s.arraySizes().isEmpty();
+                boolean useGlobal = forceGlobal || localScopes.isEmpty() || (localScopes.size() == 1 && isArrayDecl);
+                if (useGlobal) {
+                    globalVarTypes.put(s.name(), s.type());
+                    code.addInstruction(new InstantiateSetAndPushGlobal(s.type(), s.name(), argCount, s.isReference(), isArrayDecl, userClassRegistry));
                     code.addInstruction(new Pop());
                 } else {
                     Map<String, Integer> scope = localScopes.peek();
@@ -388,7 +446,7 @@ public class ChuckEmitter {
                         offset = scope.size();
                         scope.put(s.name(), offset);
                     }
-                    code.addInstruction(new InstantiateSetAndPushLocal(s.type(), offset, argCount, s.isReference(), !s.arraySizes().isEmpty(), userClassRegistry));
+                    code.addInstruction(new InstantiateSetAndPushLocal(s.type(), offset, argCount, s.isReference(), isArrayDecl, userClassRegistry));
                     code.addInstruction(new Pop());
                 }
             }
@@ -472,7 +530,7 @@ public class ChuckEmitter {
         } else if (stmt instanceof ChuckAST.ClassDefStmt s) {
             // Check for extending primitive types
             if (s.parentName() != null) {
-                java.util.Set<String> primitives = java.util.Set.of("int", "float", "string", "time", "dur", "void", "vec3", "vec4", "complex", "polar");
+                java.util.Set<String> primitives = java.util.Set.of("int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar");
                 if (primitives.contains(s.parentName())) {
                     throw new RuntimeException(currentFile + ": error: cannot extend primitive type '" + s.parentName() + "'");
                 }
@@ -500,6 +558,7 @@ public class ChuckEmitter {
                         boolean isArray = !f.arraySizes().isEmpty();
                         if (!isArray && f.type().equals("int")) staticInts.put(f.name(), 0L);
                         else if (!isArray && f.type().equals("float")) { staticInts.put(f.name(), Double.doubleToRawLongBits(0.0)); staticIsDouble.put(f.name(), true); }
+                        else if (f.type().equals("vec2")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 2));
                         else if (f.type().equals("vec3")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 3));
                         else if (f.type().equals("vec4")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 4));
                         else if (f.type().equals("complex") || f.type().equals("polar")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 2));
@@ -807,7 +866,7 @@ public class ChuckEmitter {
             // Check for 'new' on primitive types or undefined types
             if (e.name().startsWith("@new_")) {
                 boolean isArrayNew = e.name().startsWith("@new_array_");
-                java.util.Set<String> primitives = java.util.Set.of("int", "float", "string", "time", "dur", "void", "vec3", "vec4", "complex", "polar");
+                java.util.Set<String> primitives = java.util.Set.of("int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar");
                 if (primitives.contains(e.type()) && !isArrayNew) {
                     throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
                         + ": error: cannot use 'new' on primitive type '" + e.type() + "'");
@@ -822,7 +881,8 @@ public class ChuckEmitter {
                     "BeeThree","BlitSaw","BlitSquare","Blit","BlowBotl","BlowHole","PercFlut","HevyMetl","FMVoices",
                     "TubeBell","Wurley","ModalBar","Shakers","BandedWG","SubNoise","FullRect","HalfRect","ZeroX","WarpTable",
                     "CurveTable","GenX","Gen5","Gen7","Gen10","Mix2","Dyno","Event","Hid","HidMsg","MidiIn","MidiOut","MidiMsg",
-                    "OscIn","OscOut","OscMsg","FileIO","IO","Std","Math","Machine","Object","String","Array"
+                    "OscIn","OscOut","OscMsg","FileIO","IO","Std","Math","Machine","Object","String","Array",
+                    "ZCR","MFCC"
                 );
                 if (!userClassRegistry.containsKey(e.type()) && !knownUGenTypes.contains(e.type()) && !primitives.contains(e.type())) {
                     throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
@@ -1146,13 +1206,15 @@ public class ChuckEmitter {
                         }
                     }
                 }
-                // Check for user-class binary operator overload (+, -, *, /, %)
+                // Check for user-class binary operator overload (+, -, *, /, %, <, <=, >, >=, ==, !=)
                 {
                     String lhsType = getExprType(e.lhs());
                     if (lhsType != null && userClassRegistry.containsKey(lhsType)) {
                         String opSymbol = switch (e.op()) {
                             case PLUS -> "+"; case MINUS -> "-"; case TIMES -> "*";
                             case DIVIDE -> "/"; case PERCENT -> "%";
+                            case LT -> "<"; case LE -> "<="; case GT -> ">";
+                            case GE -> ">="; case EQ -> "=="; case NEQ -> "!=";
                             default -> null;
                         };
                         if (opSymbol != null) {
@@ -1164,6 +1226,62 @@ public class ChuckEmitter {
                                 code.addInstruction(new CallFunc(opFunc, 2));
                                 return;
                             }
+                        }
+                    }
+                }
+                // Check for complex/polar built-in arithmetic
+                {
+                    String lhsType = getExprType(e.lhs());
+                    if ("complex".equals(lhsType) || "polar".equals(lhsType)) {
+                        boolean isPolar = "polar".equals(lhsType);
+                        ChuckInstr complexInstr = switch (e.op()) {
+                            case PLUS  -> isPolar ? new PolarAdd()  : new ComplexAdd();
+                            case MINUS -> isPolar ? new PolarSub()  : new ComplexSub();
+                            case TIMES -> isPolar ? new PolarMul()  : new ComplexMul();
+                            case DIVIDE -> isPolar ? new PolarDiv() : new ComplexDiv();
+                            default -> null;
+                        };
+                        if (complexInstr != null) {
+                            emitExpression(e.lhs(), code);
+                            emitExpression(e.rhs(), code);
+                            code.addInstruction(complexInstr);
+                            return;
+                        }
+                    }
+                }
+                // Check for vec2/vec3/vec4 element-wise arithmetic
+                {
+                    String lhsType = getExprType(e.lhs());
+                    if ("vec2".equals(lhsType) || "vec3".equals(lhsType) || "vec4".equals(lhsType)) {
+                        switch (e.op()) {
+                            case PLUS -> {
+                                emitExpression(e.lhs(), code);
+                                emitExpression(e.rhs(), code);
+                                code.addInstruction(new VecAdd());
+                                return;
+                            }
+                            case MINUS -> {
+                                emitExpression(e.lhs(), code);
+                                emitExpression(e.rhs(), code);
+                                code.addInstruction(new VecSub());
+                                return;
+                            }
+                            case TIMES -> {
+                                // vec * scalar: check if rhs is scalar (float/int)
+                                String rhsType = getExprType(e.rhs());
+                                if (rhsType == null || "float".equals(rhsType) || "int".equals(rhsType)) {
+                                    emitExpression(e.lhs(), code);
+                                    emitExpression(e.rhs(), code);
+                                    code.addInstruction(new VecScale());
+                                    return;
+                                }
+                                // vec * vec → dot product
+                                emitExpression(e.lhs(), code);
+                                emitExpression(e.rhs(), code);
+                                code.addInstruction(new VecDot());
+                                return;
+                            }
+                            default -> {} // fall through to generic
                         }
                     }
                 }
@@ -1365,6 +1483,20 @@ public class ChuckEmitter {
                     if (d.staticObjects().containsKey(id.name())) {
                         code.addInstruction(new GetStatic(currentClass, id.name()));
                         code.addInstruction(new GetFieldByName(e.member()));
+                        return;
+                    }
+                }
+            }
+            // Vector field accessor: v.x / v.y / v.z / v.w / v.re / v.im / v.mag / v.phase
+            {
+                int vecIdx = vecFieldIndex(e.member());
+                if (vecIdx >= 0 && e.base() instanceof ChuckAST.IdExp baseId) {
+                    String baseType = varTypes.get(baseId.name());
+                    if (baseType == null) baseType = globalVarTypes.get(baseId.name());
+                    if (isVecType(baseType)) {
+                        emitExpression(e.base(), code);
+                        code.addInstruction(new PushInt(vecIdx));
+                        code.addInstruction(new GetArrayInt());
                         return;
                     }
                 }
@@ -1619,6 +1751,16 @@ public class ChuckEmitter {
                 return;
             }
             emitExpression(e.call(), code);
+        } else if (exp instanceof ChuckAST.TernaryExp e) {
+            emitExpression(e.condition(), code);
+            int jumpFalseIdx = code.getNumInstructions();
+            code.addInstruction(null); // placeholder JumpIfFalse to else branch
+            emitExpression(e.thenExp(), code);
+            int jumpEndIdx = code.getNumInstructions();
+            code.addInstruction(null); // placeholder Jump to end
+            code.replaceInstruction(jumpFalseIdx, new JumpIfFalse(code.getNumInstructions()));
+            emitExpression(e.elseExp(), code);
+            code.replaceInstruction(jumpEndIdx, new Jump(code.getNumInstructions()));
         }
     }
 
@@ -1684,6 +1826,18 @@ public class ChuckEmitter {
                     default -> code.addInstruction(new MathFunc(e.member()));
                 }
             } else {
+                // Vector field write: val => v.x / v.y / v.re / v.im etc.
+                int vecIdx = vecFieldIndex(e.member());
+                if (vecIdx >= 0 && e.base() instanceof ChuckAST.IdExp baseId) {
+                    String baseType = varTypes.get(baseId.name());
+                    if (baseType == null) baseType = globalVarTypes.get(baseId.name());
+                    if (isVecType(baseType)) {
+                        emitExpression(e.base(), code);
+                        code.addInstruction(new PushInt(vecIdx));
+                        code.addInstruction(new SetArrayInt());
+                        return;
+                    }
+                }
                 emitExpression(e.base(), code);
                 code.addInstruction(new SetMemberIntByName(e.member()));
             }
@@ -1707,9 +1861,8 @@ public class ChuckEmitter {
                 // ChuckTo pops source & target, pushes target back.
                 // Stack is now: [..., target]
             } else {
-                code.addInstruction(new StackSwap());
                 code.addInstruction(new Pop());
-                // Stack is now: [..., target]
+                // Stack is now: [..., source]
             }
             
             // Now save the target object to its variable
@@ -1761,6 +1914,26 @@ public class ChuckEmitter {
     private Integer getLocalOffset(String name) {
         if (localScopes.isEmpty()) return null;
         return localScopes.peek().get(name);
+    }
+
+    /**
+     * Returns the array index for a vec/complex/polar field name, or -1 if not a vec field.
+     * x/re/mag -> 0, y/im/phase -> 1, z -> 2, w -> 3.
+     */
+    private static int vecFieldIndex(String member) {
+        return switch (member) {
+            case "x", "re", "mag", "magnitude" -> 0;
+            case "y", "im", "phase"            -> 1;
+            case "z"                            -> 2;
+            case "w"                            -> 3;
+            default                             -> -1;
+        };
+    }
+
+    /** Returns true if the type name is a vector or complex primitive type. */
+    private static boolean isVecType(String type) {
+        return type != null && (type.equals("vec2") || type.equals("vec3") || type.equals("vec4")
+                || type.equals("complex") || type.equals("polar"));
     }
 
     /** Checks a static initializer's source expression for disallowed references (member/local vars and funcs). */
@@ -1848,10 +2021,24 @@ public class ChuckEmitter {
         int o1, o2; SwapLocal(int a, int b) { o1 = a; o2 = b; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             int fp = s.getFramePointer();
-            long d1 = s.mem.getData(fp + o1); Object r1 = s.mem.getRef(fp + o1);
-            s.mem.setData(fp + o1, s.mem.getData(fp + o2)); s.mem.setRef(fp + o1, s.mem.getRef(fp + o2));
-            s.mem.setData(fp + o2, d1); s.mem.setRef(fp + o2, r1);
-            if (r1 != null) s.reg.pushObject(r1); else s.reg.push(d1);
+            int i1 = fp + o1, i2 = fp + o2;
+            // Snapshot slot 1
+            long d1 = s.mem.getData(i1);
+            Object r1 = s.mem.getRef(i1);
+            boolean isObj1 = s.mem.isObjectAt(i1);
+            boolean isDbl1 = s.mem.isDoubleAt(i1);
+            // Copy slot 2 → slot 1 (preserving type flags)
+            if (s.mem.isObjectAt(i2)) s.mem.setRef(i1, s.mem.getRef(i2));
+            else if (s.mem.isDoubleAt(i2)) s.mem.setData(i1, Double.longBitsToDouble(s.mem.getData(i2)));
+            else s.mem.setData(i1, s.mem.getData(i2));
+            // Copy snapshot (slot 1) → slot 2 (preserving type flags)
+            if (isObj1) s.mem.setRef(i2, r1);
+            else if (isDbl1) s.mem.setData(i2, Double.longBitsToDouble(d1));
+            else s.mem.setData(i2, d1);
+            // Push a value (the new value of slot 1) for any expression context
+            if (s.mem.isObjectAt(i1)) s.reg.pushObject(s.mem.getRef(i1));
+            else if (s.mem.isDoubleAt(i1)) s.reg.push(Double.longBitsToDouble(s.mem.getData(i1)));
+            else s.reg.push(s.mem.getData(i1));
         }
     }
 
@@ -2200,10 +2387,8 @@ public class ChuckEmitter {
                 if (obj instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
                 if (obj instanceof AutoCloseable ac) s.registerCloseable(ac);
                 s.reg.pushObject(obj);
-            }
-
- else if (s.reg.isDouble(0)) {
-                double val = s.reg.popAsDouble(); s.mem.setData(idx, Double.doubleToRawLongBits(val)); s.reg.push(val);
+            } else if (s.reg.isDouble(0)) {
+                double val = s.reg.popAsDouble(); s.mem.setData(idx, val); s.reg.push(val);
             } else {
                 long val = s.reg.popLong(); s.mem.setData(idx, val); s.reg.push(val);
             }
@@ -2704,7 +2889,8 @@ public class ChuckEmitter {
             if (ar) {
                 int sz = ((Number) args[0]).intValue();
                 if (sz < 0) {
-                    if (t.equals("vec3")) obj = new ChuckArray(ChuckType.ARRAY, 3);
+                    if (t.equals("vec2")) obj = new ChuckArray(ChuckType.ARRAY, 2);
+                    else if (t.equals("vec3")) obj = new ChuckArray(ChuckType.ARRAY, 3);
                     else if (t.equals("vec4")) obj = new ChuckArray(ChuckType.ARRAY, 4);
                     else if (t.equals("complex") || t.equals("polar")) obj = new ChuckArray(ChuckType.ARRAY, 2);
                     else obj = null;
@@ -2765,7 +2951,8 @@ public class ChuckEmitter {
             if (ar) {
                 int sz = ((Number) args[0]).intValue();
                 if (sz < 0) {
-                    if (t.equals("vec3")) obj = new ChuckArray(ChuckType.ARRAY, 3);
+                    if (t.equals("vec2")) obj = new ChuckArray(ChuckType.ARRAY, 2);
+                    else if (t.equals("vec3")) obj = new ChuckArray(ChuckType.ARRAY, 3);
                     else if (t.equals("vec4")) obj = new ChuckArray(ChuckType.ARRAY, 4);
                     else if (t.equals("complex") || t.equals("polar")) obj = new ChuckArray(ChuckType.ARRAY, 2);
                     else obj = null;
@@ -2925,6 +3112,7 @@ public class ChuckEmitter {
             case "SinOsc" -> new SinOsc(sr); case "Gain" -> new Gain();
             case "Pan2" -> new Pan2(); case "Noise" -> new Noise();
             case "ADSR", "Adsr" -> new Adsr(sr); case "string" -> new ChuckString("");
+            case "vec2" -> new ChuckArray(ChuckType.ARRAY, 2);
             case "vec3" -> new ChuckArray(ChuckType.ARRAY, 3);
             case "vec4" -> new ChuckArray(ChuckType.ARRAY, 4);
             case "complex", "polar" -> new ChuckArray(ChuckType.ARRAY, 2);
@@ -2938,11 +3126,16 @@ public class ChuckEmitter {
             // Oscillators
             case "TriOsc" -> new TriOsc(sr);
             case "SawOsc" -> new SawOsc(sr);
+            case "BlitSaw" -> new BlitSaw(sr);
             case "SqrOsc" -> new SqrOsc(sr);
+            case "BlitSquare" -> new BlitSquare(sr);
             case "PulseOsc" -> new PulseOsc(sr);
             case "Phasor" -> new Phasor(sr);
             // Filters
-            case "HPF", "BPF", "BRF", "OnePole" -> new OnePole();
+            case "HPF" -> new HPF(sr);
+            case "BPF" -> new BPF(sr);
+            case "BRF" -> new BRF(sr);
+            case "OnePole" -> new OnePole();
             case "OneZero" -> new OneZero();
             case "ResonZ" -> new ResonZ(sr);
             case "BiQuad", "TwoPole", "TwoZero", "PoleZero" -> new BiQuad(sr);
@@ -2973,6 +3166,10 @@ public class ChuckEmitter {
             case "Rolloff" -> new Rolloff();
             case "RMS" -> new RMS();
             case "Centroid" -> new Centroid();
+            case "ZCR" -> new ZCR();
+            case "MFCC" -> new MFCC();
+            case "SFM" -> new SFM();
+            case "Kurtosis" -> new Kurtosis();
             // GenX table oscillators
             case "GenX" -> new Gen7(sr);
             case "Gen5" -> new Gen5(sr);
@@ -2993,6 +3190,12 @@ public class ChuckEmitter {
             case "Saxofony" -> new Saxofony(sr);
             case "Shakers" -> new Shakers(sr);
             case "Rhodey" -> new Rhodey(sr);
+            case "Wurley" -> new Wurley(sr);
+            case "BeeThree" -> new BeeThree(sr);
+            case "HevyMetl" -> new HevyMetl(sr);
+            case "PercFlut" -> new PercFlut(sr);
+            case "TubeBell" -> new TubeBell(sr);
+            case "FMVoices" -> new FMVoices(sr);
             // I/O
             case "ChuGen" -> new ChuGen();
             case "WarpTable" -> new WarpTable(sr);
@@ -3338,10 +3541,196 @@ public class ChuckEmitter {
                     s.reg.push((long) vm.replace((int)id, path));
                 }
                 case "status" -> { vm.status(); s.reg.push(0L); }
-                case "clear" -> { vm.clear(); s.reg.push(0L); }
+                case "clear", "removeAll" -> { vm.clear(); s.reg.push(0L); }
                 case "eval" -> { String src = args.length > 0 ? String.valueOf(args[0]) : ""; s.reg.push((long) vm.eval(src)); }
+                case "numShreds" -> s.reg.push((long) vm.getActiveShredCount());
+                case "shredExists" -> {
+                    int sid = args.length > 0 ? ((Number) args[0]).intValue() : 0;
+                    s.reg.push(vm.shredExists(sid) ? 1L : 0L);
+                }
+                case "shreds" -> {
+                    int[] ids = vm.getActiveShredIds();
+                    org.chuck.core.ChuckArray arr = new org.chuck.core.ChuckArray(org.chuck.core.ChuckType.ARRAY, ids.length);
+                    for (int i = 0; i < ids.length; i++) arr.setInt(i, ids[i]);
+                    s.reg.pushObject(arr);
+                }
+                case "crash" -> { vm.print("[chuck]: (VM) crash! (by request)\n"); System.exit(1); }
                 default -> s.reg.push(0L);
             }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Built-in complex arithmetic instructions
+    // -------------------------------------------------------------------------
+
+    /** complex + complex : element-wise (re+re, im+im) */
+    public static class ComplexAdd implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            ChuckArray rhs = (ChuckArray) s.reg.popObject();
+            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.setFloat(0, lhs.getFloat(0) + rhs.getFloat(0));
+            result.setFloat(1, lhs.getFloat(1) + rhs.getFloat(1));
+            s.reg.pushObject(result);
+        }
+    }
+
+    /** complex - complex : element-wise */
+    public static class ComplexSub implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            ChuckArray rhs = (ChuckArray) s.reg.popObject();
+            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.setFloat(0, lhs.getFloat(0) - rhs.getFloat(0));
+            result.setFloat(1, lhs.getFloat(1) - rhs.getFloat(1));
+            s.reg.pushObject(result);
+        }
+    }
+
+    /** complex * complex : (a+bi)(c+di) = (ac-bd) + (ad+bc)i */
+    public static class ComplexMul implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            ChuckArray rhs = (ChuckArray) s.reg.popObject();
+            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            double a = lhs.getFloat(0), b = lhs.getFloat(1);
+            double c = rhs.getFloat(0), d = rhs.getFloat(1);
+            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.setFloat(0, a * c - b * d);
+            result.setFloat(1, a * d + b * c);
+            s.reg.pushObject(result);
+        }
+    }
+
+    /** complex / complex : (a+bi)/(c+di) = ((ac+bd) + (bc-ad)i) / (c²+d²) */
+    public static class ComplexDiv implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            ChuckArray rhs = (ChuckArray) s.reg.popObject();
+            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            double a = lhs.getFloat(0), b = lhs.getFloat(1);
+            double c = rhs.getFloat(0), d = rhs.getFloat(1);
+            double denom = c * c + d * d;
+            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            if (denom < 1e-300) {
+                result.setFloat(0, 0.0);
+                result.setFloat(1, 0.0);
+            } else {
+                result.setFloat(0, (a * c + b * d) / denom);
+                result.setFloat(1, (b * c - a * d) / denom);
+            }
+            s.reg.pushObject(result);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Built-in polar arithmetic instructions
+    // -------------------------------------------------------------------------
+
+    /** polar + polar : convert to rectangular, add, convert back */
+    public static class PolarAdd implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            ChuckArray rhs = (ChuckArray) s.reg.popObject();
+            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            double r1 = lhs.getFloat(0), t1 = lhs.getFloat(1);
+            double r2 = rhs.getFloat(0), t2 = rhs.getFloat(1);
+            double re = r1 * Math.cos(t1) + r2 * Math.cos(t2);
+            double im = r1 * Math.sin(t1) + r2 * Math.sin(t2);
+            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.setFloat(0, Math.sqrt(re * re + im * im));
+            result.setFloat(1, Math.atan2(im, re));
+            s.reg.pushObject(result);
+        }
+    }
+
+    /** polar - polar : convert to rectangular, subtract, convert back */
+    public static class PolarSub implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            ChuckArray rhs = (ChuckArray) s.reg.popObject();
+            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            double r1 = lhs.getFloat(0), t1 = lhs.getFloat(1);
+            double r2 = rhs.getFloat(0), t2 = rhs.getFloat(1);
+            double re = r1 * Math.cos(t1) - r2 * Math.cos(t2);
+            double im = r1 * Math.sin(t1) - r2 * Math.sin(t2);
+            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.setFloat(0, Math.sqrt(re * re + im * im));
+            result.setFloat(1, Math.atan2(im, re));
+            s.reg.pushObject(result);
+        }
+    }
+
+    /** polar * polar : (r1*r2, θ1+θ2) */
+    public static class PolarMul implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            ChuckArray rhs = (ChuckArray) s.reg.popObject();
+            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.setFloat(0, lhs.getFloat(0) * rhs.getFloat(0));
+            result.setFloat(1, lhs.getFloat(1) + rhs.getFloat(1));
+            s.reg.pushObject(result);
+        }
+    }
+
+    /** polar / polar : (r1/r2, θ1-θ2) */
+    public static class PolarDiv implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            ChuckArray rhs = (ChuckArray) s.reg.popObject();
+            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            double mag = rhs.getFloat(0);
+            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.setFloat(0, mag < 1e-300 ? 0.0 : lhs.getFloat(0) / mag);
+            result.setFloat(1, lhs.getFloat(1) - rhs.getFloat(1));
+            s.reg.pushObject(result);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Built-in vec element-wise arithmetic instructions
+    // -------------------------------------------------------------------------
+
+    /** vec + vec : element-wise addition */
+    public static class VecAdd implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            ChuckArray rhs = (ChuckArray) s.reg.popObject();
+            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            int len = Math.min(lhs.size(), rhs.size());
+            ChuckArray result = new ChuckArray(ChuckType.ARRAY, len);
+            for (int i = 0; i < len; i++) result.setFloat(i, lhs.getFloat(i) + rhs.getFloat(i));
+            s.reg.pushObject(result);
+        }
+    }
+
+    /** vec - vec : element-wise subtraction */
+    public static class VecSub implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            ChuckArray rhs = (ChuckArray) s.reg.popObject();
+            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            int len = Math.min(lhs.size(), rhs.size());
+            ChuckArray result = new ChuckArray(ChuckType.ARRAY, len);
+            for (int i = 0; i < len; i++) result.setFloat(i, lhs.getFloat(i) - rhs.getFloat(i));
+            s.reg.pushObject(result);
+        }
+    }
+
+    /** vec * scalar (float/int) : scale all elements */
+    public static class VecScale implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            double scalar = s.reg.popAsDouble();
+            ChuckArray vec = (ChuckArray) s.reg.popObject();
+            ChuckArray result = new ChuckArray(ChuckType.ARRAY, vec.size());
+            for (int i = 0; i < vec.size(); i++) result.setFloat(i, vec.getFloat(i) * scalar);
+            s.reg.pushObject(result);
+        }
+    }
+
+    /** vec * vec : dot product, returns scalar (float) */
+    public static class VecDot implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            ChuckArray rhs = (ChuckArray) s.reg.popObject();
+            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            int len = Math.min(lhs.size(), rhs.size());
+            double dot = 0.0;
+            for (int i = 0; i < len; i++) dot += lhs.getFloat(i) * rhs.getFloat(i);
+            s.reg.push(dot);
         }
     }
 }

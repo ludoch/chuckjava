@@ -1,7 +1,5 @@
 package org.chuck.core;
 
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Defines a ChucK type.

@@ -49,7 +49,7 @@ The pipeline: `.ck` source → `ChuckLexer` → tokens → `ChuckParser` → AST
   - Individual instruction classes (`PushInt`, `PushFloat`, `AdvanceTime`, `ChuckTo`, `CallFunc`, etc.)
 - **`org.chuck.audio`** — Unit Generator (UGen) graph:
   - `ChuckUGen` (abstract base) — pull-based tick mechanism; `tick(long systemTime)` is idempotent per sample
-  - Concrete UGens: oscillators (`SinOsc`, `SawOsc`, `TriOsc`, `SqrOsc`, `PulseOsc`, `Phasor`), effects (`Echo`, `Delay`, `Chorus`, `JCRev`, `ResonZ`, `AllPass`), envelopes (`Adsr`, `Envelope`), instruments (`Clarinet`, `Mandolin`, `Plucked`, `Rhodey`), utilities (`Gain`, `Pan2`, `Noise`, `Impulse`, `Step`, `Blackhole`, `SndBuf`, `WvOut`)
+  - Concrete UGens: oscillators (`SinOsc`, `SawOsc`, `TriOsc`, `SqrOsc`, `PulseOsc`, `Phasor`, `BlitSaw`, `BlitSquare`), filters (`LPF`, `HPF`, `BPF`, `BRF`, `ResonZ`), effects (`Echo`, `Delay`, `Chorus`, `JCRev`, `AllPass`), envelopes (`Adsr`, `Envelope`), instruments (`Clarinet`, `Mandolin`, `Plucked`, `Rhodey`, `Wurley`, `BeeThree`, `HevyMetl`, `PercFlut`, `TubeBell`, `FMVoices`), analyzers (`ZCR`, `MFCC`, `SFM`, `Kurtosis`, `RMS`, `Centroid`, `FFT`, `IFFT`), utilities (`Gain`, `Pan2`, `Noise`, `Impulse`, `Step`, `Blackhole`, `SndBuf`, `WvOut`)
   - `ChuckAudio` — Java `SourceDataLine` audio output; calls `vm.advanceTime(bufferSize)` per buffer
 - **`org.chuck.ide`** — `ChuckIDE`: a JavaFX-based code editor with syntax highlighting (RichTextFX)
 - **`org.chuck.midi`** — `MidiIn`/`ChuckMidi` for MIDI input support
@@ -60,6 +60,28 @@ The pipeline: `.ck` source → `ChuckLexer` → tokens → `ChuckParser` → AST
 - Emitter now handles: `UnaryExp`, `StringExp`, `ReturnStmt`, `ASSIGN`, `CallMethod`, `MathFunc`, `StdFtom`, all 22 UGen types in `InstantiateAndSetGlobal`
 - IDE: replaced `TextArea` with RichTextFX `CodeArea` (syntax highlighting, line numbers, error line highlighting)
 - Concurrency model was audited and confirmed correct — Virtual Thread yield works via `ReentrantLock`
+
+### Recently Fixed Issues (2026-03-22)
+- `emitChuckTarget(DeclExp)` bug: `StackSwap + Pop + StoreLocal` stored default 0 instead of source; replaced with `Pop + StoreLocal`
+- ANTLR grammar precedence: `conditionalOp` (ternary `?:`) was listed below `chuckOp` (`=>`), giving it lower priority; swapped to fix `a ? b : c => x` parsing
+- Added `BlitSaw` and `BlitSquare` PolyBLEP band-limited oscillators
+- Added `HPF`, `BPF`, `BRF` Butterworth filters
+- Added `switch`/`case`/`default` statement support (ANTLR grammar + emitter)
+- Full Machine shred API: `numShreds()`, `shreds()`, `shredExists(id)`, `crash()`, `removeAll()`
+- Full `me.*` shred API: `path()`, `source()`, `sourcePath()`, `running()`, `done()`; new instruction classes `MeId`, `MePath`, `MeRunning`
+
+### Recently Fixed Issues (2026-03-23)
+- `SwapLocal` type-tag corruption: `setRef(idx, null)` was marking int slots as objects; fixed by copying all four parallel arrays respecting source-slot type flags
+- Root-scope array declarations now use global storage (`InstantiateSetAndPushGlobal`) so `vm.getGlobalObject(name)` returns them correctly
+- Added `vec2` type (2-element vector, stored as `ChuckArray(2)`)
+- Vector field accessors `.x/.y/.z/.w`, `.re/.im`, `.mag/.phase` wired in emitter for both read (`DotExp`) and write (`emitChuckTarget` DotExp path)
+- Added `ZCR` (Zero Crossing Rate) UAna — frame-based, configurable `frameSize`, `upchuck()`-compatible
+- Added `MFCC` UAna — mel filterbank (26 bands) + log + DCT-II; `computeFromSpectrum()` for external FFT input
+- Added FM instruments: `Wurley`, `BeeThree`, `HevyMetl`, `PercFlut`, `TubeBell`, `FMVoices` — all with `noteOn`/`noteOff`/`setFreq`
+- Comparison operator overloading (`<`, `<=`, `>`, `>=`, `==`, `!=`) dispatches to user-defined `__pub_op__<:2` functions (same dispatch path as arithmetic)
+- Built-in `complex`/`polar` arithmetic: `ComplexAdd/Sub/Mul/Div`, `PolarAdd/Sub/Mul/Div` inner instruction classes; polar `*`/`/` use magnitude×/÷ and phase+/−
+- Built-in `vec2`/`vec3`/`vec4` arithmetic: `VecAdd`, `VecSub`, `VecScale`, `VecDot` instructions; emitter detects vec LHS type via `varTypes` map
+- Added `SFM` (Spectral Flatness Measure) and `Kurtosis` UAnas — both chain after `FFT`, pull `getFvals()` from upstream blob
 
 ### Key Design Patterns
 

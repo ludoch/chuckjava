@@ -121,7 +121,7 @@ public class ChuckParser {
         "SinOsc", "SawOsc", "TriOsc", "SqrOsc", "PulseOsc", "Phasor", "Noise", "Impulse", "Step",
         // UGens - instruments
         "Mandolin", "Clarinet", "Plucked", "Rhodey", "Bowed", "StifKarp", "Moog", "Flute", "Sitar",
-        "Brass", "Saxofony", "Shakers",
+        "Brass", "Saxofony", "Shakers", "Wurley", "BeeThree", "HevyMetl", "PercFlut", "TubeBell", "FMVoices",
         // UGens - envelopes
         "ADSR", "Adsr", "Envelope",
         // UGens - utilities
@@ -139,10 +139,10 @@ public class ChuckParser {
         // Builtins
         "Machine", "me",
         // Primitive/built-in types
-        "complex", "polar", "vec3", "vec4",
+        "complex", "polar", "vec2", "vec3", "vec4",
         // Other built-in types seen in examples
         "Event", "Object", "UGen", "Chugraph", "Chugen",
-        "DCT", "Flip", "PitchTrack", "AutoCorr", "XCorr", "ZeroX", "Flux", "MFCC", "Kurtosis",
+        "DCT", "Flip", "PitchTrack", "AutoCorr", "XCorr", "ZeroX", "Flux", "MFCC", "ZCR", "Kurtosis",
         "Rolloff", "SFM", "Chroma", "Sigmund", "Dyno", "LPF", "HPF", "BPF", "BRF", "BiQuad",
         "PoleZero", "AllPass", "Blit", "BlitSaw", "BlitSquare", "FilterBasic", "Teabox",
         "KNN", "KNN2", "SVM", "MLP", "HMM", "PCA", "Wekinator", "Word2Vec",
@@ -785,6 +785,7 @@ public class ChuckParser {
         }
 
         // Handle @operator return type prefix: fun @operator +
+        @SuppressWarnings("unused")
         boolean hasAtOperator = false;
         if (peek().type() == ChuckLexer.TokenType.ID && peek().value().startsWith("@")) {
             hasAtOperator = true;

@@ -8,9 +8,11 @@ public class Moog extends ChuckUGen {
     private final SinOsc[] oscillators = new SinOsc[2];
     private final Lpf filter;
     private final Adsr adsr;
+    @SuppressWarnings("unused")
     private float filterQ = 0.5f;
     private float filterSweep = 0.0f;
     private double freq = 440.0;
+    @SuppressWarnings("unused")
     private float sampleRate;
 
     public Moog(float sampleRate) {

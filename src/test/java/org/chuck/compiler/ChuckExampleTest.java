@@ -30,10 +30,12 @@ public class ChuckExampleTest {
         
         // Mock a "s" object (SinOsc)
         ChuckType sinType = new ChuckType("SinOsc", ChuckType.OBJECT, 2, 0);
+        @SuppressWarnings("unused")
         ChuckObject sinOsc = new ChuckObject(sinType);
         vm.setGlobalInt("s", 0); // We'll represent objects by IDs or direct globals in this simple test
         
         // Let's manually push the object for the script to use
+        @SuppressWarnings("unused")
         ChuckShred shred = new ChuckShred(bytecode) {
             @Override
             public void execute(ChuckVM vm) {

@@ -113,6 +113,11 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     public String dir() {
         return dir(0);
     }
+    
+    public String path() { return (code != null && code.getName() != null) ? code.getName() : ""; }
+    public String source() { return path(); }
+    public String sourcePath() { return path(); }
+    public int running() { return isRunning ? 1 : 0; }
 
     public String dir(int n) {
         if (code == null || code.getName() == null) return "./";

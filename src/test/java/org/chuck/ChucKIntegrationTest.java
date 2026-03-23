@@ -74,6 +74,7 @@ public class ChucKIntegrationTest {
         System.setErr(ps);
 
         try {
+            @SuppressWarnings("unused")
             int shredId = vm.run(source, ckFile.toString());
 
             // Advance time until finished or timeout

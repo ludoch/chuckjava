@@ -1,0 +1,84 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Current File",
+            "request": "launch",
+            "mainClass": "${file}"
+        },
+        {
+            "type": "java",
+            "name": "Test77",
+            "request": "launch",
+            "mainClass": "Test77",
+            "projectName": "chuck-java"
+        },
+        {
+            "type": "java",
+            "name": "AntlrExamplesTester",
+            "request": "launch",
+            "mainClass": "org.chuck.AntlrExamplesTester",
+            "projectName": "chuck-java"
+        },
+        {
+            "type": "java",
+            "name": "HandwrittenExamplesTester",
+            "request": "launch",
+            "mainClass": "org.chuck.HandwrittenExamplesTester",
+            "projectName": "chuck-java"
+        },
+        {
+            "type": "java",
+            "name": "Launcher",
+            "request": "launch",
+            "mainClass": "org.chuck.Launcher",
+            "projectName": "chuck-java"
+        },
+        {
+            "type": "java",
+            "name": "Main",
+            "request": "launch",
+            "mainClass": "org.chuck.Main",
+            "projectName": "chuck-java"
+        },
+        {
+            "type": "java",
+            "name": "JavaMachine",
+            "request": "launch",
+            "mainClass": "org.chuck.core.JavaMachine",
+            "projectName": "chuck-java"
+        },
+        {
+            "type": "java",
+            "name": "CallbackHost",
+            "request": "launch",
+            "mainClass": "org.chuck.examples.host.CallbackHost",
+            "projectName": "chuck-java"
+        },
+        {
+            "type": "java",
+            "name": "GlobalInterop",
+            "request": "launch",
+            "mainClass": "org.chuck.examples.host.GlobalInterop",
+            "projectName": "chuck-java"
+        },
+        {
+            "type": "java",
+            "name": "MinimalHost",
+            "request": "launch",
+            "mainClass": "org.chuck.examples.host.MinimalHost",
+            "projectName": "chuck-java"
+        },
+        {
+            "type": "java",
+            "name": "ChuckIDE",
+            "request": "launch",
+            "mainClass": "org.chuck.ide.ChuckIDE",
+            "projectName": "chuck-java"
+        }
+    ]
+}

@@ -2,7 +2,6 @@ package org.chuck.audio;
 
 import org.chuck.core.ChuckObject;
 import org.chuck.core.ChuckType;
-import java.util.ArrayList;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.List;
 

@@ -1,7 +1,6 @@
 package org.chuck.core;
 
 import java.io.*;
-import java.nio.file.Paths;
 import java.util.Scanner;
 
 /**
@@ -15,8 +14,10 @@ public class FileIO extends ChuckObject {
     public static final int ASCII = 16;
 
     private RandomAccessFile file;
+    @SuppressWarnings("unused")
     private Scanner scanner;
     private int mode;
+    @SuppressWarnings("unused")
     private String path;
     private boolean eof = false;
 

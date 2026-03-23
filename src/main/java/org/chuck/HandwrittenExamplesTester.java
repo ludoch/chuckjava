@@ -1,8 +1,6 @@
 package org.chuck;
 
 import org.chuck.compiler.*;
-import org.chuck.core.*;
-import java.io.File;
 import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Collectors;
