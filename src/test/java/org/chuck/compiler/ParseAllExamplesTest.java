@@ -1,5 +1,6 @@
 package org.chuck.compiler;
 
+import org.antlr.v4.runtime.*;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -10,7 +11,7 @@ import java.util.*;
 import java.util.stream.Stream;
 
 /**
- * Attempts to parse every .ck file under the examples/ directory.
+ * Attempts to parse every .ck file under the examples/ directory using ANTLR.
  * Reports per-file errors grouped by error message pattern.
  */
 public class ParseAllExamplesTest {
@@ -37,9 +38,11 @@ public class ParseAllExamplesTest {
             for (Path file : ckFiles) {
                 try {
                     String source = Files.readString(file);
-                    ChuckLexer lexer = new ChuckLexer(source);
-                    ChuckParser parser = new ChuckParser(lexer.tokenize());
-                    parser.parse();
+                    CharStream input = CharStreams.fromString(source);
+                    ChuckANTLRLexer lexer = new ChuckANTLRLexer(input);
+                    CommonTokenStream tokens = new CommonTokenStream(lexer);
+                    ChuckANTLRParser parser = new ChuckANTLRParser(tokens);
+                    parser.program();
                     passed++;
                 } catch (Exception e) {
                     String msg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
@@ -54,7 +57,7 @@ public class ParseAllExamplesTest {
         }
 
         // Print summary
-        System.out.printf("%n=== Parse Results: %d / %d passed ===%n%n", passed, total);
+        System.out.printf("%n=== Parse Results (ANTLR): %d / %d passed ===%n%n", passed, total);
 
         if (!errorGroups.isEmpty()) {
             System.out.println("--- Error groups (sorted by frequency) ---");

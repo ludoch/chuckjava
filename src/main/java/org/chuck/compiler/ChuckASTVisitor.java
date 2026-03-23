@@ -42,15 +42,22 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         if (result instanceof List<?> list) {
             List<ChuckAST.Stmt> stmts = new ArrayList<>();
             for (Object item : list) {
-                if (item instanceof ChuckAST.Exp exp) {
+                if (item instanceof ChuckAST.DeclExp d) {
+                    stmts.add(new ChuckAST.DeclStmt(d.type(), d.name(), d.arraySizes(), d.callArgs(), d.isReference(), d.isStatic(), d.isGlobal(), d.line(), d.column()));
+                } else if (item instanceof ChuckAST.Exp exp) {
                     stmts.add(new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()));
                 }
             }
+            // If it's a single DeclStmt in the list, just return it instead of wrapping in BlockStmt
+            if (stmts.size() == 1) return stmts.get(0);
             return new ChuckAST.BlockStmt(stmts, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
         }
         switch (result) {
             case ChuckAST.Stmt stmt -> {
                 return stmt;
+            }
+            case ChuckAST.DeclExp d -> {
+                return new ChuckAST.DeclStmt(d.type(), d.name(), d.arraySizes(), d.callArgs(), d.isReference(), d.isStatic(), d.isGlobal(), d.line(), d.column());
             }
             case ChuckAST.Exp exp -> {
                 return new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
@@ -115,12 +122,34 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     @Override
     public ChuckAST.Stmt visitForStatement(ForStatementContext ctx) {
         if (ctx.COLON() != null) {
-            String type = ctx.getChild(2).getText();
+            String type = ctx.type() != null ? ctx.type().getText() : (ctx.AUTO() != null ? "auto" : "Object");
             String name = ctx.ID().getText();
             ChuckAST.Exp coll = (ChuckAST.Exp) visit(ctx.expression(0));
             return new ChuckAST.ForEachStmt(type, name, coll, (ChuckAST.Stmt) visit(ctx.statement()), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
         }
-        return (ChuckAST.Stmt) visit(ctx.statement());
+
+        ChuckAST.Stmt init = null;
+        ChuckAST.Stmt cond = null;
+        ChuckAST.Exp update = null;
+
+        int childIdx = 2; // skip FOR LPAREN
+        if (ctx.getChild(childIdx) instanceof ExpressionContext) {
+            init = new ChuckAST.ExpStmt((ChuckAST.Exp) visit(ctx.getChild(childIdx)), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+            childIdx++;
+        }
+        childIdx++; // skip SEMI
+
+        if (ctx.getChild(childIdx) instanceof ExpressionContext) {
+            cond = new ChuckAST.ExpStmt((ChuckAST.Exp) visit(ctx.getChild(childIdx)), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+            childIdx++;
+        }
+        childIdx++; // skip SEMI
+
+        if (ctx.getChild(childIdx) instanceof ExpressionContext) {
+            update = (ChuckAST.Exp) visit(ctx.getChild(childIdx));
+        }
+
+        return new ChuckAST.ForStmt(init, cond, update, (ChuckAST.Stmt) visit(ctx.statement()), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     @Override
@@ -157,6 +186,9 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         String typeStr = ctx.type().getText();
         List<ChuckAST.Exp> decls = new ArrayList<>();
         
+        boolean isGlobal = ctx.accessModifier() != null && ctx.accessModifier().GLOBAL() != null;
+        boolean isStatic = ctx.STATIC() != null;
+
         for (VariableDeclContext v : ctx.variableDecl()) {
             List<ChuckAST.Exp> arraySizes = new ArrayList<>();
             for (ChuckANTLRParser.ArrayDimensionContext ad : v.arrayDimension()) {
@@ -178,7 +210,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
             // vec/complex/polar are value types stored as ChuckArrays — instantiate, don't treat as null reference
             
-            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(typeStr, v.ID().getText(), arraySizes, null, isRef, ctx.STATIC() != null, false,
+            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(typeStr, v.ID().getText(), arraySizes, null, isRef, isStatic, isGlobal,
                     v.getStart().getLine(), v.getStart().getCharPositionInLine());            
             
             if (v.CHUCK_OP() != null) {
@@ -191,8 +223,6 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         }
         
         if (decls.size() == 1) return decls.get(0);
-        // If multiple, Return a specialized list or just the last one? 
-        // For emission, we need to emit all. Let's return a list and handle it in Emitter.
         return decls;
     }
 
@@ -385,7 +415,15 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     public ChuckAST.Stmt visitFunctionDef(FunctionDefContext ctx) {
         String retType = ctx.type() != null ? ctx.type().getText() : "void";
         String name = ctx.functionName().getText();
+        boolean isPublic = ctx.PUBLIC() != null || (ctx.accessModifier() != null && ctx.accessModifier().PUBLIC() != null);
         boolean isStatic = ctx.STATIC() != null;
+
+        if (name.startsWith("@operator")) {
+            String opSym = name.substring("@operator".length()).trim();
+            if (isPublic) name = "__pub_op__" + opSym;
+            else name = "__op__" + opSym;
+        }
+
         List<String> argTypes = new ArrayList<>();
         List<String> argNames = new ArrayList<>();
         if (ctx.formalParameters() != null) {

@@ -15,7 +15,6 @@ public class ChuckCLI {
     private boolean loop = false;
     @SuppressWarnings("unused")
     private boolean dump = false;
-    private boolean useAntlr = false;
     private boolean syntaxOnly = false;
     private boolean forceGui = false;
     private int verbose = 1;
@@ -68,8 +67,6 @@ public class ChuckCLI {
                 silent = true;
             } else if (arg.equals("--dump")) {
                 dump = true;
-            } else if (arg.equals("--antlr")) {
-                useAntlr = true;
             } else if (arg.equals("--syntax")) {
                 syntaxOnly = true;
             } else if (arg.equals("--gui") || arg.equals("--ide")) {
@@ -137,17 +134,11 @@ public class ChuckCLI {
         for (String fileName : filesToAdd) {
             try {
                 String source = Files.readString(Paths.get(fileName));
-                if (useAntlr) {
-                    org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
-                    org.chuck.compiler.ChuckANTLRLexer lexer = new org.chuck.compiler.ChuckANTLRLexer(input);
-                    org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
-                    org.chuck.compiler.ChuckANTLRParser parser = new org.chuck.compiler.ChuckANTLRParser(tokens);
-                    parser.program();
-                } else {
-                    org.chuck.compiler.ChuckLexer lexer = new org.chuck.compiler.ChuckLexer(source);
-                    org.chuck.compiler.ChuckParser parser = new org.chuck.compiler.ChuckParser(lexer.tokenize());
-                    parser.parse();
-                }
+                org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
+                org.chuck.compiler.ChuckANTLRLexer lexer = new org.chuck.compiler.ChuckANTLRLexer(input);
+                org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
+                org.chuck.compiler.ChuckANTLRParser parser = new org.chuck.compiler.ChuckANTLRParser(tokens);
+                parser.program();
                 System.out.println("✅ Syntax check passed: " + fileName);
             } catch (Exception e) {
                 System.err.println("❌ Syntax error in " + fileName + ": " + e.getMessage());
@@ -162,7 +153,6 @@ public class ChuckCLI {
             }
 
             ChuckVM vm = new ChuckVM(sampleRate);
-            vm.setAntlrEnabled(useAntlr);
             vm.addPrintListener(System.out::println);
             
             if (loop) {
@@ -264,7 +254,6 @@ public class ChuckCLI {
         System.out.println("  --gui / --ide    Force launch the JavaFX IDE");
         System.out.println("  --about / --help Print this help message");
         System.out.println("  --version        Display version information");
-        System.out.println("  --antlr          Use ANTLR4 parser mode");
         System.out.println("Commands:");
         System.out.println("  + / --add        Add file to running VM");
         System.out.println("  - / --remove     Remove shred from running VM");

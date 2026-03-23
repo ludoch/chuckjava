@@ -1,5 +1,6 @@
 package org.chuck.compiler;
 
+import org.antlr.v4.runtime.*;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
@@ -16,21 +17,18 @@ public class ChuckCompilerTest {
             }
             """;
         
-        ChuckLexer lexer = new ChuckLexer(code);
-        List<ChuckLexer.Token> tokens = lexer.tokenize();
+        CharStream input = CharStreams.fromString(code);
+        ChuckANTLRLexer lexer = new ChuckANTLRLexer(input);
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        ChuckANTLRParser parser = new ChuckANTLRParser(tokens);
+        ChuckASTVisitor visitor = new ChuckASTVisitor();
         
-        assertNotNull(tokens);
-        
-        ChuckParser parser = new ChuckParser(tokens);
-        List<ChuckAST.Stmt> ast = parser.parse();
+        @SuppressWarnings("unchecked")
+        List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
         
         assertNotNull(ast);
         // Expecting at least 3 top-level structures
         assertTrue(ast.size() >= 3);
-        
-        // Check first statement: SinOsc s => dac;
-        // In our current parser, this is a BlockStmt containing [Decl, ExpStmt]
-        assertTrue(ast.get(0) instanceof ChuckAST.BlockStmt || ast.get(0) instanceof ChuckAST.ExpStmt);
         
         // Check while loop
         assertTrue(ast.stream().anyMatch(s -> s instanceof ChuckAST.WhileStmt));

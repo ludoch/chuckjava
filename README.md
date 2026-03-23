@@ -125,7 +125,6 @@ ChucK-Java now supports a full-featured CLI that mirrors the original ChucK impl
 - `--srate:<N>`: Set sampling rate (default: 44100).
 - `--bufsize:<N>`: Set audio buffer size (default: 512).
 - `--chan:<N>`: Set number of channels (default: 2).
-- `--antlr`: Use the ANTLR4-based parser instead of the handwritten one.
 - `--version`: Display version information.
 - `--help`: Print usage information.
 
@@ -279,7 +278,7 @@ Every time you save the file, the `JavaMachine` (or the IDE via `Ctrl+Enter`) wi
 ## 🏗️ Architecture
 
 ### 1. Compiler Pipeline
--   **Hybrid Parsing**: Supports both a fast hand-written recursive descent parser and a hardened **ANTLR4** grammar for complex expressions.
+-   **ANTLR4 Parsing**: Uses a hardened **ANTLR4** grammar for robust expression and control-flow parsing.
 -   **Emitter**: Translates the AST into VM Instructions with smart stack management and support for multi-pass static resolution.
 
 ### 2. Virtual Machine (VM)

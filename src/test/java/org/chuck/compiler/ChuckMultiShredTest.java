@@ -1,5 +1,6 @@
 package org.chuck.compiler;
 
+import org.antlr.v4.runtime.*;
 import org.chuck.core.*;
 import org.junit.jupiter.api.Test;
 import java.util.List;
@@ -31,11 +32,14 @@ public class ChuckMultiShredTest {
             30 => now;
             """;
         
-        ChuckLexer lexer = new ChuckLexer(codeSource);
-        List<ChuckLexer.Token> tokens = lexer.tokenize();
+        CharStream input = CharStreams.fromString(codeSource);
+        ChuckANTLRLexer lexer = new ChuckANTLRLexer(input);
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        ChuckANTLRParser parser = new ChuckANTLRParser(tokens);
+        ChuckASTVisitor visitor = new ChuckASTVisitor();
         
-        ChuckParser parser = new ChuckParser(tokens);
-        List<ChuckAST.Stmt> ast = parser.parse();
+        @SuppressWarnings("unchecked")
+        List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
         
         ChuckEmitter emitter = new ChuckEmitter();
         ChuckCode bytecode = emitter.emit(ast, "Main");

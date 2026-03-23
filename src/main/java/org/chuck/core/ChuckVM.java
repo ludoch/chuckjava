@@ -149,16 +149,6 @@ public class ChuckVM {
     // HID support
     private final List<org.chuck.hid.Hid> openHidDevices = new java.util.concurrent.CopyOnWriteArrayList<>();
 
-    private boolean antlrEnabled = false;
-
-    public void setAntlrEnabled(boolean enabled) {
-        this.antlrEnabled = enabled;
-    }
-
-    public boolean isAntlrEnabled() {
-        return antlrEnabled;
-    }
-
     public int getActiveShredCount() {
         return activeShreds.size();
     }
@@ -358,20 +348,14 @@ public class ChuckVM {
     }
 
     private List<org.chuck.compiler.ChuckAST.Stmt> parseSource(String source) {
-        if (antlrEnabled) {
-            org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
-            org.chuck.compiler.ChuckANTLRLexer lexer = new org.chuck.compiler.ChuckANTLRLexer(input);
-            org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
-            org.chuck.compiler.ChuckANTLRParser parser = new org.chuck.compiler.ChuckANTLRParser(tokens);
-            org.chuck.compiler.ChuckASTVisitor visitor = new org.chuck.compiler.ChuckASTVisitor();
-            @SuppressWarnings("unchecked")
-            List<org.chuck.compiler.ChuckAST.Stmt> result = (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
-            return result;
-        } else {
-            org.chuck.compiler.ChuckLexer lexer = new org.chuck.compiler.ChuckLexer(source);
-            org.chuck.compiler.ChuckParser parser = new org.chuck.compiler.ChuckParser(lexer.tokenize());
-            return parser.parse();
-        }
+        org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
+        org.chuck.compiler.ChuckANTLRLexer lexer = new org.chuck.compiler.ChuckANTLRLexer(input);
+        org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
+        org.chuck.compiler.ChuckANTLRParser parser = new org.chuck.compiler.ChuckANTLRParser(tokens);
+        org.chuck.compiler.ChuckASTVisitor visitor = new org.chuck.compiler.ChuckASTVisitor();
+        @SuppressWarnings("unchecked")
+        List<org.chuck.compiler.ChuckAST.Stmt> result = (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
+        return result;
     }
 
     private String resolveImportPath(String currentFilePath, String importPath) {

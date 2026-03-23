@@ -1244,7 +1244,6 @@ Run via `mvn exec:java -Dexec.args="[flags] [files]"` or `./run.sh [flags] [file
 | `--srate:N` | Set sample rate (default: 44100) |
 | `--bufsize:N` | Set audio buffer size in samples (default: 512) |
 | `--chan:N` | Set number of output channels (default: 2) |
-| `--antlr` | Use ANTLR4-based parser instead of the default handwritten parser |
 | `--version` | Print version and exit |
 | `--help` | Print usage summary |
 

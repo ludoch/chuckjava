@@ -32,14 +32,14 @@ mvn package
 
 ## Architecture
 
-The pipeline: `.ck` source → `ChuckLexer` → tokens → `ChuckParser` → AST → `ChuckEmitter` → `ChuckCode` (bytecode) → `ChuckVM` executes via `ChuckShred`s.
+The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `ChuckASTVisitor` → AST → `ChuckEmitter` → `ChuckCode` (bytecode) → `ChuckVM` executes via `ChuckShred`s.
 
 ### Packages
 
 - **`org.chuck`** — Entry point (`Main.java`): reads a `.ck` file, wires together the compile pipeline, and runs it.
 - **`org.chuck.compiler`** — Compiler pipeline:
-  - `ChuckLexer` — tokenizes ChucK source
-  - `ChuckParser` — recursive descent parser producing a `ChuckAST`
+  - `ChuckANTLR.g4` — ANTLR4 grammar for the ChucK language
+  - `ChuckASTVisitor` — maps ANTLR parse tree to `ChuckAST`
   - `ChuckEmitter` — walks the AST and emits `ChuckInstr` instances into a `ChuckCode` object
 - **`org.chuck.core`** — VM runtime:
   - `ChuckVM` — manages the shreduler (priority queue by wake time), global variables (`dac`, `blackhole`, ints, objects), and drives the UGen audio graph sample-by-sample

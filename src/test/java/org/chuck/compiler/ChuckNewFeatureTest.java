@@ -1,5 +1,6 @@
 package org.chuck.compiler;
 
+import org.antlr.v4.runtime.*;
 import org.chuck.core.*;
 import org.junit.jupiter.api.Test;
 import java.util.List;
@@ -13,10 +14,17 @@ public class ChuckNewFeatureTest {
     public void testMeId() throws InterruptedException {
         String code = "me.id() => int id; <<< id >>>;";
         
-        ChuckLexer lexer = new ChuckLexer(code);
-        ChuckParser parser = new ChuckParser(lexer.tokenize());
+        CharStream input = CharStreams.fromString(code);
+        ChuckANTLRLexer lexer = new ChuckANTLRLexer(input);
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        ChuckANTLRParser parser = new ChuckANTLRParser(tokens);
+        ChuckASTVisitor visitor = new ChuckASTVisitor();
+        
+        @SuppressWarnings("unchecked")
+        List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
+        
         ChuckEmitter emitter = new ChuckEmitter();
-        ChuckCode bytecode = emitter.emit(parser.parse(), "MeTest");
+        ChuckCode bytecode = emitter.emit(ast, "MeTest");
         
         ChuckVM vm = new ChuckVM(44100);
         List<String> output = Collections.synchronizedList(new ArrayList<>());
@@ -39,10 +47,17 @@ public class ChuckNewFeatureTest {
     public void testSwapOperator() throws InterruptedException {
         String code = "10 => int a; 20 => int b; a <=> b; <<< a, b >>>;";
         
-        ChuckLexer lexer = new ChuckLexer(code);
-        ChuckParser parser = new ChuckParser(lexer.tokenize());
+        CharStream input = CharStreams.fromString(code);
+        ChuckANTLRLexer lexer = new ChuckANTLRLexer(input);
+        CommonTokenStream tokens = new CommonTokenStream(lexer);
+        ChuckANTLRParser parser = new ChuckANTLRParser(tokens);
+        ChuckASTVisitor visitor = new ChuckASTVisitor();
+        
+        @SuppressWarnings("unchecked")
+        List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
+        
         ChuckEmitter emitter = new ChuckEmitter();
-        ChuckCode bytecode = emitter.emit(parser.parse(), "SwapTest");
+        ChuckCode bytecode = emitter.emit(ast, "SwapTest");
         
         ChuckVM vm = new ChuckVM(44100);
         List<String> output = Collections.synchronizedList(new ArrayList<>());

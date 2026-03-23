@@ -709,13 +709,6 @@ public class ChuckIDE extends Application {
 
         // Options
         Menu optionsMenu = new Menu("_Options");
-        CheckMenuItem antlrItem = new CheckMenuItem("Use ANTLR4 Parser");
-        antlrItem.setSelected(vm.isAntlrEnabled());
-        antlrItem.setOnAction(e -> {
-            vm.setAntlrEnabled(antlrItem.isSelected());
-            print("Parser mode changed: " + (vm.isAntlrEnabled() ? "ANTLR4" : "Hand-written"));
-        });
-        optionsMenu.getItems().add(antlrItem);
 
         // Examples
         Menu examplesMenu = new Menu("_Examples");
@@ -977,20 +970,13 @@ public class ChuckIDE extends Application {
 
             // --- Existing ChucK compilation logic ---
             String source = editor.getText();
-            List<org.chuck.compiler.ChuckAST.Stmt> ast;
-
-            if (vm.isAntlrEnabled()) {
-                org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
-                org.chuck.compiler.ChuckANTLRLexer lexer = new org.chuck.compiler.ChuckANTLRLexer(input);
-                org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
-                org.chuck.compiler.ChuckANTLRParser parser = new org.chuck.compiler.ChuckANTLRParser(tokens);
-                org.chuck.compiler.ChuckASTVisitor visitor = new org.chuck.compiler.ChuckASTVisitor();
-                ast = (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
-            } else {
-                org.chuck.compiler.ChuckLexer lexer = new org.chuck.compiler.ChuckLexer(source);
-                org.chuck.compiler.ChuckParser parser = new org.chuck.compiler.ChuckParser(lexer.tokenize());
-                ast = parser.parse();
-            }
+            org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
+            org.chuck.compiler.ChuckANTLRLexer lexer = new org.chuck.compiler.ChuckANTLRLexer(input);
+            org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
+            org.chuck.compiler.ChuckANTLRParser parser = new org.chuck.compiler.ChuckANTLRParser(tokens);
+            org.chuck.compiler.ChuckASTVisitor visitor = new org.chuck.compiler.ChuckASTVisitor();
+            @SuppressWarnings("unchecked")
+            List<org.chuck.compiler.ChuckAST.Stmt> ast = (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
 
             org.chuck.compiler.ChuckEmitter emitter = new org.chuck.compiler.ChuckEmitter();
             ChuckCode code = emitter.emit(ast, path);

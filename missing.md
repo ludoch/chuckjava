@@ -83,6 +83,8 @@ This document tracks the features from the original [Stanford ChucK](https://chu
 | `public`/`private`/`protected` on class members | ❌ Missing | No access modifiers |
 | `static` variables in classes | ⚠️ Partial | Not fully initialized |
 | Doc comments | ❌ Missing | Not in AST or parser |
+| **ANTLR4 Parser** | ✅ Done | Now the default and only parser (replacing the hand-written one). |
+
 
 ### 6.2 UGens — Missing
 
