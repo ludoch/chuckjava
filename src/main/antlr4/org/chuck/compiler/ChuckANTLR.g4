@@ -70,7 +70,7 @@ postfixOpToken : PLUS_PLUS | MINUS_MINUS ;
 functionName
     : ID
     | REFERENCE_TAG ID
-    | REFERENCE_TAG OPERATOR operatorToken?
+    | REFERENCE_TAG? OPERATOR operatorToken?
     ;
 
 operatorToken

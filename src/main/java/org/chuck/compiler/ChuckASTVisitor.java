@@ -42,28 +42,16 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         if (result instanceof List<?> list) {
             List<ChuckAST.Stmt> stmts = new ArrayList<>();
             for (Object item : list) {
-                if (item instanceof ChuckAST.DeclExp d) {
-                    stmts.add(new ChuckAST.DeclStmt(d.type(), d.name(), d.arraySizes(), d.callArgs(), d.isReference(), d.isStatic(), d.isGlobal(), d.line(), d.column()));
-                } else if (item instanceof ChuckAST.Exp exp) {
+                if (item instanceof ChuckAST.Exp exp) {
                     stmts.add(new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()));
                 }
             }
-            // If it's a single DeclStmt in the list, just return it instead of wrapping in BlockStmt
             if (stmts.size() == 1) return stmts.get(0);
             return new ChuckAST.BlockStmt(stmts, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
         }
-        switch (result) {
-            case ChuckAST.Stmt stmt -> {
-                return stmt;
-            }
-            case ChuckAST.DeclExp d -> {
-                return new ChuckAST.DeclStmt(d.type(), d.name(), d.arraySizes(), d.callArgs(), d.isReference(), d.isStatic(), d.isGlobal(), d.line(), d.column());
-            }
-            case ChuckAST.Exp exp -> {
-                return new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-            }
-            default -> {
-            }
+        if (result instanceof ChuckAST.Stmt stmt) return stmt;
+        if (result instanceof ChuckAST.Exp exp) {
+            return new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
         }
         return null;
     }
@@ -418,8 +406,8 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         boolean isPublic = ctx.PUBLIC() != null || (ctx.accessModifier() != null && ctx.accessModifier().PUBLIC() != null);
         boolean isStatic = ctx.STATIC() != null;
 
-        if (name.startsWith("@operator")) {
-            String opSym = name.substring("@operator".length()).trim();
+        if (name.startsWith("@operator") || name.startsWith("operator")) {
+            String opSym = name.startsWith("@operator") ? name.substring("@operator".length()).trim() : name.substring("operator".length()).trim();
             if (isPublic) name = "__pub_op__" + opSym;
             else name = "__op__" + opSym;
         }

@@ -98,13 +98,29 @@ public class ChuckEmitter {
         if (exp instanceof ChuckAST.BinaryExp bin) {
             String opSymbol = switch (bin.op()) {
                 case PLUS -> "+"; case MINUS -> "-"; case TIMES -> "*";
-                case DIVIDE -> "/"; case PERCENT -> "%"; default -> null;
+                case DIVIDE -> "/"; case PERCENT -> "%"; 
+                case LT -> "<"; case LE -> "<="; case GT -> ">";
+                case GE -> ">="; case EQ -> "=="; case NEQ -> "!=";
+                default -> null;
             };
             if (opSymbol != null) {
                 String lhsType = getExprType(bin.lhs());
                 if (lhsType != null && userClassRegistry.containsKey(lhsType)) {
                     String retType = functionReturnTypes.get("__pub_op__" + opSymbol + ":2");
                     if (retType == null) retType = functionReturnTypes.get("__op__" + opSymbol + ":2");
+                    if (retType == null) {
+                        UserClassDescriptor desc = userClassRegistry.get(lhsType);
+                        if (desc != null) {
+                            if (desc.methods().containsKey("__pub_op__" + opSymbol + ":1") ||
+                                desc.methods().containsKey("__op__" + opSymbol + ":1")) {
+                                // For now, assume it returns int for comparison or same type for arithmetic
+                                // (Ideally we'd track method return types too)
+                                return (bin.op() == ChuckAST.Operator.EQ || bin.op() == ChuckAST.Operator.NEQ ||
+                                        bin.op() == ChuckAST.Operator.LT || bin.op() == ChuckAST.Operator.LE ||
+                                        bin.op() == ChuckAST.Operator.GT || bin.op() == ChuckAST.Operator.GE) ? "int" : lhsType;
+                            }
+                        }
+                    }
                     if (retType != null) return retType;
                 }
             }
@@ -938,16 +954,19 @@ public class ChuckEmitter {
                     argCount = e.arraySizes().size();
                 }
 
-                Integer localOffset = forceGlobal ? null : getLocalOffset(e.name());
+                boolean isArrayDecl = !e.arraySizes().isEmpty();
+                boolean useGlobal = forceGlobal || localScopes.isEmpty() || (localScopes.size() == 1 && isArrayDecl);
+
+                Integer localOffset = (forceGlobal || useGlobal) ? null : getLocalOffset(e.name());
                 if (localOffset != null) {
-                    code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), !e.arraySizes().isEmpty(), userClassRegistry));
-                } else if (!forceGlobal && !localScopes.isEmpty()) {
+                    code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), isArrayDecl, userClassRegistry));
+                } else if (!forceGlobal && !useGlobal && !localScopes.isEmpty()) {
                     Map<String, Integer> scope = localScopes.peek();
                     localOffset = scope.size();
                     scope.put(e.name(), localOffset);
-                    code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), !e.arraySizes().isEmpty(), userClassRegistry));
+                    code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), isArrayDecl, userClassRegistry));
                 } else {
-                    code.addInstruction(new InstantiateSetAndPushGlobal(e.type(), e.name(), argCount, e.isReference(), !e.arraySizes().isEmpty(), userClassRegistry));
+                    code.addInstruction(new InstantiateSetAndPushGlobal(e.type(), e.name(), argCount, e.isReference(), isArrayDecl, userClassRegistry));
                 }
             }
         } else if (exp instanceof ChuckAST.BinaryExp e) {
@@ -1225,6 +1244,19 @@ public class ChuckEmitter {
                                 emitExpression(e.rhs(), code);
                                 code.addInstruction(new CallFunc(opFunc, 2));
                                 return;
+                            }
+
+                            // Also check for method-style overload in user class
+                            UserClassDescriptor desc = userClassRegistry.get(lhsType);
+                            if (desc != null) {
+                                String mName = desc.methods().containsKey("__pub_op__" + opSymbol + ":1") ? "__pub_op__" + opSymbol :
+                                              (desc.methods().containsKey("__op__" + opSymbol + ":1") ? "__op__" + opSymbol : null);
+                                if (mName != null) {
+                                    emitExpression(e.lhs(), code);
+                                    emitExpression(e.rhs(), code);
+                                    code.addInstruction(new CallMethod(mName, 1));
+                                    return;
+                                }
                             }
                         }
                     }
@@ -2390,8 +2422,11 @@ public class ChuckEmitter {
             } else if (s.reg.isDouble(0)) {
                 double val = s.reg.popAsDouble(); s.mem.setData(idx, val); s.reg.push(val);
             } else {
-                long val = s.reg.popLong(); s.mem.setData(idx, val); s.reg.push(val);
+                long val = s.reg.popLong();
+                s.mem.setData(idx, val);
+                s.reg.push(val);
             }
+            if (idx >= s.mem.getSp()) s.mem.setSp(idx + 1);
         }
     }
     static class GetGlobalObjectOrInt implements ChuckInstr {
@@ -2814,11 +2849,12 @@ public class ChuckEmitter {
             if (s.reg.getSp() > savedSp && s.reg.getSp() > 0) {
                 retD = s.reg.isDouble(0); retP = s.reg.peekLong(0); retO = s.reg.peekObject(0);
             }
+            boolean hasReturn = s.reg.getSp() > savedSp;
             s.reg.setSp(savedSp); s.setPc(savedPc); s.setCode(savedCode);
             UserObject uo = s.thisStack.isEmpty() ? null : s.thisStack.pop();
             boolean isCtor = (uo != null && savedCode != null && uo.className.equals(savedCode.getName()));
             s.setFramePointer(savedFp); s.mem.setSp(fp - 4);
-            if (retO != null || retP != 0 || retD) {
+            if (hasReturn) {
                 if (retO != null) s.reg.pushObject(retO);
                 else if (retD) s.reg.push(Double.longBitsToDouble(retP));
                 else s.reg.push(retP);
@@ -2922,6 +2958,7 @@ public class ChuckEmitter {
                     s.reg.push(0L);
                 }
             }
+            if (fp + o >= s.mem.getSp()) s.mem.setSp(fp + o + 1);
         }
     }
     static class InstantiateSetAndPushGlobal implements ChuckInstr {

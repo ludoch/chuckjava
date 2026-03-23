@@ -169,10 +169,15 @@ public class ChuckAnalysisAndSpatialTest {
             }
             Box a; 1.0 => a.val;
             Box b; 3.0 => b.val;
-            <<< a < b, a == b >>>;
-            """, 1);
+            <<< a.val, b.val >>>;
+            <<< a < b >>>;
+            <<< a == b >>>;
+            """, 100);
         assertFalse(out.isEmpty());
-        assertEquals("1 0", out.get(0));
+        // ChucK-Java prints floats with 6 decimal places
+        assertEquals("1.000000 3.000000", out.get(0));
+        assertEquals("1", out.get(1));
+        assertEquals("0", out.get(2));
     }
 
     // -------------------------------------------------------------------------
