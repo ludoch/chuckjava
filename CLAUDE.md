@@ -83,6 +83,24 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - Built-in `vec2`/`vec3`/`vec4` arithmetic: `VecAdd`, `VecSub`, `VecScale`, `VecDot` instructions; emitter detects vec LHS type via `varTypes` map
 - Added `SFM` (Spectral Flatness Measure) and `Kurtosis` UAnas — both chain after `FFT`, pull `getFvals()` from upstream blob
 
+### Std Library & Machine API Additions (2026-03-30)
+- `Std.itoa(long)` — int to string
+- `Std.ftoa(double, long)` — float to string with decimal places
+- `Std.ftoi(double)` — float to int (truncate)
+- `Std.sgn(double)` — sign: returns -1.0, 0.0, or 1.0
+- `Std.scalef(val, srcMin, srcMax, dstMin, dstMax)` — linear rescale
+- `Std.abs(long)` — absolute value of int
+- `ChuckEvent.can_wait()` — always returns true
+- `Machine.resetID` — resets shred ID counter via `ChuckShred.resetIdCounter()`
+- `Machine.gc` — calls System.gc()
+- `Machine.version` — returns version string "1.5.4.0 (java)"
+- `Machine.platform` — returns OS name
+- `Machine.loglevel` / `Machine.setloglevel` — get/set log level
+- `Machine.timeofday` — current time in seconds since epoch
+- `Machine.clearVM` — alias for `Machine.clear` in MachineCall switch
+- `StringTokenizer` already existed with `set(s)`, `more()`, `next()`, `reset()` — registered as `"StringTokenizer"` in emitter
+- Tests: 11 tests in `ChuckStdTest` (all passing)
+
 ### Recently Added UGens (2026-03-30)
 - `TwoPole` — two-pole resonance filter; `setResonance(freq, radius, normalize)`, raw `setB0/setA1/setA2`, ChucK-style `freq()`/`radius()`/`norm()` accessors
 - `TwoZero` — two-zero FIR notch filter; `setNotch(freq, radius)` with unity-gain normalization, raw `setB0/setB1/setB2`

@@ -3597,6 +3597,17 @@ public class ChuckEmitter {
                     s.reg.pushObject(arr);
                 }
                 case "crash" -> { vm.print("[chuck]: (VM) crash! (by request)\n"); System.exit(1); }
+                case "resetID" -> { vm.resetShredId(); s.reg.push(0L); }
+                case "clearVM" -> { vm.clear(); s.reg.push(0L); }
+                case "gc" -> { vm.gc(); s.reg.push(0L); }
+                case "version" -> s.reg.pushObject(new ChuckString(vm.getVersion()));
+                case "platform" -> s.reg.pushObject(new ChuckString(vm.getPlatform()));
+                case "loglevel" -> {
+                    if (argc > 0) { vm.setLogLevel(((Number) args[0]).intValue()); s.reg.push(0L); }
+                    else s.reg.push((long) vm.getLogLevel());
+                }
+                case "setloglevel" -> { vm.setLogLevel(args.length > 0 ? ((Number) args[0]).intValue() : 1); s.reg.push(0L); }
+                case "timeofday" -> s.reg.push(Double.doubleToRawLongBits(vm.getTimeOfDay()));
                 default -> s.reg.push(0L);
             }
         }

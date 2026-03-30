@@ -87,6 +87,9 @@ public class ChuckEvent extends ChuckObject {
 
     public int getWaitingCount() { return waitingShreds.size(); }
 
+    /** Returns true — all ChucK events can be waited on. */
+    public boolean can_wait() { return true; }
+
     public void broadcast(ChuckVM vm) {
         List<ChuckShred> toWake = new ArrayList<>();
         eventLock.lock();

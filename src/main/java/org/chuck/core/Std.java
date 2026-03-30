@@ -100,4 +100,37 @@ public class Std {
         for (int i = 0; i < sz; i++) arr.setInt(i, start + i * step);
         return arr;
     }
+
+    /** Convert int to string. */
+    public static String itoa(long i) {
+        return Long.toString(i);
+    }
+
+    /** Convert float to string with the given number of decimal places. */
+    public static String ftoa(double f, long decimals) {
+        return String.format("%." + Math.max(0, decimals) + "f", f);
+    }
+
+    /** Convert float to int (truncate). */
+    public static long ftoi(double f) {
+        return (long) f;
+    }
+
+    /** Sign of a value: -1, 0, or 1. */
+    public static double sgn(double v) {
+        if (v > 0.0) return 1.0;
+        if (v < 0.0) return -1.0;
+        return 0.0;
+    }
+
+    /** Scale a value from [srcMin, srcMax] to [dstMin, dstMax]. */
+    public static double scalef(double val, double srcMin, double srcMax, double dstMin, double dstMax) {
+        if (srcMax == srcMin) return dstMin;
+        return dstMin + (val - srcMin) / (srcMax - srcMin) * (dstMax - dstMin);
+    }
+
+    /** Absolute value of an integer. */
+    public static long abs(long v) {
+        return Math.abs(v);
+    }
 }
