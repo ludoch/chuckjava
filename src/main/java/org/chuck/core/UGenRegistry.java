@@ -91,9 +91,9 @@ public class UGenRegistry {
         register("LiSa16", (sr, args) -> new LiSaN(16, sr));
 
         // --- STK Instruments ---
-        register("Clarinet", (sr, args) -> new Clarinet(sr));
-        register("Mandolin", (sr, args) -> new Mandolin(sr));
-        register("Plucked", (sr, args) -> new Plucked(sr));
+        register("Clarinet", (sr, args) -> new Clarinet(10.0f, sr));
+        register("Mandolin", (sr, args) -> new Mandolin(10.0f, sr));
+        register("Plucked", (sr, args) -> new Plucked(10.0f, sr));
         register("Rhodey", (sr, args) -> new Rhodey(sr));
         register("Wurley", (sr, args) -> new Wurley(sr));
         register("TubeBell", (sr, args) -> new TubeBell(sr));
@@ -108,7 +108,6 @@ public class UGenRegistry {
         register("Sitar", (sr, args) -> new Sitar(sr));
         register("StifKarp", (sr, args) -> new StifKarp(sr));
         register("Shakers", (sr, args) -> new Shakers(sr));
-        register("ModalBar", (sr, args) -> new ModalBar(sr));
 
         // --- Analysis (UAna) ---
         register("FFT", (sr, args) -> new FFT());

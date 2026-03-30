@@ -40,20 +40,24 @@ public class ChuckEmitter {
     // Track variables declared with empty-array syntax (e.g., SinOsc foos[])
     private final java.util.Set<String> emptyArrayVars = new java.util.HashSet<>();
 
-    // Known built-in UGen type names (used for type validation)
-    private static final java.util.Set<String> KNOWN_UGEN_TYPES = java.util.Set.of(
-        "SinOsc","SawOsc","TriOsc","SqrOsc","PulseOsc","Phasor","Noise","Impulse","Step","Gain","Blackhole",
-        "Pan2","Pan4","Pan8","Pan16","PanN","ADSR","Adsr","Envelope","Echo","Delay","DelayA","DelayL","Chorus","JCRev","NRev","PRCRev","ResonZ",
-        "OnePole","OneZero","TwoPole","TwoZero","BPF","HPF","LPF","BRF","BiQuad","PoleZero","PitShift","Modulate",
-        "LiSa","LiSa2","LiSa4","LiSa6","LiSa8","LiSa10","LiSa16","SndBuf","SndBuf2","WvIn","WvOut","WaveLoop","FFT","IFFT","RMS","Centroid","UAnaBlob",
-        "Chugraph","Chubgraph","ChuGen","GVerb","Identity2",
-        "Clarinet","Mandolin","Plucked","Rhodey","Bowed","StifKarp","Moog","Flute","Sitar","Brass","Saxofony",
-        "BeeThree","BlitSaw","BlitSquare","Blit","BlowBotl","BlowHole","PercFlut","HevyMetl","FMVoices",
-        "TubeBell","Wurley","ModalBar","Shakers","BandedWG","SubNoise","FullRect","HalfRect","ZeroX","WarpTable",
-        "CurveTable","GenX","Gen5","Gen7","Gen9","Gen10","Gen17","Mix2","Mix4","Mix8","Mix16","MixN","Dyno","Event","Hid","HidMsg","MidiIn","MidiOut","MidiMsg",
-        "OscIn","OscOut","OscMsg","FileIO","IO","Std","Math","Machine","Object","String","Array","UGen","UGen_Multi","UGen_Stereo",
-        "UAna","Shred","Thread","ChucK","ZCR","MFCC","SFM","Kurtosis","vec2"
+    // Additional core UGens not in UGenRegistry
+    private static final java.util.Set<String> CORE_UGENS = java.util.Set.of(
+        "OscIn","OscOut","OscMsg","FileIO","IO","Std","Math","Machine","UGen","UGen_Multi","UGen_Stereo",
+        "UAna","Shred","Thread","ChucK"
     );
+
+    // Core non-UGen data types
+    private static final java.util.Set<String> CORE_DATA_TYPES = java.util.Set.of(
+        "int","float","string","time","dur","void","vec2","vec3","vec4","complex","polar","Object","Array"
+    );
+
+    private boolean isKnownUGenType(String type) {
+        return UGenRegistry.isRegistered(type) || CORE_UGENS.contains(type);
+    }
+
+    private boolean isKnownType(String type) {
+        return isKnownUGenType(type) || CORE_DATA_TYPES.contains(type) || userClassRegistry.containsKey(type);
+    }
 
     public ChuckEmitter() {
         this(new HashMap<>());
@@ -93,10 +97,36 @@ public class ChuckEmitter {
             String type = getVarType(exp);
             if (type != null) return type;
             if (userClassRegistry.containsKey(id.name())) return id.name();
+            // Handle core types as types themselves
+            if (CORE_DATA_TYPES.contains(id.name())) return id.name();
+            if (isKnownUGenType(id.name())) return id.name();
             return null;
         }
+        if (exp instanceof ChuckAST.IntExp) return "int";
+        if (exp instanceof ChuckAST.FloatExp) return "float";
+        if (exp instanceof ChuckAST.StringExp) return "string";
         if (exp instanceof ChuckAST.DeclExp e) return e.type();
         if (exp instanceof ChuckAST.BinaryExp bin) {
+            String lhsType = getExprType(bin.lhs());
+            if (lhsType == null) return null;
+
+            // Handle built-in vector/complex arithmetic results
+            if (lhsType.equals("vec2") || lhsType.equals("vec3") || lhsType.equals("vec4") ||
+                lhsType.equals("complex") || lhsType.equals("polar")) {
+                if (bin.op() == ChuckAST.Operator.EQ || bin.op() == ChuckAST.Operator.NEQ ||
+                    bin.op() == ChuckAST.Operator.LT || bin.op() == ChuckAST.Operator.LE ||
+                    bin.op() == ChuckAST.Operator.GT || bin.op() == ChuckAST.Operator.GE) {
+                    return "int";
+                }
+                if (bin.op() == ChuckAST.Operator.TIMES) {
+                    String rhsType = getExprType(bin.rhs());
+                    if (rhsType != null && (rhsType.equals("vec2") || rhsType.equals("vec3") || rhsType.equals("vec4"))) {
+                        return "float"; // Dot product
+                    }
+                }
+                return lhsType; // Element-wise arithmetic returns same type
+            }
+
             String opSymbol = switch (bin.op()) {
                 case PLUS -> "+"; case MINUS -> "-"; case TIMES -> "*";
                 case DIVIDE -> "/"; case PERCENT -> "%"; 
@@ -104,26 +134,21 @@ public class ChuckEmitter {
                 case GE -> ">="; case EQ -> "=="; case NEQ -> "!=";
                 default -> null;
             };
-            if (opSymbol != null) {
-                String lhsType = getExprType(bin.lhs());
-                if (lhsType != null && userClassRegistry.containsKey(lhsType)) {
-                    String retType = functionReturnTypes.get("__pub_op__" + opSymbol + ":2");
-                    if (retType == null) retType = functionReturnTypes.get("__op__" + opSymbol + ":2");
-                    if (retType == null) {
-                        UserClassDescriptor desc = userClassRegistry.get(lhsType);
-                        if (desc != null) {
-                            if (desc.methods().containsKey("__pub_op__" + opSymbol + ":1") ||
-                                desc.methods().containsKey("__op__" + opSymbol + ":1")) {
-                                // For now, assume it returns int for comparison or same type for arithmetic
-                                // (Ideally we'd track method return types too)
-                                return (bin.op() == ChuckAST.Operator.EQ || bin.op() == ChuckAST.Operator.NEQ ||
-                                        bin.op() == ChuckAST.Operator.LT || bin.op() == ChuckAST.Operator.LE ||
-                                        bin.op() == ChuckAST.Operator.GT || bin.op() == ChuckAST.Operator.GE) ? "int" : lhsType;
-                            }
+            if (opSymbol != null && userClassRegistry.containsKey(lhsType)) {
+                String retType = functionReturnTypes.get("__pub_op__" + opSymbol + ":2");
+                if (retType == null) retType = functionReturnTypes.get("__op__" + opSymbol + ":2");
+                if (retType == null) {
+                    UserClassDescriptor desc = userClassRegistry.get(lhsType);
+                    if (desc != null) {
+                        if (desc.methods().containsKey("__pub_op__" + opSymbol + ":1") ||
+                            desc.methods().containsKey("__op__" + opSymbol + ":1")) {
+                            return (bin.op() == ChuckAST.Operator.EQ || bin.op() == ChuckAST.Operator.NEQ ||
+                                    bin.op() == ChuckAST.Operator.LT || bin.op() == ChuckAST.Operator.LE ||
+                                    bin.op() == ChuckAST.Operator.GT || bin.op() == ChuckAST.Operator.GE) ? "int" : lhsType;
                         }
                     }
-                    if (retType != null) return retType;
                 }
+                if (retType != null) return retType;
             }
         }
         return null;
@@ -141,7 +166,10 @@ public class ChuckEmitter {
 
     private boolean isSubclassOfUGen(String className) {
         if (className == null) return false;
-        if (KNOWN_UGEN_TYPES.contains(className)) return true;
+        if (isKnownUGenType(className)) {
+            // Built-in non-UGens like vec3 shouldn't return true here
+            return !CORE_DATA_TYPES.contains(className);
+        }
         UserClassDescriptor d = userClassRegistry.get(className);
         if (d == null) return false;
         return isSubclassOfUGen(d.parentName());
@@ -214,7 +242,7 @@ public class ChuckEmitter {
             if (s.exp() instanceof ChuckAST.IdExp ide && localScopes.isEmpty() && currentClass == null) {
                 String nm = ide.name();
                 boolean knownName = varTypes.containsKey(nm) || globalVarTypes.containsKey(nm)
-                    || userClassRegistry.containsKey(nm) || KNOWN_UGEN_TYPES.contains(nm)
+                    || userClassRegistry.containsKey(nm) || isKnownUGenType(nm)
                     || currentClassFields.contains(nm)
                     || nm.equals("null") || nm.equals("true") || nm.equals("false")
                     || nm.equals("this") || nm.equals("super") || nm.equals("pi") || nm.equals("e")
@@ -494,7 +522,7 @@ public class ChuckEmitter {
                 // => cannot be overloaded for UGen subtypes
                 if ((opSuffix.equals("=>") || opSuffix.equals("@=>")) && s.argTypes().size() >= 1) {
                     for (String argType : s.argTypes()) {
-                        if (KNOWN_UGEN_TYPES.contains(argType)) {
+                        if (isKnownUGenType(argType)) {
                             throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
                                 + ": error: cannot overload '" + opSuffix + "' for UGen subtype '" + argType + "'");
                         }
@@ -889,19 +917,7 @@ public class ChuckEmitter {
                         + ": error: cannot use 'new' on primitive type '" + e.type() + "'");
                 }
                 // Check for undefined type (not a known class or UGen)
-                java.util.Set<String> knownUGenTypes = java.util.Set.of(
-                    "SinOsc","SawOsc","TriOsc","SqrOsc","PulseOsc","Phasor","Noise","Impulse","Step","Gain","Blackhole",
-                    "Pan2","ADSR","Adsr","Envelope","Echo","Delay","DelayA","DelayL","Chorus","JCRev","NRev","PRCRev","ResonZ",
-                    "OnePole","OneZero","TwoPole","TwoZero","BPF","HPF","LPF","BRF","BiQuad","PoleZero","PitShift","Modulate",
-                    "LiSa","SndBuf","WvIn","WvOut","WaveLoop","FFT","IFFT","RMS","Centroid","UAnaBlob",
-                    "Clarinet","Mandolin","Plucked","Rhodey","Bowed","StifKarp","Moog","Flute","Sitar","Brass","Saxofony",
-                    "BeeThree","BlitSaw","BlitSquare","Blit","BlowBotl","BlowHole","PercFlut","HevyMetl","FMVoices",
-                    "TubeBell","Wurley","ModalBar","Shakers","BandedWG","SubNoise","FullRect","HalfRect","ZeroX","WarpTable",
-                    "CurveTable","GenX","Gen5","Gen7","Gen10","Mix2","Dyno","Event","Hid","HidMsg","MidiIn","MidiOut","MidiMsg",
-                    "OscIn","OscOut","OscMsg","FileIO","IO","Std","Math","Machine","Object","String","Array",
-                    "ZCR","MFCC"
-                );
-                if (!userClassRegistry.containsKey(e.type()) && !knownUGenTypes.contains(e.type()) && !primitives.contains(e.type())) {
+                if (!userClassRegistry.containsKey(e.type()) && !isKnownUGenType(e.type()) && !primitives.contains(e.type())) {
                     throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
                         + ": error: undefined type '" + e.type() + "'");
                 }
@@ -1205,8 +1221,7 @@ public class ChuckEmitter {
                 // Check for public operator overload on user-class types
                 if (e.op() == ChuckAST.Operator.PLUS) {
                     // Detect function reference used in binary + (e.g., foo + "" or Foo.bar + "")
-                    if (e.lhs() instanceof ChuckAST.IdExp lhsFn) {
-                        String fnName = lhsFn.name();
+                    if (e.lhs() instanceof ChuckAST.IdExp(String fnName, int line, int column)) {
                         boolean isFuncRef = functions.keySet().stream().anyMatch(k -> k.startsWith(fnName + ":"));
                         if (isFuncRef) {
                             throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
@@ -1782,7 +1797,7 @@ public class ChuckEmitter {
     private void emitChuckTarget(ChuckAST.Exp target, ChuckCode code) {
         if (target instanceof ChuckAST.IdExp e) {
             String type = getVarType(target);
-            boolean isUGen = type != null && (KNOWN_UGEN_TYPES.contains(type) || isSubclassOfUGen(type));
+            boolean isUGen = type != null && (isKnownUGenType(type) || isSubclassOfUGen(type));
             
             if (e.name().equals("now")) {
                 code.addInstruction(new AdvanceTime());
@@ -1864,7 +1879,7 @@ public class ChuckEmitter {
             // Stack is now: [..., source, target]
             
             String type = e.type();
-            boolean isUGen = KNOWN_UGEN_TYPES.contains(type) || isSubclassOfUGen(type);
+            boolean isUGen = isKnownUGenType(type) || isSubclassOfUGen(type);
             
             if (isUGen) {
                 code.addInstruction(new org.chuck.core.ChuckTo());
@@ -3080,161 +3095,21 @@ public class ChuckEmitter {
             return uo;
         }
         
-        // Handle common built-in types with constructors via reflection
-        try {
-            Class<?> clazz = null;
-            if (t.equals("GainDB")) clazz = org.chuck.audio.GainDB.class;
-            else if (t.equals("SinOsc")) clazz = org.chuck.audio.SinOsc.class;
-            // ... add others as needed, or use a general lookup
-            
-            if (clazz != null) {
-                for (java.lang.reflect.Constructor<?> c : clazz.getConstructors()) {
-                    if (c.getParameterCount() == argc) {
-                        Class<?>[] pts = c.getParameterTypes();
-                        Object[] coe = new Object[argc];
-                        boolean valid = true;
-                        for (int i = 0; i < argc; i++) {
-                            Object val = args[i];
-                            if (val instanceof Long l) {
-                                if (pts[i] == long.class || pts[i] == Long.class) coe[i] = l;
-                                else if (pts[i] == int.class || pts[i] == Integer.class) coe[i] = l.intValue();
-                                else if (pts[i] == double.class || pts[i] == Double.class) coe[i] = l.doubleValue();
-                                else if (pts[i] == float.class || pts[i] == Float.class) coe[i] = l.floatValue();
-                                else { valid = false; break; }
-                            } else if (val instanceof Double dv) {
-                                if (pts[i] == double.class || pts[i] == Double.class) coe[i] = dv;
-                                else if (pts[i] == float.class || pts[i] == Float.class) coe[i] = dv.floatValue();
-                                else { valid = false; break; }
-                            } else {
-                                if (val != null && pts[i].isInstance(val)) coe[i] = val;
-                                else { coe[i] = val; }
-                            }
-                        }
-                        if (valid) return (ChuckObject) c.newInstance(coe);
-                    }
-                }
-            }
-        } catch (Exception ignored) {}
+        // 1. Try UGenRegistry (New centralized factory)
+        ChuckUGen ugen = UGenRegistry.instantiate(t, sr, args);
+        if (ugen != null) return ugen;
 
+        // 2. Try Chugin Loader
         ChuckObject chugin = ChuginLoader.instantiateChugin(t, sr, vm);
         if (chugin != null) return chugin;
 
+        // 3. Fallback switch for core non-UGen types
         return switch (t) {
-            case "SinOsc" -> new SinOsc(sr); case "Gain" -> new Gain();
-            case "Pan2" -> new Pan2();
-            case "Pan4" -> new Pan4();
-            case "Pan8" -> new Pan8();
-            case "Pan16" -> new Pan16();
-            case "PanN" -> argc > 0 && args[0] instanceof Number n ? new PanN(n.intValue()) : new PanN(2);
-            case "Mix2" -> new Mix2();
-            case "Mix4" -> new Mix4();
-            case "Mix8" -> new Mix8();
-            case "Mix16" -> new Mix16();
-            case "MixN" -> argc > 0 && args[0] instanceof Number n ? new MixN(n.intValue()) : new MixN(2);
-            case "Noise" -> new Noise();
-            case "ADSR", "Adsr" -> new Adsr(sr); case "string" -> new ChuckString("");
+            case "string" -> new ChuckString("");
             case "vec2" -> new ChuckArray(ChuckType.ARRAY, 2);
             case "vec3" -> new ChuckArray(ChuckType.ARRAY, 3);
             case "vec4" -> new ChuckArray(ChuckType.ARRAY, 4);
             case "complex", "polar" -> new ChuckArray(ChuckType.ARRAY, 2);
-            case "Echo" -> new Echo((int) (sr * 2)); case "Delay" -> new Delay((int) (sr * 2), sr);
-            case "DelayL" -> new DelayL((int) (sr * 2), sr);
-            case "Chorus" -> new Chorus(sr); case "Lpf", "LPF" -> new Lpf(sr);
-            case "PitShift" -> new PitShift();
-            case "Dyno" -> new Dyno(sr);
-            case "LiSa" -> new LiSa(sr);
-            case "LiSa2" -> new LiSa2(sr);
-            case "LiSa4" -> new LiSaN(4, sr);
-            case "LiSa6" -> new LiSaN(6, sr);
-            case "LiSa8" -> new LiSaN(8, sr);
-            case "LiSa10" -> new LiSaN(10, sr);
-            case "LiSa16" -> new LiSaN(16, sr);
-            case "Identity2" -> new Identity2();
-            case "SndBuf2" -> new SndBuf2(sr);
-            case "WvOut2" -> new WvOut2(sr);
-            case "GainDB" -> argc > 0 && args[0] instanceof Number n ? new GainDB(n.doubleValue()) : new GainDB();
-            // Oscillators
-            case "TriOsc" -> new TriOsc(sr);
-            case "SawOsc" -> new SawOsc(sr);
-            case "BlitSaw" -> new BlitSaw(sr);
-            case "SqrOsc" -> new SqrOsc(sr);
-            case "BlitSquare" -> new BlitSquare(sr);
-            case "PulseOsc" -> new PulseOsc(sr);
-            case "Phasor" -> new Phasor(sr);
-            // Filters
-            case "HPF" -> new HPF(sr);
-            case "BPF" -> new BPF(sr);
-            case "BRF" -> new BRF(sr);
-            case "OnePole" -> new OnePole();
-            case "OneZero" -> new OneZero();
-            case "ResonZ" -> new ResonZ(sr);
-            case "BiQuad" -> new BiQuad(sr);
-            case "TwoPole" -> new TwoPole(sr);
-            case "TwoZero" -> new TwoZero(sr);
-            case "PoleZero" -> new PoleZero();
-            case "Envelope" -> new Envelope(sr);
-            case "DelayA" -> new DelayA((int)(sr * 2), sr);
-            case "Blit" -> new Blit(sr);
-            case "CNoise" -> new CNoise();
-            // Utilities / misc
-            case "Step" -> new Step();
-            case "Impulse" -> new Impulse();
-            case "Blackhole" -> new Blackhole();
-            case "Adc" -> new Adc();
-            case "SndBuf" -> new SndBuf(sr);
-            case "WvOut" -> new WvOutUGen(sr);
-            case "WvIn" -> new WvIn(sr);
-            case "WaveLoop" -> new WaveLoop(sr);
-            case "SubNoise" -> new SubNoise();
-            case "HalfRect" -> new HalfRect();
-            case "FullRect" -> new FullRect();
-            case "ZeroX" -> new ZeroX();
-            case "NRev" -> new NRev(sr);
-            case "PRCRev" -> new PRCRev(sr);
-            case "GVerb" -> new GVerb(sr);
-            case "JCRev", "JCRev2" -> new JCRev(sr);
-            // UAna
-            case "FFT" -> new FFT();
-            case "IFFT" -> new IFFT();
-            case "Flux" -> new Flux();
-            case "Rolloff" -> new Rolloff();
-            case "RMS" -> new RMS();
-            case "Centroid" -> new Centroid();
-            case "ZCR" -> new ZCR();
-            case "MFCC" -> new MFCC();
-            case "SFM" -> new SFM();
-            case "Kurtosis" -> new Kurtosis();
-            // GenX table oscillators
-            case "GenX" -> new Gen7(sr);
-            case "Gen5" -> new Gen5(sr);
-            case "Gen7" -> new Gen7(sr);
-            case "Gen9" -> new Gen9(sr);
-            case "Gen10" -> new Gen10(sr);
-            case "Gen17" -> new Gen17(sr);
-            // Instruments
-            case "Clarinet" -> new Clarinet(10.0f, sr);
-            case "Mandolin" -> new Mandolin(10.0f, sr);
-            case "Plucked" -> new Plucked(10.0f, sr);
-            case "Bowed" -> new Bowed(sr);
-            case "StifKarp" -> new StifKarp(sr);
-            case "Flute" -> new Flute(sr);
-            case "Sitar" -> new Sitar(sr);
-            case "Moog" -> new Moog(sr);
-            case "Brass" -> new Brass(sr);
-            case "Saxofony" -> new Saxofony(sr);
-            case "Shakers" -> new Shakers(sr);
-            case "Rhodey" -> new Rhodey(sr);
-            case "Wurley" -> new Wurley(sr);
-            case "BeeThree" -> new BeeThree(sr);
-            case "HevyMetl" -> new HevyMetl(sr);
-            case "PercFlut" -> new PercFlut(sr);
-            case "TubeBell" -> new TubeBell(sr);
-            case "FMVoices" -> new FMVoices(sr);
-            // I/O
-            case "ChuGen" -> new ChuGen();
-            case "WarpTable" -> new WarpTable(sr);
-            case "CurveTable" -> new CurveTable(sr);
-            case "Modulate" -> new Modulate(sr);
             case "MidiOut" -> new org.chuck.midi.MidiOut();
             case "SerialIO" -> new SerialIO();
             case "OscBundle" -> new org.chuck.network.OscBundle();
@@ -3248,6 +3123,13 @@ public class ChuckEmitter {
             case "OscMsg" -> new org.chuck.network.OscMsg();
             case "MidiMsg" -> new org.chuck.midi.MidiMsg();
             case "HidMsg" -> new org.chuck.hid.HidMsg();
+            // GenX table oscillators (fallback aliases)
+            case "GenX" -> new Gen7(sr);
+            case "Gen5" -> new Gen5(sr);
+            case "Gen7" -> new Gen7(sr);
+            case "Gen9" -> new Gen9(sr);
+            case "Gen10" -> new Gen10(sr);
+            case "Gen17" -> new Gen17(sr);
             default -> null;
         };
     }
