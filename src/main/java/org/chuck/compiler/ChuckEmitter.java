@@ -3175,9 +3175,14 @@ public class ChuckEmitter {
             case "OnePole" -> new OnePole();
             case "OneZero" -> new OneZero();
             case "ResonZ" -> new ResonZ(sr);
-            case "BiQuad", "TwoPole", "TwoZero", "PoleZero" -> new BiQuad(sr);
+            case "BiQuad" -> new BiQuad(sr);
+            case "TwoPole" -> new TwoPole(sr);
+            case "TwoZero" -> new TwoZero(sr);
+            case "PoleZero" -> new PoleZero();
             case "Envelope" -> new Envelope(sr);
-            case "DelayA" -> new DelayL((int)(sr * 2), sr);
+            case "DelayA" -> new DelayA((int)(sr * 2), sr);
+            case "Blit" -> new Blit(sr);
+            case "CNoise" -> new CNoise();
             // Utilities / misc
             case "Step" -> new Step();
             case "Impulse" -> new Impulse();

@@ -83,6 +83,15 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - Built-in `vec2`/`vec3`/`vec4` arithmetic: `VecAdd`, `VecSub`, `VecScale`, `VecDot` instructions; emitter detects vec LHS type via `varTypes` map
 - Added `SFM` (Spectral Flatness Measure) and `Kurtosis` UAnas — both chain after `FFT`, pull `getFvals()` from upstream blob
 
+### Recently Added UGens (2026-03-30)
+- `TwoPole` — two-pole resonance filter; `setResonance(freq, radius, normalize)`, raw `setB0/setA1/setA2`, ChucK-style `freq()`/`radius()`/`norm()` accessors
+- `TwoZero` — two-zero FIR notch filter; `setNotch(freq, radius)` with unity-gain normalization, raw `setB0/setB1/setB2`
+- `PoleZero` — one-pole one-zero filter; `setAllpass(coeff)` for unity-gain allpass, `setBlockZero(pole)` for DC blocker
+- `DelayA` — allpass-interpolating fractional delay (flat phase response); `setDelay(samples)`, `setDelaySec(sec)`
+- `Blit` — band-limited impulse train (Stilson-Smith sinc algorithm); `setFrequency(hz)`, `setHarmonics(n)` (0 = auto up to Nyquist)
+- `CNoise` — colored noise generator; modes `white`/`pink`/`brown`/`flip`/`xor` via `mode("name")`, `fprob()` for flip probability
+- All six registered in `ChuckEmitter.instantiateType()` and covered by unit tests in `ChuckUGenTest`
+
 ### Key Design Patterns
 
 **Time model:** `ChuckVM.advanceTime(n)` advances the logical clock sample-by-sample. Each sample, the shreduler wakes any `ChuckShred` whose `wakeTime <= now`, then ticks the entire UGen graph. Shreds yield by calling `shred.yield(samples)`, which suspends their Virtual Thread until the VM advances to their wake time.

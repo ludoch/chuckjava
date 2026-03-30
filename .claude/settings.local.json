@@ -24,7 +24,9 @@
       "Bash(grep -h \"^public class\\\\|^public static class\" /c/Users/ludo/a/chuckjava/src/main/java/org/chuck/audio/*.java)",
       "Bash(xargs -I {} basename {})",
       "Bash(ls:*)",
-      "Bash(grep -h \"DelayA\\\\|DelayP\\\\|TwoZero\\\\|TwoPole\\\\|PoleZero\\\\|BLT\\\\|Blit\\\\|BlitSaw\\\\|BlitSquare\\\\|CNoise\\\\|SubNoise\\\\|WvOut2\\\\|SndBuf2\\\\|Mesh2D\\\\|Identity2\" /c/Users/ludo/a/chuck/src/core/ugen_*.cpp)"
+      "Bash(grep -h \"DelayA\\\\|DelayP\\\\|TwoZero\\\\|TwoPole\\\\|PoleZero\\\\|BLT\\\\|Blit\\\\|BlitSaw\\\\|BlitSquare\\\\|CNoise\\\\|SubNoise\\\\|WvOut2\\\\|SndBuf2\\\\|Mesh2D\\\\|Identity2\" /c/Users/ludo/a/chuck/src/core/ugen_*.cpp)",
+      "Bash(grep:*)",
+      "Bash(rtk mvn:*)"
     ]
   }
 }
