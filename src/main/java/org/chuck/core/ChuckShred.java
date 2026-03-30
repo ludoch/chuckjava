@@ -19,7 +19,7 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     
     private final int id;
     private long wakeTime = 0;
-    private boolean isDone = false;
+    public volatile boolean isDone = false;
     private boolean isRunning = false;
     private boolean isWaiting = false; // Waiting on an event
     private String name = "";

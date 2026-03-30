@@ -59,6 +59,7 @@ public class ChuckVM {
     // Multi-channel output (dac)
     private final int numChannels = 2;
     private final ChuckUGen[] dacChannels = new ChuckUGen[numChannels];
+    private final org.chuck.audio.MultiChannelDac multiChannelDac;
     public final ChuckObject dac;
     public final Blackhole blackhole;
     public final Adc adc;
@@ -82,6 +83,8 @@ public class ChuckVM {
         this.adc = new Adc();
         setGlobalObject("adc", adc);
 
+        this.multiChannelDac = new org.chuck.audio.MultiChannelDac(dacChannels);
+
         setGlobalObject("chout", new ChuckIO(System.out, this));
         setGlobalObject("cherr", new ChuckIO(System.err, this));
         setGlobalObject("IO", new ChuckIO(System.out, this));
@@ -92,7 +95,7 @@ public class ChuckVM {
     }
 
     public ChuckUGen getMultiChannelDac() {
-        return new org.chuck.audio.MultiChannelDac(dacChannels);
+        return multiChannelDac;
     }
 
     public float getChannelLastOut(int channel) {
@@ -227,6 +230,7 @@ public class ChuckVM {
                 } catch (Throwable t) {
                     t.printStackTrace();
                 } finally {
+                    shred.isDone = true;
                     shred.cleanup();
                     activeShreds.remove(shred.getId());
                 }

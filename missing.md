@@ -39,6 +39,9 @@ This document tracks the features from the original [Stanford ChucK](https://chu
 | **SubNoise** | Done | Sub-sampled noise generator implemented. |
 | **Modulate** | Done | Vibrato/Tremolo modulation UGen implemented. |
 | **WarpTable / CurveTable** | Done | Advanced lookup table UGens implemented. |
+| **Pan4 / Pan8 / Pan16** | Done | Multi-channel panners implemented (4, 8, 16 channels). |
+| **Mix4 / Mix8 / Mix16** | Done | Multi-channel mixers implemented (4, 8, 16 channels). |
+| **MultiChannelUGen** | Done | Robust base class for N-channel UGens implemented. |
 
 ## 3. I/O & Networking
 

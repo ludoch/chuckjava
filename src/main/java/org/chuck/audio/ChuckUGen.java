@@ -166,6 +166,12 @@ public abstract class ChuckUGen extends ChuckObject {
         return lastOut;
     }
 
+    /** Returns the most recent sample for a specific output channel. */
+    public float getChannelLastOut(int i) {
+        if (i == 0) return lastOut;
+        return 0.0f;
+    }
+
     public int getNumSources() {
         return sources.size();
     }

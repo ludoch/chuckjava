@@ -12,15 +12,15 @@ public class Mix2 extends StereoUGen {
         
         // Update last outs for scalar callers
         if (length > 0) {
-            lastOutLeft = buffer[offset + length - 1];
-            lastOutRight = buffer[offset + length - 1];
+            lastOutChannels[0] = buffer[offset + length - 1];
+            lastOutChannels[1] = buffer[offset + length - 1];
             lastTickTime = (systemTime == -1) ? -1 : systemTime + length - 1;
         }
     }
 
     @Override
     protected void computeStereo(float input, long systemTime) {
-        lastOutLeft = input;
-        lastOutRight = input;
+        lastOutChannels[0] = input;
+        lastOutChannels[1] = input;
     }
 }

@@ -29,8 +29,12 @@ public class ChuckDSL {
      */
     public static void advance(ChuckDuration duration) {
         ChuckShred current = ChuckShred.CURRENT_SHRED.get();
-        if (current != null) {
+        ChuckVM vm = ChuckVM.CURRENT_VM.get();
+        if (current != null && vm != null) {
             current.yield(Math.round(duration.samples()));
+            // RE-SCHEDULE: For Java shreds running in their own loop, 
+            // we must put them back in the priority queue after they wake up.
+            vm.schedule(current);
         }
     }
 
@@ -80,11 +84,19 @@ public class ChuckDSL {
         String className = fileName.substring(0, fileName.lastIndexOf('.'));
         
         // Use the same class loader parent to ensure ScopedValues and static dac() etc. are shared
-        @SuppressWarnings("resource")
         var loader = new java.net.URLClassLoader(
             new java.net.URL[]{tempDir.toUri().toURL()}, 
             ChuckDSL.class.getClassLoader()
-        );
+        ) {
+            @Override
+            protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+                // Force loading of core ChucK classes from the parent loader
+                if (name.startsWith("org.chuck.core.") || name.startsWith("org.chuck.audio.")) {
+                    return ChuckDSL.class.getClassLoader().loadClass(name);
+                }
+                return super.loadClass(name, resolve);
+            }
+        };
         Class<?> clazz = loader.loadClass(className);
         
         return () -> {

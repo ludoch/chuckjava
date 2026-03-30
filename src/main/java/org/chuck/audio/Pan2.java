@@ -114,19 +114,19 @@ public class Pan2 extends StereoUGen {
         }
         
         // Update proxies
-        lastOutLeft = buffer[offset + length - 1];
-        lastOutRight = rightBuf[length - 1];
-        left.lastOut = lastOutLeft;
-        right.lastOut = lastOutRight;
+        lastOutChannels[0] = buffer[offset + length - 1];
+        lastOutChannels[1] = rightBuf[length - 1];
+        left.lastOut = lastOutChannels[0];
+        right.lastOut = lastOutChannels[1];
         
         // Note: in a full multi-channel system, rightBuf would be sent to the second channel
     }
 
     @Override
     protected void computeStereo(float input, long systemTime) {
-        lastOutLeft = input * gL;
-        lastOutRight = input * gR;
-        left.lastOut = lastOutLeft;
-        right.lastOut = lastOutRight;
+        lastOutChannels[0] = input * gL;
+        lastOutChannels[1] = input * gR;
+        left.lastOut = lastOutChannels[0];
+        right.lastOut = lastOutChannels[1];
     }
 }

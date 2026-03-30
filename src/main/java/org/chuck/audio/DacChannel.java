@@ -32,15 +32,13 @@ public class DacChannel extends ChuckUGen {
         for (ChuckUGen src : sources) {
             // Trigger tick on source. ChuckUGen.tick ensures it only computes once per sample.
             src.tick(systemTime);
-            
-            if (src instanceof StereoUGen s) {
-                sum += (channelIndex == 0) ? s.getLastOutLeft() : s.getLastOutRight();
-            } else {
-                sum += src.getLastOut();
-            }
+            sum += src.getChannelLastOut(channelIndex);
         }
         
         lastOut = sum * gain;
+        if (Math.abs(lastOut) > 1e-6 && systemTime % 4410 == 0) {
+            System.out.println("[VM] DAC[" + channelIndex + "] sum=" + lastOut + " at " + systemTime);
+        }
         lastTickTime = systemTime;
         return lastOut;
     }

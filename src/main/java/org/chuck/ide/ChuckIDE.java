@@ -162,10 +162,13 @@ public class ChuckIDE extends Application {
         
         // Setup Master Gain
         masterGain = new org.chuck.audio.Gain();
+        // IDE master gain is a final stage. In a real ChucK VM, dac is the end.
+        // For the IDE, we want to monitor the dac output through a master gain.
         vm.getDacChannel(0).chuckTo(masterGain);
         vm.getDacChannel(1).chuckTo(masterGain);
         
         audio = new ChuckAudio(vm, 512, 2, sampleRate);
+        audio.setMasterGainUGen(masterGain); // We need this method in ChuckAudio
         
         List<String> rawArgs = getParameters().getRaw();
         for (String arg : rawArgs) {
@@ -961,6 +964,9 @@ public class ChuckIDE extends Application {
                 int id = vm.spork(task);
                 
                 ChuckShred shredObj = vm.getShred(id);
+                if (shredObj != null) {
+                    shredObj.setName(currentFile.getName());
+                }
                 ShredInfo info = new ShredInfo(id, currentFile.getName(), shredObj);
                 shredListView.getItems().add(info);
                 print("Sporked Java Shred " + id + " (" + currentFile.getName() + ")");

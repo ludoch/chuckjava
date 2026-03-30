@@ -50,7 +50,7 @@ public class JCRev extends StereoUGen {
         float wetL = outLeft.tick(filtout, systemTime);
         float wetR = outRight.tick(filtout, systemTime);
         
-        lastOutLeft = dry * (1.0f - mix) + wetL * mix;
-        lastOutRight = dry * (1.0f - mix) + wetR * mix;
+        lastOutChannels[0] = dry * (1.0f - mix) + wetL * mix;
+        lastOutChannels[1] = dry * (1.0f - mix) + wetR * mix;
     }
 }

@@ -111,13 +111,10 @@ public class Adsr extends ChuckUGen {
     @Override
     protected float compute(float input, long systemTime) {
         update(systemTime);
+        if (getNumSources() == 0) {
+            return currentLevel;
+        }
         return input * currentLevel;
-    }
-
-    @Override
-    public float tick(long systemTime) {
-        update(systemTime);
-        return currentLevel;
     }
 
     @Override

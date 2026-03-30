@@ -40,7 +40,7 @@ public class GVerb extends StereoUGen {
             else wetR += out;
         }
         
-        lastOutLeft = input * (1.0f - mix) + (wetL / 4.0f) * mix;
-        lastOutRight = input * (1.0f - mix) + (wetR / 4.0f) * mix;
+        lastOutChannels[0] = input * (1.0f - mix) + (wetL / 4.0f) * mix;
+        lastOutChannels[1] = input * (1.0f - mix) + (wetR / 4.0f) * mix;
     }
 }

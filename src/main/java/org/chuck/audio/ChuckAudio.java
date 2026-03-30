@@ -22,6 +22,7 @@ public class ChuckAudio {
     private TargetDataLine inputLine;   // null if no mic available
     private boolean running = false;
     private float masterGain = 0.8f;
+    private Gain masterGainUGen;
     private int verbose = 1;
 
     // Optional recorder
@@ -34,6 +35,10 @@ public class ChuckAudio {
         this.numInputChannels = numChannels; // Default to same as output
         this.sampleRate = sampleRate;
         initJavaSound();
+    }
+
+    public void setMasterGainUGen(Gain ugen) {
+        this.masterGainUGen = ugen;
     }
 
     public void setVerbose(int verbose) {
@@ -128,8 +133,17 @@ public class ChuckAudio {
 
                         // Interleave Left/Right for stereo output
                         for (int c = 0; c < numChannels; c++) {
-                            // IMPORTANT: Explicitly tick the DAC channel to trigger the UGen graph computation
-                            float sample = vm.getDacChannel(c).tick(vm.getCurrentTime()) * masterGain;
+                            float sample;
+                            if (masterGainUGen != null) {
+                                // If we have an IDE master gain UGen, it is connected to dacChannels
+                                // already. Ticking it will pull through the whole graph.
+                                // NOTE: For multi-channel, we'd need a Stereo master gain.
+                                // For now, we use the mono masterGainUGen lastOut.
+                                sample = masterGainUGen.getLastOut() * masterGain;
+                            } else {
+                                // Fallback: pull directly from VM dac channels
+                                sample = vm.getDacChannel(c).getLastOut() * masterGain;
+                            }
                             
                             sumSq += (double)sample * sample;
                             short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
@@ -142,10 +156,10 @@ public class ChuckAudio {
                         i += samplesToProcess;
                     }
                     
-                    if (verbose > 1) {
+                    if (verbose > 1 || (verbose > 0 && vm.getCurrentTime() % (sampleRate * 2) == 0)) {
                         double rms = Math.sqrt(sumSq / (bufferSize * numChannels));
                         if (rms > 1e-9) {
-                            System.out.printf("[Audio] RMS: %.9f\n", rms);
+                            vm.print(String.format("[Audio] Engine RMS: %.6f\n", rms));
                         }
                     }
                     

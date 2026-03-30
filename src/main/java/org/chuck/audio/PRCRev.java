@@ -31,7 +31,7 @@ public class PRCRev extends StereoUGen {
         
         float wet = (comb[0].tick(temp, systemTime) + comb[1].tick(temp, systemTime)) * 0.5f;
         
-        lastOutLeft = input * (1.0f - mix) + wet * mix;
-        lastOutRight = lastOutLeft;
+        lastOutChannels[0] = input * (1.0f - mix) + wet * mix;
+        lastOutChannels[1] = lastOutChannels[0];
     }
 }

@@ -20,8 +20,8 @@ public class PolyphonyDSL implements Shred {
             final double freq = 220.0 * (i + 1);
             
             vm.spork(() -> {
-                TriOsc tri = new TriOsc(44100);
-                Adsr env = new Adsr(44100);
+                TriOsc tri = new TriOsc(sampleRate());
+                Adsr env = new Adsr(sampleRate());
                 
                 tri.chuck(env).chuck(dac());
                 tri.freq(freq);

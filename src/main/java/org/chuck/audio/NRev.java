@@ -31,7 +31,7 @@ public class NRev extends StereoUGen {
             temp = allpass[i].tick(temp, systemTime);
         }
         
-        lastOutLeft = input * (1.0f - mix) + temp * mix;
-        lastOutRight = lastOutLeft; // NRev is mono-in, quasi-mono out in this simple version
+        lastOutChannels[0] = input * (1.0f - mix) + temp * mix;
+        lastOutChannels[1] = lastOutChannels[0]; // NRev is mono-in, quasi-mono out in this simple version
     }
 }

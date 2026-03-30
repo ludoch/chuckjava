@@ -43,13 +43,13 @@ public class ChuckEmitter {
     // Known built-in UGen type names (used for type validation)
     private static final java.util.Set<String> KNOWN_UGEN_TYPES = java.util.Set.of(
         "SinOsc","SawOsc","TriOsc","SqrOsc","PulseOsc","Phasor","Noise","Impulse","Step","Gain","Blackhole",
-        "Pan2","ADSR","Adsr","Envelope","Echo","Delay","DelayA","DelayL","Chorus","JCRev","NRev","PRCRev","ResonZ",
+        "Pan2","Pan4","Pan8","Pan16","ADSR","Adsr","Envelope","Echo","Delay","DelayA","DelayL","Chorus","JCRev","NRev","PRCRev","ResonZ",
         "OnePole","OneZero","TwoPole","TwoZero","BPF","HPF","LPF","BRF","BiQuad","PoleZero","PitShift","Modulate",
         "LiSa","SndBuf","WvIn","WvOut","WaveLoop","FFT","IFFT","RMS","Centroid","UAnaBlob",
         "Clarinet","Mandolin","Plucked","Rhodey","Bowed","StifKarp","Moog","Flute","Sitar","Brass","Saxofony",
         "BeeThree","BlitSaw","BlitSquare","Blit","BlowBotl","BlowHole","PercFlut","HevyMetl","FMVoices",
         "TubeBell","Wurley","ModalBar","Shakers","BandedWG","SubNoise","FullRect","HalfRect","ZeroX","WarpTable",
-        "CurveTable","GenX","Gen5","Gen7","Gen10","Mix2","Dyno","Event","Hid","HidMsg","MidiIn","MidiOut","MidiMsg",
+        "CurveTable","GenX","Gen5","Gen7","Gen10","Mix2","Mix4","Mix8","Mix16","Dyno","Event","Hid","HidMsg","MidiIn","MidiOut","MidiMsg",
         "OscIn","OscOut","OscMsg","FileIO","IO","Std","Math","Machine","Object","String","Array","UGen",
         "UAna","Shred","Thread","ChucK","ZCR","MFCC","SFM","Kurtosis","vec2"
     );
@@ -3147,7 +3147,15 @@ public class ChuckEmitter {
 
         return switch (t) {
             case "SinOsc" -> new SinOsc(sr); case "Gain" -> new Gain();
-            case "Pan2" -> new Pan2(); case "Noise" -> new Noise();
+            case "Pan2" -> new Pan2();
+            case "Pan4" -> new Pan4();
+            case "Pan8" -> new Pan8();
+            case "Pan16" -> new Pan16();
+            case "Mix2" -> new Mix2();
+            case "Mix4" -> new Mix4();
+            case "Mix8" -> new Mix8();
+            case "Mix16" -> new Mix16();
+            case "Noise" -> new Noise();
             case "ADSR", "Adsr" -> new Adsr(sr); case "string" -> new ChuckString("");
             case "vec2" -> new ChuckArray(ChuckType.ARRAY, 2);
             case "vec3" -> new ChuckArray(ChuckType.ARRAY, 3);
@@ -3192,7 +3200,6 @@ public class ChuckEmitter {
             case "WvOut" -> new WvOutUGen(sr);
             case "WvIn" -> new WvIn(sr);
             case "WaveLoop" -> new WaveLoop(sr);
-            case "Mix2" -> new Mix2();
             case "SubNoise" -> new SubNoise();
             case "HalfRect" -> new HalfRect();
             case "FullRect" -> new FullRect();
