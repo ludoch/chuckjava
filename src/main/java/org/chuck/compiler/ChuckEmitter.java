@@ -87,79 +87,83 @@ public class ChuckEmitter {
     }
 
     private String getVarType(ChuckAST.Exp exp) {
-        if (exp instanceof ChuckAST.IdExp id) return varTypes.get(id.name());
-        return null;
+        return switch (exp) {
+            case ChuckAST.IdExp id -> varTypes.get(id.name());
+            default -> null;
+        };
     }
 
     /** Infers the type of an expression, including results of binary operator overloads. */
     private String getExprType(ChuckAST.Exp exp) {
-        if (exp instanceof ChuckAST.IdExp id) {
-            String type = getVarType(exp);
-            if (type != null) return type;
-            if (userClassRegistry.containsKey(id.name())) return id.name();
-            // Handle core types as types themselves
-            if (CORE_DATA_TYPES.contains(id.name())) return id.name();
-            if (isKnownUGenType(id.name())) return id.name();
-            return null;
-        }
-        if (exp instanceof ChuckAST.IntExp) return "int";
-        if (exp instanceof ChuckAST.FloatExp) return "float";
-        if (exp instanceof ChuckAST.StringExp) return "string";
-        if (exp instanceof ChuckAST.DeclExp e) return e.type();
-        if (exp instanceof ChuckAST.BinaryExp bin) {
-            String lhsType = getExprType(bin.lhs());
-            if (lhsType == null) return null;
-
-            // Handle built-in vector/complex arithmetic results
-            if (lhsType.equals("vec2") || lhsType.equals("vec3") || lhsType.equals("vec4") ||
-                lhsType.equals("complex") || lhsType.equals("polar")) {
-                if (bin.op() == ChuckAST.Operator.EQ || bin.op() == ChuckAST.Operator.NEQ ||
-                    bin.op() == ChuckAST.Operator.LT || bin.op() == ChuckAST.Operator.LE ||
-                    bin.op() == ChuckAST.Operator.GT || bin.op() == ChuckAST.Operator.GE) {
-                    return "int";
-                }
-                if (bin.op() == ChuckAST.Operator.TIMES) {
-                    String rhsType = getExprType(bin.rhs());
-                    if (rhsType != null && (rhsType.equals("vec2") || rhsType.equals("vec3") || rhsType.equals("vec4"))) {
-                        return "float"; // Dot product
-                    }
-                }
-                return lhsType; // Element-wise arithmetic returns same type
+        return switch (exp) {
+            case ChuckAST.IdExp id -> {
+                String type = getVarType(exp);
+                if (type != null) yield type;
+                if (userClassRegistry.containsKey(id.name())) yield id.name();
+                // Handle core types as types themselves
+                if (CORE_DATA_TYPES.contains(id.name())) yield id.name();
+                if (isKnownUGenType(id.name())) yield id.name();
+                yield null;
             }
+            case ChuckAST.IntExp _ -> "int";
+            case ChuckAST.FloatExp _ -> "float";
+            case ChuckAST.StringExp _ -> "string";
+            case ChuckAST.DeclExp e -> e.type();
+            case ChuckAST.BinaryExp bin -> {
+                String lhsType = getExprType(bin.lhs());
+                if (lhsType == null) yield null;
 
-            String opSymbol = switch (bin.op()) {
-                case PLUS -> "+"; case MINUS -> "-"; case TIMES -> "*";
-                case DIVIDE -> "/"; case PERCENT -> "%"; 
-                case LT -> "<"; case LE -> "<="; case GT -> ">";
-                case GE -> ">="; case EQ -> "=="; case NEQ -> "!=";
-                default -> null;
-            };
-            if (opSymbol != null && userClassRegistry.containsKey(lhsType)) {
-                String retType = functionReturnTypes.get("__pub_op__" + opSymbol + ":2");
-                if (retType == null) retType = functionReturnTypes.get("__op__" + opSymbol + ":2");
-                if (retType == null) {
-                    UserClassDescriptor desc = userClassRegistry.get(lhsType);
-                    if (desc != null) {
-                        if (desc.methods().containsKey("__pub_op__" + opSymbol + ":1") ||
-                            desc.methods().containsKey("__op__" + opSymbol + ":1")) {
-                            return (bin.op() == ChuckAST.Operator.EQ || bin.op() == ChuckAST.Operator.NEQ ||
-                                    bin.op() == ChuckAST.Operator.LT || bin.op() == ChuckAST.Operator.LE ||
-                                    bin.op() == ChuckAST.Operator.GT || bin.op() == ChuckAST.Operator.GE) ? "int" : lhsType;
+                // Handle built-in vector/complex arithmetic results
+                if (lhsType.equals("vec2") || lhsType.equals("vec3") || lhsType.equals("vec4") ||
+                    lhsType.equals("complex") || lhsType.equals("polar")) {
+                    if (bin.op() == ChuckAST.Operator.EQ || bin.op() == ChuckAST.Operator.NEQ ||
+                        bin.op() == ChuckAST.Operator.LT || bin.op() == ChuckAST.Operator.LE ||
+                        bin.op() == ChuckAST.Operator.GT || bin.op() == ChuckAST.Operator.GE) {
+                        yield "int";
+                    }
+                    if (bin.op() == ChuckAST.Operator.TIMES) {
+                        String rhsType = getExprType(bin.rhs());
+                        if (rhsType != null && (rhsType.equals("vec2") || rhsType.equals("vec3") || rhsType.equals("vec4"))) {
+                            yield "float"; // Dot product
                         }
                     }
+                    yield lhsType; // Element-wise arithmetic returns same type
                 }
-                if (retType != null) return retType;
+
+                String opSymbol = switch (bin.op()) {
+                    case PLUS -> "+"; case MINUS -> "-"; case TIMES -> "*";
+                    case DIVIDE -> "/"; case PERCENT -> "%"; 
+                    case LT -> "<"; case LE -> "<="; case GT -> ">";
+                    case GE -> ">="; case EQ -> "=="; case NEQ -> "!=";
+                    default -> null;
+                };
+                if (opSymbol != null && userClassRegistry.containsKey(lhsType)) {
+                    String retType = functionReturnTypes.get("__pub_op__" + opSymbol + ":2");
+                    if (retType == null) retType = functionReturnTypes.get("__op__" + opSymbol + ":2");
+                    if (retType == null) {
+                        UserClassDescriptor desc = userClassRegistry.get(lhsType);
+                        if (desc != null) {
+                            if (desc.methods().containsKey("__pub_op__" + opSymbol + ":1") ||
+                                desc.methods().containsKey("__op__" + opSymbol + ":1")) {
+                                yield (bin.op() == ChuckAST.Operator.EQ || bin.op() == ChuckAST.Operator.NEQ ||
+                                        bin.op() == ChuckAST.Operator.LT || bin.op() == ChuckAST.Operator.LE ||
+                                        bin.op() == ChuckAST.Operator.GT || bin.op() == ChuckAST.Operator.GE) ? "int" : lhsType;
+                            }
+                        }
+                    }
+                    if (retType != null) yield retType;
+                }
+                yield null;
             }
-        }
-        return null;
+            default -> null;
+        };
     }
 
     private void flattenStmts(List<ChuckAST.Stmt> input, List<ChuckAST.Stmt> output) {
         for (ChuckAST.Stmt s : input) {
-            if (s instanceof ChuckAST.BlockStmt b) {
-                flattenStmts(b.statements(), output);
-            } else {
-                output.add(s);
+            switch (s) {
+                case ChuckAST.BlockStmt b -> flattenStmts(b.statements(), output);
+                default -> output.add(s);
             }
         }
     }
@@ -237,1557 +241,1579 @@ public class ChuckEmitter {
     }
 
     private void emitStatement(ChuckAST.Stmt stmt, ChuckCode code) {
-        if (stmt instanceof ChuckAST.ExpStmt s) {
-            // Check for standalone undefined variable (e.g. `x;`) — error-nspc-no-crash
-            if (s.exp() instanceof ChuckAST.IdExp ide && localScopes.isEmpty() && currentClass == null) {
-                String nm = ide.name();
-                boolean knownName = varTypes.containsKey(nm) || globalVarTypes.containsKey(nm)
-                    || userClassRegistry.containsKey(nm) || isKnownUGenType(nm)
-                    || currentClassFields.contains(nm)
-                    || nm.equals("null") || nm.equals("true") || nm.equals("false")
-                    || nm.equals("this") || nm.equals("super") || nm.equals("pi") || nm.equals("e")
-                    || nm.equals("now") || nm.equals("dac") || nm.equals("blackhole") || nm.equals("adc")
-                    || nm.equals("me") || nm.equals("cherr") || nm.equals("chout") || nm.equals("Machine")
-                    || nm.equals("maybe") || nm.equals("second") || nm.equals("ms") || nm.equals("samp")
-                    || nm.equals("minute") || nm.equals("hour");
-                if (!knownName) {
-                    throw new RuntimeException(currentFile + ":" + ide.line() + ":" + ide.column()
-                        + ": error: undefined variable '" + nm + "'");
+        switch (stmt) {
+            case ChuckAST.ExpStmt s -> {
+                // Check for standalone undefined variable (e.g. `x;`) — error-nspc-no-crash
+                if (s.exp() instanceof ChuckAST.IdExp ide && localScopes.isEmpty() && currentClass == null) {
+                    String nm = ide.name();
+                    boolean knownName = varTypes.containsKey(nm) || globalVarTypes.containsKey(nm)
+                        || userClassRegistry.containsKey(nm) || isKnownUGenType(nm)
+                        || currentClassFields.contains(nm)
+                        || nm.equals("null") || nm.equals("true") || nm.equals("false")
+                        || nm.equals("this") || nm.equals("super") || nm.equals("pi") || nm.equals("e")
+                        || nm.equals("now") || nm.equals("dac") || nm.equals("blackhole") || nm.equals("adc")
+                        || nm.equals("me") || nm.equals("cherr") || nm.equals("chout") || nm.equals("Machine")
+                        || nm.equals("maybe") || nm.equals("second") || nm.equals("ms") || nm.equals("samp")
+                        || nm.equals("minute") || nm.equals("hour");
+                    if (!knownName) {
+                        throw new RuntimeException(currentFile + ":" + ide.line() + ":" + ide.column()
+                            + ": error: undefined variable '" + nm + "'");
+                    }
                 }
-            }
-            emitExpression(s.exp(), code);
-            code.addInstruction(new Pop());
-        } else if (stmt instanceof ChuckAST.WhileStmt s) {
-            int startPc = code.getNumInstructions();
-            continueJumps.push(new ArrayList<>());
-            breakJumps.push(new ArrayList<>());
-
-            emitExpression(s.condition(), code);
-            int jumpIdx = code.getNumInstructions();
-            code.addInstruction(null); // placeholder for JumpIfFalse
-            emitStatement(s.body(), code);
-            code.addInstruction(new Jump(startPc));
-            int endPc = code.getNumInstructions();
-            code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
-
-            for (int jump : breakJumps.pop()) {
-                code.replaceInstruction(jump, new Jump(endPc));
-            }
-            for (int jump : continueJumps.pop()) {
-                code.replaceInstruction(jump, new Jump(startPc));
-            }
-        } else if (stmt instanceof ChuckAST.UntilStmt s) {
-            int startPc = code.getNumInstructions();
-            continueJumps.push(new ArrayList<>());
-            breakJumps.push(new ArrayList<>());
-
-            emitExpression(s.condition(), code);
-            code.addInstruction(new LogicalNot());
-            int jumpIdx = code.getNumInstructions();
-            code.addInstruction(null); // placeholder for JumpIfFalse
-            emitStatement(s.body(), code);
-            code.addInstruction(new Jump(startPc));
-            int endPc = code.getNumInstructions();
-            code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
-
-            for (int jump : breakJumps.pop()) {
-                code.replaceInstruction(jump, new Jump(endPc));
-            }
-            for (int jump : continueJumps.pop()) {
-                code.replaceInstruction(jump, new Jump(startPc));
-            }
-        } else if (stmt instanceof ChuckAST.DoStmt s) {
-            int startPc = code.getNumInstructions();
-            int bodyStart = code.getNumInstructions();
-            breakJumps.push(new ArrayList<>());
-            continueJumps.push(new ArrayList<>());
-
-            emitStatement(s.body(), code);
-
-            int condStart = code.getNumInstructions();
-
-            emitExpression(s.condition(), code);
-            if (s.isUntil()) {
-                code.addInstruction(new LogicalNot());
-            }
-            code.addInstruction(new JumpIfTrue(bodyStart));
-            int endPc = code.getNumInstructions();
-
-            for (int jump : breakJumps.pop()) {
-                code.replaceInstruction(jump, new Jump(endPc));
-            }
-            for (int jump : continueJumps.pop()) {
-                code.replaceInstruction(jump, new Jump(condStart));
-            }
-        } else if (stmt instanceof ChuckAST.BreakStmt) {
-            if (!breakJumps.isEmpty()) {
-                breakJumps.peek().add(code.getNumInstructions());
-                code.addInstruction(null); // placeholder for Jump
-            }
-        } else if (stmt instanceof ChuckAST.ContinueStmt) {
-            if (!continueJumps.isEmpty()) {
-                continueJumps.peek().add(code.getNumInstructions());
-                code.addInstruction(null); // placeholder for Jump
-            }
-        } else if (stmt instanceof ChuckAST.SwitchStmt s) {
-            emitExpression(s.condition(), code);
-            
-            breakJumps.push(new ArrayList<>());
-            List<Integer> caseConditionJumps = new ArrayList<>();
-            ChuckAST.CaseStmt defaultCase = null;
-            int defaultBodyStartIndex = -1;
-            
-            for (ChuckAST.CaseStmt c : s.cases()) {
-                if (c.isDefault()) {
-                    defaultCase = c;
-                } else {
-                    code.addInstruction(new Duplicate());
-                    emitExpression(c.match(), code);
-                    code.addInstruction(new EqualAny());
-                    caseConditionJumps.add(code.getNumInstructions());
-                    code.addInstruction(null); // JumpIfTrue
-                }
-            }
-            
-            code.addInstruction(new Pop()); // pop switch value if no match
-            int jumpToDefaultOrEnd = code.getNumInstructions();
-            code.addInstruction(null); // Jump to default or end
-            
-            int caseIdx = 0;
-            for (ChuckAST.CaseStmt c : s.cases()) {
-                if (c.isDefault()) {
-                    defaultBodyStartIndex = code.getNumInstructions();
-                } else {
-                    code.replaceInstruction(caseConditionJumps.get(caseIdx++), new JumpIfTrue(code.getNumInstructions()));
-                    code.addInstruction(new Pop()); // pop switch value before body executes
-                }
-                for (ChuckAST.Stmt b : c.body()) {
-                    emitStatement(b, code);
-                }
-                // Implicit break: add jump-to-end unless body ends with explicit break
-                java.util.List<ChuckAST.Stmt> body = c.body();
-                boolean endsWithBreak = !body.isEmpty() && body.get(body.size() - 1) instanceof ChuckAST.BreakStmt;
-                if (!endsWithBreak) {
-                    breakJumps.peek().add(code.getNumInstructions());
-                    code.addInstruction(null); // implicit jump to end (no fall-through)
-                }
-            }
-
-            int endPc = code.getNumInstructions();
-
-            if (defaultCase != null) {
-                code.replaceInstruction(jumpToDefaultOrEnd, new Jump(defaultBodyStartIndex));
-            } else {
-                code.replaceInstruction(jumpToDefaultOrEnd, new Jump(endPc));
-            }
-
-            for (int jump : breakJumps.pop()) {
-                code.replaceInstruction(jump, new Jump(endPc));
-            }
-        } else if (stmt instanceof ChuckAST.ForStmt s) {
-            emitStatement(s.init(), code);
-            int startPc = code.getNumInstructions();
-            breakJumps.push(new ArrayList<>());
-            continueJumps.push(new ArrayList<>());
-
-            if (s.condition() instanceof ChuckAST.ExpStmt es) {
-                emitExpression(es.exp(), code);
-            } else {
-                code.addInstruction(new PushInt(1)); // truthy
-            }
-            int jumpIdx = code.getNumInstructions();
-            code.addInstruction(null); // placeholder for JumpIfFalse
-
-            emitStatement(s.body(), code);
-
-            int updateStart = code.getNumInstructions();
-            emitExpression(s.update(), code);
-            code.addInstruction(new Pop()); // pop update result
-            code.addInstruction(new Jump(startPc));
-
-            int endPc = code.getNumInstructions();
-            code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
-            for (int jump : breakJumps.pop()) {
-                code.replaceInstruction(jump, new Jump(endPc));
-            }
-            for (int jump : continueJumps.pop()) {
-                code.replaceInstruction(jump, new Jump(updateStart));
-            }
-        } else if (stmt instanceof ChuckAST.BlockStmt s) {
-            for (ChuckAST.Stmt inner : s.statements()) {
-                emitStatement(inner, code);
-            }
-        } else if (stmt instanceof ChuckAST.ImportStmt) {
-            // already processed by VM before emit — skip
-        } else if (stmt instanceof ChuckAST.DeclStmt s) {
-            // Check for 'auto' without initialization
-            if (s.type().equals("auto")) {
-                throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
-                    + ": error: 'auto' requires initialization (cannot declare 'auto' without a value)");
-            }
-            // Check for static variable declared outside class scope
-            if (s.isStatic() && (currentClass == null || !localScopes.isEmpty())) {
-                throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
-                    + ": error: static variables must be declared at class scope");
-            }
-            // Track empty-array variable declarations
-            if (!s.arraySizes().isEmpty() && s.arraySizes().get(0) instanceof ChuckAST.IntExp sz0 && sz0.value() < 0) {
-                emptyArrayVars.add(s.name());
-            }
-            varTypes.put(s.name(), s.type()); // track variable type for operator dispatch
-            int argCount = 0;
-            boolean isUserClass = userClassRegistry.containsKey(s.type());
-            boolean isVec = s.type().equals("vec2") || s.type().equals("vec3") || s.type().equals("vec4") || s.type().equals("complex") || s.type().equals("polar");
-            boolean forceGlobal = s.isGlobal();
-            // Compile-time check: detect global type conflicts
-            if (forceGlobal || localScopes.isEmpty()) {
-                String prevType = globalVarTypes.get(s.name());
-                if (prevType != null && !prevType.equals(s.type()) && !prevType.equals("int") && !prevType.equals("float") && !prevType.equals("string")) {
-                    throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
-                        + ": error: global " + prevType + " '" + s.name() + "' has different type '" + s.type()
-                        + "' than already existing global " + prevType + " of the same name");
-                }
-                globalVarTypes.put(s.name(), s.type());
-            }
-
-            if (isUserClass && s.callArgs() instanceof ChuckAST.CallExp call) {
-                if (forceGlobal || localScopes.isEmpty()) {
-                    code.addInstruction(new InstantiateSetAndPushGlobal(s.type(), s.name(), 0, s.isReference(), false, userClassRegistry));
-                } else {
-                    Map<String, Integer> scope = localScopes.peek();
-                    int offset = scope.size();
-                    scope.put(s.name(), offset);
-                    code.addInstruction(new InstantiateSetAndPushLocal(s.type(), offset, 0, s.isReference(), false, userClassRegistry));
-                }
-                code.addInstruction(new Dup());
-                for (ChuckAST.Exp arg : call.args()) emitExpression(arg, code);
-                code.addInstruction(new CallMethod(s.type(), call.args().size()));
+                emitExpression(s.exp(), code);
                 code.addInstruction(new Pop());
-            } else {
-                if (s.callArgs() instanceof ChuckAST.CallExp call) {
-                    for (ChuckAST.Exp arg : call.args()) emitExpression(arg, code);
-                    argCount = call.args().size();
+            }
+            case ChuckAST.WhileStmt s -> {
+                int startPc = code.getNumInstructions();
+                continueJumps.push(new ArrayList<>());
+                breakJumps.push(new ArrayList<>());
+
+                emitExpression(s.condition(), code);
+                int jumpIdx = code.getNumInstructions();
+                code.addInstruction(null); // placeholder for JumpIfFalse
+                emitStatement(s.body(), code);
+                code.addInstruction(new Jump(startPc));
+                int endPc = code.getNumInstructions();
+                code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
+
+                for (int jump : breakJumps.pop()) {
+                    code.replaceInstruction(jump, new Jump(endPc));
                 }
-                if (!s.arraySizes().isEmpty()) {
-                    for (ChuckAST.Exp sizeExp : s.arraySizes()) emitExpression(sizeExp, code);
-                    argCount = s.arraySizes().size();
+                for (int jump : continueJumps.pop()) {
+                    code.replaceInstruction(jump, new Jump(startPc));
+                }
+            }
+            case ChuckAST.UntilStmt s -> {
+                int startPc = code.getNumInstructions();
+                continueJumps.push(new ArrayList<>());
+                breakJumps.push(new ArrayList<>());
+
+                emitExpression(s.condition(), code);
+                code.addInstruction(new LogicalNot());
+                int jumpIdx = code.getNumInstructions();
+                code.addInstruction(null); // placeholder for JumpIfFalse
+                emitStatement(s.body(), code);
+                code.addInstruction(new Jump(startPc));
+                int endPc = code.getNumInstructions();
+                code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
+
+                for (int jump : breakJumps.pop()) {
+                    code.replaceInstruction(jump, new Jump(endPc));
+                }
+                for (int jump : continueJumps.pop()) {
+                    code.replaceInstruction(jump, new Jump(startPc));
+                }
+            }
+            case ChuckAST.DoStmt s -> {
+                int startPc = code.getNumInstructions();
+                int bodyStart = code.getNumInstructions();
+                breakJumps.push(new ArrayList<>());
+                continueJumps.push(new ArrayList<>());
+
+                emitStatement(s.body(), code);
+
+                int condStart = code.getNumInstructions();
+
+                emitExpression(s.condition(), code);
+                if (s.isUntil()) {
+                    code.addInstruction(new LogicalNot());
+                }
+                code.addInstruction(new JumpIfTrue(bodyStart));
+                int endPc = code.getNumInstructions();
+
+                for (int jump : breakJumps.pop()) {
+                    code.replaceInstruction(jump, new Jump(endPc));
+                }
+                for (int jump : continueJumps.pop()) {
+                    code.replaceInstruction(jump, new Jump(condStart));
+                }
+            }
+            case ChuckAST.BreakStmt _ -> {
+                if (!breakJumps.isEmpty()) {
+                    breakJumps.peek().add(code.getNumInstructions());
+                    code.addInstruction(null); // placeholder for Jump
+                }
+            }
+            case ChuckAST.ContinueStmt _ -> {
+                if (!continueJumps.isEmpty()) {
+                    continueJumps.peek().add(code.getNumInstructions());
+                    code.addInstruction(null); // placeholder for Jump
+                }
+            }
+            case ChuckAST.SwitchStmt s -> {
+                emitExpression(s.condition(), code);
+                
+                breakJumps.push(new ArrayList<>());
+                List<Integer> caseConditionJumps = new ArrayList<>();
+                ChuckAST.CaseStmt defaultCase = null;
+                int defaultBodyStartIndex = -1;
+                
+                for (ChuckAST.CaseStmt c : s.cases()) {
+                    if (c.isDefault()) {
+                        defaultCase = c;
+                    } else {
+                        code.addInstruction(new Duplicate());
+                        emitExpression(c.match(), code);
+                        code.addInstruction(new EqualAny());
+                        caseConditionJumps.add(code.getNumInstructions());
+                        code.addInstruction(null); // JumpIfTrue
+                    }
+                }
+                
+                code.addInstruction(new Pop()); // pop switch value if no match
+                int jumpToDefaultOrEnd = code.getNumInstructions();
+                code.addInstruction(null); // Jump to default or end
+                
+                int caseIdx = 0;
+                for (ChuckAST.CaseStmt c : s.cases()) {
+                    if (c.isDefault()) {
+                        defaultBodyStartIndex = code.getNumInstructions();
+                    } else {
+                        code.replaceInstruction(caseConditionJumps.get(caseIdx++), new JumpIfTrue(code.getNumInstructions()));
+                        code.addInstruction(new Pop()); // pop switch value before body executes
+                    }
+                    for (ChuckAST.Stmt b : c.body()) {
+                        emitStatement(b, code);
+                    }
+                    // Implicit break: add jump-to-end unless body ends with explicit break
+                    java.util.List<ChuckAST.Stmt> body = c.body();
+                    boolean endsWithBreak = !body.isEmpty() && body.get(body.size() - 1) instanceof ChuckAST.BreakStmt;
+                    if (!endsWithBreak) {
+                        breakJumps.peek().add(code.getNumInstructions());
+                        code.addInstruction(null); // implicit jump to end (no fall-through)
+                    }
                 }
 
-                if (isVec && !s.isReference() && argCount == 0) {
-                    code.addInstruction(new PushInt(0)); // dummy size for instantiation
-                    argCount = 1;
+                int endPc = code.getNumInstructions();
+
+                if (defaultCase != null) {
+                    code.replaceInstruction(jumpToDefaultOrEnd, new Jump(defaultBodyStartIndex));
+                } else {
+                    code.replaceInstruction(jumpToDefaultOrEnd, new Jump(endPc));
                 }
 
-                boolean isArrayDecl = !s.arraySizes().isEmpty();
-                boolean useGlobal = forceGlobal || localScopes.isEmpty() || (localScopes.size() == 1 && isArrayDecl);
-                if (useGlobal) {
+                for (int jump : breakJumps.pop()) {
+                    code.replaceInstruction(jump, new Jump(endPc));
+                }
+            }
+            case ChuckAST.ForStmt s -> {
+                emitStatement(s.init(), code);
+                int startPc = code.getNumInstructions();
+                breakJumps.push(new ArrayList<>());
+                continueJumps.push(new ArrayList<>());
+
+                if (s.condition() instanceof ChuckAST.ExpStmt es) {
+                    emitExpression(es.exp(), code);
+                } else {
+                    code.addInstruction(new PushInt(1)); // truthy
+                }
+                int jumpIdx = code.getNumInstructions();
+                code.addInstruction(null); // placeholder for JumpIfFalse
+
+                emitStatement(s.body(), code);
+
+                int updateStart = code.getNumInstructions();
+                emitExpression(s.update(), code);
+                code.addInstruction(new Pop()); // pop update result
+                code.addInstruction(new Jump(startPc));
+
+                int endPc = code.getNumInstructions();
+                code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
+                for (int jump : breakJumps.pop()) {
+                    code.replaceInstruction(jump, new Jump(endPc));
+                }
+                for (int jump : continueJumps.pop()) {
+                    code.replaceInstruction(jump, new Jump(updateStart));
+                }
+            }
+            case ChuckAST.BlockStmt s -> {
+                for (ChuckAST.Stmt inner : s.statements()) {
+                    emitStatement(inner, code);
+                }
+            }
+            case ChuckAST.ImportStmt _ -> {
+                // already processed by VM before emit — skip
+            }
+            case ChuckAST.DeclStmt s -> {
+                // Check for 'auto' without initialization
+                if (s.type().equals("auto")) {
+                    throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
+                        + ": error: 'auto' requires initialization (cannot declare 'auto' without a value)");
+                }
+                // Check for static variable declared outside class scope
+                if (s.isStatic() && (currentClass == null || !localScopes.isEmpty())) {
+                    throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
+                        + ": error: static variables must be declared at class scope");
+                }
+                // Track empty-array variable declarations
+                if (!s.arraySizes().isEmpty() && s.arraySizes().get(0) instanceof ChuckAST.IntExp sz0 && sz0.value() < 0) {
+                    emptyArrayVars.add(s.name());
+                }
+                varTypes.put(s.name(), s.type()); // track variable type for operator dispatch
+                int argCount = 0;
+                boolean isUserClass = userClassRegistry.containsKey(s.type());
+                boolean isVec = s.type().equals("vec2") || s.type().equals("vec3") || s.type().equals("vec4") || s.type().equals("complex") || s.type().equals("polar");
+                boolean forceGlobal = s.isGlobal();
+                // Compile-time check: detect global type conflicts
+                if (forceGlobal || localScopes.isEmpty()) {
+                    String prevType = globalVarTypes.get(s.name());
+                    if (prevType != null && !prevType.equals(s.type()) && !prevType.equals("int") && !prevType.equals("float") && !prevType.equals("string")) {
+                        throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
+                            + ": error: global " + prevType + " '" + s.name() + "' has different type '" + s.type()
+                            + "' than already existing global " + prevType + " of the same name");
+                    }
                     globalVarTypes.put(s.name(), s.type());
-                    code.addInstruction(new InstantiateSetAndPushGlobal(s.type(), s.name(), argCount, s.isReference(), isArrayDecl, userClassRegistry));
+                }
+
+                if (isUserClass && s.callArgs() instanceof ChuckAST.CallExp call) {
+                    if (forceGlobal || localScopes.isEmpty()) {
+                        code.addInstruction(new InstantiateSetAndPushGlobal(s.type(), s.name(), 0, s.isReference(), false, userClassRegistry));
+                    } else {
+                        Map<String, Integer> scope = localScopes.peek();
+                        int offset = scope.size();
+                        scope.put(s.name(), offset);
+                        code.addInstruction(new InstantiateSetAndPushLocal(s.type(), offset, 0, s.isReference(), false, userClassRegistry));
+                    }
+                    code.addInstruction(new Dup());
+                    for (ChuckAST.Exp arg : call.args()) emitExpression(arg, code);
+                    code.addInstruction(new CallMethod(s.type(), call.args().size()));
                     code.addInstruction(new Pop());
                 } else {
-                    Map<String, Integer> scope = localScopes.peek();
-                    Integer offset = scope.get(s.name());
-                    if (offset == null) {
-                        offset = scope.size();
-                        scope.put(s.name(), offset);
+                    if (s.callArgs() instanceof ChuckAST.CallExp call) {
+                        for (ChuckAST.Exp arg : call.args()) emitExpression(arg, code);
+                        argCount = call.args().size();
                     }
-                    code.addInstruction(new InstantiateSetAndPushLocal(s.type(), offset, argCount, s.isReference(), isArrayDecl, userClassRegistry));
-                    code.addInstruction(new Pop());
+                    if (!s.arraySizes().isEmpty()) {
+                        for (ChuckAST.Exp sizeExp : s.arraySizes()) emitExpression(sizeExp, code);
+                        argCount = s.arraySizes().size();
+                    }
+
+                    if (isVec && !s.isReference() && argCount == 0) {
+                        code.addInstruction(new PushInt(0)); // dummy size for instantiation
+                        argCount = 1;
+                    }
+
+                    boolean isArrayDecl = !s.arraySizes().isEmpty();
+                    boolean useGlobal = forceGlobal || localScopes.isEmpty() || (localScopes.size() == 1 && isArrayDecl);
+                    if (useGlobal) {
+                        globalVarTypes.put(s.name(), s.type());
+                        code.addInstruction(new InstantiateSetAndPushGlobal(s.type(), s.name(), argCount, s.isReference(), isArrayDecl, userClassRegistry));
+                        code.addInstruction(new Pop());
+                    } else {
+                        Map<String, Integer> scope = localScopes.peek();
+                        Integer offset = scope.get(s.name());
+                        if (offset == null) {
+                            offset = scope.size();
+                            scope.put(s.name(), offset);
+                        }
+                        code.addInstruction(new InstantiateSetAndPushLocal(s.type(), offset, argCount, s.isReference(), isArrayDecl, userClassRegistry));
+                        code.addInstruction(new Pop());
+                    }
                 }
             }
-        } else if (stmt instanceof ChuckAST.PrintStmt s) {
-            for (ChuckAST.Exp exp : s.expressions()) {
-                emitExpression(exp, code);
-            }
-            code.addInstruction(new ChuckPrint(s.expressions().size()));
-        } else if (stmt instanceof ChuckAST.FuncDefStmt s) {
-            // Validate operator overloads
-            if (s.name().startsWith("__op__") || s.name().startsWith("__pub_op__")) {
-                String opSuffix = s.name().startsWith("__pub_op__") ? s.name().substring("__pub_op__".length()) : s.name().substring("__op__".length());
-                // ~ is never a valid overloadable operator
-                if (opSuffix.equals("~")) {
-                    throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
-                        + ": error: cannot overload operator '" + opSuffix + "'");
+            case ChuckAST.PrintStmt s -> {
+                for (ChuckAST.Exp exp : s.expressions()) {
+                    emitExpression(exp, code);
                 }
-                // ++ and -- cannot be overloaded for primitive types
-                java.util.Set<String> primitiveTypes = java.util.Set.of("int", "float", "string", "time", "dur", "void");
-                if ((opSuffix.equals("++") || opSuffix.equals("--")) && s.argTypes().size() >= 1) {
-                    for (String argType : s.argTypes()) {
-                        if (primitiveTypes.contains(argType)) {
-                            throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
-                                + ": error: cannot overload operator '" + opSuffix + "' for primitive type '" + argType + "'");
+                code.addInstruction(new ChuckPrint(s.expressions().size()));
+            }
+            case ChuckAST.FuncDefStmt s -> {
+                // Validate operator overloads
+                if (s.name().startsWith("__op__") || s.name().startsWith("__pub_op__")) {
+                    String opSuffix = s.name().startsWith("__pub_op__") ? s.name().substring("__pub_op__".length()) : s.name().substring("__op__".length());
+                    // ~ is never a valid overloadable operator
+                    if (opSuffix.equals("~")) {
+                        throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
+                            + ": error: cannot overload operator '" + opSuffix + "'");
+                    }
+                    // ++ and -- cannot be overloaded for primitive types
+                    java.util.Set<String> primitiveTypes = java.util.Set.of("int", "float", "string", "time", "dur", "void");
+                    if ((opSuffix.equals("++") || opSuffix.equals("--")) && s.argTypes().size() >= 1) {
+                        for (String argType : s.argTypes()) {
+                            if (primitiveTypes.contains(argType)) {
+                                throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
+                                    + ": error: cannot overload operator '" + opSuffix + "' for primitive type '" + argType + "'");
+                            }
+                        }
+                    }
+                    // => cannot be overloaded for UGen subtypes
+                    if ((opSuffix.equals("=>") || opSuffix.equals("@=>")) && s.argTypes().size() >= 1) {
+                        for (String argType : s.argTypes()) {
+                            if (isKnownUGenType(argType)) {
+                                throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
+                                    + ": error: cannot overload '" + opSuffix + "' for UGen subtype '" + argType + "'");
+                            }
                         }
                     }
                 }
-                // => cannot be overloaded for UGen subtypes
-                if ((opSuffix.equals("=>") || opSuffix.equals("@=>")) && s.argTypes().size() >= 1) {
-                    for (String argType : s.argTypes()) {
-                        if (isKnownUGenType(argType)) {
-                            throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
-                                + ": error: cannot overload '" + opSuffix + "' for UGen subtype '" + argType + "'");
-                        }
-                    }
-                }
-            }
-            String key = s.name() + ":" + s.argNames().size();
-            ChuckCode funcCode = functions.get(key);
-            if (funcCode == null) funcCode = new ChuckCode(s.name());
-
-            String prevReturnType = currentFuncReturnType;
-            boolean prevHasReturn = currentFuncHasReturn;
-            boolean prevStaticCtx = inStaticFuncContext;
-            currentFuncReturnType = s.returnType() != null ? s.returnType() : "void";
-            currentFuncHasReturn = false;
-            inStaticFuncContext = s.isStatic();
-
-            Map<String, Integer> scope = new HashMap<>();
-            localScopes.push(scope);
-            for (int i = 0; i < s.argNames().size(); i++) {
-                scope.put(s.argNames().get(i), i);
-            }
-            emitStatement(s.body(), funcCode);
-            funcCode.addInstruction(new ReturnFunc());
-            localScopes.pop();
-
-            // Check for missing return in non-void function
-            if (!currentFuncReturnType.equals("void") && !currentFuncHasReturn) {
-                throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
-                    + ": error: not all control paths in 'fun " + currentFuncReturnType + " " + s.name() + "()' return a value");
-            }
-
-            currentFuncReturnType = prevReturnType;
-            currentFuncHasReturn = prevHasReturn;
-            inStaticFuncContext = prevStaticCtx;
-
-            functions.put(key, funcCode);
-            if (s.returnType() != null && !s.returnType().equals("void")) {
-                functionReturnTypes.put(key, s.returnType());
-            }
-        } else if (stmt instanceof ChuckAST.ReturnStmt s) {
-            // Check for return value in void function
-            if (s.exp() != null && "void".equals(currentFuncReturnType)) {
-                throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
-                    + ": error: function was defined with return type 'void' -- but returning a value");
-            }
-            currentFuncHasReturn = true;
-            if (s.exp() != null) emitExpression(s.exp(), code);
-            code.addInstruction(currentClass != null ? new ReturnMethod() : new ReturnFunc());
-        } else if (stmt instanceof ChuckAST.ClassDefStmt s) {
-            // Check for extending primitive types
-            if (s.parentName() != null) {
-                java.util.Set<String> primitives = java.util.Set.of("int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar");
-                if (primitives.contains(s.parentName())) {
-                    throw new RuntimeException(currentFile + ": error: cannot extend primitive type '" + s.parentName() + "'");
-                }
-            }
-            List<String[]> fieldDefs = new ArrayList<>();
-            java.util.Set<String> fieldNames = new java.util.LinkedHashSet<>();
-            List<ChuckAST.FuncDefStmt> methods = new ArrayList<>();
-
-            Map<String, Long> staticInts = new HashMap<>();
-            Map<String, Boolean> staticIsDouble = new HashMap<>();
-            Map<String, Object> staticObjects = new HashMap<>();
-
-            // Pre-check: static vars cannot be declared inside nested blocks within a class body
-            for (ChuckAST.Stmt bodyItem : s.body()) {
-                if (bodyItem instanceof ChuckAST.BlockStmt block) {
-                    checkNoStaticInBlock(block.statements());
-                }
-            }
-            List<ChuckAST.Stmt> flattenedBody = new ArrayList<>();
-            flattenStmts(s.body(), flattenedBody);
-
-            for (ChuckAST.Stmt bodyStmt : flattenedBody) {
-                if (bodyStmt instanceof ChuckAST.DeclStmt f) {
-                    if (f.isStatic()) {
-                        boolean isArray = !f.arraySizes().isEmpty();
-                        if (!isArray && f.type().equals("int")) staticInts.put(f.name(), 0L);
-                        else if (!isArray && f.type().equals("float")) { staticInts.put(f.name(), Double.doubleToRawLongBits(0.0)); staticIsDouble.put(f.name(), true); }
-                        else if (f.type().equals("vec2")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 2));
-                        else if (f.type().equals("vec3")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 3));
-                        else if (f.type().equals("vec4")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 4));
-                        else if (f.type().equals("complex") || f.type().equals("polar")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 2));
-                        else staticObjects.put(f.name(), null); // Includes static arrays like int a[]
-                    } else {
-                        fieldDefs.add(new String[]{f.type(), f.name()});
-                        fieldNames.add(f.name());
-                    }
-                } else if (bodyStmt instanceof ChuckAST.FuncDefStmt m) {
-                    methods.add(m);
-                } else if (bodyStmt instanceof ChuckAST.ExpStmt es
-                        && es.exp() instanceof ChuckAST.BinaryExp bexp
-                        && bexp.op() == ChuckAST.Operator.CHUCK
-                        && bexp.rhs() instanceof ChuckAST.DeclExp rDecl) {
-                    if (rDecl.isStatic()) {
-                        boolean isArray = !rDecl.arraySizes().isEmpty();
-                        if (!isArray && rDecl.type().equals("int")) staticInts.put(rDecl.name(), 0L);
-                        else if (!isArray && rDecl.type().equals("float")) { staticInts.put(rDecl.name(), Double.doubleToRawLongBits(0.0)); staticIsDouble.put(rDecl.name(), true); }
-                        else staticObjects.put(rDecl.name(), null);
-                    } else {
-                        // e.g. `5 => int n;` — field declaration with literal initializer
-                        String initStr = null;
-                        if (bexp.lhs() instanceof ChuckAST.IntExp iv) initStr = String.valueOf(iv.value());
-                        else if (bexp.lhs() instanceof ChuckAST.FloatExp fv) initStr = String.valueOf(fv.value());
-                        if (initStr != null) {
-                            fieldDefs.add(new String[]{rDecl.type(), rDecl.name(), initStr});
-                        } else {
-                            fieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
-                        }
-                        fieldNames.add(rDecl.name());
-                    }
-                } else if (bodyStmt instanceof ChuckAST.ExpStmt es && es.exp() instanceof ChuckAST.DeclExp rDecl) {
-                    // Standalone declaration like 'static int a[];'
-                    if (rDecl.isStatic()) {
-                        boolean isArray = !rDecl.arraySizes().isEmpty();
-                        if (!isArray && rDecl.type().equals("int")) staticInts.put(rDecl.name(), 0L);
-                        else if (!isArray && rDecl.type().equals("float")) { staticInts.put(rDecl.name(), Double.doubleToRawLongBits(0.0)); staticIsDouble.put(rDecl.name(), true); }
-                        else staticObjects.put(rDecl.name(), null);
-                    } else {
-                        fieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
-                        fieldNames.add(rDecl.name());
-                    }
-                }
-            }
-            Map<String, ChuckCode> methodCodes = new HashMap<>();
-            Map<String, ChuckCode> staticMethodCodes = new HashMap<>();
-            String prevClass = currentClass;
-            java.util.Set<String> prevFields = currentClassFields;
-            currentClass = s.name();
-            currentClassFields = fieldNames;
-
-            if (code != null) {
-                for (ChuckAST.Stmt bodyStmt : flattenedBody) {
-                    if (bodyStmt instanceof ChuckAST.DeclStmt || bodyStmt instanceof ChuckAST.FuncDefStmt) continue;
-                    // Skip CHUCK+DeclExp field initializers already handled as fieldDefs
-                    if (bodyStmt instanceof ChuckAST.ExpStmt es
-                            && es.exp() instanceof ChuckAST.BinaryExp bexp
-                            && bexp.op() == ChuckAST.Operator.CHUCK
-                            && bexp.rhs() instanceof ChuckAST.DeclExp rDecl
-                            && fieldNames.contains(rDecl.name())) continue;
-                    emitStatement(bodyStmt, code);
-                }
-            }
-
-            // Track methods defined so far to detect duplicates
-            java.util.Set<String> definedMethods = new java.util.HashSet<>();
-            currentClassMethodsList = methods;
-
-            for (ChuckAST.FuncDefStmt m : methods) {
-                String methodName = m.name();
-                boolean isCtor = methodName.equals("@construct") || methodName.equals(s.name());
-                if (methodName.equals("@construct")) methodName = s.name(); // constructor
-
-                // Constructor validation
-                if (isCtor || m.name().equals(s.name())) {
-                    if (m.isStatic()) {
-                        throw new RuntimeException(currentFile + ":" + m.line() + ":" + m.column()
-                            + ": error: constructor cannot be declared as 'static'");
-                    }
-                    if (m.returnType() != null && !m.returnType().equals("void") && !m.returnType().isEmpty()) {
-                        throw new RuntimeException(currentFile + ":" + m.line() + ":" + m.column()
-                            + ": error: constructor must return void -- returning type '" + m.returnType() + "'");
-                    }
-                }
-
-                // Duplicate method check (same name + arg count)
-                String methodKey = methodName + ":" + m.argNames().size();
-                if (definedMethods.contains(methodKey)) {
-                    throw new RuntimeException(currentFile + ":" + m.line() + ":" + m.column()
-                        + ": error: cannot overload function with identical arguments -- '"
-                        + methodName + "' already defined in class '" + s.name() + "'");
-                }
-                definedMethods.add(methodKey);
-
-                ChuckCode methodCode = new ChuckCode(methodName);
+                String key = s.name() + ":" + s.argNames().size();
+                ChuckCode funcCode = functions.get(key);
+                if (funcCode == null) funcCode = new ChuckCode(s.name());
 
                 String prevReturnType = currentFuncReturnType;
                 boolean prevHasReturn = currentFuncHasReturn;
                 boolean prevStaticCtx = inStaticFuncContext;
-                currentFuncReturnType = m.returnType() != null ? m.returnType() : "void";
+                currentFuncReturnType = s.returnType() != null ? s.returnType() : "void";
                 currentFuncHasReturn = false;
-                inStaticFuncContext = m.isStatic();
+                inStaticFuncContext = s.isStatic();
 
                 Map<String, Integer> scope = new HashMap<>();
                 localScopes.push(scope);
-                for (int i = 0; i < m.argNames().size(); i++) {
-                    scope.put(m.argNames().get(i), i);
+                for (int i = 0; i < s.argNames().size(); i++) {
+                    scope.put(s.argNames().get(i), i);
                 }
+                emitStatement(s.body(), funcCode);
+                funcCode.addInstruction(new ReturnFunc());
+                localScopes.pop();
 
-                emitStatement(m.body(), methodCode);
-                methodCode.addInstruction(m.isStatic() ? new ReturnFunc() : new ReturnMethod());
-
-                // Check for missing return in non-void method
+                // Check for missing return in non-void function
                 if (!currentFuncReturnType.equals("void") && !currentFuncHasReturn) {
-                    throw new RuntimeException(currentFile + ":" + m.line() + ":" + m.column()
-                        + ": error: not all control paths in 'fun " + currentFuncReturnType + " "
-                        + s.name() + "." + m.name() + "()' return a value");
+                    throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
+                        + ": error: not all control paths in 'fun " + currentFuncReturnType + " " + s.name() + "()' return a value");
                 }
 
                 currentFuncReturnType = prevReturnType;
                 currentFuncHasReturn = prevHasReturn;
                 inStaticFuncContext = prevStaticCtx;
 
-                if (m.isStatic()) {
-                    staticMethodCodes.put(methodName + ":" + m.argNames().size(), methodCode);
-                } else {
-                    methodCodes.put(methodName + ":" + m.argNames().size(), methodCode);
+                functions.put(key, funcCode);
+                if (s.returnType() != null && !s.returnType().equals("void")) {
+                    functionReturnTypes.put(key, s.returnType());
                 }
-                localScopes.pop();
             }
-            currentClass = prevClass;
-            currentClassFields = prevFields;
-            UserClassDescriptor descriptor = new UserClassDescriptor(s.name(), s.parentName(), fieldDefs, methodCodes, staticMethodCodes, staticInts, staticIsDouble, staticObjects);
-            userClassRegistry.put(s.name(), descriptor);
-            if (code != null) {
-                code.addInstruction(new RegisterClass(s.name(), descriptor));
+            case ChuckAST.ReturnStmt s -> {
+                // Check for return value in void function
+                if (s.exp() != null && "void".equals(currentFuncReturnType)) {
+                    throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
+                        + ": error: function was defined with return type 'void' -- but returning a value");
+                }
+                currentFuncHasReturn = true;
+                if (s.exp() != null) emitExpression(s.exp(), code);
+                code.addInstruction(currentClass != null ? new ReturnMethod() : new ReturnFunc());
             }
-        } else if (stmt instanceof ChuckAST.IfStmt s) {
-            emitExpression(s.condition(), code);
-            int jumpIdx = code.getNumInstructions();
-            code.addInstruction(null); // placeholder for JumpIfFalse
+            case ChuckAST.ClassDefStmt s -> {
+                // Check for extending primitive types
+                if (s.parentName() != null) {
+                    java.util.Set<String> primitives = java.util.Set.of("int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar");
+                    if (primitives.contains(s.parentName())) {
+                        throw new RuntimeException(currentFile + ": error: cannot extend primitive type '" + s.parentName() + "'");
+                    }
+                }
+                List<String[]> fieldDefs = new ArrayList<>();
+                java.util.Set<String> fieldNames = new java.util.LinkedHashSet<>();
+                List<ChuckAST.FuncDefStmt> methods = new ArrayList<>();
 
-            int bodyStart = code.getNumInstructions();
-            emitStatement(s.thenBranch(), code);
+                Map<String, Long> staticInts = new HashMap<>();
+                Map<String, Boolean> staticIsDouble = new HashMap<>();
+                Map<String, Object> staticObjects = new HashMap<>();
 
-            if (s.elseBranch() != null) {
-                int thenEndIdx = code.getNumInstructions();
-                code.addInstruction(null); // placeholder for Jump (skip else)
-                int elseStartIdx = code.getNumInstructions();
-                code.replaceInstruction(jumpIdx, new JumpIfFalse(elseStartIdx));
-                emitStatement(s.elseBranch(), code);
-                int elseEndIdx = code.getNumInstructions();
-                code.replaceInstruction(thenEndIdx, new Jump(elseEndIdx));
-            } else {
-                int endIdx = code.getNumInstructions();
-                code.replaceInstruction(jumpIdx, new JumpIfFalse(endIdx));
+                // Pre-check: static vars cannot be declared inside nested blocks within a class body
+                for (ChuckAST.Stmt bodyItem : s.body()) {
+                    if (bodyItem instanceof ChuckAST.BlockStmt block) {
+                        checkNoStaticInBlock(block.statements());
+                    }
+                }
+                List<ChuckAST.Stmt> flattenedBody = new ArrayList<>();
+                flattenStmts(s.body(), flattenedBody);
+
+                for (ChuckAST.Stmt bodyStmt : flattenedBody) {
+                    if (bodyStmt instanceof ChuckAST.DeclStmt f) {
+                        if (f.isStatic()) {
+                            boolean isArray = !f.arraySizes().isEmpty();
+                            if (!isArray && f.type().equals("int")) staticInts.put(f.name(), 0L);
+                            else if (!isArray && f.type().equals("float")) { staticInts.put(f.name(), Double.doubleToRawLongBits(0.0)); staticIsDouble.put(f.name(), true); }
+                            else if (f.type().equals("vec2")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 2));
+                            else if (f.type().equals("vec3")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 3));
+                            else if (f.type().equals("vec4")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 4));
+                            else if (f.type().equals("complex") || f.type().equals("polar")) staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 2));
+                            else staticObjects.put(f.name(), null); // Includes static arrays like int a[]
+                        } else {
+                            fieldDefs.add(new String[]{f.type(), f.name()});
+                            fieldNames.add(f.name());
+                        }
+                    } else if (bodyStmt instanceof ChuckAST.FuncDefStmt m) {
+                        methods.add(m);
+                    } else if (bodyStmt instanceof ChuckAST.ExpStmt es
+                            && es.exp() instanceof ChuckAST.BinaryExp bexp
+                            && bexp.op() == ChuckAST.Operator.CHUCK
+                            && bexp.rhs() instanceof ChuckAST.DeclExp rDecl) {
+                        if (rDecl.isStatic()) {
+                            boolean isArray = !rDecl.arraySizes().isEmpty();
+                            if (!isArray && rDecl.type().equals("int")) staticInts.put(rDecl.name(), 0L);
+                            else if (!isArray && rDecl.type().equals("float")) { staticInts.put(rDecl.name(), Double.doubleToRawLongBits(0.0)); staticIsDouble.put(rDecl.name(), true); }
+                            else staticObjects.put(rDecl.name(), null);
+                        } else {
+                            // e.g. `5 => int n;` — field declaration with literal initializer
+                            String initStr = null;
+                            if (bexp.lhs() instanceof ChuckAST.IntExp iv) initStr = String.valueOf(iv.value());
+                            else if (bexp.lhs() instanceof ChuckAST.FloatExp fv) initStr = String.valueOf(fv.value());
+                            if (initStr != null) {
+                                fieldDefs.add(new String[]{rDecl.type(), rDecl.name(), initStr});
+                            } else {
+                                fieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
+                            }
+                            fieldNames.add(rDecl.name());
+                        }
+                    } else if (bodyStmt instanceof ChuckAST.ExpStmt es && es.exp() instanceof ChuckAST.DeclExp rDecl) {
+                        // Standalone declaration like 'static int a[];'
+                        if (rDecl.isStatic()) {
+                            boolean isArray = !rDecl.arraySizes().isEmpty();
+                            if (!isArray && rDecl.type().equals("int")) staticInts.put(rDecl.name(), 0L);
+                            else if (!isArray && rDecl.type().equals("float")) { staticInts.put(rDecl.name(), Double.doubleToRawLongBits(0.0)); staticIsDouble.put(rDecl.name(), true); }
+                            else staticObjects.put(rDecl.name(), null);
+                        } else {
+                            fieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
+                            fieldNames.add(rDecl.name());
+                        }
+                    }
+                }
+                Map<String, ChuckCode> methodCodes = new HashMap<>();
+                Map<String, ChuckCode> staticMethodCodes = new HashMap<>();
+                String prevClass = currentClass;
+                java.util.Set<String> prevFields = currentClassFields;
+                currentClass = s.name();
+                currentClassFields = fieldNames;
+
+                if (code != null) {
+                    for (ChuckAST.Stmt bodyStmt : flattenedBody) {
+                        if (bodyStmt instanceof ChuckAST.DeclStmt || bodyStmt instanceof ChuckAST.FuncDefStmt) continue;
+                        // Skip CHUCK+DeclExp field initializers already handled as fieldDefs
+                        if (bodyStmt instanceof ChuckAST.ExpStmt es
+                                && es.exp() instanceof ChuckAST.BinaryExp bexp
+                                && bexp.op() == ChuckAST.Operator.CHUCK
+                                && bexp.rhs() instanceof ChuckAST.DeclExp rDecl
+                                && fieldNames.contains(rDecl.name())) continue;
+                        emitStatement(bodyStmt, code);
+                    }
+                }
+
+                // Track methods defined so far to detect duplicates
+                java.util.Set<String> definedMethods = new java.util.HashSet<>();
+                currentClassMethodsList = methods;
+
+                for (ChuckAST.FuncDefStmt m : methods) {
+                    String methodName = m.name();
+                    boolean isCtor = methodName.equals("@construct") || methodName.equals(s.name());
+                    if (methodName.equals("@construct")) methodName = s.name(); // constructor
+
+                    // Constructor validation
+                    if (isCtor || m.name().equals(s.name())) {
+                        if (m.isStatic()) {
+                            throw new RuntimeException(currentFile + ":" + m.line() + ":" + m.column()
+                                + ": error: constructor cannot be declared as 'static'");
+                        }
+                        if (m.returnType() != null && !m.returnType().equals("void") && !m.returnType().isEmpty()) {
+                            throw new RuntimeException(currentFile + ":" + m.line() + ":" + m.column()
+                                + ": error: constructor must return void -- returning type '" + m.returnType() + "'");
+                        }
+                    }
+
+                    // Duplicate method check (same name + arg count)
+                    String methodKey = methodName + ":" + m.argNames().size();
+                    if (definedMethods.contains(methodKey)) {
+                        throw new RuntimeException(currentFile + ":" + m.line() + ":" + m.column()
+                            + ": error: cannot overload function with identical arguments -- '"
+                            + methodName + "' already defined in class '" + s.name() + "'");
+                    }
+                    definedMethods.add(methodKey);
+
+                    ChuckCode methodCode = new ChuckCode(methodName);
+
+                    String prevReturnType = currentFuncReturnType;
+                    boolean prevHasReturn = currentFuncHasReturn;
+                    boolean prevStaticCtx = inStaticFuncContext;
+                    currentFuncReturnType = m.returnType() != null ? m.returnType() : "void";
+                    currentFuncHasReturn = false;
+                    inStaticFuncContext = m.isStatic();
+
+                    Map<String, Integer> scope = new HashMap<>();
+                    localScopes.push(scope);
+                    for (int i = 0; i < m.argNames().size(); i++) {
+                        scope.put(m.argNames().get(i), i);
+                    }
+
+                    emitStatement(m.body(), methodCode);
+                    methodCode.addInstruction(m.isStatic() ? new ReturnFunc() : new ReturnMethod());
+
+                    // Check for missing return in non-void method
+                    if (!currentFuncReturnType.equals("void") && !currentFuncHasReturn) {
+                        throw new RuntimeException(currentFile + ":" + m.line() + ":" + m.column()
+                            + ": error: not all control paths in 'fun " + currentFuncReturnType + " "
+                            + s.name() + "." + m.name() + "()' return a value");
+                    }
+
+                    currentFuncReturnType = prevReturnType;
+                    currentFuncHasReturn = prevHasReturn;
+                    inStaticFuncContext = prevStaticCtx;
+
+                    if (m.isStatic()) {
+                        staticMethodCodes.put(methodName + ":" + m.argNames().size(), methodCode);
+                    } else {
+                        methodCodes.put(methodName + ":" + m.argNames().size(), methodCode);
+                    }
+                    localScopes.pop();
+                }
+                currentClass = prevClass;
+                currentClassFields = prevFields;
+                UserClassDescriptor descriptor = new UserClassDescriptor(s.name(), s.parentName(), fieldDefs, methodCodes, staticMethodCodes, staticInts, staticIsDouble, staticObjects);
+                userClassRegistry.put(s.name(), descriptor);
+                if (code != null) {
+                    code.addInstruction(new RegisterClass(s.name(), descriptor));
+                }
             }
-        } else if (stmt instanceof ChuckAST.ForEachStmt s) {
-            if (localScopes.isEmpty()) {
-                localScopes.push(new HashMap<>());
+            case ChuckAST.IfStmt s -> {
+                emitExpression(s.condition(), code);
+                int jumpIdx = code.getNumInstructions();
+                code.addInstruction(null); // placeholder for JumpIfFalse
+
+                int bodyStart = code.getNumInstructions();
+                emitStatement(s.thenBranch(), code);
+
+                if (s.elseBranch() != null) {
+                    int thenEndIdx = code.getNumInstructions();
+                    code.addInstruction(null); // placeholder for Jump (skip else)
+                    int elseStartIdx = code.getNumInstructions();
+                    code.replaceInstruction(jumpIdx, new JumpIfFalse(elseStartIdx));
+                    emitStatement(s.elseBranch(), code);
+                    int elseEndIdx = code.getNumInstructions();
+                    code.replaceInstruction(thenEndIdx, new Jump(elseEndIdx));
+                } else {
+                    int endIdx = code.getNumInstructions();
+                    code.replaceInstruction(jumpIdx, new JumpIfFalse(endIdx));
+                }
             }
-            Map<String, Integer> scope = localScopes.peek();
+            case ChuckAST.ForEachStmt s -> {
+                if (localScopes.isEmpty()) {
+                    localScopes.push(new HashMap<>());
+                }
+                Map<String, Integer> scope = localScopes.peek();
 
-            // 1. Assign collection to a hidden local
-            String collName = "__coll_" + s.iterName() + "_" + s.line() + "_" + s.column();
-            int collOffset = scope.size();
-            scope.put(collName, collOffset);
-            emitExpression(s.collection(), code);
-            code.addInstruction(new StoreLocal(collOffset));
-            code.addInstruction(new Pop());
+                // 1. Assign collection to a hidden local
+                String collName = "__coll_" + s.iterName() + "_" + s.line() + "_" + s.column();
+                int collOffset = scope.size();
+                scope.put(collName, collOffset);
+                emitExpression(s.collection(), code);
+                code.addInstruction(new StoreLocal(collOffset));
+                code.addInstruction(new Pop());
 
-            // 2. Initialize index local to 0
-            String idxName = "__idx_" + s.iterName() + "_" + s.line() + "_" + s.column();
-            int idxOffset = scope.size();
-            scope.put(idxName, idxOffset);
-            code.addInstruction(new PushInt(0));
-            code.addInstruction(new StoreLocal(idxOffset));
-            code.addInstruction(new Pop());
+                // 2. Initialize index local to 0
+                String idxName = "__idx_" + s.iterName() + "_" + s.line() + "_" + s.column();
+                int idxOffset = scope.size();
+                scope.put(idxName, idxOffset);
+                code.addInstruction(new PushInt(0));
+                code.addInstruction(new StoreLocal(idxOffset));
+                code.addInstruction(new Pop());
 
-            // 3. Loop start
-            int startPc = code.getNumInstructions();
-            continueJumps.push(new ArrayList<>());
-            breakJumps.push(new ArrayList<>());
+                // 3. Loop start
+                int startPc = code.getNumInstructions();
+                continueJumps.push(new ArrayList<>());
+                breakJumps.push(new ArrayList<>());
 
-            // 4. Condition: idx < collection.size()
-            code.addInstruction(new LoadLocal(idxOffset));
-            code.addInstruction(new LoadLocal(collOffset));
-            code.addInstruction(new CallMethod("size", 0));
-            code.addInstruction(new LessThanAny());
+                // 4. Condition: idx < collection.size()
+                code.addInstruction(new LoadLocal(idxOffset));
+                code.addInstruction(new LoadLocal(collOffset));
+                code.addInstruction(new CallMethod("size", 0));
+                code.addInstruction(new LessThanAny());
 
-            int jumpIdx = code.getNumInstructions();
-            code.addInstruction(null); // placeholder for JumpIfFalse
+                int jumpIdx = code.getNumInstructions();
+                code.addInstruction(null); // placeholder for JumpIfFalse
 
-            // 5. Load current element: collection[idx]
-            code.addInstruction(new LoadLocal(collOffset));
-            code.addInstruction(new LoadLocal(idxOffset));
-            code.addInstruction(new GetArrayInt());
+                // 5. Load current element: collection[idx]
+                code.addInstruction(new LoadLocal(collOffset));
+                code.addInstruction(new LoadLocal(idxOffset));
+                code.addInstruction(new GetArrayInt());
 
-            // 6. Store in iteration variable
-            Integer iterOffset = getLocalOffset(s.iterName());
-            if (iterOffset == null) {
-                iterOffset = scope.size();
-                scope.put(s.iterName(), iterOffset);
+                // 6. Store in iteration variable
+                Integer iterOffset = getLocalOffset(s.iterName());
+                if (iterOffset == null) {
+                    iterOffset = scope.size();
+                    scope.put(s.iterName(), iterOffset);
+                }
+                code.addInstruction(new StoreLocal(iterOffset));
+                code.addInstruction(new Pop());
+
+                // 7. Loop body
+                emitStatement(s.body(), code);
+
+                // 8. Update: idx++
+                int updateStart = code.getNumInstructions();
+                code.addInstruction(new LoadLocal(idxOffset));
+                code.addInstruction(new PushInt(1));
+                code.addInstruction(new AddAny());
+                code.addInstruction(new StoreLocal(idxOffset));
+                code.addInstruction(new Pop());
+
+                // 9. Jump back to condition
+                code.addInstruction(new Jump(startPc));
+
+                // 10. Loop end
+                int endPc = code.getNumInstructions();
+                code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
+
+                for (int jump : breakJumps.pop()) {
+                    code.replaceInstruction(jump, new Jump(endPc));
+                }
+                for (int jump : continueJumps.pop()) {
+                    code.replaceInstruction(jump, new Jump(updateStart));
+                }
             }
-            code.addInstruction(new StoreLocal(iterOffset));
-            code.addInstruction(new Pop());
+            case ChuckAST.RepeatStmt s -> {
+                if (localScopes.isEmpty()) localScopes.push(new HashMap<>());
+                Map<String, Integer> scope = localScopes.peek();
+                String cntName = "__repeat_cnt_" + s.line() + "_" + s.column();
+                int cntOffset = scope.size();
+                scope.put(cntName, cntOffset);
 
-            // 7. Loop body
-            emitStatement(s.body(), code);
+                // Store count in local
+                emitExpression(s.count(), code);
+                code.addInstruction(new StoreLocal(cntOffset));
+                code.addInstruction(new Pop());
 
-            // 8. Update: idx++
-            int updateStart = code.getNumInstructions();
-            code.addInstruction(new LoadLocal(idxOffset));
-            code.addInstruction(new PushInt(1));
-            code.addInstruction(new AddAny());
-            code.addInstruction(new StoreLocal(idxOffset));
-            code.addInstruction(new Pop());
+                int startPc = code.getNumInstructions();
+                continueJumps.push(new ArrayList<>());
+                breakJumps.push(new ArrayList<>());
 
-            // 9. Jump back to condition
-            code.addInstruction(new Jump(startPc));
+                // Condition: counter > 0
+                code.addInstruction(new LoadLocal(cntOffset));
+                code.addInstruction(new PushInt(0));
+                code.addInstruction(new GreaterThanAny());
+                int jumpIdx = code.getNumInstructions();
+                code.addInstruction(null); // placeholder for JumpIfFalse
 
-            // 10. Loop end
-            int endPc = code.getNumInstructions();
-            code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
+                // Body
+                emitStatement(s.body(), code);
 
-            for (int jump : breakJumps.pop()) {
-                code.replaceInstruction(jump, new Jump(endPc));
+                // Decrement counter
+                int updateStart = code.getNumInstructions();
+                code.addInstruction(new LoadLocal(cntOffset));
+                code.addInstruction(new PushInt(1));
+                code.addInstruction(new MinusAny());
+                code.addInstruction(new StoreLocal(cntOffset));
+                code.addInstruction(new Pop());
+                code.addInstruction(new Jump(startPc));
+
+                int endPc = code.getNumInstructions();
+                code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
+
+                for (int jump : breakJumps.pop()) code.replaceInstruction(jump, new Jump(endPc));
+                for (int jump : continueJumps.pop()) code.replaceInstruction(jump, new Jump(updateStart));
             }
-            for (int jump : continueJumps.pop()) {
-                code.replaceInstruction(jump, new Jump(updateStart));
-            }
-        } else if (stmt instanceof ChuckAST.RepeatStmt s) {
-            if (localScopes.isEmpty()) localScopes.push(new HashMap<>());
-            Map<String, Integer> scope = localScopes.peek();
-            String cntName = "__repeat_cnt_" + s.line() + "_" + s.column();
-            int cntOffset = scope.size();
-            scope.put(cntName, cntOffset);
-
-            // Store count in local
-            emitExpression(s.count(), code);
-            code.addInstruction(new StoreLocal(cntOffset));
-            code.addInstruction(new Pop());
-
-            int startPc = code.getNumInstructions();
-            continueJumps.push(new ArrayList<>());
-            breakJumps.push(new ArrayList<>());
-
-            // Condition: counter > 0
-            code.addInstruction(new LoadLocal(cntOffset));
-            code.addInstruction(new PushInt(0));
-            code.addInstruction(new GreaterThanAny());
-            int jumpIdx = code.getNumInstructions();
-            code.addInstruction(null); // placeholder for JumpIfFalse
-
-            // Body
-            emitStatement(s.body(), code);
-
-            // Decrement counter
-            int updateStart = code.getNumInstructions();
-            code.addInstruction(new LoadLocal(cntOffset));
-            code.addInstruction(new PushInt(1));
-            code.addInstruction(new MinusAny());
-            code.addInstruction(new StoreLocal(cntOffset));
-            code.addInstruction(new Pop());
-            code.addInstruction(new Jump(startPc));
-
-            int endPc = code.getNumInstructions();
-            code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
-
-            for (int jump : breakJumps.pop()) code.replaceInstruction(jump, new Jump(endPc));
-            for (int jump : continueJumps.pop()) code.replaceInstruction(jump, new Jump(updateStart));
+            default -> {}
         }
     }
 
     private void emitExpression(ChuckAST.Exp exp, ChuckCode code) {
-        if (exp instanceof ChuckAST.IntExp e) {
-            code.addInstruction(new PushInt(e.value()));
-        } else if (exp instanceof ChuckAST.FloatExp e) {
-            code.addInstruction(new PushFloat(e.value()));
-        } else if (exp instanceof ChuckAST.StringExp e) {
-            code.addInstruction(new PushString(e.value()));
-        } else if (exp instanceof ChuckAST.MeExp e) {
-            code.addInstruction(new PushMe());
-        } else if (exp instanceof ChuckAST.UnaryExp e) {
-            if (e.op() == ChuckAST.Operator.S_OR) {
-                String innerType = getVarType(e.exp());
-                if (innerType != null && userClassRegistry.containsKey(innerType)) {
-                    ChuckCode opCode = functions.get("__pub_op__!:1");
-                    if (opCode == null) opCode = functions.get("__op__!:1");
-                    if (opCode != null) {
-                        emitExpression(e.exp(), code);
-                        code.addInstruction(new CallFunc(opCode, 1));
-                        return;
+        switch (exp) {
+            case ChuckAST.IntExp e -> code.addInstruction(new PushInt(e.value()));
+            case ChuckAST.FloatExp e -> code.addInstruction(new PushFloat(e.value()));
+            case ChuckAST.StringExp e -> code.addInstruction(new PushString(e.value()));
+            case ChuckAST.MeExp _ -> code.addInstruction(new PushMe());
+            case ChuckAST.UnaryExp e -> {
+                if (e.op() == ChuckAST.Operator.S_OR) {
+                    String innerType = getVarType(e.exp());
+                    if (innerType != null && userClassRegistry.containsKey(innerType)) {
+                        ChuckCode opCode = functions.get("__pub_op__!:1");
+                        if (opCode == null) opCode = functions.get("__op__!:1");
+                        if (opCode != null) {
+                            emitExpression(e.exp(), code);
+                            code.addInstruction(new CallFunc(opCode, 1));
+                            return;
+                        }
                     }
                 }
-            }
-            emitExpression(e.exp(), code);
-            switch (e.op()) {
-                case MINUS -> code.addInstruction(new NegateAny());
-                case S_OR  -> code.addInstruction(new LogicalNot());
-                case PLUS  -> {}
-                default    -> {}
-            }
-        } else if (exp instanceof ChuckAST.DeclExp e) {
-            // Check for 'new' on primitive types or undefined types
-            if (e.name().startsWith("@new_")) {
-                boolean isArrayNew = e.name().startsWith("@new_array_");
-                java.util.Set<String> primitives = java.util.Set.of("int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar");
-                if (primitives.contains(e.type()) && !isArrayNew) {
-                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                        + ": error: cannot use 'new' on primitive type '" + e.type() + "'");
-                }
-                // Check for undefined type (not a known class or UGen)
-                if (!userClassRegistry.containsKey(e.type()) && !isKnownUGenType(e.type()) && !primitives.contains(e.type())) {
-                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                        + ": error: undefined type '" + e.type() + "'");
+                emitExpression(e.exp(), code);
+                switch (e.op()) {
+                    case MINUS -> code.addInstruction(new NegateAny());
+                    case S_OR  -> code.addInstruction(new LogicalNot());
+                    case PLUS  -> {}
+                    default    -> {}
                 }
             }
-            // Check for static variable declared outside class scope
-            if (e.isStatic() && (currentClass == null || !localScopes.isEmpty())) {
-                throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                    + ": error: static variables must be declared at class scope");
-            }
-            // Track empty-array variable declarations
-            if (!e.arraySizes().isEmpty() && e.arraySizes().get(0) instanceof ChuckAST.IntExp sz0e && sz0e.value() < 0) {
-                emptyArrayVars.add(e.name());
-            }
-            varTypes.put(e.name(), e.type()); // track variable type
-            int argCount = 0;
-            boolean isUserClass = userClassRegistry.containsKey(e.type());
-            boolean forceGlobal = e.isGlobal();
-            // Compile-time check: detect global type conflicts
-            if (forceGlobal || localScopes.isEmpty()) {
-                String prevType = globalVarTypes.get(e.name());
-                if (prevType != null && !prevType.equals(e.type()) && !prevType.equals("int") && !prevType.equals("float") && !prevType.equals("string")) {
-                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                        + ": error: global " + prevType + " '" + e.name() + "' has different type '" + e.type()
-                        + "' than already existing global " + prevType + " of the same name");
+            case ChuckAST.DeclExp e -> {
+                // Check for 'new' on primitive types or undefined types
+                if (e.name().startsWith("@new_")) {
+                    boolean isArrayNew = e.name().startsWith("@new_array_");
+                    java.util.Set<String> primitives = java.util.Set.of("int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar");
+                    if (primitives.contains(e.type()) && !isArrayNew) {
+                        throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                            + ": error: cannot use 'new' on primitive type '" + e.type() + "'");
+                    }
+                    // Check for undefined type (not a known class or UGen)
+                    if (!userClassRegistry.containsKey(e.type()) && !isKnownUGenType(e.type()) && !primitives.contains(e.type())) {
+                        throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                            + ": error: undefined type '" + e.type() + "'");
+                    }
                 }
-                globalVarTypes.put(e.name(), e.type());
-            }
+                // Check for static variable declared outside class scope
+                if (e.isStatic() && (currentClass == null || !localScopes.isEmpty())) {
+                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                        + ": error: static variables must be declared at class scope");
+                }
+                // Track empty-array variable declarations
+                if (!e.arraySizes().isEmpty() && e.arraySizes().get(0) instanceof ChuckAST.IntExp sz0e && sz0e.value() < 0) {
+                    emptyArrayVars.add(e.name());
+                }
+                varTypes.put(e.name(), e.type()); // track variable type
+                int argCount = 0;
+                boolean isUserClass = userClassRegistry.containsKey(e.type());
+                boolean forceGlobal = e.isGlobal();
+                // Compile-time check: detect global type conflicts
+                if (forceGlobal || localScopes.isEmpty()) {
+                    String prevType = globalVarTypes.get(e.name());
+                    if (prevType != null && !prevType.equals(e.type()) && !prevType.equals("int") && !prevType.equals("float") && !prevType.equals("string")) {
+                        throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                            + ": error: global " + prevType + " '" + e.name() + "' has different type '" + e.type()
+                            + "' than already existing global " + prevType + " of the same name");
+                    }
+                    globalVarTypes.put(e.name(), e.type());
+                }
 
-            if (isUserClass && e.callArgs() instanceof ChuckAST.CallExp call) {
-                Integer localOffset = forceGlobal ? null : getLocalOffset(e.name());
-                if (localOffset != null) {
-                    code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, 0, e.isReference(), false, userClassRegistry));
-                } else if (!forceGlobal && !localScopes.isEmpty()) {
-                    Map<String, Integer> scope = localScopes.peek();
-                    localOffset = scope.size();
-                    scope.put(e.name(), localOffset);
-                    code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, 0, e.isReference(), false, userClassRegistry));
-                } else {
-                    code.addInstruction(new InstantiateSetAndPushGlobal(e.type(), e.name(), 0, e.isReference(), false, userClassRegistry));
-                }
-                code.addInstruction(new Dup());
-                for (ChuckAST.Exp arg : call.args()) emitExpression(arg, code);
-                code.addInstruction(new CallMethod(e.type(), call.args().size()));
-            } else {
-                if (e.callArgs() instanceof ChuckAST.CallExp call) {
+                if (isUserClass && e.callArgs() instanceof ChuckAST.CallExp call) {
+                    Integer localOffset = forceGlobal ? null : getLocalOffset(e.name());
+                    if (localOffset != null) {
+                        code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, 0, e.isReference(), false, userClassRegistry));
+                    } else if (!forceGlobal && !localScopes.isEmpty()) {
+                        Map<String, Integer> scope = localScopes.peek();
+                        localOffset = scope.size();
+                        scope.put(e.name(), localOffset);
+                        code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, 0, e.isReference(), false, userClassRegistry));
+                    } else {
+                        code.addInstruction(new InstantiateSetAndPushGlobal(e.type(), e.name(), 0, e.isReference(), false, userClassRegistry));
+                    }
+                    code.addInstruction(new Dup());
                     for (ChuckAST.Exp arg : call.args()) emitExpression(arg, code);
-                    argCount = call.args().size();
-                }
-                if (!e.arraySizes().isEmpty()) {
-                    for (ChuckAST.Exp sizeExp : e.arraySizes()) emitExpression(sizeExp, code);
-                    argCount = e.arraySizes().size();
-                }
-
-                boolean isArrayDecl = !e.arraySizes().isEmpty();
-                boolean useGlobal = forceGlobal || localScopes.isEmpty() || (localScopes.size() == 1 && isArrayDecl);
-
-                Integer localOffset = (forceGlobal || useGlobal) ? null : getLocalOffset(e.name());
-                if (localOffset != null) {
-                    code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), isArrayDecl, userClassRegistry));
-                } else if (!forceGlobal && !useGlobal && !localScopes.isEmpty()) {
-                    Map<String, Integer> scope = localScopes.peek();
-                    localOffset = scope.size();
-                    scope.put(e.name(), localOffset);
-                    code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), isArrayDecl, userClassRegistry));
+                    code.addInstruction(new CallMethod(e.type(), call.args().size()));
                 } else {
-                    code.addInstruction(new InstantiateSetAndPushGlobal(e.type(), e.name(), argCount, e.isReference(), isArrayDecl, userClassRegistry));
+                    if (e.callArgs() instanceof ChuckAST.CallExp call) {
+                        for (ChuckAST.Exp arg : call.args()) emitExpression(arg, code);
+                        argCount = call.args().size();
+                    }
+                    if (!e.arraySizes().isEmpty()) {
+                        for (ChuckAST.Exp sizeExp : e.arraySizes()) emitExpression(sizeExp, code);
+                        argCount = e.arraySizes().size();
+                    }
+
+                    boolean isArrayDecl = !e.arraySizes().isEmpty();
+                    boolean useGlobal = forceGlobal || localScopes.isEmpty() || (localScopes.size() == 1 && isArrayDecl);
+
+                    Integer localOffset = (forceGlobal || useGlobal) ? null : getLocalOffset(e.name());
+                    if (localOffset != null) {
+                        code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), isArrayDecl, userClassRegistry));
+                    } else if (!forceGlobal && !useGlobal && !localScopes.isEmpty()) {
+                        Map<String, Integer> scope = localScopes.peek();
+                        localOffset = scope.size();
+                        scope.put(e.name(), localOffset);
+                        code.addInstruction(new InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), isArrayDecl, userClassRegistry));
+                    } else {
+                        code.addInstruction(new InstantiateSetAndPushGlobal(e.type(), e.name(), argCount, e.isReference(), isArrayDecl, userClassRegistry));
+                    }
                 }
             }
-        } else if (exp instanceof ChuckAST.BinaryExp e) {
-            if (e.op() == ChuckAST.Operator.CHUCK || e.op() == ChuckAST.Operator.AT_CHUCK) {
-                // Check for 'auto' type inference errors
-                if (e.rhs() instanceof ChuckAST.DeclExp rDecl && rDecl.type().equals("auto")) {
-                    if (e.lhs() instanceof ChuckAST.IdExp lhsId) {
-                        String n = lhsId.name();
-                        if (n.equals("null")) throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                            + ": error: cannot infer 'auto' type from 'null'");
-                        if (n.equals("void")) throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                            + ": error: cannot infer 'auto' type from 'void'");
-                        String lhsType = varTypes.get(n);
-                        if ("auto".equals(lhsType)) throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                            + ": error: cannot infer 'auto' type from another 'auto' variable");
+            case ChuckAST.BinaryExp e -> {
+                if (e.op() == ChuckAST.Operator.CHUCK || e.op() == ChuckAST.Operator.AT_CHUCK) {
+                    // Check for 'auto' type inference errors
+                    if (e.rhs() instanceof ChuckAST.DeclExp rDecl && rDecl.type().equals("auto")) {
+                        if (e.lhs() instanceof ChuckAST.IdExp lhsId) {
+                            String n = lhsId.name();
+                            if (n.equals("null")) throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                                + ": error: cannot infer 'auto' type from 'null'");
+                            if (n.equals("void")) throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                                + ": error: cannot infer 'auto' type from 'void'");
+                            String lhsType = varTypes.get(n);
+                            if ("auto".equals(lhsType)) throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                                + ": error: cannot infer 'auto' type from another 'auto' variable");
+                        }
                     }
-                }
-                // Check for empty-array DeclExp as chuck target (error-ugen-array-link-1)
-                if (e.op() == ChuckAST.Operator.CHUCK && e.rhs() instanceof ChuckAST.DeclExp rDecl2
-                        && !rDecl2.arraySizes().isEmpty()) {
-                    ChuckAST.Exp sz = rDecl2.arraySizes().get(0);
-                    if (sz instanceof ChuckAST.IntExp szInt && szInt.value() < 0) {
+                    // Check for empty-array DeclExp as chuck target (error-ugen-array-link-1)
+                    if (e.op() == ChuckAST.Operator.CHUCK && e.rhs() instanceof ChuckAST.DeclExp rDecl2
+                            && !rDecl2.arraySizes().isEmpty()) {
+                        ChuckAST.Exp sz = rDecl2.arraySizes().get(0);
+                        if (sz instanceof ChuckAST.IntExp szInt && szInt.value() < 0) {
+                            throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                                + ": error: cannot connect '=>' to empty array '[ ]' declaration");
+                        }
+                    }
+                    // Check for empty-array DeclExp as chuck source (error-ugen-array-link-2)
+                    if (e.op() == ChuckAST.Operator.CHUCK && e.lhs() instanceof ChuckAST.DeclExp lDecl2
+                            && !lDecl2.arraySizes().isEmpty()) {
+                        ChuckAST.Exp sz = lDecl2.arraySizes().get(0);
+                        if (sz instanceof ChuckAST.IntExp szInt && szInt.value() < 0) {
+                            throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                                + ": error: cannot connect '=>' from empty array '[ ]' declaration");
+                        }
+                    }
+                    // Check static decl with static-scope violations
+                    if (e.rhs() instanceof ChuckAST.DeclExp rDecl3 && rDecl3.isStatic()) {
+                        if (currentClass == null || !localScopes.isEmpty()) {
+                            throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                                + ": error: static variables must be declared at class scope");
+                        }
+                        // Check static init source for invalid references
+                        checkStaticInitSource(e.lhs());
+                    }
+                    // Check if LHS is an empty-array variable (error-ugen-array-link-2)
+                    if (e.op() == ChuckAST.Operator.CHUCK && e.lhs() instanceof ChuckAST.IdExp lhsId2
+                            && emptyArrayVars.contains(lhsId2.name())) {
                         throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                            + ": error: cannot connect '=>' to empty array '[ ]' declaration");
+                            + ": error: cannot connect empty array '" + lhsId2.name() + "[]' => to other UGens");
                     }
-                }
-                // Check for empty-array DeclExp as chuck source (error-ugen-array-link-2)
-                if (e.op() == ChuckAST.Operator.CHUCK && e.lhs() instanceof ChuckAST.DeclExp lDecl2
-                        && !lDecl2.arraySizes().isEmpty()) {
-                    ChuckAST.Exp sz = lDecl2.arraySizes().get(0);
-                    if (sz instanceof ChuckAST.IntExp szInt && szInt.value() < 0) {
+                    // Check AT_CHUCK to explicit-sized array declaration (error-array-assign)
+                    if (e.op() == ChuckAST.Operator.AT_CHUCK && e.rhs() instanceof ChuckAST.DeclExp rDecl4
+                            && !rDecl4.arraySizes().isEmpty()
+                            && rDecl4.arraySizes().get(0) instanceof ChuckAST.IntExp szI4 && szI4.value() >= 0) {
                         throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                            + ": error: cannot connect '=>' from empty array '[ ]' declaration");
+                            + ": error: cannot use '@=>' to assign to array declaration with explicit size");
                     }
-                }
-                // Check static decl with static-scope violations
-                if (e.rhs() instanceof ChuckAST.DeclExp rDecl3 && rDecl3.isStatic()) {
-                    if (currentClass == null || !localScopes.isEmpty()) {
+                    // Check for multi-variable declaration error (test 114.ck)
+                    Object rhs = e.rhs();
+                    if (rhs instanceof ChuckAST.BlockStmt) {
                         throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                            + ": error: static variables must be declared at class scope");
+                            + ": error: cannot '=>' from/to a multi-variable declaration");
                     }
-                    // Check static init source for invalid references
-                    checkStaticInitSource(e.lhs());
-                }
-                // Check if LHS is an empty-array variable (error-ugen-array-link-2)
-                if (e.op() == ChuckAST.Operator.CHUCK && e.lhs() instanceof ChuckAST.IdExp lhsId2
-                        && emptyArrayVars.contains(lhsId2.name())) {
-                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                        + ": error: cannot connect empty array '" + lhsId2.name() + "[]' => to other UGens");
-                }
-                // Check AT_CHUCK to explicit-sized array declaration (error-array-assign)
-                if (e.op() == ChuckAST.Operator.AT_CHUCK && e.rhs() instanceof ChuckAST.DeclExp rDecl4
-                        && !rDecl4.arraySizes().isEmpty()
-                        && rDecl4.arraySizes().get(0) instanceof ChuckAST.IntExp szI4 && szI4.value() >= 0) {
-                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                        + ": error: cannot use '@=>' to assign to array declaration with explicit size");
-                }
-                // Check for multi-variable declaration error (test 114.ck)
-                Object rhs = e.rhs();
-                if (rhs instanceof ChuckAST.BlockStmt) {
-                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                        + ": error: cannot '=>' from/to a multi-variable declaration");
-                }
-                emitExpression(e.lhs(), code);
-                emitChuckTarget(e.rhs(), code);
-            } else if (e.op() == ChuckAST.Operator.UNCHUCK) {
-                emitExpression(e.lhs(), code);
-                emitExpression(e.rhs(), code);
-                code.addInstruction(new ChuckUnchuck());
-            } else if (e.op() == ChuckAST.Operator.UPCHUCK) {
-                // Error if used on user-class objects (local =^ operator not exported)
-                String lhsType = getVarType(e.lhs());
-                if (lhsType != null && userClassRegistry.containsKey(lhsType)) {
+                    emitExpression(e.lhs(), code);
+                    emitChuckTarget(e.rhs(), code);
+                } else if (e.op() == ChuckAST.Operator.UNCHUCK) {
+                    emitExpression(e.lhs(), code);
+                    emitExpression(e.rhs(), code);
+                    code.addInstruction(new ChuckUnchuck());
+                } else if (e.op() == ChuckAST.Operator.UPCHUCK) {
+                    // Error if used on user-class objects (local =^ operator not exported)
+                    String lhsType = getVarType(e.lhs());
+                    if (lhsType != null && userClassRegistry.containsKey(lhsType)) {
+                        String rhsType = getVarType(e.rhs());
+                        String rhsName = rhsType != null ? rhsType : lhsType;
+                        throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                                + ": error: cannot resolve operator '=^' on types '"
+                                + lhsType + "' and '" + rhsName + "'");
+                    }
+                    emitExpression(e.lhs(), code);
+                    emitChuckTarget(e.rhs(), code);
+                } else if (e.op() == ChuckAST.Operator.APPEND) {
+                    emitExpression(e.lhs(), code);
+                    emitExpression(e.rhs(), code);
+                    code.addInstruction(new CallMethod("append", 1));
+                } else if (e.op() == ChuckAST.Operator.NEW) {
+                    // Check for empty brackets: new SinOsc[] (error-empty-bracket)
+                    if (e.rhs() instanceof ChuckAST.IntExp szNew && szNew.value() < 0) {
+                        String typeName = e.lhs() instanceof ChuckAST.IdExp tid ? tid.name() : "?";
+                        throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                            + ": error: cannot use 'new " + typeName + "[]' with empty brackets");
+                    }
+                    emitExpression(e.rhs(), code); // size
+                    code.addInstruction(new NewArray());
+                } else if (e.op() == ChuckAST.Operator.PLUS_CHUCK || e.op() == ChuckAST.Operator.MINUS_CHUCK
+                        || e.op() == ChuckAST.Operator.TIMES_CHUCK || e.op() == ChuckAST.Operator.DIVIDE_CHUCK
+                        || e.op() == ChuckAST.Operator.PERCENT_CHUCK) {
+                    // Disallow compound assignment to a declaration (error-add-assign-decl)
+                    if (e.rhs() instanceof ChuckAST.DeclExp) {
+                        throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                            + ": error: cannot use compound assignment operator with a variable declaration");
+                    }
+                    // User-class prefix ++ dispatch (++a where a is user class with __op__++:1)
+                    if (e.op() == ChuckAST.Operator.PLUS_CHUCK
+                            && e.lhs() instanceof ChuckAST.IntExp lhsInt && lhsInt.value() == 1
+                            && e.rhs() instanceof ChuckAST.IdExp rhsId) {
+                        String rhsType = varTypes.get(rhsId.name());
+                        if (rhsType != null && userClassRegistry.containsKey(rhsType)) {
+                            ChuckCode opCode = functions.get("__pub_op__++:1");
+                            if (opCode == null) opCode = functions.get("__op__++:1");
+                            if (opCode != null) {
+                                emitExpression(e.rhs(), code);
+                                code.addInstruction(new CallFunc(opCode, 1));
+                                return;
+                            }
+                        }
+                    }
+                    // Disallow compound assignments on read-only builtins (e.g. now++, 1 +=> pi)
+                    if (e.rhs() instanceof ChuckAST.IdExp rid) {
+                        if (rid.name().equals("now")) throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                            + ": error: cannot perform compound assignment on 'now'");
+                        if (rid.name().equals("pi") || rid.name().equals("e") || rid.name().equals("maybe"))
+                            throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                            + ": error: cannot assign to read-only value '" + rid.name() + "'");
+                    } else if (e.rhs() instanceof ChuckAST.DotExp rdot
+                            && rdot.base() instanceof ChuckAST.IdExp baseId
+                            && baseId.name().equals("Math")) {
+                        switch (rdot.member()) {
+                            case "PI", "TWO_PI", "HALF_PI", "E", "INFINITY", "NEGATIVE_INFINITY", "NaN", "nan" ->
+                                throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                                + ": error: 'Math." + rdot.member() + "' is a constant, and is not assignable");
+                            default -> {}
+                        }
+                    }
+                    ChuckAST.Operator arith = switch (e.op()) {
+                        case PLUS_CHUCK    -> ChuckAST.Operator.PLUS;
+                        case MINUS_CHUCK   -> ChuckAST.Operator.MINUS;
+                        case TIMES_CHUCK   -> ChuckAST.Operator.TIMES;
+                        case DIVIDE_CHUCK  -> ChuckAST.Operator.DIVIDE;
+                        case PERCENT_CHUCK -> ChuckAST.Operator.PERCENT;
+                        default -> ChuckAST.Operator.PLUS;
+                    };
+                    emitExpression(e.rhs(), code);  // push current value of target
+                    emitExpression(e.lhs(), code);  // push the operand
+                    switch (arith) {
+                        case PLUS    -> code.addInstruction(new AddAny());
+                        case MINUS   -> code.addInstruction(new MinusAny());
+                        case TIMES   -> code.addInstruction(new TimesAny());
+                        case DIVIDE  -> code.addInstruction(new DivideAny());
+                        case PERCENT -> code.addInstruction(new ModuloAny());
+                        default -> {}
+                    }
+                    emitChuckTarget(e.rhs(), code);
+                } else if (e.op() == ChuckAST.Operator.POSTFIX_PLUS_PLUS || e.op() == ChuckAST.Operator.POSTFIX_MINUS_MINUS) {
+                    // Postfix ++ / -- : dispatch to user-class operator, or return old value for primitives
+                    if (e.rhs() instanceof ChuckAST.DeclExp) {
+                        throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                            + ": error: cannot use compound assignment operator with a variable declaration");
+                    }
+                    boolean isPostfixPlus = e.op() == ChuckAST.Operator.POSTFIX_PLUS_PLUS;
                     String rhsType = getVarType(e.rhs());
-                    String rhsName = rhsType != null ? rhsType : lhsType;
-                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                            + ": error: cannot resolve operator '=^' on types '"
-                            + lhsType + "' and '" + rhsName + "'");
-                }
-                emitExpression(e.lhs(), code);
-                emitChuckTarget(e.rhs(), code);
-            } else if (e.op() == ChuckAST.Operator.APPEND) {
-                emitExpression(e.lhs(), code);
-                emitExpression(e.rhs(), code);
-                code.addInstruction(new CallMethod("append", 1));
-            } else if (e.op() == ChuckAST.Operator.NEW) {
-                // Check for empty brackets: new SinOsc[] (error-empty-bracket)
-                if (e.rhs() instanceof ChuckAST.IntExp szNew && szNew.value() < 0) {
-                    String typeName = e.lhs() instanceof ChuckAST.IdExp tid ? tid.name() : "?";
-                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                        + ": error: cannot use 'new " + typeName + "[]' with empty brackets");
-                }
-                emitExpression(e.rhs(), code); // size
-                code.addInstruction(new NewArray());
-            } else if (e.op() == ChuckAST.Operator.PLUS_CHUCK || e.op() == ChuckAST.Operator.MINUS_CHUCK
-                    || e.op() == ChuckAST.Operator.TIMES_CHUCK || e.op() == ChuckAST.Operator.DIVIDE_CHUCK
-                    || e.op() == ChuckAST.Operator.PERCENT_CHUCK) {
-                // Disallow compound assignment to a declaration (error-add-assign-decl)
-                if (e.rhs() instanceof ChuckAST.DeclExp) {
-                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                        + ": error: cannot use compound assignment operator with a variable declaration");
-                }
-                // User-class prefix ++ dispatch (++a where a is user class with __op__++:1)
-                if (e.op() == ChuckAST.Operator.PLUS_CHUCK
-                        && e.lhs() instanceof ChuckAST.IntExp lhsInt && lhsInt.value() == 1
-                        && e.rhs() instanceof ChuckAST.IdExp rhsId) {
-                    String rhsType = varTypes.get(rhsId.name());
                     if (rhsType != null && userClassRegistry.containsKey(rhsType)) {
-                        ChuckCode opCode = functions.get("__pub_op__++:1");
-                        if (opCode == null) opCode = functions.get("__op__++:1");
+                        // Call postfix operator: __pub_op__:1 or __op__:1 (no symbol = postfix ++)
+                        String opKey = isPostfixPlus ? ":1" : "--:1";
+                        ChuckCode opCode = functions.get("__pub_op__" + opKey);
+                        if (opCode == null) opCode = functions.get("__op__" + opKey);
                         if (opCode != null) {
                             emitExpression(e.rhs(), code);
                             code.addInstruction(new CallFunc(opCode, 1));
                             return;
                         }
                     }
-                }
-                // Disallow compound assignments on read-only builtins (e.g. now++, 1 +=> pi)
-                if (e.rhs() instanceof ChuckAST.IdExp rid) {
-                    if (rid.name().equals("now")) throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                        + ": error: cannot perform compound assignment on 'now'");
-                    if (rid.name().equals("pi") || rid.name().equals("e") || rid.name().equals("maybe"))
-                        throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                        + ": error: cannot assign to read-only value '" + rid.name() + "'");
-                } else if (e.rhs() instanceof ChuckAST.DotExp rdot
-                        && rdot.base() instanceof ChuckAST.IdExp baseId
-                        && baseId.name().equals("Math")) {
-                    switch (rdot.member()) {
-                        case "PI", "TWO_PI", "HALF_PI", "E", "INFINITY", "NEGATIVE_INFINITY", "NaN", "nan" ->
+                    // Primitive postfix: push old value, push current value again, add/sub 1, store back, pop new value
+                    // Old value remains on stack as the expression result
+                    emitExpression(e.rhs(), code);  // push old value (for return)
+                    emitExpression(e.rhs(), code);  // push current value again (for arithmetic)
+                    emitExpression(e.lhs(), code);  // push 1
+                    if (isPostfixPlus) code.addInstruction(new AddAny());
+                    else code.addInstruction(new MinusAny());
+                    emitChuckTarget(e.rhs(), code); // store new value, pushes new value back
+                    code.addInstruction(new Pop());  // discard new value, old value remains
+                } else if (e.op() == ChuckAST.Operator.WRITE_IO) {
+                    emitExpression(e.rhs(), code);
+                    emitExpression(e.lhs(), code);
+                    code.addInstruction(new WriteIO());
+                } else if (e.op() == ChuckAST.Operator.SWAP) {
+                    emitSwapTarget(e.lhs(), e.rhs(), code);
+                } else if (e.op() == ChuckAST.Operator.AT_CHUCK) {
+                    emitExpression(e.lhs(), code);
+                    if (e.rhs() instanceof ChuckAST.IdExp id) {
+                        Integer lo = getLocalOffset(id.name());
+                        if (lo != null) code.addInstruction(new StoreLocal(lo));
+                        else {
+                            // For @=>, we want direct assignment to the global
+                            code.addInstruction(new SetGlobalObjectOnly(id.name()));
+                        }
+                    } else if (e.rhs() instanceof ChuckAST.DotExp dot) {
+                        emitExpression(dot.base(), code);
+                        code.addInstruction(new SetMemberIntByName(dot.member()));
+                    } else if (e.rhs() instanceof ChuckAST.ArrayAccessExp ae) {
+                        emitExpression(ae.base(), code);
+                        for (int i = 0; i < ae.indices().size(); i++) {
+                            emitExpression(ae.indices().get(i), code);
+                            if (i < ae.indices().size() - 1) code.addInstruction(new GetArrayInt());
+                            else code.addInstruction(new SetArrayInt());
+                        }
+                    }
+                } else if (e.op() == ChuckAST.Operator.ASSIGN) {
+                    emitExpression(e.rhs(), code);
+                    if (e.lhs() instanceof ChuckAST.IdExp id) {
+                        Integer localOffset = getLocalOffset(id.name());
+                        if (localOffset != null) code.addInstruction(new StoreLocal(localOffset));
+                        else code.addInstruction(new SetGlobalObjectOrInt(id.name()));
+                    } else if (e.lhs() instanceof ChuckAST.DotExp dot) {
+                        emitExpression(dot.base(), code);
+                        code.addInstruction(new SetMemberIntByName(dot.member()));
+                    } else if (e.lhs() instanceof ChuckAST.ArrayAccessExp ae) {
+                        emitExpression(ae.base(), code);
+                        for (int i = 0; i < ae.indices().size(); i++) {
+                            emitExpression(ae.indices().get(i), code);
+                            if (i < ae.indices().size() - 1) code.addInstruction(new GetArrayInt());
+                            else code.addInstruction(new SetArrayInt());
+                        }
+                    }
+                } else if (e.op() == ChuckAST.Operator.DUR_MUL) {
+                    emitExpression(e.lhs(), code);
+                    if (e.rhs() instanceof ChuckAST.IdExp id) {
+                        code.addInstruction(new CreateDuration(id.name()));
+                    }
+                } else {
+                    // Check for public operator overload on user-class types
+                    if (e.op() == ChuckAST.Operator.PLUS) {
+                        // Detect function reference used in binary + (e.g., foo + "" or Foo.bar + "")
+                        if (e.lhs() instanceof ChuckAST.IdExp idExp) {
+                            String fnName = idExp.name();
+                            boolean isFuncRef = functions.keySet().stream().anyMatch(k -> k.startsWith(fnName + ":"));
+                            if (isFuncRef) {
+                                throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                                    + ": error: cannot perform '+' on '[fun]" + fnName + "()' and value");
+                            }
+                        }
+                        if (e.lhs() instanceof ChuckAST.DotExp lhsDot
+                                && lhsDot.base() instanceof ChuckAST.IdExp baseId
+                                && userClassRegistry.containsKey(baseId.name())) {
+                            UserClassDescriptor d = userClassRegistry.get(baseId.name());
+                            String memName = lhsDot.member();
+                            boolean isMemberFunc = d.methods().containsKey(memName)
+                                || d.staticMethods().keySet().stream().anyMatch(k -> k.startsWith(memName + ":"));
+                            if (isMemberFunc) {
+                                throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                                    + ": error: cannot perform '+' on '[fun]" + baseId.name() + "." + memName + "()' and value");
+                            }
+                        }
+                    }
+                    // Check for user-class binary operator overload (+, -, *, /, %, <, <=, >, >=, ==, !=)
+                    {
+                        String lhsType = getExprType(e.lhs());
+                        if (lhsType != null && userClassRegistry.containsKey(lhsType)) {
+                            String opSymbol = switch (e.op()) {
+                                case PLUS -> "+"; case MINUS -> "-"; case TIMES -> "*";
+                                case DIVIDE -> "/"; case PERCENT -> "%";
+                                case LT -> "<"; case LE -> "<="; case GT -> ">";
+                                case GE -> ">="; case EQ -> "=="; case NEQ -> "!=";
+                                default -> null;
+                            };
+                            if (opSymbol != null) {
+                                ChuckCode opFunc = functions.get("__pub_op__" + opSymbol + ":2");
+                                if (opFunc == null) opFunc = functions.get("__op__" + opSymbol + ":2");
+                                if (opFunc != null) {
+                                    emitExpression(e.lhs(), code);
+                                    emitExpression(e.rhs(), code);
+                                    code.addInstruction(new CallFunc(opFunc, 2));
+                                    return;
+                                }
+
+                                // Also check for method-style overload in user class
+                                UserClassDescriptor desc = userClassRegistry.get(lhsType);
+                                if (desc != null) {
+                                    String mName = desc.methods().containsKey("__pub_op__" + opSymbol + ":1") ? "__pub_op__" + opSymbol :
+                                                  (desc.methods().containsKey("__op__" + opSymbol + ":1") ? "__op__" + opSymbol : null);
+                                    if (mName != null) {
+                                        emitExpression(e.lhs(), code);
+                                        emitExpression(e.rhs(), code);
+                                        code.addInstruction(new CallMethod(mName, 1));
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // Check for complex/polar built-in arithmetic
+                    {
+                        String lhsType = getExprType(e.lhs());
+                        if ("complex".equals(lhsType) || "polar".equals(lhsType)) {
+                            boolean isPolar = "polar".equals(lhsType);
+                            ChuckInstr complexInstr = switch (e.op()) {
+                                case PLUS  -> isPolar ? new PolarAdd()  : new ComplexAdd();
+                                case MINUS -> isPolar ? new PolarSub()  : new ComplexSub();
+                                case TIMES -> isPolar ? new PolarMul()  : new ComplexMul();
+                                case DIVIDE -> isPolar ? new PolarDiv() : new ComplexDiv();
+                                default -> null;
+                            };
+                            if (complexInstr != null) {
+                                emitExpression(e.lhs(), code);
+                                emitExpression(e.rhs(), code);
+                                code.addInstruction(complexInstr);
+                                return;
+                            }
+                        }
+                    }
+                    // Check for vec2/vec3/vec4 element-wise arithmetic
+                    {
+                        String lhsType = getExprType(e.lhs());
+                        if ("vec2".equals(lhsType) || "vec3".equals(lhsType) || "vec4".equals(lhsType)) {
+                            switch (e.op()) {
+                                case PLUS -> {
+                                    emitExpression(e.lhs(), code);
+                                    emitExpression(e.rhs(), code);
+                                    code.addInstruction(new VecAdd());
+                                    return;
+                                }
+                                case MINUS -> {
+                                    emitExpression(e.lhs(), code);
+                                    emitExpression(e.rhs(), code);
+                                    code.addInstruction(new VecSub());
+                                    return;
+                                }
+                                case TIMES -> {
+                                    // vec * scalar: check if rhs is scalar (float/int)
+                                    String rhsType = getExprType(e.rhs());
+                                    if (rhsType == null || "float".equals(rhsType) || "int".equals(rhsType)) {
+                                        emitExpression(e.lhs(), code);
+                                        emitExpression(e.rhs(), code);
+                                        code.addInstruction(new VecScale());
+                                        return;
+                                    }
+                                    // vec * vec → dot product
+                                    emitExpression(e.lhs(), code);
+                                    emitExpression(e.rhs(), code);
+                                    code.addInstruction(new VecDot());
+                                    return;
+                                }
+                                default -> {} // fall through to generic
+                            }
+                        }
+                    }
+                    // Check for UGen in arithmetic context (error-binary: 1 + dac)
+                    if (e.op() == ChuckAST.Operator.PLUS || e.op() == ChuckAST.Operator.MINUS
+                            || e.op() == ChuckAST.Operator.TIMES || e.op() == ChuckAST.Operator.DIVIDE) {
+                        java.util.Set<String> ugenGlobals = java.util.Set.of("dac", "blackhole", "adc");
+                        if (e.lhs() instanceof ChuckAST.IdExp lid && ugenGlobals.contains(lid.name())) {
                             throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                            + ": error: 'Math." + rdot.member() + "' is a constant, and is not assignable");
+                                + ": error: cannot perform arithmetic on UGen '" + lid.name() + "'");
+                        }
+                        if (e.rhs() instanceof ChuckAST.IdExp rid && ugenGlobals.contains(rid.name())) {
+                            throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                                + ": error: cannot perform arithmetic on UGen '" + rid.name() + "'");
+                        }
+                    }
+                    if (e.op() != ChuckAST.Operator.AND && e.op() != ChuckAST.Operator.OR) {
+                        emitExpression(e.lhs(), code);
+                        emitExpression(e.rhs(), code);
+                    }
+                    switch (e.op()) {
+                        case PLUS    -> code.addInstruction(new AddAny());
+                        case MINUS   -> code.addInstruction(new MinusAny());
+                        case TIMES   -> code.addInstruction(new TimesAny());
+                        case DIVIDE  -> code.addInstruction(new DivideAny());
+                        case PERCENT -> code.addInstruction(new ModuloAny());
+                        case S_OR    -> code.addInstruction(new BitwiseOrAny());
+                        case S_AND   -> code.addInstruction(new BitwiseAndAny());
+                        case LT      -> code.addInstruction(new LessThanAny());
+                        case LE      -> code.addInstruction(new LessOrEqualAny());
+                        case GT      -> code.addInstruction(new GreaterThanAny());
+                        case GE      -> code.addInstruction(new GreaterOrEqualAny());
+                        case EQ      -> code.addInstruction(new EqualsAny());
+                        case NEQ     -> code.addInstruction(new NotEqualsAny());
+                        case DUR_MUL -> {
+                            emitExpression(e.lhs(), code);
+                            if (e.rhs() instanceof ChuckAST.IdExp id) {
+                                code.addInstruction(new CreateDuration(id.name()));
+                            } else {
+                                emitExpression(e.rhs(), code);
+                                // Fallback?
+                            }
+                        }
+                        case WRITE_IO -> {
+                            emitExpression(e.lhs(), code);
+                            emitExpression(e.rhs(), code);
+                            code.addInstruction(new ChuckWriteIO());
+                        }
+                        case AND -> {
+                            String lt = getExprType(e.lhs());
+                            String rt = getExprType(e.rhs());
+                            if ("Event".equals(lt) || "Event".equals(rt)) {
+                                emitExpression(e.lhs(), code);
+                                emitExpression(e.rhs(), code);
+                                code.addInstruction(new CreateEventConjunction());
+                            } else {
+                                emitExpression(e.lhs(), code);
+                                int jumpIdx = code.getNumInstructions();
+                                code.addInstruction(null); // placeholder for JumpIfFalse
+                                emitExpression(e.rhs(), code);
+                                int endIdx = code.getNumInstructions();
+                                code.replaceInstruction(jumpIdx, new JumpIfFalseAndPushFalse(endIdx));
+                            }
+                        }
+                        case OR -> {
+                            String lt = getExprType(e.lhs());
+                            String rt = getExprType(e.rhs());
+                            if ("Event".equals(lt) || "Event".equals(rt)) {
+                                emitExpression(e.lhs(), code);
+                                emitExpression(e.rhs(), code);
+                                code.addInstruction(new CreateEventDisjunction());
+                            } else {
+                                emitExpression(e.lhs(), code);
+                                int jumpIdx = code.getNumInstructions();
+                                code.addInstruction(null); // placeholder for JumpIfTrue
+                                emitExpression(e.rhs(), code);
+                                int endIdx = code.getNumInstructions();
+                                code.replaceInstruction(jumpIdx, new JumpIfTrueAndPushTrue(endIdx));
+                            }
+                        }
                         default -> {}
                     }
                 }
-                ChuckAST.Operator arith = switch (e.op()) {
-                    case PLUS_CHUCK    -> ChuckAST.Operator.PLUS;
-                    case MINUS_CHUCK   -> ChuckAST.Operator.MINUS;
-                    case TIMES_CHUCK   -> ChuckAST.Operator.TIMES;
-                    case DIVIDE_CHUCK  -> ChuckAST.Operator.DIVIDE;
-                    case PERCENT_CHUCK -> ChuckAST.Operator.PERCENT;
-                    default -> ChuckAST.Operator.PLUS;
-                };
-                emitExpression(e.rhs(), code);  // push current value of target
-                emitExpression(e.lhs(), code);  // push the operand
-                switch (arith) {
-                    case PLUS    -> code.addInstruction(new AddAny());
-                    case MINUS   -> code.addInstruction(new MinusAny());
-                    case TIMES   -> code.addInstruction(new TimesAny());
-                    case DIVIDE  -> code.addInstruction(new DivideAny());
-                    case PERCENT -> code.addInstruction(new ModuloAny());
-                    default -> {}
-                }
-                emitChuckTarget(e.rhs(), code);
-            } else if (e.op() == ChuckAST.Operator.POSTFIX_PLUS_PLUS || e.op() == ChuckAST.Operator.POSTFIX_MINUS_MINUS) {
-                // Postfix ++ / -- : dispatch to user-class operator, or return old value for primitives
-                if (e.rhs() instanceof ChuckAST.DeclExp) {
+            }
+            case ChuckAST.IdExp e -> {
+                Integer localOffset = getLocalOffset(e.name());
+                if (e.name().equals("this") && currentClass == null) {
                     throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                        + ": error: cannot use compound assignment operator with a variable declaration");
+                        + ": error: keyword 'this' cannot be used outside class definition");
                 }
-                boolean isPostfixPlus = e.op() == ChuckAST.Operator.POSTFIX_PLUS_PLUS;
-                String rhsType = getVarType(e.rhs());
-                if (rhsType != null && userClassRegistry.containsKey(rhsType)) {
-                    // Call postfix operator: __pub_op__:1 or __op__:1 (no symbol = postfix ++)
-                    String opKey = isPostfixPlus ? ":1" : "--:1";
-                    ChuckCode opCode = functions.get("__pub_op__" + opKey);
-                    if (opCode == null) opCode = functions.get("__op__" + opKey);
-                    if (opCode != null) {
-                        emitExpression(e.rhs(), code);
-                        code.addInstruction(new CallFunc(opCode, 1));
-                        return;
-                    }
-                }
-                // Primitive postfix: push old value, push current value again, add/sub 1, store back, pop new value
-                // Old value remains on stack as the expression result
-                emitExpression(e.rhs(), code);  // push old value (for return)
-                emitExpression(e.rhs(), code);  // push current value again (for arithmetic)
-                emitExpression(e.lhs(), code);  // push 1
-                if (isPostfixPlus) code.addInstruction(new AddAny());
-                else code.addInstruction(new MinusAny());
-                emitChuckTarget(e.rhs(), code); // store new value, pushes new value back
-                code.addInstruction(new Pop());  // discard new value, old value remains
-            } else if (e.op() == ChuckAST.Operator.WRITE_IO) {
-                emitExpression(e.rhs(), code);
-                emitExpression(e.lhs(), code);
-                code.addInstruction(new WriteIO());
-            } else if (e.op() == ChuckAST.Operator.SWAP) {
-                emitSwapTarget(e.lhs(), e.rhs(), code);
-            } else if (e.op() == ChuckAST.Operator.AT_CHUCK) {
-                emitExpression(e.lhs(), code);
-                if (e.rhs() instanceof ChuckAST.IdExp id) {
-                    Integer lo = getLocalOffset(id.name());
-                    if (lo != null) code.addInstruction(new StoreLocal(lo));
-                    else {
-                        // For @=>, we want direct assignment to the global
-                        code.addInstruction(new SetGlobalObjectOnly(id.name()));
-                    }
-                } else if (e.rhs() instanceof ChuckAST.DotExp dot) {
-                    emitExpression(dot.base(), code);
-                    code.addInstruction(new SetMemberIntByName(dot.member()));
-                } else if (e.rhs() instanceof ChuckAST.ArrayAccessExp ae) {
-                    emitExpression(ae.base(), code);
-                    for (int i = 0; i < ae.indices().size(); i++) {
-                        emitExpression(ae.indices().get(i), code);
-                        if (i < ae.indices().size() - 1) code.addInstruction(new GetArrayInt());
-                        else code.addInstruction(new SetArrayInt());
-                    }
-                }
-            } else if (e.op() == ChuckAST.Operator.WRITE_IO) {
-                emitExpression(e.rhs(), code);
-                emitExpression(e.lhs(), code);
-                code.addInstruction(new WriteIO());
-            } else if (e.op() == ChuckAST.Operator.ASSIGN) {
-                emitExpression(e.rhs(), code);
-                if (e.lhs() instanceof ChuckAST.IdExp id) {
-                    Integer localOffset = getLocalOffset(id.name());
-                    if (localOffset != null) code.addInstruction(new StoreLocal(localOffset));
-                    else code.addInstruction(new SetGlobalObjectOrInt(id.name()));
-                } else if (e.lhs() instanceof ChuckAST.DotExp dot) {
-                    emitExpression(dot.base(), code);
-                    code.addInstruction(new SetMemberIntByName(dot.member()));
-                } else if (e.lhs() instanceof ChuckAST.ArrayAccessExp ae) {
-                    emitExpression(ae.base(), code);
-                    for (int i = 0; i < ae.indices().size(); i++) {
-                        emitExpression(ae.indices().get(i), code);
-                        if (i < ae.indices().size() - 1) code.addInstruction(new GetArrayInt());
-                        else code.addInstruction(new SetArrayInt());
-                    }
-                }
-            } else if (e.op() == ChuckAST.Operator.DUR_MUL) {
-                emitExpression(e.lhs(), code);
-                if (e.rhs() instanceof ChuckAST.IdExp id) {
-                    code.addInstruction(new CreateDuration(id.name()));
-                }
-            } else {
-                // Check for public operator overload on user-class types
-                if (e.op() == ChuckAST.Operator.PLUS) {
-                    // Detect function reference used in binary + (e.g., foo + "" or Foo.bar + "")
-                    if (e.lhs() instanceof ChuckAST.IdExp(String fnName, int line, int column)) {
-                        boolean isFuncRef = functions.keySet().stream().anyMatch(k -> k.startsWith(fnName + ":"));
-                        if (isFuncRef) {
-                            throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                                + ": error: cannot perform '+' on '[fun]" + fnName + "()' and value");
-                        }
-                    }
-                    if (e.lhs() instanceof ChuckAST.DotExp lhsDot
-                            && lhsDot.base() instanceof ChuckAST.IdExp baseId
-                            && userClassRegistry.containsKey(baseId.name())) {
-                        UserClassDescriptor d = userClassRegistry.get(baseId.name());
-                        String memName = lhsDot.member();
-                        boolean isMemberFunc = d.methods().containsKey(memName)
-                            || d.staticMethods().keySet().stream().anyMatch(k -> k.startsWith(memName + ":"));
-                        if (isMemberFunc) {
-                            throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                                + ": error: cannot perform '+' on '[fun]" + baseId.name() + "." + memName + "()' and value");
-                        }
-                    }
-                }
-                // Check for user-class binary operator overload (+, -, *, /, %, <, <=, >, >=, ==, !=)
-                {
-                    String lhsType = getExprType(e.lhs());
-                    if (lhsType != null && userClassRegistry.containsKey(lhsType)) {
-                        String opSymbol = switch (e.op()) {
-                            case PLUS -> "+"; case MINUS -> "-"; case TIMES -> "*";
-                            case DIVIDE -> "/"; case PERCENT -> "%";
-                            case LT -> "<"; case LE -> "<="; case GT -> ">";
-                            case GE -> ">="; case EQ -> "=="; case NEQ -> "!=";
-                            default -> null;
-                        };
-                        if (opSymbol != null) {
-                            ChuckCode opFunc = functions.get("__pub_op__" + opSymbol + ":2");
-                            if (opFunc == null) opFunc = functions.get("__op__" + opSymbol + ":2");
-                            if (opFunc != null) {
-                                emitExpression(e.lhs(), code);
-                                emitExpression(e.rhs(), code);
-                                code.addInstruction(new CallFunc(opFunc, 2));
-                                return;
-                            }
-
-                            // Also check for method-style overload in user class
-                            UserClassDescriptor desc = userClassRegistry.get(lhsType);
-                            if (desc != null) {
-                                String mName = desc.methods().containsKey("__pub_op__" + opSymbol + ":1") ? "__pub_op__" + opSymbol :
-                                              (desc.methods().containsKey("__op__" + opSymbol + ":1") ? "__op__" + opSymbol : null);
-                                if (mName != null) {
-                                    emitExpression(e.lhs(), code);
-                                    emitExpression(e.rhs(), code);
-                                    code.addInstruction(new CallMethod(mName, 1));
-                                    return;
-                                }
-                            }
-                        }
-                    }
-                }
-                // Check for complex/polar built-in arithmetic
-                {
-                    String lhsType = getExprType(e.lhs());
-                    if ("complex".equals(lhsType) || "polar".equals(lhsType)) {
-                        boolean isPolar = "polar".equals(lhsType);
-                        ChuckInstr complexInstr = switch (e.op()) {
-                            case PLUS  -> isPolar ? new PolarAdd()  : new ComplexAdd();
-                            case MINUS -> isPolar ? new PolarSub()  : new ComplexSub();
-                            case TIMES -> isPolar ? new PolarMul()  : new ComplexMul();
-                            case DIVIDE -> isPolar ? new PolarDiv() : new ComplexDiv();
-                            default -> null;
-                        };
-                        if (complexInstr != null) {
-                            emitExpression(e.lhs(), code);
-                            emitExpression(e.rhs(), code);
-                            code.addInstruction(complexInstr);
-                            return;
-                        }
-                    }
-                }
-                // Check for vec2/vec3/vec4 element-wise arithmetic
-                {
-                    String lhsType = getExprType(e.lhs());
-                    if ("vec2".equals(lhsType) || "vec3".equals(lhsType) || "vec4".equals(lhsType)) {
-                        switch (e.op()) {
-                            case PLUS -> {
-                                emitExpression(e.lhs(), code);
-                                emitExpression(e.rhs(), code);
-                                code.addInstruction(new VecAdd());
-                                return;
-                            }
-                            case MINUS -> {
-                                emitExpression(e.lhs(), code);
-                                emitExpression(e.rhs(), code);
-                                code.addInstruction(new VecSub());
-                                return;
-                            }
-                            case TIMES -> {
-                                // vec * scalar: check if rhs is scalar (float/int)
-                                String rhsType = getExprType(e.rhs());
-                                if (rhsType == null || "float".equals(rhsType) || "int".equals(rhsType)) {
-                                    emitExpression(e.lhs(), code);
-                                    emitExpression(e.rhs(), code);
-                                    code.addInstruction(new VecScale());
-                                    return;
-                                }
-                                // vec * vec → dot product
-                                emitExpression(e.lhs(), code);
-                                emitExpression(e.rhs(), code);
-                                code.addInstruction(new VecDot());
-                                return;
-                            }
-                            default -> {} // fall through to generic
-                        }
-                    }
-                }
-                // Check for UGen in arithmetic context (error-binary: 1 + dac)
-                if (e.op() == ChuckAST.Operator.PLUS || e.op() == ChuckAST.Operator.MINUS
-                        || e.op() == ChuckAST.Operator.TIMES || e.op() == ChuckAST.Operator.DIVIDE) {
-                    java.util.Set<String> ugenGlobals = java.util.Set.of("dac", "blackhole", "adc");
-                    if (e.lhs() instanceof ChuckAST.IdExp lid && ugenGlobals.contains(lid.name())) {
-                        throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                            + ": error: cannot perform arithmetic on UGen '" + lid.name() + "'");
-                    }
-                    if (e.rhs() instanceof ChuckAST.IdExp rid && ugenGlobals.contains(rid.name())) {
-                        throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                            + ": error: cannot perform arithmetic on UGen '" + rid.name() + "'");
-                    }
-                }
-                if (e.op() != ChuckAST.Operator.AND && e.op() != ChuckAST.Operator.OR) {
-                    emitExpression(e.lhs(), code);
-                    emitExpression(e.rhs(), code);
-                }
-                switch (e.op()) {
-                    case PLUS    -> code.addInstruction(new AddAny());
-                    case MINUS   -> code.addInstruction(new MinusAny());
-                    case TIMES   -> code.addInstruction(new TimesAny());
-                    case DIVIDE  -> code.addInstruction(new DivideAny());
-                    case PERCENT -> code.addInstruction(new ModuloAny());
-                    case S_OR    -> code.addInstruction(new BitwiseOrAny());
-                    case S_AND   -> code.addInstruction(new BitwiseAndAny());
-                    case LT      -> code.addInstruction(new LessThanAny());
-                    case LE      -> code.addInstruction(new LessOrEqualAny());
-                    case GT      -> code.addInstruction(new GreaterThanAny());
-                    case GE      -> code.addInstruction(new GreaterOrEqualAny());
-                    case EQ      -> code.addInstruction(new EqualsAny());
-                    case NEQ     -> code.addInstruction(new NotEqualsAny());
-                    case DUR_MUL -> {
-                        emitExpression(e.lhs(), code);
-                        if (e.rhs() instanceof ChuckAST.IdExp id) {
-                            code.addInstruction(new CreateDuration(id.name()));
-                        } else {
-                            emitExpression(e.rhs(), code);
-                            // Fallback?
-                        }
-                    }
-                    case WRITE_IO -> {
-                        emitExpression(e.lhs(), code);
-                        emitExpression(e.rhs(), code);
-                        code.addInstruction(new ChuckWriteIO());
-                    }
-                    case AND -> {
-                        String lt = getExprType(e.lhs());
-                        String rt = getExprType(e.rhs());
-                        if ("Event".equals(lt) || "Event".equals(rt)) {
-                            emitExpression(e.lhs(), code);
-                            emitExpression(e.rhs(), code);
-                            code.addInstruction(new CreateEventConjunction());
-                        } else {
-                            emitExpression(e.lhs(), code);
-                            int jumpIdx = code.getNumInstructions();
-                            code.addInstruction(null); // placeholder for JumpIfFalse
-                            emitExpression(e.rhs(), code);
-                            int endIdx = code.getNumInstructions();
-                            code.replaceInstruction(jumpIdx, new JumpIfFalseAndPushFalse(endIdx));
-                        }
-                    }
-                    case OR -> {
-                        String lt = getExprType(e.lhs());
-                        String rt = getExprType(e.rhs());
-                        if ("Event".equals(lt) || "Event".equals(rt)) {
-                            emitExpression(e.lhs(), code);
-                            emitExpression(e.rhs(), code);
-                            code.addInstruction(new CreateEventDisjunction());
-                        } else {
-                            emitExpression(e.lhs(), code);
-                            int jumpIdx = code.getNumInstructions();
-                            code.addInstruction(null); // placeholder for JumpIfTrue
-                            emitExpression(e.rhs(), code);
-                            int endIdx = code.getNumInstructions();
-                            code.replaceInstruction(jumpIdx, new JumpIfTrueAndPushTrue(endIdx));
-                        }
-                    }
-                    default -> {}
-                }
-            }
-        } else if (exp instanceof ChuckAST.IdExp e) {
-            Integer localOffset = getLocalOffset(e.name());
-            if (e.name().equals("this") && currentClass == null) {
-                throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                    + ": error: keyword 'this' cannot be used outside class definition");
-            }
-            if (e.name().equals("super") && inStaticFuncContext) {
-                throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                    + ": error: keyword 'super' cannot be used inside static functions");
-            }
-            if (localOffset != null) code.addInstruction(new LoadLocal(localOffset));
-            else if (e.name().equals("now")) code.addInstruction(new PushNow());
-            else if (e.name().equals("dac")) code.addInstruction(new PushDac());
-            else if (e.name().equals("blackhole")) code.addInstruction(new PushBlackhole());
-            else if (e.name().equals("adc")) code.addInstruction(new PushAdc());
-            else if (e.name().equals("me")) code.addInstruction(new PushMe());
-            else if (e.name().equals("cherr")) code.addInstruction(new PushCherr());
-            else if (e.name().equals("chout")) code.addInstruction(new PushChout());
-            else if (e.name().equals("Machine")) code.addInstruction(new PushMachine());
-            else if (e.name().equals("maybe")) code.addInstruction(new PushMaybe());
-            else if (e.name().equals("second") || e.name().equals("ms") || e.name().equals("samp")
-                    || e.name().equals("minute") || e.name().equals("hour")) {
-                code.addInstruction(new PushInt(1));
-                code.addInstruction(new CreateDuration(e.name()));
-            } else if (currentClassFields.contains(e.name())) {
-                code.addInstruction(new GetUserField(e.name()));
-            } else if (currentClass != null && userClassRegistry.get(currentClass) != null &&
-                    (userClassRegistry.get(currentClass).staticInts().containsKey(e.name()) ||
-                     userClassRegistry.get(currentClass).staticObjects().containsKey(e.name()))) {
-                code.addInstruction(new GetStatic(currentClass, e.name()));
-            } else {
-                code.addInstruction(new GetGlobalObjectOrInt(e.name()));
-            }
-        } else if (exp instanceof ChuckAST.DotExp e) {
-            // Handle static field access: ClassName.staticField
-            if (e.base() instanceof ChuckAST.IdExp id) {
-                String potentialClassName = id.name();
-                UserClassDescriptor classDesc = userClassRegistry.get(potentialClassName);
-                if (classDesc != null && (classDesc.staticInts().containsKey(e.member()) || classDesc.staticObjects().containsKey(e.member()))) {
-                    code.addInstruction(new GetStatic(potentialClassName, e.member()));
-                    return;
-                }
-            }
-            if (e.base() instanceof ChuckAST.IdExp id && id.name().equals("IO")) {
-                if (e.member().equals("nl") || e.member().equals("newline")) {
-                    code.addInstruction(new PushString("\n"));
-                } else {
-                    code.addInstruction(new GetBuiltinStatic("org.chuck.core.ChuckIO", e.member()));
-                }
-                return;
-            }
-            if (e.base() instanceof ChuckAST.IdExp id && id.name().equals("Math")) {
-                switch (e.member()) {
-                    case "INFINITY", "infinity" -> { code.addInstruction(new PushFloat(Double.POSITIVE_INFINITY)); return; }
-                    case "NEGATIVE_INFINITY"    -> { code.addInstruction(new PushFloat(Double.NEGATIVE_INFINITY)); return; }
-                    case "NaN", "nan"           -> { code.addInstruction(new PushFloat(Double.NaN)); return; }
-                    case "PI"                   -> { code.addInstruction(new PushFloat(Math.PI)); return; }
-                    case "TWO_PI"               -> { code.addInstruction(new PushFloat(2.0 * Math.PI)); return; }
-                    case "HALF_PI"              -> { code.addInstruction(new PushFloat(Math.PI / 2.0)); return; }
-                    case "E"                    -> { code.addInstruction(new PushFloat(Math.E)); return; }
-                    case "SQRT2"                -> { code.addInstruction(new PushFloat(Math.sqrt(2.0))); return; }
-                }
-            }
-            if (e.member().equals("size")) {
-                emitExpression(e.base(), code);
-                code.addInstruction(new CallMethod("size", 0));
-                return;
-            } else if (e.member().equals("zero")) {
-                emitExpression(e.base(), code);
-                code.addInstruction(new ArrayZero());
-                // ChucK's .zero() returns the array itself for chaining
-                return;
-            }
-            if (e.base() instanceof ChuckAST.IdExp id) {
-                String baseType = getExprType(e.base());
-                if (baseType != null && userClassRegistry.containsKey(baseType)) {
-                    UserClassDescriptor d = userClassRegistry.get(baseType);
-                    if (d.staticInts().containsKey(e.member()) || d.staticObjects().containsKey(e.member())) {
-                        code.addInstruction(new GetStatic(baseType, e.member()));
-                        return;
-                    }
-                }
-                if (id.name().equals("ADSR") || id.name().equals("Adsr")) {
-                    code.addInstruction(new GetBuiltinStatic("org.chuck.audio.Adsr", e.member()));
-                    return;
-                }
-                if (id.name().equals("Std")) {
-                    code.addInstruction(new GetBuiltinStatic("org.chuck.core.Std", e.member()));
-                    return;
-                }
-                if (id.name().equals("RegEx")) {
-                    code.addInstruction(new GetBuiltinStatic("org.chuck.core.RegEx", e.member()));
-                    return;
-                }
-                if (id.name().equals("Reflect")) {
-                    code.addInstruction(new GetBuiltinStatic("org.chuck.core.Reflect", e.member()));
-                    return;
-                }
-                if (id.name().equals("SerialIO")) {
-                    code.addInstruction(new GetBuiltinStatic("org.chuck.core.SerialIO", e.member()));
-                    return;
-                }
-                if (id.name().equals("FileIO")) {
-                    code.addInstruction(new GetBuiltinStatic("org.chuck.core.FileIO", e.member()));
-                    return;
-                }
-                if (userClassRegistry.containsKey(id.name())) {
-                    UserClassDescriptor d = userClassRegistry.get(id.name());
-                    if (d.staticInts().containsKey(e.member()) || d.staticObjects().containsKey(e.member())) {
-                        code.addInstruction(new GetStatic(id.name(), e.member()));
-                        return;
-                    }
-                }
-                if (currentClass != null && userClassRegistry.containsKey(currentClass)) {
-                    UserClassDescriptor d = userClassRegistry.get(currentClass);
-                    if (d.staticObjects().containsKey(id.name())) {
-                        code.addInstruction(new GetStatic(currentClass, id.name()));
-                        code.addInstruction(new GetFieldByName(e.member()));
-                        return;
-                    }
-                }
-            }
-            // Vector field accessor: v.x / v.y / v.z / v.w / v.re / v.im / v.mag / v.phase
-            {
-                int vecIdx = vecFieldIndex(e.member());
-                if (vecIdx >= 0 && e.base() instanceof ChuckAST.IdExp baseId) {
-                    String baseType = varTypes.get(baseId.name());
-                    if (baseType == null) baseType = globalVarTypes.get(baseId.name());
-                    if (isVecType(baseType)) {
-                        emitExpression(e.base(), code);
-                        code.addInstruction(new PushInt(vecIdx));
-                        code.addInstruction(new GetArrayInt());
-                        return;
-                    }
-                }
-            }
-            emitExpression(e.base(), code);
-            code.addInstruction(new GetFieldByName(e.member()));
-        } else if (exp instanceof ChuckAST.IntExp e) {
-            code.addInstruction(new PushInt(e.value()));
-        } else if (exp instanceof ChuckAST.FloatExp e) {
-            code.addInstruction(new PushFloat(e.value()));
-        } else if (exp instanceof ChuckAST.StringExp e) {
-            code.addInstruction(new PushString(e.value()));
-        } else if (exp instanceof ChuckAST.ArrayLitExp e) {
-            for (ChuckAST.Exp el : e.elements()) emitExpression(el, code);
-            code.addInstruction(new NewArrayFromStack(e.elements().size()));
-        } else if (exp instanceof ChuckAST.VectorLitExp e) {
-            for (ChuckAST.Exp el : e.elements()) emitExpression(el, code);
-            code.addInstruction(new NewArrayFromStack(e.elements().size()));
-        } else if (exp instanceof ChuckAST.ComplexLit e) {
-            emitExpression(e.re(), code);
-            emitExpression(e.im(), code);
-            code.addInstruction(new NewArrayFromStack(2));
-        } else if (exp instanceof ChuckAST.PolarLit e) {
-            emitExpression(e.mag(), code);
-            emitExpression(e.phase(), code);
-            code.addInstruction(new NewArrayFromStack(2));
-        } else if (exp instanceof ChuckAST.ArrayAccessExp e) {
-            emitExpression(e.base(), code);
-            for (ChuckAST.Exp index : e.indices()) {
-                emitExpression(index, code);
-                code.addInstruction(new GetArrayInt());
-            }
-        } else if (exp instanceof ChuckAST.CallExp e) {
-            // Check for super.method() in wrong context
-            if (e.base() instanceof ChuckAST.DotExp dot2
-                    && dot2.base() instanceof ChuckAST.IdExp superId && superId.name().equals("super")) {
-                if (inStaticFuncContext) {
-                    throw new RuntimeException(currentFile + ":" + superId.line() + ":" + superId.column()
+                if (e.name().equals("super") && inStaticFuncContext) {
+                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
                         + ": error: keyword 'super' cannot be used inside static functions");
                 }
-                // Check if parent class has the method
-                if (currentClass != null) {
-                    UserClassDescriptor cd = userClassRegistry.get(currentClass);
-                    String parentName = cd != null ? cd.parentName() : null;
-                    if (parentName == null) {
-                        // Extends Object implicitly - Object has no user-defined methods
-                        throw new RuntimeException(currentFile + ":" + dot2.base().line() + ":" + dot2.base().column()
-                            + ": error: class 'Object' has no member '" + dot2.member() + "'");
-                    }
-                    UserClassDescriptor parentDesc = userClassRegistry.get(parentName);
-                    if (parentDesc != null && !parentDesc.methods().containsKey(dot2.member())) {
-                        throw new RuntimeException(currentFile + ":" + dot2.base().line() + ":" + dot2.base().column()
-                            + ": error: class '" + parentName + "' has no member '" + dot2.member() + "'");
-                    }
+                if (localOffset != null) code.addInstruction(new LoadLocal(localOffset));
+                else if (e.name().equals("now")) code.addInstruction(new PushNow());
+                else if (e.name().equals("dac")) code.addInstruction(new PushDac());
+                else if (e.name().equals("blackhole")) code.addInstruction(new PushBlackhole());
+                else if (e.name().equals("adc")) code.addInstruction(new PushAdc());
+                else if (e.name().equals("me")) code.addInstruction(new PushMe());
+                else if (e.name().equals("cherr")) code.addInstruction(new PushCherr());
+                else if (e.name().equals("chout")) code.addInstruction(new PushChout());
+                else if (e.name().equals("Machine")) code.addInstruction(new PushMachine());
+                else if (e.name().equals("maybe")) code.addInstruction(new PushMaybe());
+                else if (e.name().equals("second") || e.name().equals("ms") || e.name().equals("samp")
+                        || e.name().equals("minute") || e.name().equals("hour")) {
+                    code.addInstruction(new PushInt(1));
+                    code.addInstruction(new CreateDuration(e.name()));
+                } else if (currentClassFields.contains(e.name())) {
+                    code.addInstruction(new GetUserField(e.name()));
+                } else if (currentClass != null && userClassRegistry.get(currentClass) != null &&
+                        (userClassRegistry.get(currentClass).staticInts().containsKey(e.name()) ||
+                         userClassRegistry.get(currentClass).staticObjects().containsKey(e.name()))) {
+                    code.addInstruction(new GetStatic(currentClass, e.name()));
+                } else {
+                    code.addInstruction(new GetGlobalObjectOrInt(e.name()));
                 }
             }
-            if (e.base() instanceof ChuckAST.DotExp dot
-                    && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("IO")) {
-                if (dot.member().equals("nl") || dot.member().equals("newline")) {
-                    code.addInstruction(new PushString("\n"));
-                    return;
-                }
-            }
-            if (e.base() instanceof ChuckAST.DotExp dot
-                    && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("Std")) {
-                String member = dot.member();
-                java.util.Set<String> builtinStd = java.util.Set.of(
-                    "mtof", "ftom", "powtodb", "rmstodb", "dbtopow", "dbtorms", "dbtolin", "lintodb",
-                    "abs", "fabs", "sgn", "rand2", "rand2f", "clamp", "clampf", "scalef", "atoi", "atof", "itoa", "ftoi", "systemTime"
-                );
-                if (builtinStd.contains(member)) {
-                    for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                    code.addInstruction(new StdFunc(member, e.args().size()));
-                } else {
-                    // General fallback: try CallBuiltinStatic for Std
-                    for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                    code.addInstruction(new CallBuiltinStatic("org.chuck.core.Std", dot.member(), e.args().size()));
-                }
-            } else if (e.base() instanceof ChuckAST.DotExp dot
-                    && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("RegEx")) {
-                for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                code.addInstruction(new CallBuiltinStatic("org.chuck.core.RegEx", dot.member(), e.args().size()));
-            } else if (e.base() instanceof ChuckAST.DotExp dot
-                    && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("Reflect")) {
-                for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                code.addInstruction(new CallBuiltinStatic("org.chuck.core.Reflect", dot.member(), e.args().size()));
-            } else if (e.base() instanceof ChuckAST.DotExp dot
-                    && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("SerialIO")) {
-                for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                code.addInstruction(new CallBuiltinStatic("org.chuck.core.SerialIO", dot.member(), e.args().size()));
-            } else if (e.base() instanceof ChuckAST.DotExp dot && dot.member().equals("last")) {
-                emitExpression(dot.base(), code);
-                code.addInstruction(new GetLastOut());
-            } else if (e.base() instanceof ChuckAST.DotExp dot
-                    && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("Math")) {
-                switch (dot.member()) {
-                    case "random", "randf" -> code.addInstruction(new MathRandom());
-                    case "sin"  -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("sin")); } }
-                    case "cos"  -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("cos")); } }
-                    case "pow"  -> { if(e.args().size() >= 2) { emitExpression(e.args().get(0), code); emitExpression(e.args().get(1), code); code.addInstruction(new MathFunc("pow")); } }
-                    case "sqrt" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("sqrt")); } }
-                    case "abs"  -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("abs")); } }
-                    case "floor"-> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("floor")); } }
-                    case "ceil" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("ceil")); } }
-                    case "equal" -> { if(e.args().size() >= 2) { emitExpression(e.args().get(0), code); emitExpression(e.args().get(1), code); code.addInstruction(new MathFunc("equal")); } }
-                    case "euclidean" -> { if(e.args().size() >= 2) { emitExpression(e.args().get(0), code); emitExpression(e.args().get(1), code); code.addInstruction(new MathFunc("euclidean")); } }
-                    case "isinf" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("isinf")); } }
-                    case "isnan" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("isnan")); } }
-                    case "log"   -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("log")); } }
-                    case "log2"  -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("log2")); } }
-                    case "log10" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("log10")); } }
-                    case "exp"   -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("exp")); } }
-                    case "round" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("round")); } }
-                    case "trunc" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("trunc")); } }
-                    case "help" -> code.addInstruction(new MathHelp());
-                    default     -> {
-                        if (!e.args().isEmpty()) {
-                            for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                            code.addInstruction(new MathFunc(dot.member()));
-                        } else {
-                            code.addInstruction(new MathHelp());
-                        }
-                    }
-                }
-            } else if (e.base() instanceof ChuckAST.DotExp dot && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("Machine")) {
-                String machMember = dot.member();
-                if (machMember.equals("realtime")) { code.addInstruction(new PushInt(0)); }
-                else if (machMember.equals("silent")) { code.addInstruction(new PushInt(1)); }
-                else {
-                    for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                    code.addInstruction(new MachineCall(machMember, e.args().size()));
-                }
-            } else if (e.base() instanceof ChuckAST.DotExp dot
-                    && (dot.base() instanceof ChuckAST.MeExp || (dot.base() instanceof ChuckAST.IdExp idMe && idMe.name().equals("me")))) {
-                if (dot.member().equals("yield")) {
-                    code.addInstruction(new Yield());
-                } else if (dot.member().equals("dir")) {
-                    if (!e.args().isEmpty()) emitExpression(e.args().get(0), code);
-                    else code.addInstruction(new PushInt(0));
-                    code.addInstruction(new MeDir());
-                } else if (dot.member().equals("args")) {
-                    code.addInstruction(new MeArgs());
-                } else if (dot.member().equals("arg")) {
-                    if (!e.args().isEmpty()) emitExpression(e.args().get(0), code);
-                    else code.addInstruction(new PushInt(0));
-                    code.addInstruction(new MeArg());
-                } else if (dot.member().equals("exit")) {
-                    code.addInstruction(new MeExit());
-                } else {
-                    code.addInstruction(new PushMe());
-                    for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                    code.addInstruction(new CallMethod(dot.member(), e.args().size()));
-                }
-            } else if (e.base() instanceof ChuckAST.DotExp dot) {
-                if (dot.base() instanceof ChuckAST.IdExp id) {
-                    if (userClassRegistry.containsKey(id.name())) {
-                        String staticKey = dot.member() + ":" + e.args().size();
-                        ChuckCode target = resolveStaticMethod(id.name(), staticKey);
-                        if (target != null) {
-                            for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                            code.addInstruction(new CallFunc(target, e.args().size()));
-                            return;
-                        }
-                    }
-                    // Handle static method called via a static field access (e.g., Foo.ours.foo())
-                    // First, try to resolve the base as a class type
-                    String baseType = getExprType(dot.base());
-                    if (baseType != null && userClassRegistry.containsKey(baseType)) {
-                        String staticKey = dot.member() + ":" + e.args().size();
-                        ChuckCode target = resolveStaticMethod(baseType, staticKey);
-                        if (target != null) {
-                            for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                            code.addInstruction(new CallFunc(target, e.args().size()));
-                            return;
-                        }
-                    }
-                }
-                emitExpression(dot.base(), code);
-                for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                code.addInstruction(new CallMethod(dot.member(), e.args().size()));
-            } else if (e.base() instanceof ChuckAST.IdExp id) {
-                String key = id.name() + ":" + e.args().size();
-
-                if (currentClass != null && userClassRegistry.containsKey(currentClass)) {
-                    UserClassDescriptor d = userClassRegistry.get(currentClass);
-                    ChuckCode target = resolveStaticMethod(currentClass, key);
-                    if (target != null) {
-                        for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                        code.addInstruction(new CallFunc(target, e.args().size()));
+            case ChuckAST.DotExp e -> {
+                // Handle static field access: ClassName.staticField
+                if (e.base() instanceof ChuckAST.IdExp id) {
+                    String potentialClassName = id.name();
+                    UserClassDescriptor classDesc = userClassRegistry.get(potentialClassName);
+                    if (classDesc != null && (classDesc.staticInts().containsKey(e.member()) || classDesc.staticObjects().containsKey(e.member()))) {
+                        code.addInstruction(new GetStatic(potentialClassName, e.member()));
                         return;
                     }
                 }
-                if (functions.containsKey(key)) {
-                    for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                    code.addInstruction(new CallFunc(functions.get(key), e.args().size()));
+                if (e.base() instanceof ChuckAST.IdExp id && id.name().equals("IO")) {
+                    if (e.member().equals("nl") || e.member().equals("newline")) {
+                        code.addInstruction(new PushString("\n"));
+                    } else {
+                        code.addInstruction(new GetBuiltinStatic("org.chuck.core.ChuckIO", e.member()));
+                    }
+                    return;
+                }
+                if (e.base() instanceof ChuckAST.IdExp id && id.name().equals("Math")) {
+                    switch (e.member()) {
+                        case "INFINITY", "infinity" -> { code.addInstruction(new PushFloat(Double.POSITIVE_INFINITY)); return; }
+                        case "NEGATIVE_INFINITY"    -> { code.addInstruction(new PushFloat(Double.NEGATIVE_INFINITY)); return; }
+                        case "NaN", "nan"           -> { code.addInstruction(new PushFloat(Double.NaN)); return; }
+                        case "PI"                   -> { code.addInstruction(new PushFloat(Math.PI)); return; }
+                        case "TWO_PI"               -> { code.addInstruction(new PushFloat(2.0 * Math.PI)); return; }
+                        case "HALF_PI"              -> { code.addInstruction(new PushFloat(Math.PI / 2.0)); return; }
+                        case "E"                    -> { code.addInstruction(new PushFloat(Math.E)); return; }
+                        case "SQRT2"                -> { code.addInstruction(new PushFloat(Math.sqrt(2.0))); return; }
+                    }
+                }
+                if (e.member().equals("size")) {
+                    emitExpression(e.base(), code);
+                    code.addInstruction(new CallMethod("size", 0));
+                    return;
+                } else if (e.member().equals("zero")) {
+                    emitExpression(e.base(), code);
+                    code.addInstruction(new ArrayZero());
+                    // ChucK's .zero() returns the array itself for chaining
+                    return;
+                }
+                if (e.base() instanceof ChuckAST.IdExp id) {
+                    String baseType = getExprType(e.base());
+                    if (baseType != null && userClassRegistry.containsKey(baseType)) {
+                        UserClassDescriptor d = userClassRegistry.get(baseType);
+                        if (d.staticInts().containsKey(e.member()) || d.staticObjects().containsKey(e.member())) {
+                            code.addInstruction(new GetStatic(baseType, e.member()));
+                            return;
+                        }
+                    }
+                    if (id.name().equals("ADSR") || id.name().equals("Adsr")) {
+                        code.addInstruction(new GetBuiltinStatic("org.chuck.audio.Adsr", e.member()));
+                        return;
+                    }
+                    if (id.name().equals("Std")) {
+                        code.addInstruction(new GetBuiltinStatic("org.chuck.core.Std", e.member()));
+                        return;
+                    }
+                    if (id.name().equals("RegEx")) {
+                        code.addInstruction(new GetBuiltinStatic("org.chuck.core.RegEx", e.member()));
+                        return;
+                    }
+                    if (id.name().equals("Reflect")) {
+                        code.addInstruction(new GetBuiltinStatic("org.chuck.core.Reflect", e.member()));
+                        return;
+                    }
+                    if (id.name().equals("SerialIO")) {
+                        code.addInstruction(new GetBuiltinStatic("org.chuck.core.SerialIO", e.member()));
+                        return;
+                    }
+                    if (id.name().equals("FileIO")) {
+                        code.addInstruction(new GetBuiltinStatic("org.chuck.core.FileIO", e.member()));
+                        return;
+                    }
+                    if (userClassRegistry.containsKey(id.name())) {
+                        UserClassDescriptor d = userClassRegistry.get(id.name());
+                        if (d.staticInts().containsKey(e.member()) || d.staticObjects().containsKey(e.member())) {
+                            code.addInstruction(new GetStatic(id.name(), e.member()));
+                            return;
+                        }
+                    }
+                    if (currentClass != null && userClassRegistry.containsKey(currentClass)) {
+                        UserClassDescriptor d = userClassRegistry.get(currentClass);
+                        if (d.staticObjects().containsKey(id.name())) {
+                            code.addInstruction(new GetStatic(currentClass, id.name()));
+                            code.addInstruction(new GetFieldByName(e.member()));
+                            return;
+                        }
+                    }
+                }
+                // Vector field accessor: v.x / v.y / v.z / v.w / v.re / v.im / v.mag / v.phase
+                {
+                    int vecIdx = vecFieldIndex(e.member());
+                    if (vecIdx >= 0 && e.base() instanceof ChuckAST.IdExp baseId) {
+                        String baseType = varTypes.get(baseId.name());
+                        if (baseType == null) baseType = globalVarTypes.get(baseId.name());
+                        if (isVecType(baseType)) {
+                            emitExpression(e.base(), code);
+                            code.addInstruction(new PushInt(vecIdx));
+                            code.addInstruction(new GetArrayInt());
+                            return;
+                        }
+                    }
+                }
+                emitExpression(e.base(), code);
+                code.addInstruction(new GetFieldByName(e.member()));
+            }
+            case ChuckAST.ArrayLitExp e -> {
+                for (ChuckAST.Exp el : e.elements()) emitExpression(el, code);
+                code.addInstruction(new NewArrayFromStack(e.elements().size()));
+            }
+            case ChuckAST.VectorLitExp e -> {
+                for (ChuckAST.Exp el : e.elements()) emitExpression(el, code);
+                code.addInstruction(new NewArrayFromStack(e.elements().size()));
+            }
+            case ChuckAST.ComplexLit e -> {
+                emitExpression(e.re(), code);
+                emitExpression(e.im(), code);
+                code.addInstruction(new NewArrayFromStack(2));
+            }
+            case ChuckAST.PolarLit e -> {
+                emitExpression(e.mag(), code);
+                emitExpression(e.phase(), code);
+                code.addInstruction(new NewArrayFromStack(2));
+            }
+            case ChuckAST.ArrayAccessExp e -> {
+                emitExpression(e.base(), code);
+                for (ChuckAST.Exp index : e.indices()) {
+                    emitExpression(index, code);
+                    code.addInstruction(new GetArrayInt());
                 }
             }
-        } else if (exp instanceof ChuckAST.SporkExp e) {
-            String funcName = null;
-            if (e.call().base() instanceof ChuckAST.IdExp id) {
-                funcName = id.name();
-                String key = funcName + ":" + e.call().args().size();
-
-                ChuckCode target = resolveStaticMethod(currentClass, key);
-                if (target != null) {
-                    for (ChuckAST.Exp arg : e.call().args()) emitExpression(arg, code);
-                    code.addInstruction(new Spork(target, e.call().args().size()));
-                    return;
+            case ChuckAST.CallExp e -> {
+                // Check for super.method() in wrong context
+                if (e.base() instanceof ChuckAST.DotExp dot2
+                        && dot2.base() instanceof ChuckAST.IdExp superId && superId.name().equals("super")) {
+                    if (inStaticFuncContext) {
+                        throw new RuntimeException(currentFile + ":" + superId.line() + ":" + superId.column()
+                            + ": error: keyword 'super' cannot be used inside static functions");
+                    }
+                    // Check if parent class has the method
+                    if (currentClass != null) {
+                        UserClassDescriptor cd = userClassRegistry.get(currentClass);
+                        String parentName = cd != null ? cd.parentName() : null;
+                        if (parentName == null) {
+                            // Extends Object implicitly - Object has no user-defined methods
+                            throw new RuntimeException(currentFile + ":" + dot2.base().line() + ":" + dot2.base().column()
+                                + ": error: class 'Object' has no member '" + dot2.member() + "'");
+                        }
+                        UserClassDescriptor parentDesc = userClassRegistry.get(parentName);
+                        if (parentDesc != null && !parentDesc.methods().containsKey(dot2.member())) {
+                            throw new RuntimeException(currentFile + ":" + dot2.base().line() + ":" + dot2.base().column()
+                                + ": error: class '" + parentName + "' has no member '" + dot2.member() + "'");
+                        }
+                    }
                 }
-
-                if (functions.containsKey(key)) {
-                    for (ChuckAST.Exp arg : e.call().args()) emitExpression(arg, code);
-                    code.addInstruction(new Spork(functions.get(key), e.call().args().size()));
-                    return;
+                if (e.base() instanceof ChuckAST.DotExp dot
+                        && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("IO")) {
+                    if (dot.member().equals("nl") || dot.member().equals("newline")) {
+                        code.addInstruction(new PushString("\n"));
+                        return;
+                    }
                 }
-            } else if (e.call().base() instanceof ChuckAST.DotExp dot) {
-                if (dot.base() instanceof ChuckAST.IdExp id && userClassRegistry.containsKey(id.name())) {
-                    String staticKey = dot.member() + ":" + e.call().args().size();
-                    ChuckCode target = resolveStaticMethod(id.name(), staticKey);
+                if (e.base() instanceof ChuckAST.DotExp dot
+                        && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("Std")) {
+                    String member = dot.member();
+                    java.util.Set<String> builtinStd = java.util.Set.of(
+                        "mtof", "ftom", "powtodb", "rmstodb", "dbtopow", "dbtorms", "dbtolin", "lintodb",
+                        "abs", "fabs", "sgn", "rand2", "rand2f", "clamp", "clampf", "scalef", "atoi", "atof", "itoa", "ftoi", "systemTime"
+                    );
+                    if (builtinStd.contains(member)) {
+                        for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                        code.addInstruction(new StdFunc(member, e.args().size()));
+                    } else {
+                        // General fallback: try CallBuiltinStatic for Std
+                        for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                        code.addInstruction(new CallBuiltinStatic("org.chuck.core.Std", dot.member(), e.args().size()));
+                    }
+                } else if (e.base() instanceof ChuckAST.DotExp dot
+                        && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("RegEx")) {
+                    for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                    code.addInstruction(new CallBuiltinStatic("org.chuck.core.RegEx", dot.member(), e.args().size()));
+                } else if (e.base() instanceof ChuckAST.DotExp dot
+                        && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("Reflect")) {
+                    for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                    code.addInstruction(new CallBuiltinStatic("org.chuck.core.Reflect", dot.member(), e.args().size()));
+                } else if (e.base() instanceof ChuckAST.DotExp dot
+                        && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("SerialIO")) {
+                    for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                    code.addInstruction(new CallBuiltinStatic("org.chuck.core.SerialIO", dot.member(), e.args().size()));
+                } else if (e.base() instanceof ChuckAST.DotExp dot && dot.member().equals("last")) {
+                    emitExpression(dot.base(), code);
+                    code.addInstruction(new GetLastOut());
+                } else if (e.base() instanceof ChuckAST.DotExp dot
+                        && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("Math")) {
+                    switch (dot.member()) {
+                        case "random", "randf" -> code.addInstruction(new MathRandom());
+                        case "sin"  -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("sin")); } }
+                        case "cos"  -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("cos")); } }
+                        case "pow"  -> { if(e.args().size() >= 2) { emitExpression(e.args().get(0), code); emitExpression(e.args().get(1), code); code.addInstruction(new MathFunc("pow")); } }
+                        case "sqrt" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("sqrt")); } }
+                        case "abs"  -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("abs")); } }
+                        case "floor"-> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("floor")); } }
+                        case "ceil" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("ceil")); } }
+                        case "equal" -> { if(e.args().size() >= 2) { emitExpression(e.args().get(0), code); emitExpression(e.args().get(1), code); code.addInstruction(new MathFunc("equal")); } }
+                        case "euclidean" -> { if(e.args().size() >= 2) { emitExpression(e.args().get(0), code); emitExpression(e.args().get(1), code); code.addInstruction(new MathFunc("euclidean")); } }
+                        case "isinf" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("isinf")); } }
+                        case "isnan" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("isnan")); } }
+                        case "log"   -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("log")); } }
+                        case "log2"  -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("log2")); } }
+                        case "log10" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("log10")); } }
+                        case "exp"   -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("exp")); } }
+                        case "round" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("round")); } }
+                        case "trunc" -> { if(!e.args().isEmpty()) { emitExpression(e.args().get(0), code); code.addInstruction(new MathFunc("trunc")); } }
+                        case "help" -> code.addInstruction(new MathHelp());
+                        default     -> {
+                            if (!e.args().isEmpty()) {
+                                for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                                code.addInstruction(new MathFunc(dot.member()));
+                            } else {
+                                code.addInstruction(new MathHelp());
+                            }
+                        }
+                    }
+                } else if (e.base() instanceof ChuckAST.DotExp dot && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("Machine")) {
+                    String machMember = dot.member();
+                    if (machMember.equals("realtime")) { code.addInstruction(new PushInt(0)); }
+                    else if (machMember.equals("silent")) { code.addInstruction(new PushInt(1)); }
+                    else {
+                        for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                        code.addInstruction(new MachineCall(machMember, e.args().size()));
+                    }
+                } else if (e.base() instanceof ChuckAST.DotExp dot
+                        && (dot.base() instanceof ChuckAST.MeExp || (dot.base() instanceof ChuckAST.IdExp idMe && idMe.name().equals("me")))) {
+                    if (dot.member().equals("yield")) {
+                        code.addInstruction(new Yield());
+                    } else if (dot.member().equals("dir")) {
+                        if (!e.args().isEmpty()) emitExpression(e.args().get(0), code);
+                        else code.addInstruction(new PushInt(0));
+                        code.addInstruction(new MeDir());
+                    } else if (dot.member().equals("args")) {
+                        code.addInstruction(new MeArgs());
+                    } else if (dot.member().equals("arg")) {
+                        if (!e.args().isEmpty()) emitExpression(e.args().get(0), code);
+                        else code.addInstruction(new PushInt(0));
+                        code.addInstruction(new MeArg());
+                    } else if (dot.member().equals("exit")) {
+                        code.addInstruction(new MeExit());
+                    } else {
+                        code.addInstruction(new PushMe());
+                        for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                        code.addInstruction(new CallMethod(dot.member(), e.args().size()));
+                    }
+                } else if (e.base() instanceof ChuckAST.DotExp dot) {
+                    if (dot.base() instanceof ChuckAST.IdExp id) {
+                        if (userClassRegistry.containsKey(id.name())) {
+                            String staticKey = dot.member() + ":" + e.args().size();
+                            ChuckCode target = resolveStaticMethod(id.name(), staticKey);
+                            if (target != null) {
+                                for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                                code.addInstruction(new CallFunc(target, e.args().size()));
+                                return;
+                            }
+                        }
+                        // Handle static method called via a static field access (e.g., Foo.ours.foo())
+                        // First, try to resolve the base as a class type
+                        String baseType = getExprType(dot.base());
+                        if (baseType != null && userClassRegistry.containsKey(baseType)) {
+                            String staticKey = dot.member() + ":" + e.args().size();
+                            ChuckCode target = resolveStaticMethod(baseType, staticKey);
+                            if (target != null) {
+                                for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                                code.addInstruction(new CallFunc(target, e.args().size()));
+                                return;
+                            }
+                        }
+                    }
+                    emitExpression(dot.base(), code);
+                    for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                    code.addInstruction(new CallMethod(dot.member(), e.args().size()));
+                } else if (e.base() instanceof ChuckAST.IdExp id) {
+                    String key = id.name() + ":" + e.args().size();
+
+                    if (currentClass != null && userClassRegistry.containsKey(currentClass)) {
+                        UserClassDescriptor d = userClassRegistry.get(currentClass);
+                        ChuckCode target = resolveStaticMethod(currentClass, key);
+                        if (target != null) {
+                            for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                            code.addInstruction(new CallFunc(target, e.args().size()));
+                            return;
+                        }
+                    }
+                    if (functions.containsKey(key)) {
+                        for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                        code.addInstruction(new CallFunc(functions.get(key), e.args().size()));
+                    }
+                }
+            }
+            case ChuckAST.SporkExp e -> {
+                String funcName = null;
+                if (e.call().base() instanceof ChuckAST.IdExp id) {
+                    funcName = id.name();
+                    String key = funcName + ":" + e.call().args().size();
+
+                    ChuckCode target = resolveStaticMethod(currentClass, key);
                     if (target != null) {
                         for (ChuckAST.Exp arg : e.call().args()) emitExpression(arg, code);
                         code.addInstruction(new Spork(target, e.call().args().size()));
                         return;
                     }
+
+                    if (functions.containsKey(key)) {
+                        for (ChuckAST.Exp arg : e.call().args()) emitExpression(arg, code);
+                        code.addInstruction(new Spork(functions.get(key), e.call().args().size()));
+                        return;
+                    }
+                } else if (e.call().base() instanceof ChuckAST.DotExp dot) {
+                    if (dot.base() instanceof ChuckAST.IdExp id && userClassRegistry.containsKey(id.name())) {
+                        String staticKey = dot.member() + ":" + e.call().args().size();
+                        ChuckCode target = resolveStaticMethod(id.name(), staticKey);
+                        if (target != null) {
+                            for (ChuckAST.Exp arg : e.call().args()) emitExpression(arg, code);
+                            code.addInstruction(new Spork(target, e.call().args().size()));
+                            return;
+                        }
+                    }
+                    emitExpression(dot.base(), code);
+                    for (ChuckAST.Exp arg : e.call().args()) emitExpression(arg, code);
+                    code.addInstruction(new SporkMethod(dot.member(), e.call().args().size()));
+                    return;
                 }
-                emitExpression(dot.base(), code);
-                for (ChuckAST.Exp arg : e.call().args()) emitExpression(arg, code);
-                code.addInstruction(new SporkMethod(dot.member(), e.call().args().size()));
-                return;
+                emitExpression(e.call(), code);
             }
-            emitExpression(e.call(), code);
-        } else if (exp instanceof ChuckAST.TernaryExp e) {
-            emitExpression(e.condition(), code);
-            int jumpFalseIdx = code.getNumInstructions();
-            code.addInstruction(null); // placeholder JumpIfFalse to else branch
-            emitExpression(e.thenExp(), code);
-            int jumpEndIdx = code.getNumInstructions();
-            code.addInstruction(null); // placeholder Jump to end
-            code.replaceInstruction(jumpFalseIdx, new JumpIfFalse(code.getNumInstructions()));
-            emitExpression(e.elseExp(), code);
-            code.replaceInstruction(jumpEndIdx, new Jump(code.getNumInstructions()));
+            case ChuckAST.TernaryExp e -> {
+                emitExpression(e.condition(), code);
+                int jumpFalseIdx = code.getNumInstructions();
+                code.addInstruction(null); // placeholder JumpIfFalse to else branch
+                emitExpression(e.thenExp(), code);
+                int jumpEndIdx = code.getNumInstructions();
+                code.addInstruction(null); // placeholder Jump to end
+                code.replaceInstruction(jumpFalseIdx, new JumpIfFalse(code.getNumInstructions()));
+                emitExpression(e.elseExp(), code);
+                code.replaceInstruction(jumpEndIdx, new Jump(code.getNumInstructions()));
+            }
         }
     }
+
 
     private static final java.util.Set<String> READ_ONLY_GLOBALS = java.util.Set.of(
         "pi", "e", "maybe", "second", "ms", "samp", "minute", "hour",
@@ -1795,119 +1821,126 @@ public class ChuckEmitter {
     );
 
     private void emitChuckTarget(ChuckAST.Exp target, ChuckCode code) {
-        if (target instanceof ChuckAST.IdExp e) {
-            String type = getVarType(target);
-            boolean isUGen = type != null && (isKnownUGenType(type) || isSubclassOfUGen(type));
-            
-            if (e.name().equals("now")) {
-                code.addInstruction(new AdvanceTime());
-                return;
-            }
-            if (e.name().equals("dac")) { code.addInstruction(new ConnectToDac()); return; }
-            if (e.name().equals("blackhole")) { code.addInstruction(new ConnectToBlackhole()); return; }
-            if (e.name().equals("adc")) { code.addInstruction(new ConnectToAdc()); return; }
+        switch (target) {
+            case ChuckAST.IdExp e -> {
+                String type = getVarType(target);
+                boolean isUGen = type != null && (isKnownUGenType(type) || isSubclassOfUGen(type));
+                
+                if (e.name().equals("now")) {
+                    code.addInstruction(new AdvanceTime());
+                    return;
+                }
+                if (e.name().equals("dac")) { code.addInstruction(new ConnectToDac()); return; }
+                if (e.name().equals("blackhole")) { code.addInstruction(new ConnectToBlackhole()); return; }
+                if (e.name().equals("adc")) { code.addInstruction(new ConnectToAdc()); return; }
 
-            if (isUGen) {
-                // If target is a UGen variable, we do a ChuckTo connection
-                emitExpression(target, code);
-                code.addInstruction(new org.chuck.core.ChuckTo());
-            } else {
-                // Otherwise it's a value assignment
-                Integer localOffset = getLocalOffset(e.name());
-                if (localOffset != null) code.addInstruction(new StoreLocal(localOffset));
-                else if (currentClassFields.contains(e.name())) code.addInstruction(new SetUserField(e.name()));
-                else code.addInstruction(new SetGlobalObjectOrInt(e.name()));
-            }
-        } else if (target instanceof ChuckAST.DotExp e) {
-            // Handle static field target: ClassName.staticField
-            if (e.base() instanceof ChuckAST.IdExp id) {
-                String potentialClassName = id.name();
-                if (userClassRegistry.containsKey(potentialClassName)) {
-                    UserClassDescriptor classDesc = userClassRegistry.get(potentialClassName);
-                    if (classDesc != null && (classDesc.staticInts().containsKey(e.member()) || classDesc.staticObjects().containsKey(e.member()))) {
-                        code.addInstruction(new SetStatic(potentialClassName, e.member()));
-                        return;
-                    }
+                if (isUGen) {
+                    // If target is a UGen variable, we do a ChuckTo connection
+                    emitExpression(target, code);
+                    code.addInstruction(new org.chuck.core.ChuckTo());
+                } else {
+                    // Otherwise it's a value assignment
+                    Integer localOffset = getLocalOffset(e.name());
+                    if (localOffset != null) code.addInstruction(new StoreLocal(localOffset));
+                    else if (currentClassFields.contains(e.name())) code.addInstruction(new SetUserField(e.name()));
+                    else code.addInstruction(new SetGlobalObjectOrInt(e.name()));
                 }
             }
-            if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Std") && e.member().equals("mtof")) {
-                code.addInstruction(new StdFunc("mtof", 1));
-            } else if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Std") && e.member().equals("ftom")) {
-                code.addInstruction(new StdFunc("ftom", 1));
-            } else if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Math")) {
-                // Math constants are read-only and cannot be assigned to
-                switch (e.member()) {
-                    case "PI", "TWO_PI", "HALF_PI", "E", "INFINITY", "NEGATIVE_INFINITY",
-                         "NaN", "nan", "infinity", "negative_infinity" ->
-                        throw new RuntimeException(currentFile + ": error: 'Math." + e.member() + "' is a constant, and is not assignable");
-                    default -> {}
-                }
-                // val => Math.func: apply math function to the value on stack
-                switch (e.member()) {
-                    case "isinf", "isnan", "sin", "cos", "sqrt", "abs", "floor", "ceil",
-                         "log", "log2", "log10", "exp", "round", "trunc",
-                         "dbtolin", "dbtopow", "lintodb", "powtodb", "dbtorms", "rmstodb"
-                        -> code.addInstruction(new MathFunc(e.member()));
-                    default -> code.addInstruction(new MathFunc(e.member()));
-                }
-            } else {
-                // Vector field write: val => v.x / v.y / v.re / v.im etc.
-                int vecIdx = vecFieldIndex(e.member());
-                if (vecIdx >= 0 && e.base() instanceof ChuckAST.IdExp baseId) {
-                    String baseType = varTypes.get(baseId.name());
-                    if (baseType == null) baseType = globalVarTypes.get(baseId.name());
-                    if (isVecType(baseType)) {
-                        emitExpression(e.base(), code);
-                        code.addInstruction(new PushInt(vecIdx));
-                        code.addInstruction(new SetArrayInt());
-                        return;
+            case ChuckAST.DotExp e -> {
+                // Handle static field target: ClassName.staticField
+                if (e.base() instanceof ChuckAST.IdExp id) {
+                    String potentialClassName = id.name();
+                    if (userClassRegistry.containsKey(potentialClassName)) {
+                        UserClassDescriptor classDesc = userClassRegistry.get(potentialClassName);
+                        if (classDesc != null && (classDesc.staticInts().containsKey(e.member()) || classDesc.staticObjects().containsKey(e.member()))) {
+                            code.addInstruction(new SetStatic(potentialClassName, e.member()));
+                            return;
+                        }
                     }
                 }
+                if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Std") && e.member().equals("mtof")) {
+                    code.addInstruction(new StdFunc("mtof", 1));
+                } else if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Std") && e.member().equals("ftom")) {
+                    code.addInstruction(new StdFunc("ftom", 1));
+                } else if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Math")) {
+                    // Math constants are read-only and cannot be assigned to
+                    switch (e.member()) {
+                        case "PI", "TWO_PI", "HALF_PI", "E", "INFINITY", "NEGATIVE_INFINITY",
+                             "NaN", "nan", "infinity", "negative_infinity" ->
+                            throw new RuntimeException(currentFile + ": error: 'Math." + e.member() + "' is a constant, and is not assignable");
+                        default -> {}
+                    }
+                    // val => Math.func: apply math function to the value on stack
+                    switch (e.member()) {
+                        case "isinf", "isnan", "sin", "cos", "sqrt", "abs", "floor", "ceil",
+                             "log", "log2", "log10", "exp", "round", "trunc",
+                             "dbtolin", "dbtopow", "lintodb", "powtodb", "dbtorms", "rmstodb"
+                            -> code.addInstruction(new MathFunc(e.member()));
+                        default -> code.addInstruction(new MathFunc(e.member()));
+                    }
+                } else {
+                    // Vector field write: val => v.x / v.y / v.re / v.im etc.
+                    int vecIdx = vecFieldIndex(e.member());
+                    if (vecIdx >= 0 && e.base() instanceof ChuckAST.IdExp baseId) {
+                        String baseType = varTypes.get(baseId.name());
+                        if (baseType == null) baseType = globalVarTypes.get(baseId.name());
+                        if (isVecType(baseType)) {
+                            emitExpression(e.base(), code);
+                            code.addInstruction(new PushInt(vecIdx));
+                            code.addInstruction(new SetArrayInt());
+                            return;
+                        }
+                    }
+                    emitExpression(e.base(), code);
+                    code.addInstruction(new SetMemberIntByName(e.member()));
+                }
+            }
+            case ChuckAST.ArrayAccessExp e -> {
                 emitExpression(e.base(), code);
-                code.addInstruction(new SetMemberIntByName(e.member()));
+                for (int i = 0; i < e.indices().size() - 1; i++) {
+                    emitExpression(e.indices().get(i), code);
+                    code.addInstruction(new GetArrayInt());
+                }
+                emitExpression(e.indices().get(e.indices().size() - 1), code);
+                code.addInstruction(new SetArrayInt());
             }
-        } else if (target instanceof ChuckAST.ArrayAccessExp e) {
-            emitExpression(e.base(), code);
-            for (int i = 0; i < e.indices().size() - 1; i++) {
-                emitExpression(e.indices().get(i), code);
-                code.addInstruction(new GetArrayInt());
+            case ChuckAST.DeclExp e -> {
+                emitExpression(e, code); // Pushes new object 'target'
+                // Stack is now: [..., source, target]
+                
+                String type = e.type();
+                boolean isUGen = isKnownUGenType(type) || isSubclassOfUGen(type);
+                
+                if (isUGen) {
+                    code.addInstruction(new org.chuck.core.ChuckTo());
+                    // ChuckTo pops source & target, pushes target back.
+                    // Stack is now: [..., target]
+                } else {
+                    code.addInstruction(new Pop());
+                    // Stack is now: [..., source]
+                }
+                
+                // Now save the target object to its variable
+                Integer localOffset = getLocalOffset(e.name());
+                if (localOffset != null) {
+                    code.addInstruction(new StoreLocal(localOffset));
+                } else {
+                    code.addInstruction(new SetGlobalObjectOrInt(e.name()));
+                }
+                // These instructions leave 'target' on stack for chaining.
             }
-            emitExpression(e.indices().get(e.indices().size() - 1), code);
-            code.addInstruction(new SetArrayInt());
-        } else if (target instanceof ChuckAST.DeclExp e) {
-            emitExpression(e, code); // Pushes new object 'target'
-            // Stack is now: [..., source, target]
-            
-            String type = e.type();
-            boolean isUGen = isKnownUGenType(type) || isSubclassOfUGen(type);
-            
-            if (isUGen) {
-                code.addInstruction(new org.chuck.core.ChuckTo());
-                // ChuckTo pops source & target, pushes target back.
-                // Stack is now: [..., target]
-            } else {
-                code.addInstruction(new Pop());
-                // Stack is now: [..., source]
+            case ChuckAST.BinaryExp e -> {
+                if (e.op() == ChuckAST.Operator.CHUCK || e.op() == ChuckAST.Operator.AT_CHUCK) {
+                    // In a chain: source => target1 => target2
+                    // When called with target = (target1 => target2)
+                    // We should first process target1, then target2.
+                    emitChuckTarget(e.lhs(), code);
+                    emitChuckTarget(e.rhs(), code);
+                } else {
+                    emitExpression(target, code);
+                }
             }
-            
-            // Now save the target object to its variable
-            Integer localOffset = getLocalOffset(e.name());
-            if (localOffset != null) {
-                code.addInstruction(new StoreLocal(localOffset));
-            } else {
-                code.addInstruction(new SetGlobalObjectOrInt(e.name()));
-            }
-            // These instructions leave 'target' on stack for chaining.
-        } else if (target instanceof ChuckAST.BinaryExp e) {
-            if (e.op() == ChuckAST.Operator.CHUCK || e.op() == ChuckAST.Operator.AT_CHUCK) {
-                // In a chain: source => target1 => target2
-                // When called with target = (target1 => target2)
-                // We should first process target1, then target2.
-                emitChuckTarget(e.lhs(), code);
-                emitChuckTarget(e.rhs(), code);
-            } else {
-                emitExpression(target, code);
-            }
+            default -> emitExpression(target, code);
         }
     }
 
@@ -1964,63 +1997,67 @@ public class ChuckEmitter {
     /** Checks a static initializer's source expression for disallowed references (member/local vars and funcs). */
     private void checkStaticInitSource(ChuckAST.Exp exp) {
         if (exp == null) return;
-        if (exp instanceof ChuckAST.IdExp id) {
-            // Member field access
-            if (currentClassFields.contains(id.name())) {
-                throw new RuntimeException(currentFile + ": error: cannot access non-static variable '"
-                    + currentClass + "." + id.name() + "' to initialize a static variable");
-            }
-            // Local variable from outer scope (not a builtin)
-            if (globalVarTypes.containsKey(id.name()) || varTypes.containsKey(id.name())) {
-                // Check if it's a global var defined outside the class (local to the file)
-                if (!currentClassFields.contains(id.name())) {
-                    throw new RuntimeException(currentFile + ": error: cannot access local variable '"
-                        + id.name() + "' to initialize a static variable");
+        switch (exp) {
+            case ChuckAST.IdExp id -> {
+                // Member field access
+                if (currentClassFields.contains(id.name())) {
+                    throw new RuntimeException(currentFile + ": error: cannot access non-static variable '"
+                        + currentClass + "." + id.name() + "' to initialize a static variable");
                 }
-            }
-        } else if (exp instanceof ChuckAST.CallExp call) {
-            if (call.base() instanceof ChuckAST.IdExp fid) {
-                // Check if it's a member method (non-static) of the current class
-                for (ChuckAST.FuncDefStmt m : currentClassMethodsList) {
-                    if (m.name().equals(fid.name()) && !m.isStatic() && !m.name().equals(currentClass)) {
-                        throw new RuntimeException(currentFile + ": error: cannot call non-static function '"
-                            + currentClass + "." + fid.name() + "()' to initialize a static variable");
+                // Local variable from outer scope (not a builtin)
+                if (globalVarTypes.containsKey(id.name()) || varTypes.containsKey(id.name())) {
+                    // Check if it's a global var defined outside the class (local to the file)
+                    if (!currentClassFields.contains(id.name())) {
+                        throw new RuntimeException(currentFile + ": error: cannot access local variable '"
+                            + id.name() + "' to initialize a static variable");
                     }
                 }
-                // Check if it's a local (file-level) function
-                String key = fid.name() + ":" + call.args().size();
-                if (functions.containsKey(key)) {
-                    // Confirm it's not a static method of the current class
-                    boolean isClassStatic = false;
+            }
+            case ChuckAST.CallExp call -> {
+                if (call.base() instanceof ChuckAST.IdExp fid) {
+                    // Check if it's a member method (non-static) of the current class
                     for (ChuckAST.FuncDefStmt m : currentClassMethodsList) {
-                        if (m.name().equals(fid.name()) && m.isStatic()) { isClassStatic = true; break; }
+                        if (m.name().equals(fid.name()) && !m.isStatic() && !m.name().equals(currentClass)) {
+                            throw new RuntimeException(currentFile + ": error: cannot call non-static function '"
+                                + currentClass + "." + fid.name() + "()' to initialize a static variable");
+                        }
                     }
-                    if (!isClassStatic) {
-                        throw new RuntimeException(currentFile + ": error: cannot call local function '"
-                            + fid.name() + "()' to initialize a static variable");
+                    // Check if it's a local (file-level) function
+                    String key = fid.name() + ":" + call.args().size();
+                    if (functions.containsKey(key)) {
+                        // Confirm it's not a static method of the current class
+                        boolean isClassStatic = false;
+                        for (ChuckAST.FuncDefStmt m : currentClassMethodsList) {
+                            if (m.name().equals(fid.name()) && m.isStatic()) { isClassStatic = true; break; }
+                        }
+                        if (!isClassStatic) {
+                            throw new RuntimeException(currentFile + ": error: cannot call local function '"
+                                + fid.name() + "()' to initialize a static variable");
+                        }
                     }
                 }
+                for (ChuckAST.Exp arg : call.args()) checkStaticInitSource(arg);
             }
-            for (ChuckAST.Exp arg : call.args()) checkStaticInitSource(arg);
-        } else if (exp instanceof ChuckAST.BinaryExp bin) {
-            checkStaticInitSource(bin.lhs());
-            checkStaticInitSource(bin.rhs());
-        } else if (exp instanceof ChuckAST.UnaryExp u) {
-            checkStaticInitSource(u.exp());
+            case ChuckAST.BinaryExp bin -> {
+                checkStaticInitSource(bin.lhs());
+                checkStaticInitSource(bin.rhs());
+            }
+            case ChuckAST.UnaryExp u -> checkStaticInitSource(u.exp());
+            default -> {}
         }
     }
 
     /** Checks that no static variable is assigned inside a nested block within a class body. */
     private void checkNoStaticInBlock(List<ChuckAST.Stmt> stmts) {
         for (ChuckAST.Stmt st : stmts) {
-            if (st instanceof ChuckAST.ExpStmt es && es.exp() instanceof ChuckAST.BinaryExp be
-                    && (be.op() == ChuckAST.Operator.CHUCK || be.op() == ChuckAST.Operator.AT_CHUCK)
-                    && be.rhs() instanceof ChuckAST.DeclExp rhs && rhs.isStatic()) {
-                throw new RuntimeException(currentFile + ":" + be.line() + ":" + be.column()
-                    + ": error: static variables must be declared at class scope");
-            }
-            if (st instanceof ChuckAST.BlockStmt inner) {
-                checkNoStaticInBlock(inner.statements());
+            switch (st) {
+                case ChuckAST.ExpStmt es when es.exp() instanceof ChuckAST.BinaryExp be
+                        && (be.op() == ChuckAST.Operator.CHUCK || be.op() == ChuckAST.Operator.AT_CHUCK)
+                        && be.rhs() instanceof ChuckAST.DeclExp rhs && rhs.isStatic() ->
+                    throw new RuntimeException(currentFile + ":" + be.line() + ":" + be.column()
+                        + ": error: static variables must be declared at class scope");
+                case ChuckAST.BlockStmt inner -> checkNoStaticInBlock(inner.statements());
+                default -> {}
             }
         }
     }
@@ -2480,8 +2517,8 @@ public class ChuckEmitter {
     static class AddAny implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             if (s.reg.isObject(0) || s.reg.isObject(1)) {
-                Object r = s.reg.pop(); Object l = s.reg.pop();
-                if (r instanceof ChuckDuration rd && l instanceof ChuckDuration ld) {
+                Object r = s.reg.pop(), l = s.reg.pop();
+                if (l instanceof ChuckDuration ld && r instanceof ChuckDuration rd) {
                     s.reg.pushObject(new ChuckDuration(ld.samples() + rd.samples()));
                 } else {
                     String ls = (l instanceof Double d) ? String.format("%.6f", d) : String.valueOf(l);
@@ -2500,8 +2537,8 @@ public class ChuckEmitter {
     static class MinusAny implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             if (s.reg.isObject(0) || s.reg.isObject(1)) {
-                Object r = s.reg.pop(); Object l = s.reg.pop();
-                if (r instanceof ChuckDuration rd && l instanceof ChuckDuration ld) {
+                Object r = s.reg.pop(), l = s.reg.pop();
+                if (l instanceof ChuckDuration ld && r instanceof ChuckDuration rd) {
                     s.reg.pushObject(new ChuckDuration(ld.samples() - rd.samples()));
                 } else {
                     s.reg.push(0.0);
@@ -2560,8 +2597,15 @@ public class ChuckEmitter {
             if (s.reg.isObject(0) || s.reg.isObject(1)) {
                 Object r = s.reg.pop(), l = s.reg.pop();
                 if (l == r) s.reg.push(1);
-                else if (l == null || r == null) s.reg.push(0);
-                else s.reg.push(l.toString().equals(r.toString()) ? 1 : 0);
+                else switch (l) {
+                    case null -> s.reg.push(r == null ? 1 : 0);
+                    default -> {
+                        switch (r) {
+                            case null -> s.reg.push(0);
+                            default -> s.reg.push(l.toString().equals(r.toString()) ? 1 : 0);
+                        }
+                    }
+                }
             }
             else { double r = s.reg.popAsDouble(), l = s.reg.popAsDouble(); s.reg.push(l == r ? 1 : 0); }
         }
@@ -2673,74 +2717,82 @@ public class ChuckEmitter {
     static class CreateDuration implements ChuckInstr {
         String unit; CreateDuration(String u) { unit = u; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            double v = s.reg.popAsDouble(); double smp = 0;
-            if (unit.equals("ms")) smp = v * vm.getSampleRate() / 1000.0;
-            else if (unit.equals("second")) smp = v * vm.getSampleRate();
-            else if (unit.equals("minute")) smp = v * vm.getSampleRate() * 60.0;
-            else if (unit.equals("hour")) smp = v * vm.getSampleRate() * 3600.0;
-            else if (unit.equals("day")) smp = v * vm.getSampleRate() * 3600.0 * 24.0;
-            else if (unit.equals("week")) smp = v * vm.getSampleRate() * 3600.0 * 24.0 * 7.0;
-            else if (unit.equals("samp")) smp = v;
+            double v = s.reg.popAsDouble();
+            double smp = switch (unit) {
+                case "ms"     -> v * vm.getSampleRate() / 1000.0;
+                case "second" -> v * vm.getSampleRate();
+                case "minute" -> v * vm.getSampleRate() * 60.0;
+                case "hour"   -> v * vm.getSampleRate() * 3600.0;
+                case "day"    -> v * vm.getSampleRate() * 3600.0 * 24.0;
+                case "week"   -> v * vm.getSampleRate() * 3600.0 * 24.0 * 7.0;
+                case "samp"   -> v;
+                default       -> 0.0;
+            };
             s.reg.pushObject(new ChuckDuration(smp));
         }
     }
     static class StdFunc implements ChuckInstr {
         String fn; int argc; StdFunc(String f, int a) { fn = f; argc = a; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            if (fn.equals("mtof")) { s.reg.push(Std.mtof(s.reg.popAsDouble())); return; }
-            if (fn.equals("ftom")) { s.reg.push(Std.ftom(s.reg.popAsDouble())); return; }
-            if (fn.equals("powtodb")) { s.reg.push(Std.powtodb(s.reg.popAsDouble())); return; }
-            if (fn.equals("rmstodb")) { s.reg.push(Std.rmstodb(s.reg.popAsDouble())); return; }
-            if (fn.equals("dbtopow")) { s.reg.push(Std.dbtopow(s.reg.popAsDouble())); return; }
-            if (fn.equals("dbtorms")) { s.reg.push(Std.dbtorms(s.reg.popAsDouble())); return; }
-            if (fn.equals("dbtolin")) { s.reg.push(Std.dbtolin(s.reg.popAsDouble())); return; }
-            if (fn.equals("lintodb")) { s.reg.push(Std.lintodb(s.reg.popAsDouble())); return; }
-            if (fn.equals("abs")) { s.reg.push(Std.abs(s.reg.popLong())); return; }
-            if (fn.equals("fabs")) { s.reg.push(Std.fabs(s.reg.popAsDouble())); return; }
-            if (fn.equals("sgn")) { s.reg.push(Std.sgn(s.reg.popAsDouble())); return; }
-            if (fn.equals("rand2")) { long hi = s.reg.popLong(); long lo = s.reg.popLong(); s.reg.push(Std.rand2(lo, hi)); return; }
-            if (fn.equals("rand2f")) { double hi = s.reg.popAsDouble(); double lo = s.reg.popAsDouble(); s.reg.push(Std.rand2f(lo, hi)); return; }
-            if (fn.equals("clamp")) { long hi = s.reg.popLong(); long lo = s.reg.popLong(); long v = s.reg.popLong(); s.reg.push(Std.clamp(v, lo, hi)); return; }
-            if (fn.equals("clampf")) { double hi = s.reg.popAsDouble(); double lo = s.reg.popAsDouble(); double v = s.reg.popAsDouble(); s.reg.push(Std.clampf(v, lo, hi)); return; }
-            if (fn.equals("scalef")) { double dHi = s.reg.popAsDouble(); double dLo = s.reg.popAsDouble(); double sHi = s.reg.popAsDouble(); double sLo = s.reg.popAsDouble(); double v = s.reg.popAsDouble(); s.reg.push(Std.scalef(v, sLo, sHi, dLo, dHi)); return; }
-            if (fn.equals("atoi")) { s.reg.push(Std.atoi(s.reg.popObject().toString())); return; }
-            if (fn.equals("atof")) { s.reg.push(Std.atof(s.reg.popObject().toString())); return; }
-            if (fn.equals("itoa")) { s.reg.pushObject(new org.chuck.core.ChuckString(Std.itoa(s.reg.popLong()))); return; }
-            if (fn.equals("ftoi")) { s.reg.push(Std.ftoi(s.reg.popAsDouble())); return; }
-            if (fn.equals("systemTime")) { s.reg.push(Std.systemTime()); return; }
+            switch (fn) {
+                case "mtof" -> s.reg.push(Std.mtof(s.reg.popAsDouble()));
+                case "ftom" -> s.reg.push(Std.ftom(s.reg.popAsDouble()));
+                case "powtodb" -> s.reg.push(Std.powtodb(s.reg.popAsDouble()));
+                case "rmstodb" -> s.reg.push(Std.rmstodb(s.reg.popAsDouble()));
+                case "dbtopow" -> s.reg.push(Std.dbtopow(s.reg.popAsDouble()));
+                case "dbtorms" -> s.reg.push(Std.dbtorms(s.reg.popAsDouble()));
+                case "dbtolin" -> s.reg.push(Std.dbtolin(s.reg.popAsDouble()));
+                case "lintodb" -> s.reg.push(Std.lintodb(s.reg.popAsDouble()));
+                case "abs" -> s.reg.push(Std.abs(s.reg.popLong()));
+                case "fabs" -> s.reg.push(Std.fabs(s.reg.popAsDouble()));
+                case "sgn" -> s.reg.push(Std.sgn(s.reg.popAsDouble()));
+                case "rand2" -> { long hi = s.reg.popLong(); long lo = s.reg.popLong(); s.reg.push(Std.rand2(lo, hi)); }
+                case "rand2f" -> { double hi = s.reg.popAsDouble(); double lo = s.reg.popAsDouble(); s.reg.push(Std.rand2f(lo, hi)); }
+                case "clamp" -> { long hi = s.reg.popLong(); long lo = s.reg.popLong(); long val = s.reg.popLong(); s.reg.push(Std.clamp(val, lo, hi)); }
+                case "clampf" -> { double hi = s.reg.popAsDouble(); double lo = s.reg.popAsDouble(); double val = s.reg.popAsDouble(); s.reg.push(Std.clampf(val, lo, hi)); }
+                case "scalef" -> { double dHi = s.reg.popAsDouble(); double dLo = s.reg.popAsDouble(); double sHi = s.reg.popAsDouble(); double sLo = s.reg.popAsDouble(); double v = s.reg.popAsDouble(); s.reg.push(Std.scalef(v, sLo, sHi, dLo, dHi)); }
+                case "atoi" -> s.reg.push(Std.atoi(s.reg.popObject().toString()));
+                case "atof" -> s.reg.push(Std.atof(s.reg.popObject().toString()));
+                case "itoa" -> s.reg.pushObject(new org.chuck.core.ChuckString(Std.itoa(s.reg.popLong())));
+                case "ftoi" -> s.reg.push(Std.ftoi(s.reg.popAsDouble()));
+                case "systemTime" -> s.reg.push(Std.systemTime());
+                default -> {}
+            }
         }
     }
     static class MathFunc implements ChuckInstr {
         String fn; MathFunc(String f) { fn = f; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            if (fn.equals("equal")) {
-                double b = s.reg.popAsDouble(), a = s.reg.popAsDouble();
-                s.reg.push(Math.abs(a - b) < 1e-6 ? 1 : 0);
-                return;
+            switch (fn) {
+                case "equal" -> {
+                    double b = s.reg.popAsDouble(), a = s.reg.popAsDouble();
+                    s.reg.push(Math.abs(a - b) < 1e-6 ? 1 : 0);
+                    return;
+                }
+                case "euclidean" -> {
+                    Object b = s.reg.pop(), a = s.reg.pop();
+                    if (a instanceof ChuckArray arrA && b instanceof ChuckArray arrB) {
+                        double sum = 0;
+                        int size = Math.min(arrA.size(), arrB.size());
+                        for (int i = 0; i < size; i++) {
+                            double da = arrA.getFloat(i);
+                            double db = arrB.getFloat(i);
+                            sum += (da - db) * (da - db);
+                        }
+                        s.reg.push(Math.sqrt(sum));
+                    } else s.reg.push(0.0);
+                    return;
+                }
+                case "isinf" -> { s.reg.push(Double.isInfinite(s.reg.popAsDouble()) ? 1L : 0L); return; }
+                case "isnan" -> { s.reg.push(Double.isNaN(s.reg.popAsDouble()) ? 1L : 0L); return; }
+                case "pow" -> {
+                    double exp2 = s.reg.popAsDouble(), base2 = s.reg.popAsDouble();
+                    s.reg.push(Math.pow(base2, exp2));
+                    return;
+                }
+                default -> {}
             }
-            if (fn.equals("euclidean")) {
-                Object b = s.reg.pop(), a = s.reg.pop();
-                ChuckArray arrA = (a instanceof ChuckArray) ? (ChuckArray) a : null;
-                ChuckArray arrB = (b instanceof ChuckArray) ? (ChuckArray) b : null;
-                if (arrA != null && arrB != null) {
-                    double sum = 0;
-                    int size = Math.min(arrA.size(), arrB.size());
-                    for (int i = 0; i < size; i++) {
-                        double da = arrA.getFloat(i);
-                        double db = arrB.getFloat(i);
-                        sum += (da - db) * (da - db);
-                    }
-                    s.reg.push(Math.sqrt(sum));
-                } else s.reg.push(0.0);
-                return;
-            }
-            if (fn.equals("isinf")) { double v2 = s.reg.popAsDouble(); s.reg.push(Double.isInfinite(v2) ? 1L : 0L); return; }
-            if (fn.equals("isnan")) { double v2 = s.reg.popAsDouble(); s.reg.push(Double.isNaN(v2) ? 1L : 0L); return; }
-            if (fn.equals("pow")) {
-                double exp2 = s.reg.popAsDouble(), base2 = s.reg.popAsDouble();
-                s.reg.push(Math.pow(base2, exp2));
-                return;
-            }
+
             double v = s.reg.popAsDouble();
             s.reg.push(switch (fn) {
                 case "sin" -> Math.sin(v); case "cos" -> Math.cos(v);
@@ -3027,39 +3079,48 @@ public class ChuckEmitter {
     }
 
     private static Object connectAny(Object src, Object dest, ChuckVM vm) {
-        if (src instanceof ChuckUGen su && dest instanceof ChuckUGen du) {
-            if (su.getNumOutputs() > 1 && du.getNumInputs() == 1) {
-                for (int i = 0; i < su.getNumOutputs(); i++) su.getOutputChannel(i).chuckTo(du);
-            } else if (su.getNumOutputs() > 1 && du.getNumInputs() > 1) {
-                int len = Math.max(su.getNumOutputs(), du.getNumInputs());
-                for (int i = 0; i < len; i++) su.getOutputChannel(i % su.getNumOutputs()).chuckTo(du.getInputChannel(i % du.getNumInputs()));
-            } else su.chuckTo(du);
-        } else if (src instanceof ChuckArray sa && dest instanceof ChuckUGen du) {
-            int len = Math.max(sa.size(), du.getNumInputs());
-            if (sa.size() > 0) {
-                for (int i = 0; i < len; i++) {
-                    Object e = sa.getObject(i % sa.size());
-                    if (e instanceof ChuckUGen su2) su2.chuckTo(du.getInputChannel(i % du.getNumInputs()));
-                }
+        return switch (src) {
+            case ChuckUGen su when dest instanceof ChuckUGen du -> {
+                if (su.getNumOutputs() > 1 && du.getNumInputs() == 1) {
+                    for (int i = 0; i < su.getNumOutputs(); i++) su.getOutputChannel(i).chuckTo(du);
+                } else if (su.getNumOutputs() > 1 && du.getNumInputs() > 1) {
+                    int len = Math.max(su.getNumOutputs(), du.getNumInputs());
+                    for (int i = 0; i < len; i++) su.getOutputChannel(i % su.getNumOutputs()).chuckTo(du.getInputChannel(i % du.getNumInputs()));
+                } else su.chuckTo(du);
+                yield dest;
             }
-        } else if (src instanceof ChuckUGen su && dest instanceof ChuckArray da) {
-            int len = Math.max(su.getNumOutputs(), da.size());
-            if (da.size() > 0) {
-                for (int i = 0; i < len; i++) {
-                    Object e = da.getObject(i % da.size());
-                    if (e instanceof ChuckUGen du2) su.getOutputChannel(i % su.getNumOutputs()).chuckTo(du2);
+            case ChuckArray sa when dest instanceof ChuckUGen du -> {
+                int len = Math.max(sa.size(), du.getNumInputs());
+                if (sa.size() > 0) {
+                    for (int i = 0; i < len; i++) {
+                        Object e = sa.getObject(i % sa.size());
+                        if (e instanceof ChuckUGen su2) su2.chuckTo(du.getInputChannel(i % du.getNumInputs()));
+                    }
                 }
+                yield dest;
             }
-        } else if (src instanceof ChuckArray sa && dest instanceof ChuckArray da) {
-            if (sa.size() > 0 && da.size() > 0) {
-                for (int i = 0; i < Math.min(sa.size(), da.size()); i++) {
-                    if (sa.isObjectAt(i)) da.setObject(i, sa.getObject(i));
-                    else if (sa.isDoubleAt(i)) da.setFloat(i, sa.getFloat(i));
-                    else da.setInt(i, sa.getInt(i));
+            case ChuckUGen su when dest instanceof ChuckArray da -> {
+                int len = Math.max(su.getNumOutputs(), da.size());
+                if (da.size() > 0) {
+                    for (int i = 0; i < len; i++) {
+                        Object e = da.getObject(i % da.size());
+                        if (e instanceof ChuckUGen du2) su.getOutputChannel(i % su.getNumOutputs()).chuckTo(du2);
+                    }
                 }
+                yield dest;
             }
-        }
-        return dest;
+            case ChuckArray sa when dest instanceof ChuckArray da -> {
+                if (sa.size() > 0 && da.size() > 0) {
+                    for (int i = 0; i < Math.min(sa.size(), da.size()); i++) {
+                        if (sa.isObjectAt(i)) da.setObject(i, sa.getObject(i));
+                        else if (sa.isDoubleAt(i)) da.setFloat(i, sa.getFloat(i));
+                        else da.setInt(i, sa.getInt(i));
+                    }
+                }
+                yield dest;
+            }
+            default -> dest;
+        };
     }
     static boolean extendsEvent(String t, Map<String, UserClassDescriptor> rm) {
         for (int depth = 0; depth < 16 && t != null; depth++) {
@@ -3264,11 +3325,6 @@ public class ChuckEmitter {
             UserClassDescriptor d = vm.getUserClass(cName);
             if (d == null) throw new RuntimeException("Static field set: class '" + cName + "' not found");
             
-            if (s.reg.getSp() > 0 && s.reg.peekObject(0) instanceof FileIO fio) {
-                // ... (FileIO logic omitted for brevity)
-                return;
-            }
-
             if (s.reg.isObject(0)) { 
                 Object o = s.reg.peekObject(0); 
                 d.staticObjects().put(fName, o); 

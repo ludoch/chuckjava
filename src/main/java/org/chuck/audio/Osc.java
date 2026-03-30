@@ -97,13 +97,14 @@ public abstract class Osc extends ChuckUGen {
     @Override
     protected void triggerDataHook(int index, long value) {
         super.triggerDataHook(index, value);
-        if (index == 0) { // freq
-            this.freq = getDataAsDouble(0);
-        } else if (index == 2) { // width
-            this.width = getDataAsDouble(2);
-        } else if (index == 3) { // phase
-            this.phase = getDataAsDouble(3) % 1.0;
-            if (this.phase < 0) this.phase += 1.0;
+        switch (index) {
+            case 0 -> this.freq = getDataAsDouble(0);
+            case 2 -> this.width = getDataAsDouble(2);
+            case 3 -> {
+                this.phase = getDataAsDouble(3) % 1.0;
+                if (this.phase < 0) this.phase += 1.0;
+            }
+            default -> {}
         }
     }
 
@@ -117,14 +118,15 @@ public abstract class Osc extends ChuckUGen {
         boolean incPhase = true;
         double effectiveFreq = freq;
         if (getNumSources() > 0) {
-            if (sync == 0) {
-                effectiveFreq = in;
-            } else if (sync == 1) {
-                phase = in % 1.0;
-                if (phase < 0) phase += 1.0;
-                incPhase = false;
-            } else if (sync == 2) {
-                effectiveFreq = freq + in;
+            switch (sync) {
+                case 0 -> effectiveFreq = in;
+                case 1 -> {
+                    phase = in % 1.0;
+                    if (phase < 0) phase += 1.0;
+                    incPhase = false;
+                }
+                case 2 -> effectiveFreq = freq + in;
+                default -> {}
             }
         }
 
@@ -135,10 +137,7 @@ public abstract class Osc extends ChuckUGen {
         phase = phase % 1.0;
         if (phase < 0) phase += 1.0;
 
-        float out = (float) computeOsc(phase);
-        if (systemTime > 0) {
-        }
-        return out;
+        return (float) computeOsc(phase);
     }
 
     protected abstract double computeOsc(double phase);
@@ -155,12 +154,12 @@ public abstract class Osc extends ChuckUGen {
         if (dt <= 0.0) return 0.0;
         if (t < dt) {
             // Just after the discontinuity
-            t /= dt;
-            return t + t - t * t - 1.0;
+            double t1 = t / dt;
+            return t1 + t1 - t1 * t1 - 1.0;
         } else if (t > 1.0 - dt) {
             // Just before the discontinuity
-            t = (t - 1.0) / dt;
-            return t * t + t + t + 1.0;
+            double t1 = (t - 1.0) / dt;
+            return t1 * t1 + t1 + t1 + 1.0;
         }
         return 0.0;
     }

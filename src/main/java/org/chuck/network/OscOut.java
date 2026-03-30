@@ -95,16 +95,21 @@ public class OscOut extends org.chuck.core.ChuckObject {
         buf.putLong(1L); // Timetag: immediate (1)
 
         for (Object element : bundle.getElements()) {
-            if (element instanceof OscMsg msg) {
-                byte[] data = serialize(msg);
-                buf.putInt(data.length);
-                buf.put(data);
-            } else if (element instanceof OscBundle sub) {
-                ByteBuffer subBuf = ByteBuffer.allocate(2048);
-                serializeBundle(sub, subBuf);
-                subBuf.flip();
-                buf.putInt(subBuf.remaining());
-                buf.put(subBuf);
+            switch (element) {
+                case OscMsg msg -> {
+                    byte[] data = serialize(msg);
+                    buf.putInt(data.length);
+                    buf.put(data);
+                }
+                case OscBundle sub -> {
+                    ByteBuffer subBuf = ByteBuffer.allocate(2048);
+                    serializeBundle(sub, subBuf);
+                    subBuf.flip();
+                    buf.putInt(subBuf.remaining());
+                    buf.put(subBuf);
+                }
+                case null -> {}
+                default -> {}
             }
         }
     }
@@ -116,19 +121,27 @@ public class OscOut extends org.chuck.core.ChuckObject {
 
         StringBuilder tags = new StringBuilder(",");
         for (Object arg : msg.getArgs()) {
-            if (arg instanceof Integer) tags.append("i");
-            else if (arg instanceof Long) tags.append("i");
-            else if (arg instanceof Float || arg instanceof Double) tags.append("f");
-            else if (arg instanceof String) tags.append("s");
+            switch (arg) {
+                case Integer _ -> tags.append("i");
+                case Long _ -> tags.append("i");
+                case Float _, Double _ -> tags.append("f");
+                case String _ -> tags.append("s");
+                case null -> {}
+                default -> {}
+            }
         }
         writeOscString(buf, tags.toString());
 
         for (Object arg : msg.getArgs()) {
-            if (arg instanceof Integer i) buf.putInt(i);
-            else if (arg instanceof Long l) buf.putInt(l.intValue());
-            else if (arg instanceof Float f) buf.putFloat(f);
-            else if (arg instanceof Double d) buf.putFloat(d.floatValue());
-            else if (arg instanceof String s) writeOscString(buf, s);
+            switch (arg) {
+                case Integer i -> buf.putInt(i);
+                case Long l -> buf.putInt(l.intValue());
+                case Float f -> buf.putFloat(f);
+                case Double d -> buf.putFloat(d.floatValue());
+                case String s -> writeOscString(buf, s);
+                case null -> {}
+                default -> {}
+            }
         }
 
         byte[] result = new byte[buf.position()];

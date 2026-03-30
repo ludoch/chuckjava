@@ -53,52 +53,59 @@ public class ChuckCLI {
         for (int i = 0; i < args.length; i++) {
             String arg = args[i];
 
-            if (arg.equals("--help") || arg.equals("-h") || arg.equals("--about")) {
-                printUsage();
-                System.exit(0);
-            } else if (arg.equals("--version")) {
-                System.out.println("ChucK-Java version 0.1.0 (JDK 25)");
-                System.exit(0);
-            } else if (arg.equals("--loop") || arg.equals("-l")) {
-                loop = true;
-            } else if (arg.equals("--halt")) {
-                loop = false;
-            } else if (arg.equals("--silent") || arg.equals("-s")) {
-                silent = true;
-            } else if (arg.equals("--dump")) {
-                dump = true;
-            } else if (arg.equals("--syntax")) {
-                syntaxOnly = true;
-            } else if (arg.equals("--gui") || arg.equals("--ide")) {
-                forceGui = true;
-            } else if (arg.startsWith("--srate:")) {
+            if (arg.startsWith("--srate:")) {
                 sampleRate = Integer.parseInt(arg.substring("--srate:".length()));
-            } else if (arg.startsWith("--bufsize:")) {
+                continue;
+            }
+            if (arg.startsWith("--bufsize:")) {
                 bufferSize = Integer.parseInt(arg.substring("--bufsize:".length()));
-            } else if (arg.startsWith("--chan:") || arg.startsWith("--out:") || arg.startsWith("--in:")) {
+                continue;
+            }
+            if (arg.startsWith("--chan:") || arg.startsWith("--out:") || arg.startsWith("--in:")) {
                 numChannels = Integer.parseInt(arg.substring(arg.indexOf(':') + 1));
-            } else if (arg.startsWith("--verbose:")) {
+                continue;
+            }
+            if (arg.startsWith("--verbose:")) {
                 verbose = Integer.parseInt(arg.substring("--verbose:".length()));
-            } else if (arg.startsWith("--timeout:")) {
+                continue;
+            }
+            if (arg.startsWith("--timeout:")) {
                 timeoutSeconds = Integer.parseInt(arg.substring("--timeout:".length()));
-            } else if (arg.equals("+") || arg.equals("--add")) {
-                if (i + 1 < args.length) {
-                    otfCommands.add("+" + args[++i]);
+                continue;
+            }
+
+            switch (arg) {
+                case "--help", "-h", "--about" -> {
+                    printUsage();
+                    System.exit(0);
                 }
-            } else if (arg.equals("-") || arg.equals("--remove")) {
-                if (i + 1 < args.length) {
-                    otfCommands.add("-" + args[++i]);
+                case "--version" -> {
+                    System.out.println("ChucK-Java version 0.1.0 (JDK 25)");
+                    System.exit(0);
                 }
-            } else if (arg.equals("=") || arg.equals("--replace")) {
-                if (i + 1 < args.length) {
-                    otfCommands.add("=" + args[++i]);
+                case "--loop", "-l" -> loop = true;
+                case "--halt" -> loop = false;
+                case "--silent", "-s" -> silent = true;
+                case "--dump" -> dump = true;
+                case "--syntax" -> syntaxOnly = true;
+                case "--gui", "--ide" -> forceGui = true;
+                case "+", "--add" -> {
+                    if (i + 1 < args.length) otfCommands.add("+" + args[++i]);
                 }
-            } else if (arg.equals("^") || arg.equals("--status")) {
-                otfCommands.add("^");
-            } else if (arg.startsWith("-")) {
-                System.err.println("Unknown option: " + arg);
-            } else {
-                filesToAdd.add(arg);
+                case "-", "--remove" -> {
+                    if (i + 1 < args.length) otfCommands.add("-" + args[++i]);
+                }
+                case "=", "--replace" -> {
+                    if (i + 1 < args.length) otfCommands.add("=" + args[++i]);
+                }
+                case "^", "--status" -> otfCommands.add("^");
+                default -> {
+                    if (arg.startsWith("-")) {
+                        System.err.println("Unknown option: " + arg);
+                    } else {
+                        filesToAdd.add(arg);
+                    }
+                }
             }
         }
     }

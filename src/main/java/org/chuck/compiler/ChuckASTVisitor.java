@@ -39,21 +39,20 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     @Override 
     public ChuckAST.Stmt visitExpressionStmt(ExpressionStmtContext ctx) { 
         Object result = visit(ctx.expression());
-        if (result instanceof List<?> list) {
-            List<ChuckAST.Stmt> stmts = new ArrayList<>();
-            for (Object item : list) {
-                if (item instanceof ChuckAST.Exp exp) {
-                    stmts.add(new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()));
+        return switch (result) {
+            case List<?> list -> {
+                List<ChuckAST.Stmt> stmts = new ArrayList<>();
+                for (Object item : list) {
+                    if (item instanceof ChuckAST.Exp exp) {
+                        stmts.add(new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()));
+                    }
                 }
+                yield (stmts.size() == 1) ? stmts.get(0) : new ChuckAST.BlockStmt(stmts, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
             }
-            if (stmts.size() == 1) return stmts.get(0);
-            return new ChuckAST.BlockStmt(stmts, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-        }
-        if (result instanceof ChuckAST.Stmt stmt) return stmt;
-        if (result instanceof ChuckAST.Exp exp) {
-            return new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-        }
-        return null;
+            case ChuckAST.Stmt stmt -> stmt;
+            case ChuckAST.Exp exp -> new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+            default -> null;
+        };
     }
 
     // --- Statement Implementations ---

@@ -621,8 +621,8 @@ public class ChuckIDE extends Application {
 
     private CodeArea getCurrentEditor() {
         Tab tab = tabPane.getSelectionModel().getSelectedItem();
-        if (tab != null && tab.getContent() instanceof CodeArea) {
-            return (CodeArea) tab.getContent();
+        if (tab != null && tab.getContent() instanceof CodeArea area) {
+            return area;
         }
         return null;
     }

@@ -91,10 +91,13 @@ public class ChuckStack {
         int idx = sp - 1;
         if (isObject[idx]) {
             Object o = popObject();
-            if (o instanceof ChuckDuration cd) return (double) cd.samples();
-            if (o instanceof Number) return ((Number) o).doubleValue();
-            if (o instanceof FileIO fio) return fio.good() ? 1.0 : 0.0;
-            return o != null ? 1.0 : 0.0;
+            return switch (o) {
+                case null -> 0.0;
+                case ChuckDuration cd -> (double) cd.samples();
+                case Number n -> n.doubleValue();
+                case FileIO fio -> fio.good() ? 1.0 : 0.0;
+                default -> 1.0;
+            };
         }
         if (isDouble[idx]) {
             return popDouble();
@@ -108,9 +111,12 @@ public class ChuckStack {
         int idx = sp - 1;
         if (isObject[idx]) {
             Object o = popObject();
-            if (o instanceof ChuckDuration cd) return (long) cd.samples();
-            if (o instanceof Number) return ((Number) o).longValue();
-            return o != null ? 1L : 0L;
+            return switch (o) {
+                case null -> 0L;
+                case ChuckDuration cd -> (long) cd.samples();
+                case Number n -> n.longValue();
+                default -> 1L;
+            };
         }
         if (isDouble[idx]) {
             return (long) popDouble();

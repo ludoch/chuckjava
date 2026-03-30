@@ -71,7 +71,7 @@ public class SetMemberIntByName implements ChuckInstr {
 
         // Handle UserObject (user-defined ChucK classes) with named fields
         if (!called && rawObj instanceof UserObject uo) {
-            if (isObjVal) uo.setObjectField(memberName, valObj instanceof ChuckObject ? (ChuckObject) valObj : null);
+            if (isObjVal) uo.setObjectField(memberName, valObj instanceof ChuckObject co ? co : null);
             else if (uo.isFloatField(memberName)) uo.setFloatField(memberName, doubleVal);
             else uo.setPrimitiveField(memberName, (long) doubleVal);
             called = true;

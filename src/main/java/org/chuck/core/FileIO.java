@@ -6,7 +6,7 @@ import java.util.Scanner;
 /**
  * FileIO: File Input/Output utility.
  */
-public class FileIO extends ChuckObject {
+public class FileIO extends ChuckObject implements AutoCloseable {
     public static final int READ = 1;
     public static final int WRITE = 2;
     public static final int APPEND = 4;

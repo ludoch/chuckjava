@@ -23,31 +23,36 @@ public class ChuckPrint implements ChuckInstr {
         
         for (int i = 0; i < numArgs; i++) {
             Object v = values[i];
-            if (v instanceof Double || v instanceof Float) {
-                double dv = ((Number) v).doubleValue();
-                String formatted;
-                if (Double.isInfinite(dv)) formatted = dv > 0 ? "inf" : "-inf";
-                else if (Double.isNaN(dv)) formatted = "nan";
-                else formatted = String.format("%.6f", dv);
-                sb.append(formatted);
-            } else if (v instanceof Long) {
-                // Check if it might be a double hidden in a long (though ChuckStack should handle this)
-                sb.append(v.toString());
-            } else if (v instanceof ChuckUGen ugen) {
-                sb.append(String.format("%.6f", ugen.getLastOut()));
-            } else if (v instanceof ChuckArray arr) {
-                sb.append("@(");
-                for (int j = 0; j < arr.size(); j++) {
-                    if (arr.isObjectAt(j)) sb.append(arr.getObject(j));
-                    else if (arr.isDoubleAt(j)) sb.append(String.format("%.6f", arr.getFloat(j)));
-                    else sb.append(arr.getInt(j));
-                    if (j < arr.size() - 1) sb.append(",");
+            switch (v) {
+                case Double dv -> {
+                    String formatted;
+                    if (Double.isInfinite(dv)) formatted = dv > 0 ? "inf" : "-inf";
+                    else if (Double.isNaN(dv)) formatted = "nan";
+                    else formatted = String.format("%.6f", dv);
+                    sb.append(formatted);
                 }
-                sb.append(")");
-            } else if (v instanceof String || v instanceof ChuckString) {
-                sb.append(v);
-            } else {
-                sb.append(v);
+                case Float fv -> {
+                    double dv = fv.doubleValue();
+                    String formatted;
+                    if (Double.isInfinite(dv)) formatted = dv > 0 ? "inf" : "-inf";
+                    else if (Double.isNaN(dv)) formatted = "nan";
+                    else formatted = String.format("%.6f", dv);
+                    sb.append(formatted);
+                }
+                case Long lv -> sb.append(lv.toString());
+                case ChuckUGen ugen -> sb.append(String.format("%.6f", ugen.getLastOut()));
+                case ChuckArray arr -> {
+                    sb.append("@(");
+                    for (int j = 0; j < arr.size(); j++) {
+                        if (arr.isObjectAt(j)) sb.append(arr.getObject(j));
+                        else if (arr.isDoubleAt(j)) sb.append(String.format("%.6f", arr.getFloat(j)));
+                        else sb.append(arr.getInt(j));
+                        if (j < arr.size() - 1) sb.append(",");
+                    }
+                    sb.append(")");
+                }
+                case null -> sb.append("null");
+                default -> sb.append(v.toString());
             }
             if (i < numArgs - 1) sb.append(" ");
         }
