@@ -26,7 +26,11 @@
       "Bash(ls:*)",
       "Bash(grep -h \"DelayA\\\\|DelayP\\\\|TwoZero\\\\|TwoPole\\\\|PoleZero\\\\|BLT\\\\|Blit\\\\|BlitSaw\\\\|BlitSquare\\\\|CNoise\\\\|SubNoise\\\\|WvOut2\\\\|SndBuf2\\\\|Mesh2D\\\\|Identity2\" /c/Users/ludo/a/chuck/src/core/ugen_*.cpp)",
       "Bash(grep:*)",
-      "Bash(rtk mvn:*)"
+      "Bash(rtk mvn:*)",
+      "Bash(find /c/Users/ludo/a/chuckjava/src/test/java/org/chuck/compiler -name \"*.java\" -exec wc -l {})",
+      "Bash(head -50 /c/Users/ludo/a/chuckjava/examples/basic/*.ck)",
+      "Bash(find C:/Users/ludo/a/chuckjava/target/surefire-reports -name *.txt)",
+      "Bash(find C:/Users/ludo/a/chuckjava/src/test -name *.ck -path *01-Basic*)"
     ]
   }
 }

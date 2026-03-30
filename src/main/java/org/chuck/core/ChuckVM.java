@@ -497,6 +497,18 @@ public class ChuckVM {
         return run(source, "eval");
     }
 
+    // Machine API
+    private static final String VERSION = "1.5.4.0 (java)";
+    private int logLevel = 1;
+
+    public void resetShredId() { ChuckShred.resetIdCounter(); }
+    public void gc() { System.gc(); }
+    public String getVersion() { return VERSION; }
+    public String getPlatform() { return System.getProperty("os.name", "unknown"); }
+    public int getLogLevel() { return logLevel; }
+    public void setLogLevel(int level) { logLevel = level; }
+    public double getTimeOfDay() { return System.currentTimeMillis() / 1000.0; }
+
     public void clear() {
         activeShreds.values().forEach(ChuckShred::abort);
         activeShreds.clear();

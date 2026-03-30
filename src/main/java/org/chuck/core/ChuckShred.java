@@ -92,6 +92,7 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     }
 
     public int getId() { return id; }
+    public static void resetIdCounter() { ID_GENERATOR.set(1); }
     public long getWakeTime() { return wakeTime; }
     public void setWakeTime(long time) { this.wakeTime = time; }
     public boolean isDone() { return isDone; }
