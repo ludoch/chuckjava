@@ -8,11 +8,24 @@ import org.chuck.core.ChuckType;
  */
 public abstract class MultiChannelUGen extends ChuckUGen {
     protected float[] lastOutChannels;
+    protected ChuckUGen[] channelProxies;
 
     public MultiChannelUGen(int numChannels) {
         super(new ChuckType("MultiChannelUGen", ChuckType.OBJECT, 0, 0));
         this.numOutputs = numChannels;
         this.lastOutChannels = new float[numChannels];
+        this.channelProxies = new ChuckUGen[numChannels];
+    }
+
+    /** ChucK-style: ugen.chan(i) returns proxy for channel i */
+    public ChuckUGen chan(int i) {
+        if (i >= 0 && i < channelProxies.length) {
+            if (channelProxies[i] == null) {
+                channelProxies[i] = new ChannelProxy(this, i);
+            }
+            return channelProxies[i];
+        }
+        return null;
     }
 
     @Override

@@ -16,6 +16,9 @@ public abstract class StereoUGen extends MultiChannelUGen {
         return lastOutChannels[1];
     }
 
+    public ChuckUGen left() { return chan(0); }
+    public ChuckUGen right() { return chan(1); }
+
     @Override
     protected void computeMulti(float input, long systemTime) {
         computeStereo(input, systemTime);

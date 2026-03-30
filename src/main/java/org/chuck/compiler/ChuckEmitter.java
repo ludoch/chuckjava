@@ -43,14 +43,15 @@ public class ChuckEmitter {
     // Known built-in UGen type names (used for type validation)
     private static final java.util.Set<String> KNOWN_UGEN_TYPES = java.util.Set.of(
         "SinOsc","SawOsc","TriOsc","SqrOsc","PulseOsc","Phasor","Noise","Impulse","Step","Gain","Blackhole",
-        "Pan2","Pan4","Pan8","Pan16","ADSR","Adsr","Envelope","Echo","Delay","DelayA","DelayL","Chorus","JCRev","NRev","PRCRev","ResonZ",
+        "Pan2","Pan4","Pan8","Pan16","PanN","ADSR","Adsr","Envelope","Echo","Delay","DelayA","DelayL","Chorus","JCRev","NRev","PRCRev","ResonZ",
         "OnePole","OneZero","TwoPole","TwoZero","BPF","HPF","LPF","BRF","BiQuad","PoleZero","PitShift","Modulate",
-        "LiSa","SndBuf","WvIn","WvOut","WaveLoop","FFT","IFFT","RMS","Centroid","UAnaBlob",
+        "LiSa","LiSa2","LiSa4","LiSa6","LiSa8","LiSa10","LiSa16","SndBuf","SndBuf2","WvIn","WvOut","WaveLoop","FFT","IFFT","RMS","Centroid","UAnaBlob",
+        "Chugraph","Chubgraph","ChuGen","GVerb","Identity2",
         "Clarinet","Mandolin","Plucked","Rhodey","Bowed","StifKarp","Moog","Flute","Sitar","Brass","Saxofony",
         "BeeThree","BlitSaw","BlitSquare","Blit","BlowBotl","BlowHole","PercFlut","HevyMetl","FMVoices",
         "TubeBell","Wurley","ModalBar","Shakers","BandedWG","SubNoise","FullRect","HalfRect","ZeroX","WarpTable",
-        "CurveTable","GenX","Gen5","Gen7","Gen10","Mix2","Mix4","Mix8","Mix16","Dyno","Event","Hid","HidMsg","MidiIn","MidiOut","MidiMsg",
-        "OscIn","OscOut","OscMsg","FileIO","IO","Std","Math","Machine","Object","String","Array","UGen",
+        "CurveTable","GenX","Gen5","Gen7","Gen9","Gen10","Gen17","Mix2","Mix4","Mix8","Mix16","MixN","Dyno","Event","Hid","HidMsg","MidiIn","MidiOut","MidiMsg",
+        "OscIn","OscOut","OscMsg","FileIO","IO","Std","Math","Machine","Object","String","Array","UGen","UGen_Multi","UGen_Stereo",
         "UAna","Shred","Thread","ChucK","ZCR","MFCC","SFM","Kurtosis","vec2"
     );
 
@@ -1594,37 +1595,14 @@ public class ChuckEmitter {
             }
             if (e.base() instanceof ChuckAST.DotExp dot
                     && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("Std")) {
-                if (dot.member().equals("mtof")) {
-                    emitExpression(e.args().get(0), code);
-                    code.addInstruction(new StdMtof());
-                } else if (dot.member().equals("ftom")) {
-                    emitExpression(e.args().get(0), code);
-                    code.addInstruction(new StdFtom());
-                } else if (dot.member().equals("rand") || dot.member().equals("randf")) {
-                    code.addInstruction(new MathRandom());
-                } else if (dot.member().equals("rand2f") && e.args().size() >= 2) {
-                    emitExpression(e.args().get(0), code);
-                    emitExpression(e.args().get(1), code);
-                    code.addInstruction(new Std2RandF());
-                } else if (dot.member().equals("rand2") && e.args().size() >= 2) {
-                    emitExpression(e.args().get(0), code);
-                    emitExpression(e.args().get(1), code);
-                    code.addInstruction(new Std2RandI());
-                } else if (dot.member().equals("powtodb") || dot.member().equals("dbtopow")
-                        || dot.member().equals("rmstodb") || dot.member().equals("dbtorms")
-                        || dot.member().equals("dbtolin") || dot.member().equals("lintodb")) {
-                    emitExpression(e.args().get(0), code);
-                    code.addInstruction(new MathFunc(dot.member()));
-                } else if (dot.member().equals("clamp") && e.args().size() == 3) {
-                    emitExpression(e.args().get(0), code);
-                    emitExpression(e.args().get(1), code);
-                    emitExpression(e.args().get(2), code);
-                    code.addInstruction(new StdClamp(false));
-                } else if (dot.member().equals("clampf") && e.args().size() == 3) {
-                    emitExpression(e.args().get(0), code);
-                    emitExpression(e.args().get(1), code);
-                    emitExpression(e.args().get(2), code);
-                    code.addInstruction(new StdClamp(true));
+                String member = dot.member();
+                java.util.Set<String> builtinStd = java.util.Set.of(
+                    "mtof", "ftom", "powtodb", "rmstodb", "dbtopow", "dbtorms", "dbtolin", "lintodb",
+                    "abs", "fabs", "sgn", "rand2", "rand2f", "clamp", "clampf", "scalef", "atoi", "atof", "itoa", "ftoi", "systemTime"
+                );
+                if (builtinStd.contains(member)) {
+                    for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                    code.addInstruction(new StdFunc(member, e.args().size()));
                 } else {
                     // General fallback: try CallBuiltinStatic for Std
                     for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
@@ -1838,9 +1816,9 @@ public class ChuckEmitter {
                 }
             }
             if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Std") && e.member().equals("mtof")) {
-                code.addInstruction(new StdMtof());
+                code.addInstruction(new StdFunc("mtof", 1));
             } else if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Std") && e.member().equals("ftom")) {
-                code.addInstruction(new StdFtom());
+                code.addInstruction(new StdFunc("ftom", 1));
             } else if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Math")) {
                 // Math constants are read-only and cannot be assigned to
                 switch (e.member()) {
@@ -2691,11 +2669,31 @@ public class ChuckEmitter {
             s.reg.pushObject(new ChuckDuration(smp));
         }
     }
-    static class StdMtof implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.push(Std.mtof(s.reg.popAsDouble())); }
-    }
-    static class StdFtom implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.push(Std.ftom(s.reg.popAsDouble())); }
+    static class StdFunc implements ChuckInstr {
+        String fn; int argc; StdFunc(String f, int a) { fn = f; argc = a; }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            if (fn.equals("mtof")) { s.reg.push(Std.mtof(s.reg.popAsDouble())); return; }
+            if (fn.equals("ftom")) { s.reg.push(Std.ftom(s.reg.popAsDouble())); return; }
+            if (fn.equals("powtodb")) { s.reg.push(Std.powtodb(s.reg.popAsDouble())); return; }
+            if (fn.equals("rmstodb")) { s.reg.push(Std.rmstodb(s.reg.popAsDouble())); return; }
+            if (fn.equals("dbtopow")) { s.reg.push(Std.dbtopow(s.reg.popAsDouble())); return; }
+            if (fn.equals("dbtorms")) { s.reg.push(Std.dbtorms(s.reg.popAsDouble())); return; }
+            if (fn.equals("dbtolin")) { s.reg.push(Std.dbtolin(s.reg.popAsDouble())); return; }
+            if (fn.equals("lintodb")) { s.reg.push(Std.lintodb(s.reg.popAsDouble())); return; }
+            if (fn.equals("abs")) { s.reg.push(Std.abs(s.reg.popLong())); return; }
+            if (fn.equals("fabs")) { s.reg.push(Std.fabs(s.reg.popAsDouble())); return; }
+            if (fn.equals("sgn")) { s.reg.push(Std.sgn(s.reg.popAsDouble())); return; }
+            if (fn.equals("rand2")) { long hi = s.reg.popLong(); long lo = s.reg.popLong(); s.reg.push(Std.rand2(lo, hi)); return; }
+            if (fn.equals("rand2f")) { double hi = s.reg.popAsDouble(); double lo = s.reg.popAsDouble(); s.reg.push(Std.rand2f(lo, hi)); return; }
+            if (fn.equals("clamp")) { long hi = s.reg.popLong(); long lo = s.reg.popLong(); long v = s.reg.popLong(); s.reg.push(Std.clamp(v, lo, hi)); return; }
+            if (fn.equals("clampf")) { double hi = s.reg.popAsDouble(); double lo = s.reg.popAsDouble(); double v = s.reg.popAsDouble(); s.reg.push(Std.clampf(v, lo, hi)); return; }
+            if (fn.equals("scalef")) { double dHi = s.reg.popAsDouble(); double dLo = s.reg.popAsDouble(); double sHi = s.reg.popAsDouble(); double sLo = s.reg.popAsDouble(); double v = s.reg.popAsDouble(); s.reg.push(Std.scalef(v, sLo, sHi, dLo, dHi)); return; }
+            if (fn.equals("atoi")) { s.reg.push(Std.atoi(s.reg.popObject().toString())); return; }
+            if (fn.equals("atof")) { s.reg.push(Std.atof(s.reg.popObject().toString())); return; }
+            if (fn.equals("itoa")) { s.reg.pushObject(new org.chuck.core.ChuckString(Std.itoa(s.reg.popLong()))); return; }
+            if (fn.equals("ftoi")) { s.reg.push(Std.ftoi(s.reg.popAsDouble())); return; }
+            if (fn.equals("systemTime")) { s.reg.push(Std.systemTime()); return; }
+        }
     }
     static class MathFunc implements ChuckInstr {
         String fn; MathFunc(String f) { fn = f; }
@@ -2745,30 +2743,6 @@ public class ChuckEmitter {
                 case "tanh" -> Math.tanh(v);
                 default -> v;
             });
-        }
-    }
-    static class StdClamp implements ChuckInstr {
-        boolean isFloat; StdClamp(boolean f) { isFloat = f; }
-        @Override public void execute(ChuckVM vm, ChuckShred s) {
-            if (isFloat) {
-                double hi = s.reg.popAsDouble(), lo = s.reg.popAsDouble(), val = s.reg.popAsDouble();
-                s.reg.push(Math.max(lo, Math.min(hi, val)));
-            } else {
-                long hi = s.reg.popLong(), lo = s.reg.popLong(), val = s.reg.popLong();
-                s.reg.push(Math.max(lo, Math.min(hi, val)));
-            }
-        }
-    }
-    static class Std2RandF implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) {
-            double max = s.reg.popAsDouble(), min = s.reg.popAsDouble();
-            s.reg.push(min + Math.random() * (max - min));
-        }
-    }
-    static class Std2RandI implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) {
-            long max = s.reg.popLong(), min = s.reg.popLong();
-            s.reg.push(min + (long) (Math.random() * (max - min + 1)));
         }
     }
     static class MathRandom implements ChuckInstr {
@@ -2873,8 +2847,8 @@ public class ChuckEmitter {
                 else s.reg.push(uo.getPrimitiveField(n));
             } else if (obj instanceof ChuckUGen ugen) {
                 if (n.equals("last")) s.reg.push((double) ugen.getLastOut());
-                else if (n.equals("left") && obj instanceof Pan2 p) s.reg.pushObject(p.left);
-                else if (n.equals("right") && obj instanceof Pan2 p) s.reg.pushObject(p.right);
+                else if (n.equals("left") && obj instanceof StereoUGen s_ugen) s.reg.pushObject(s_ugen.left());
+                else if (n.equals("right") && obj instanceof StereoUGen s_ugen) s.reg.pushObject(s_ugen.right());
                 else s.reg.push(0L);
             } else {
                 // Reflection fallback for public fields (e.g. MidiMsg.data1)
@@ -3151,10 +3125,12 @@ public class ChuckEmitter {
             case "Pan4" -> new Pan4();
             case "Pan8" -> new Pan8();
             case "Pan16" -> new Pan16();
+            case "PanN" -> argc > 0 && args[0] instanceof Number n ? new PanN(n.intValue()) : new PanN(2);
             case "Mix2" -> new Mix2();
             case "Mix4" -> new Mix4();
             case "Mix8" -> new Mix8();
             case "Mix16" -> new Mix16();
+            case "MixN" -> argc > 0 && args[0] instanceof Number n ? new MixN(n.intValue()) : new MixN(2);
             case "Noise" -> new Noise();
             case "ADSR", "Adsr" -> new Adsr(sr); case "string" -> new ChuckString("");
             case "vec2" -> new ChuckArray(ChuckType.ARRAY, 2);
@@ -3167,6 +3143,15 @@ public class ChuckEmitter {
             case "PitShift" -> new PitShift();
             case "Dyno" -> new Dyno(sr);
             case "LiSa" -> new LiSa(sr);
+            case "LiSa2" -> new LiSa2(sr);
+            case "LiSa4" -> new LiSaN(4, sr);
+            case "LiSa6" -> new LiSaN(6, sr);
+            case "LiSa8" -> new LiSaN(8, sr);
+            case "LiSa10" -> new LiSaN(10, sr);
+            case "LiSa16" -> new LiSaN(16, sr);
+            case "Identity2" -> new Identity2();
+            case "SndBuf2" -> new SndBuf2(sr);
+            case "WvOut2" -> new WvOut2(sr);
             case "GainDB" -> argc > 0 && args[0] instanceof Number n ? new GainDB(n.doubleValue()) : new GainDB();
             // Oscillators
             case "TriOsc" -> new TriOsc(sr);

@@ -26,8 +26,37 @@ public class Std {
         return Math.max(lo, Math.min(hi, val));
     }
 
+    /** Linear power to decibel. */
+    public static double powtodb(double v) {
+        if (v <= 0) return -100.0; // Approximation of -infinity
+        return 10.0 * Math.log10(v);
+    }
+
+    /** RMS to decibel. */
+    public static double rmstodb(double v) {
+        if (v <= 0) return -100.0;
+        return 20.0 * Math.log10(v);
+    }
+
+    /** Decibel to linear power. */
+    public static double dbtopow(double v) {
+        return Math.pow(10.0, v / 10.0);
+    }
+
+    /** Decibel to RMS. */
+    public static double dbtorms(double v) {
+        return Math.pow(10.0, v / 20.0);
+    }
+
+    /** Decibel to linear. */
     public static double dbtolin(double db) {
         return Math.pow(10.0, db / 20.0);
+    }
+
+    /** Linear to decibel. */
+    public static double lintodb(double lin) {
+        if (lin <= 0) return -100.0;
+        return 20.0 * Math.log10(lin);
     }
 
     public static long atoi(String s) {

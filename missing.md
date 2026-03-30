@@ -91,13 +91,13 @@ This document tracks the features from the original [Stanford ChucK](https://chu
 
 ### 6.2 UGens — Missing
 
-**Filters:** `TwoPole`, `TwoZero`, `PoleZero`, ~~`HPF`~~, ~~`BPF`~~, ~~`BRF`~~ ✅, `DelayA` (allpass-interp), `DelayP`
+**Filters:** ~~`TwoPole`, `TwoZero`, `PoleZero`, `HPF`, `BPF`, `BRF`~~ ✅, `DelayA` (allpass-interp), `DelayP`
 
-**Oscillators / Generators:** `Blit`, ~~`BlitSaw`~~, ~~`BlitSquare`~~ ✅ (band-limited PolyBLEP), `CNoise` (colored noise)
+**Oscillators / Generators:** ~~`Blit`, `BlitSaw`, `BlitSquare`~~ ✅ (band-limited PolyBLEP), `CNoise` (colored noise)
 
-**FM Instruments (STK):** ~~`BeeThree`~~, ~~`FMVoices`~~, ~~`HevyMetl`~~, `HnkyTonk`, `FrencHrn`, `KrstlChr`, ~~`PercFlut`~~, ~~`TubeBell`~~, ~~`Wurley`~~ ✅
+**FM Instruments (STK):** ~~`BeeThree`, `FMVoices`, `HevyMetl`, `PercFlut`, `TubeBell`, `Wurley`~~ ✅, `HnkyTonk`, `FrencHrn`, `KrstlChr`, `BlowBotl`, `BlowHole`, `BandedWG`
 
-**Multichannel:** `LiSa2/4/6/8/10/16`, `WvOut2`, `SndBuf2`, `UGen_Multi`, `UGen_Stereo`, `Identity2`
+**Multichannel:** ~~`LiSa2`, `WvOut2`, `SndBuf2`, `PanN`, `MixN`~~ ✅, `LiSa4/6/8/10/16`, `WvOut4/8/16`, `SndBuf4/8/16`, `Identity2`
 
 **Spatial:** `Mesh2D` (2D mesh physical model)
 
@@ -118,12 +118,12 @@ Java has: `FFT`, `IFFT`, `RMS`, `Centroid`, `Flux`, `ZeroX`, `ZCR`, `MFCC`, `SFM
 |:---|:---|
 | `Machine.crash()` | ✅ Implemented |
 | `Machine.removeAll()` | ✅ Implemented |
-| `Machine.resetID()` | ❌ Missing |
-| `Machine.clearVM()` | ❌ Missing |
+| `Machine.resetID()` | ✅ Implemented |
+| `Machine.clearVM()` | ✅ Implemented |
 | `Machine.shreds()` / `numShreds()` | ✅ Implemented |
 | `Machine.shredExists(id)` | ✅ Implemented |
-| `Machine.setloglevel()` / `getloglevel()` | ❌ Missing |
-| `Machine.gc()` | ❌ Missing |
+| `Machine.setloglevel()` / `getloglevel()` | ✅ Implemented |
+| `Machine.gc()` | ✅ Implemented |
 | `Type` / `Function` introspection classes | ❌ Missing |
 
 ### 6.5 AI / ML Library — Completely Absent
