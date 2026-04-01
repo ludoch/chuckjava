@@ -781,10 +781,11 @@ public class ChuckEmitter {
                             } else {
                                 // e.g. `5 => int n;` — field declaration with literal initializer
                                 String initStr = null;
-                                if (bexp.lhs() instanceof ChuckAST.IntExp iv) {
-                                    initStr = String.valueOf(iv.value());
-                                } else if (bexp.lhs() instanceof ChuckAST.FloatExp fv) {
-                                    initStr = String.valueOf(fv.value());
+                                switch (bexp.lhs()) {
+                                    case ChuckAST.IntExp iv -> initStr = String.valueOf(iv.value());
+                                    case ChuckAST.FloatExp fv -> initStr = String.valueOf(fv.value());
+                                    default -> {
+                                    }
                                 }
                                 if (initStr != null) {
                                     fieldDefs.add(new String[]{rDecl.type(), rDecl.name(), initStr});
@@ -2568,10 +2569,10 @@ public class ChuckEmitter {
      * (member/local vars and funcs).
      */
     private void checkStaticInitSource(ChuckAST.Exp exp) {
-        if (exp == null) {
-            return;
-        }
         switch (exp) {
+            case null -> {
+            }
+
             case ChuckAST.IdExp id -> {
                 // Member field access
                 if (currentClassFields.contains(id.name())) {
@@ -2660,15 +2661,15 @@ public class ChuckEmitter {
             Object l = s.reg.pop();
             if (r instanceof ChuckObject) {
                 s.reg.pushObject(r);
-            } else if (r instanceof Double) {
-                s.reg.push((Double) r);
+            } else if (r instanceof Double aDouble) {
+                s.reg.push(aDouble);
             } else {
                 s.reg.push((Long) r);
             }
             if (l instanceof ChuckObject) {
                 s.reg.pushObject(l);
-            } else if (l instanceof Double) {
-                s.reg.push((Double) l);
+            } else if (l instanceof Double aDouble) {
+                s.reg.push(aDouble);
             } else {
                 s.reg.push((Long) l);
             }
@@ -3241,13 +3242,11 @@ public class ChuckEmitter {
             Object l = s.reg.pop();
             switch (l) {
                 case FileIO fio -> {
-                    if (r instanceof Long lv) {
-                        fio.write(lv);
-                    } else if (r instanceof Double dv) {
-                        fio.write(dv);
-                    } else {
-                        fio.write(String.valueOf(r));
-                    }
+                switch (r) {
+                    case Long lv -> fio.write(lv);
+                    case Double dv -> fio.write(dv);
+                    default -> fio.write(String.valueOf(r));
+                }
                     s.reg.pushObject(fio); // return target for chaining
                 }
                 case ChuckIO cio -> {
@@ -3641,22 +3640,18 @@ public class ChuckEmitter {
 
             switch (dest) {
                 case FileIO fio -> {
-                    if (val instanceof Double d) {
-                        fio.write(d);
-                    } else if (val instanceof Long l) {
-                        fio.write(l);
-                    } else {
-                        fio.write(String.valueOf(val));
-                    }
+                switch (val) {
+                    case Double d -> fio.write(d);
+                    case Long l -> fio.write(l);
+                    default -> fio.write(String.valueOf(val));
+                }
                 }
                 case ChuckIO cio -> {
-                    if (val instanceof Double d) {
-                        cio.write(d.doubleValue());
-                    } else if (val instanceof Long l) {
-                        cio.write(l.longValue());
-                    } else {
-                        cio.write(String.valueOf(val));
-                    }
+                switch (val) {
+                    case Double d -> cio.write(d.doubleValue());
+                    case Long l -> cio.write(l.longValue());
+                    default -> cio.write(String.valueOf(val));
+                }
                 }
                 default -> {
                     String out;
@@ -4115,14 +4110,11 @@ public class ChuckEmitter {
                 }
             }
             for (Object arg : args) {
-                if (arg instanceof ChuckObject co) {
-                    ns.reg.pushObject(co);
-                } else if (arg instanceof Double d) {
-                    ns.reg.push(d);
-                } else if (arg instanceof Long l) {
-                    ns.reg.push(l);
-                } else {
-                    ns.reg.pushObject(arg);
+                switch (arg) {
+                    case ChuckObject co -> ns.reg.pushObject(co);
+                    case Double d -> ns.reg.push(d);
+                    case Long l -> ns.reg.push(l);
+                    case null, default -> ns.reg.pushObject(arg);
                 }
             }
             ns.setParentShred(s);
@@ -4177,14 +4169,11 @@ public class ChuckEmitter {
             }
             ChuckShred ns = new ChuckShred(target);
             for (Object arg : args) {
-                if (arg instanceof ChuckObject co) {
-                    ns.reg.pushObject(co);
-                } else if (arg instanceof Double d) {
-                    ns.reg.push(d);
-                } else if (arg instanceof Long l) {
-                    ns.reg.push(l);
-                } else {
-                    ns.reg.pushObject(arg);
+                switch (arg) {
+                    case ChuckObject co -> ns.reg.pushObject(co);
+                    case Double d -> ns.reg.push(d);
+                    case Long l -> ns.reg.push(l);
+                    case null, default -> ns.reg.pushObject(arg);
                 }
             }
             if (!isStatic) {
@@ -4278,12 +4267,10 @@ public class ChuckEmitter {
                 try {
                     java.lang.reflect.Field f = obj.getClass().getField(n);
                     Object val = f.get(obj);
-                    if (val instanceof Number num) {
-                        s.reg.push(num.longValue());
-                    } else if (val instanceof ChuckObject co) {
-                        s.reg.pushObject(co);
-                    } else {
-                        s.reg.push(0L);
+                    switch (val) {
+                        case Number num -> s.reg.push(num.longValue());
+                        case ChuckObject co -> s.reg.pushObject(co);
+                        default -> s.reg.push(0L);
                     }
                 } catch (IllegalAccessException | IllegalArgumentException | NoSuchFieldException ignored) {
                     s.reg.push(0L);
@@ -4863,49 +4850,54 @@ public class ChuckEmitter {
                     boolean valid = true;
                     for (int i = 0; i < argc; i++) {
                         Object val = args[i];
-                        if (val instanceof Long l) {
-                            if (pts[i] == long.class || pts[i] == Long.class) {
-                                coe[i] = l;
-                                score += 3;
-                            } else if (pts[i] == int.class || pts[i] == Integer.class) {
-                                coe[i] = l.intValue();
-                                score += 2;
-                            } else if (pts[i] == double.class || pts[i] == Double.class) {
-                                coe[i] = l.doubleValue();
-                                score += 1;
-                            } else if (pts[i] == float.class || pts[i] == Float.class) {
-                                coe[i] = l.floatValue();
-                                score += 1;
-                            } else {
-                                valid = false;
-                                break;
+                        switch (val) {
+                            case Long l -> {
+                                if (pts[i] == long.class || pts[i] == Long.class) {
+                                    coe[i] = l;
+                                    score += 3;
+                                } else if (pts[i] == int.class || pts[i] == Integer.class) {
+                                    coe[i] = l.intValue();
+                                    score += 2;
+                                } else if (pts[i] == double.class || pts[i] == Double.class) {
+                                    coe[i] = l.doubleValue();
+                                    score += 1;
+                                } else if (pts[i] == float.class || pts[i] == Float.class) {
+                                    coe[i] = l.floatValue();
+                                    score += 1;
+                                } else {
+                                    valid = false;
+                                    break;
+                                }
                             }
-                        } else if (val instanceof Double d) {
-                            if (pts[i] == double.class || pts[i] == Double.class) {
-                                coe[i] = d;
-                                score += 3;
-                            } else if (pts[i] == float.class || pts[i] == Float.class) {
-                                coe[i] = d.floatValue();
-                                score += 2;
-                            } else {
-                                valid = false;
-                                break;
+                            case Double d -> {
+                                if (pts[i] == double.class || pts[i] == Double.class) {
+                                    coe[i] = d;
+                                    score += 3;
+                                } else if (pts[i] == float.class || pts[i] == Float.class) {
+                                    coe[i] = d.floatValue();
+                                    score += 2;
+                                } else {
+                                    valid = false;
+                                    break;
+                                }
                             }
-                        } else if (val instanceof ChuckString cs) {
-                            if (pts[i] == String.class) {
-                                coe[i] = cs.toString();
-                                score += 3;
-                            } else {
-                                valid = false;
-                                break;
+                            case ChuckString cs -> {
+                                if (pts[i] == String.class) {
+                                    coe[i] = cs.toString();
+                                    score += 3;
+                                } else {
+                                    valid = false;
+                                    break;
+                                }
                             }
-                        } else {
-                            if (val != null && pts[i].isInstance(val)) {
-                                coe[i] = val;
-                                score += 2;
-                            } else {
-                                coe[i] = val;
-                                score += 0;
+                            default -> {
+                                if (val != null && pts[i].isInstance(val)) {
+                                    coe[i] = val;
+                                    score += 2;
+                                } else {
+                                    coe[i] = val;
+                                    score += 0;
+                                }
                             }
                         }
                     }
@@ -4939,8 +4931,8 @@ public class ChuckEmitter {
                     if (argc == 0) {
                         java.lang.reflect.Field f = clazz.getField(methodName);
                         Object val = f.get(null);
-                        if (val instanceof Number) {
-                            s.reg.push(((Number) val).longValue());
+                        if (val instanceof Number number) {
+                            s.reg.push(number.longValue());
                         } else {
                             s.reg.pushObject(val);
                         }
@@ -4974,7 +4966,7 @@ public class ChuckEmitter {
                 } else {
                     s.reg.pushObject(val);
                 }
-            } catch (Exception e) {
+            } catch (ClassNotFoundException | IllegalAccessException | IllegalArgumentException | NoSuchFieldException e) {
                 s.reg.push(0L);
             }
         }
@@ -5191,72 +5183,78 @@ public class ChuckEmitter {
                     boolean valid = true;
                     for (int i = 0; i < a; i++) {
                         Object val = args[i];
-                        if (val instanceof Long l) {
-                            if (pts[i] == long.class || pts[i] == Long.class) {
-                                coe[i] = l;
-                                score += 3;
-                            } else if (pts[i] == int.class || pts[i] == Integer.class) {
-                                coe[i] = l.intValue();
-                                score += 2;
-                            } else if (pts[i] == double.class || pts[i] == Double.class) {
-                                coe[i] = l.doubleValue();
-                                score += 1;
-                            } else if (pts[i] == float.class || pts[i] == Float.class) {
-                                coe[i] = l.floatValue();
-                                score += 1;
-                            } else if (pts[i] == String.class) {
-                                coe[i] = String.valueOf(l);
-                                score += 0;
-                            } else {
-                                valid = false;
-                                break;
+                        switch (val) {
+                            case Long l -> {
+                                if (pts[i] == long.class || pts[i] == Long.class) {
+                                    coe[i] = l;
+                                    score += 3;
+                                } else if (pts[i] == int.class || pts[i] == Integer.class) {
+                                    coe[i] = l.intValue();
+                                    score += 2;
+                                } else if (pts[i] == double.class || pts[i] == Double.class) {
+                                    coe[i] = l.doubleValue();
+                                    score += 1;
+                                } else if (pts[i] == float.class || pts[i] == Float.class) {
+                                    coe[i] = l.floatValue();
+                                    score += 1;
+                                } else if (pts[i] == String.class) {
+                                    coe[i] = String.valueOf(l);
+                                    score += 0;
+                                } else {
+                                    valid = false;
+                                    break;
+                                }
                             }
-                        } else if (val instanceof Double d) {
-                            if (pts[i] == double.class || pts[i] == Double.class) {
-                                coe[i] = d;
-                                score += 3;
-                            } else if (pts[i] == float.class || pts[i] == Float.class) {
-                                coe[i] = d.floatValue();
-                                score += 2;
-                            } else if (pts[i] == String.class) {
-                                coe[i] = String.valueOf(d);
-                                score += 0;
-                            } else {
-                                valid = false;
-                                break;
+                            case Double d -> {
+                                if (pts[i] == double.class || pts[i] == Double.class) {
+                                    coe[i] = d;
+                                    score += 3;
+                                } else if (pts[i] == float.class || pts[i] == Float.class) {
+                                    coe[i] = d.floatValue();
+                                    score += 2;
+                                } else if (pts[i] == String.class) {
+                                    coe[i] = String.valueOf(d);
+                                    score += 0;
+                                } else {
+                                    valid = false;
+                                    break;
+                                }
                             }
-                        } else if (val instanceof ChuckString cs) {
-                            if (pts[i] == String.class) {
-                                coe[i] = cs.toString();
-                                score += 3;
-                            } else if (pts[i].isAssignableFrom(ChuckString.class)) {
-                                coe[i] = cs;
-                                score += 2;
-                            } else {
-                                valid = false;
-                                break;
+                            case ChuckString cs -> {
+                                if (pts[i] == String.class) {
+                                    coe[i] = cs.toString();
+                                    score += 3;
+                                } else if (pts[i].isAssignableFrom(ChuckString.class)) {
+                                    coe[i] = cs;
+                                    score += 2;
+                                } else {
+                                    valid = false;
+                                    break;
+                                }
                             }
-                        } else if (val instanceof ChuckDuration cd) {
-                            if (pts[i] == double.class || pts[i] == Double.class) {
-                                coe[i] = (double) cd.samples();
-                                score += 2;
-                            } else if (pts[i] == float.class || pts[i] == Float.class) {
-                                coe[i] = (float) cd.samples();
-                                score += 2;
-                            } else if (pts[i] == long.class || pts[i] == Long.class) {
-                                coe[i] = (long) cd.samples();
-                                score += 3;
-                            } else {
-                                valid = false;
-                                break;
+                            case ChuckDuration cd -> {
+                                if (pts[i] == double.class || pts[i] == Double.class) {
+                                    coe[i] = (double) cd.samples();
+                                    score += 2;
+                                } else if (pts[i] == float.class || pts[i] == Float.class) {
+                                    coe[i] = (float) cd.samples();
+                                    score += 2;
+                                } else if (pts[i] == long.class || pts[i] == Long.class) {
+                                    coe[i] = (long) cd.samples();
+                                    score += 3;
+                                } else {
+                                    valid = false;
+                                    break;
+                                }
                             }
-                        } else {
-                            if (val != null && pts[i].isInstance(val)) {
-                                coe[i] = val;
-                                score += 2;
-                            } else {
-                                coe[i] = val;
-                                score += 0;
+                            default -> {
+                                if (val != null && pts[i].isInstance(val)) {
+                                    coe[i] = val;
+                                    score += 2;
+                                } else {
+                                    coe[i] = val;
+                                    score += 0;
+                                }
                             }
                         }
                     }
@@ -5291,7 +5289,7 @@ public class ChuckEmitter {
                     }
                     return;
                 }
-            } catch (Exception e) {
+            } catch (IllegalAccessException | InvocationTargetException e) {
                 e.printStackTrace();
             }
             // Method not found: throw for user-defined types and UGens
