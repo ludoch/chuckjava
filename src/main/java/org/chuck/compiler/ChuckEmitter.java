@@ -175,6 +175,10 @@ public class ChuckEmitter {
                 "float";
             case ChuckAST.StringExp _ ->
                 "string";
+            case ChuckAST.ComplexLit _ ->
+                "complex";
+            case ChuckAST.PolarLit _ ->
+                "polar";
             case ChuckAST.DeclExp e ->
                 e.type();
             case ChuckAST.BinaryExp bin -> {
@@ -505,7 +509,7 @@ public class ChuckEmitter {
                 }
             }
             case ChuckAST.ForStmt s -> {
-                emitStatement(s.init(), code);
+                if (s.init() != null) emitStatement(s.init(), code);
                 int startPc = code.getNumInstructions();
                 breakJumps.push(new ArrayList<>());
                 continueJumps.push(new ArrayList<>());
@@ -521,8 +525,10 @@ public class ChuckEmitter {
                 emitStatement(s.body(), code);
 
                 int updateStart = code.getNumInstructions();
-                emitExpression(s.update(), code);
-                code.addInstruction(new Pop()); // pop update result
+                if (s.update() != null) {
+                    emitExpression(s.update(), code);
+                    code.addInstruction(new Pop()); // pop update result
+                }
                 code.addInstruction(new Jump(startPc));
 
                 int endPc = code.getNumInstructions();
@@ -549,7 +555,7 @@ public class ChuckEmitter {
                             + ": error: 'auto' requires initialization (cannot declare 'auto' without a value)");
                 }
                 // Check for static variable declared outside class scope
-                if (s.isStatic() && (currentClass == null || !localScopes.isEmpty())) {
+                if (s.isStatic() && (currentClass == null || localScopes.size() > 1)) {
                     throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
                             + ": error: static variables must be declared at class scope");
                 }
@@ -608,7 +614,7 @@ public class ChuckEmitter {
                     }
 
                     boolean isArrayDecl = !s.arraySizes().isEmpty();
-                    boolean useGlobal = forceGlobal || localScopes.isEmpty() || (localScopes.size() == 1 && isArrayDecl);
+                    boolean useGlobal = forceGlobal || localScopes.isEmpty() || localScopes.size() == 1;
                     if (useGlobal) {
                         globalVarTypes.put(s.name(), s.type());
                         code.addInstruction(new InstantiateSetAndPushGlobal(s.type(), s.name(), argCount, s.isReference(), isArrayDecl, userClassRegistry));
@@ -1152,7 +1158,7 @@ public class ChuckEmitter {
                     }
                 }
                 // Check for static variable declared outside class scope
-                if (e.isStatic() && (currentClass == null || !localScopes.isEmpty())) {
+                if (e.isStatic() && (currentClass == null || localScopes.size() > 1)) {
                     throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
                             + ": error: static variables must be declared at class scope");
                 }
@@ -1207,7 +1213,7 @@ public class ChuckEmitter {
                     }
 
                     boolean isArrayDecl = !e.arraySizes().isEmpty();
-                    boolean useGlobal = forceGlobal || localScopes.isEmpty() || (localScopes.size() == 1 && isArrayDecl);
+                    boolean useGlobal = forceGlobal || localScopes.isEmpty() || localScopes.size() == 1;
 
                     Integer localOffset = (forceGlobal || useGlobal) ? null : getLocalOffset(e.name());
                     if (localOffset != null) {
@@ -1262,7 +1268,7 @@ public class ChuckEmitter {
                     }
                     // Check static decl with static-scope violations
                     if (e.rhs() instanceof ChuckAST.DeclExp rDecl3 && rDecl3.isStatic()) {
-                        if (currentClass == null || !localScopes.isEmpty()) {
+                        if (currentClass == null || localScopes.size() > 1) {
                             throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
                                     + ": error: static variables must be declared at class scope");
                         }
@@ -1605,6 +1611,20 @@ public class ChuckEmitter {
                             }
                         }
                     }
+                    // Check for scalar * vec (scalar on left, vec on right)
+                    {
+                        String lhsTypeS = getExprType(e.lhs());
+                        String rhsTypeS = getExprType(e.rhs());
+                        if (e.op() == ChuckAST.Operator.TIMES
+                                && ("float".equals(lhsTypeS) || "int".equals(lhsTypeS))
+                                && ("vec2".equals(rhsTypeS) || "vec3".equals(rhsTypeS) || "vec4".equals(rhsTypeS))) {
+                            // Emit: vec first (stack expects vec then scalar for VecScale)
+                            emitExpression(e.rhs(), code);
+                            emitExpression(e.lhs(), code);
+                            code.addInstruction(new VecScale());
+                            return;
+                        }
+                    }
                     // Check for vec2/vec3/vec4 element-wise arithmetic
                     {
                         String lhsType = getExprType(e.lhs());
@@ -1631,7 +1651,15 @@ public class ChuckEmitter {
                                         code.addInstruction(new VecScale());
                                         return;
                                     }
-                                    // vec * vec → dot product
+                                    // vec3/vec4 * vec3/vec4 → cross product
+                                    if (("vec3".equals(lhsType) || "vec4".equals(lhsType))
+                                            && ("vec3".equals(rhsType) || "vec4".equals(rhsType))) {
+                                        emitExpression(e.lhs(), code);
+                                        emitExpression(e.rhs(), code);
+                                        code.addInstruction(new VecCross());
+                                        return;
+                                    }
+                                    // vec * vec → dot product (returns scalar)
                                     emitExpression(e.lhs(), code);
                                     emitExpression(e.rhs(), code);
                                     code.addInstruction(new VecDot());
@@ -1783,6 +1811,10 @@ public class ChuckEmitter {
                         || e.name().equals("minute") || e.name().equals("hour")) {
                     code.addInstruction(new PushInt(1));
                     code.addInstruction(new CreateDuration(e.name()));
+                } else if (e.name().equals("pi")) {
+                    code.addInstruction(new PushFloat(Math.PI));
+                } else if (e.name().equals("e")) {
+                    code.addInstruction(new PushFloat(Math.E));
                 } else if (currentClassFields.contains(e.name())) {
                     code.addInstruction(new GetUserField(e.name()));
                 } else if (currentClass != null && userClassRegistry.get(currentClass) != null
@@ -1941,17 +1973,23 @@ public class ChuckEmitter {
                     emitExpression(el, code);
                     code.addInstruction(new EnsureFloat());
                 }
-                code.addInstruction(new NewArrayFromStack(e.elements().size()));
+                String vTag = switch (e.elements().size()) {
+                    case 2 -> "vec2";
+                    case 3 -> "vec3";
+                    case 4 -> "vec4";
+                    default -> null;
+                };
+                code.addInstruction(new NewArrayFromStack(e.elements().size(), vTag));
             }
             case ChuckAST.ComplexLit e -> {
                 emitExpression(e.re(), code);
                 emitExpression(e.im(), code);
-                code.addInstruction(new NewArrayFromStack(2));
+                code.addInstruction(new NewArrayFromStack(2, "complex"));
             }
             case ChuckAST.PolarLit e -> {
                 emitExpression(e.mag(), code);
                 emitExpression(e.phase(), code);
-                code.addInstruction(new NewArrayFromStack(2));
+                code.addInstruction(new NewArrayFromStack(2, "polar"));
             }
             case ChuckAST.ArrayAccessExp e -> {
                 emitExpression(e.base(), code);
@@ -2753,7 +2791,14 @@ public class ChuckEmitter {
             if (s.reg.getSp() == 0) {
                 return;
             }
-            if (s.reg.isDouble(0)) {
+            if (s.reg.isObject(0)) {
+                Object obj = s.reg.popObject();
+                if (obj instanceof ChuckArray arr) {
+                    s.reg.pushObject(arr.negate());
+                } else {
+                    s.reg.pushObject(obj); // no-op for unknown objects
+                }
+            } else if (s.reg.isDouble(0)) {
                 s.reg.push(-s.reg.popAsDouble());
             } else {
                 s.reg.push(-s.reg.popLong());
@@ -3819,14 +3864,21 @@ public class ChuckEmitter {
     static class NewArrayFromStack implements ChuckInstr {
 
         int size;
+        String vecTag;
 
         NewArrayFromStack(int sz) {
             size = sz;
         }
 
+        NewArrayFromStack(int sz, String tag) {
+            size = sz;
+            vecTag = tag;
+        }
+
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
             ChuckArray arr = new ChuckArray(ChuckType.ARRAY, size);
+            arr.vecTag = vecTag;
             for (int i = size - 1; i >= 0; i--) {
                 if (s.reg.isObject(0)) {
                     Object obj = s.reg.popObject();
@@ -4708,14 +4760,21 @@ public class ChuckEmitter {
         return switch (t) {
             case "string" ->
                 new ChuckString("");
-            case "vec2" ->
-                new ChuckArray(ChuckType.ARRAY, 2);
-            case "vec3" ->
-                new ChuckArray(ChuckType.ARRAY, 3);
-            case "vec4" ->
-                new ChuckArray(ChuckType.ARRAY, 4);
-            case "complex", "polar" ->
-                new ChuckArray(ChuckType.ARRAY, 2);
+            case "vec2" -> {
+                ChuckArray v = new ChuckArray(ChuckType.ARRAY, 2); v.vecTag = "vec2"; yield v;
+            }
+            case "vec3" -> {
+                ChuckArray v = new ChuckArray(ChuckType.ARRAY, 3); v.vecTag = "vec3"; yield v;
+            }
+            case "vec4" -> {
+                ChuckArray v = new ChuckArray(ChuckType.ARRAY, 4); v.vecTag = "vec4"; yield v;
+            }
+            case "complex" -> {
+                ChuckArray v = new ChuckArray(ChuckType.ARRAY, 2); v.vecTag = "complex"; yield v;
+            }
+            case "polar" -> {
+                ChuckArray v = new ChuckArray(ChuckType.ARRAY, 2); v.vecTag = "polar"; yield v;
+            }
             case "MidiOut" ->
                 new org.chuck.midi.MidiOut();
             case "SerialIO" ->
@@ -4891,7 +4950,7 @@ public class ChuckEmitter {
                                 }
                             }
                             default -> {
-                                if (val != null && pts[i].isInstance(val)) {
+                                if (pts[i].isInstance(val)) {
                                     coe[i] = val;
                                     score += 2;
                                 } else {
@@ -5248,7 +5307,7 @@ public class ChuckEmitter {
                                 }
                             }
                             default -> {
-                                if (val != null && pts[i].isInstance(val)) {
+                                if (pts[i].isInstance(val)) {
                                     coe[i] = val;
                                     score += 2;
                                 } else {
@@ -5658,6 +5717,7 @@ public class ChuckEmitter {
             ChuckArray lhs = (ChuckArray) s.reg.popObject();
             int len = Math.min(lhs.size(), rhs.size());
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, len);
+            result.vecTag = lhs.vecTag;
             for (int i = 0; i < len; i++) {
                 result.setFloat(i, lhs.getFloat(i) + rhs.getFloat(i));
             }
@@ -5676,6 +5736,7 @@ public class ChuckEmitter {
             ChuckArray lhs = (ChuckArray) s.reg.popObject();
             int len = Math.min(lhs.size(), rhs.size());
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, len);
+            result.vecTag = lhs.vecTag;
             for (int i = 0; i < len; i++) {
                 result.setFloat(i, lhs.getFloat(i) - rhs.getFloat(i));
             }
@@ -5693,6 +5754,7 @@ public class ChuckEmitter {
             double scalar = s.reg.popAsDouble();
             ChuckArray vec = (ChuckArray) s.reg.popObject();
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, vec.size());
+            result.vecTag = vec.vecTag;
             for (int i = 0; i < vec.size(); i++) {
                 result.setFloat(i, vec.getFloat(i) * scalar);
             }
@@ -5831,6 +5893,17 @@ public class ChuckEmitter {
                 dot += lhs.getFloat(i) * rhs.getFloat(i);
             }
             s.reg.push(dot);
+        }
+    }
+
+    public static class VecCross implements ChuckInstr {
+
+        @Override
+        public void execute(ChuckVM vm, ChuckShred s) {
+            ChuckArray rhs = (ChuckArray) s.reg.popObject();
+            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            ChuckArray result = lhs.cross(rhs);
+            s.reg.pushObject(result);
         }
     }
 }

@@ -1,6 +1,7 @@
 package org.chuck.core;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,6 +23,9 @@ public class ChuckArray extends ChuckObject {
     private final Map<String, Double> assocFloat = new HashMap<>();
     @SuppressWarnings("unused")
     private final Map<String, Object> assocObject = new HashMap<>();
+
+    /** Non-null for vec2/vec3/vec4/complex/polar; null for regular arrays. */
+    public String vecTag = null;
 
     public ChuckArray(ChuckType type, int size) {
         super(type);
@@ -201,5 +205,82 @@ public class ChuckArray extends ChuckObject {
         if (index < 0 || index >= types.size()) return 0.0;
         if (types.get(index) == 1) return floatData.get(index);
         return (double) intData.get(index);
+    }
+
+    // --- vec2/vec3/vec4 methods ---
+
+    /** Set all components. Supports 2, 3, or 4 args depending on vec type. */
+    public void set(double x, double y) {
+        if (size() >= 1) setFloat(0, x);
+        if (size() >= 2) setFloat(1, y);
+    }
+    public void set(double x, double y, double z) {
+        if (size() >= 1) setFloat(0, x);
+        if (size() >= 2) setFloat(1, y);
+        if (size() >= 3) setFloat(2, z);
+    }
+    public void set(double x, double y, double z, double w) {
+        if (size() >= 1) setFloat(0, x);
+        if (size() >= 2) setFloat(1, y);
+        if (size() >= 3) setFloat(2, z);
+        if (size() >= 4) setFloat(3, w);
+    }
+
+    /** Magnitude (length) of the vector. */
+    public double magnitude() {
+        double sum = 0;
+        for (int i = 0; i < size(); i++) {
+            double v = getFloat(i);
+            sum += v * v;
+        }
+        return Math.sqrt(sum);
+    }
+
+    /** Normalize in place (makes the vector unit length). */
+    public ChuckArray normalize() {
+        double mag = magnitude();
+        if (mag > 0) {
+            for (int i = 0; i < size(); i++) {
+                setFloat(i, getFloat(i) / mag);
+            }
+        }
+        return this;
+    }
+
+    /** Cross product (vec3/vec4). For vec4, uses first 3 components and sets w=0. */
+    public ChuckArray cross(ChuckArray other) {
+        boolean isVec4 = "vec4".equals(vecTag) || "vec4".equals(other.vecTag);
+        int resultSize = isVec4 ? 4 : 3;
+        ChuckArray result = new ChuckArray(ChuckType.ARRAY, resultSize);
+        result.vecTag = isVec4 ? "vec4" : "vec3";
+        if (size() >= 3 && other.size() >= 3) {
+            double ax = getFloat(0), ay = getFloat(1), az = getFloat(2);
+            double bx = other.getFloat(0), by = other.getFloat(1), bz = other.getFloat(2);
+            result.setFloat(0, ay * bz - az * by);
+            result.setFloat(1, az * bx - ax * bz);
+            result.setFloat(2, ax * by - ay * bx);
+            if (isVec4) result.setFloat(3, 0.0);
+        }
+        return result;
+    }
+
+    /** Dot product. Returns a scalar (double). */
+    public double dot(ChuckArray other) {
+        double sum = 0;
+        int len = Math.min(size(), other.size());
+        for (int i = 0; i < len; i++) {
+            sum += getFloat(i) * other.getFloat(i);
+        }
+        return sum;
+    }
+
+    /** Negate all components, returns new array. */
+    public ChuckArray negate() {
+        ChuckArray result = new ChuckArray(ChuckType.ARRAY, size());
+        result.vecTag = vecTag;
+        for (int i = 0; i < size(); i++) {
+            result.setFloat(i, -getFloat(i));
+        }
+        return result;
     }
 }

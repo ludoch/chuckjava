@@ -42,14 +42,42 @@ public class ChuckPrint implements ChuckInstr {
                 case Long lv -> sb.append(lv.toString());
                 case ChuckUGen ugen -> sb.append(String.format("%.6f", ugen.getLastOut()));
                 case ChuckArray arr -> {
-                    sb.append("@(");
-                    for (int j = 0; j < arr.size(); j++) {
-                        if (arr.isObjectAt(j)) sb.append(arr.getObject(j));
-                        else if (arr.isDoubleAt(j)) sb.append(String.format("%.6f", arr.getFloat(j)));
-                        else sb.append(arr.getInt(j));
-                        if (j < arr.size() - 1) sb.append(",");
+                    String tag = arr.vecTag;
+                    if ("vec2".equals(tag) || "vec3".equals(tag) || "vec4".equals(tag)) {
+                        sb.append("@(");
+                        for (int j = 0; j < arr.size(); j++) {
+                            if (arr.isDoubleAt(j)) sb.append(String.format("%.4f", arr.getFloat(j)));
+                            else sb.append(arr.getInt(j));
+                            if (j < arr.size() - 1) sb.append(",");
+                        }
+                        sb.append(")");
+                    } else if ("complex".equals(tag)) {
+                        sb.append("#(");
+                        for (int j = 0; j < arr.size(); j++) {
+                            if (arr.isDoubleAt(j)) sb.append(String.format("%.4f", arr.getFloat(j)));
+                            else sb.append(arr.getInt(j));
+                            if (j < arr.size() - 1) sb.append(",");
+                        }
+                        sb.append(")");
+                    } else if ("polar".equals(tag)) {
+                        sb.append("%(");
+                        for (int j = 0; j < arr.size(); j++) {
+                            if (arr.isDoubleAt(j)) sb.append(String.format("%.4f", arr.getFloat(j)));
+                            else sb.append(arr.getInt(j));
+                            if (j < arr.size() - 1) sb.append(",");
+                        }
+                        sb.append(")");
+                    } else {
+                        // Regular array
+                        sb.append("@(");
+                        for (int j = 0; j < arr.size(); j++) {
+                            if (arr.isObjectAt(j)) sb.append(arr.getObject(j));
+                            else if (arr.isDoubleAt(j)) sb.append(String.format("%.6f", arr.getFloat(j)));
+                            else sb.append(arr.getInt(j));
+                            if (j < arr.size() - 1) sb.append(",");
+                        }
+                        sb.append(")");
                     }
-                    sb.append(")");
                 }
                 case null -> sb.append("null");
                 default -> sb.append(v.toString());

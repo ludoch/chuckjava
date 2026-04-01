@@ -239,8 +239,13 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
     @Override
     public ChuckAST.Exp visitPostfixOp(PostfixOpContext ctx) {
-        ChuckAST.Operator op = ctx.getChild(1).getText().equals("++") ? ChuckAST.Operator.PLUS : ChuckAST.Operator.MINUS;
-        return new ChuckAST.UnaryExp(op, (ChuckAST.Exp) visit(ctx.expression()), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        ChuckAST.Operator op = ctx.getChild(1).getText().equals("++") ?
+            ChuckAST.Operator.POSTFIX_PLUS_PLUS : ChuckAST.Operator.POSTFIX_MINUS_MINUS;
+        ChuckAST.Exp exp = (ChuckAST.Exp) visit(ctx.expression());
+        int line = ctx.getStart().getLine();
+        int col = ctx.getStart().getCharPositionInLine();
+        // Emitter expects BinaryExp(lhs=IntExp(1), POSTFIX_PLUS_PLUS, rhs=variable)
+        return new ChuckAST.BinaryExp(new ChuckAST.IntExp(1, line, col), op, exp, line, col);
     }
 
     @Override

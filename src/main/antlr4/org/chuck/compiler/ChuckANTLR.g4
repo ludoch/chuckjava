@@ -145,7 +145,7 @@ primary
     | primary LBRACK expressionList RBRACK                 # arrayAccessExp
     | primary LPAREN expressionList? RPAREN                # callExp
     | LPAREN expressionList? RPAREN                        # parenExp
-    | LBRACK expressionList? RBRACK                        # arrayLitExp
+    | LBRACK (expressionList COMMA?)? RBRACK               # arrayLitExp
     | REFERENCE_TAG LPAREN expressionList? RPAREN          # vectorLitExp
     | NEW typeName (LPAREN expressionList? RPAREN)? (arrayDimension)* # newExp
     | HASH LPAREN expression COMMA expression RPAREN       # complexLit

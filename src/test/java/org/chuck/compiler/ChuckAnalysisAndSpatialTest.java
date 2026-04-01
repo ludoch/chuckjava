@@ -146,7 +146,7 @@ public class ChuckAnalysisAndSpatialTest {
         List<String> out = runChuck("""
             @(1.0, 2.0, 3.0) => vec3 u;
             @(4.0, 5.0, 6.0) => vec3 v;
-            u * v => float d;
+            u.dot(v) => float d;
             <<< d >>>;
             """, 1);
         // 1*4 + 2*5 + 3*6 = 4+10+18 = 32
