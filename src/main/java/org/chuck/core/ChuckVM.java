@@ -45,8 +45,8 @@ public class ChuckVM {
     private final Map<String, Boolean> globalIsDouble = new ConcurrentHashMap<>();
     private final Map<String, Boolean> globalIsObject = new ConcurrentHashMap<>();
     private final Map<String, Object> globalObjects = new ConcurrentHashMap<>();
-    private Map<String, UserClassDescriptor> userClassRegistry = new ConcurrentHashMap<>();
-    private Map<String, ChuckCode> importedFunctions = new ConcurrentHashMap<>();
+    private final Map<String, UserClassDescriptor> userClassRegistry = new ConcurrentHashMap<>();
+    private final Map<String, ChuckCode> importedFunctions = new ConcurrentHashMap<>();
 
     public void registerUserClass(String name, UserClassDescriptor descriptor) {
         userClassRegistry.put(name, descriptor);
@@ -272,6 +272,7 @@ public class ChuckVM {
                 try {
                     shred.execute(this);
                 } catch (Throwable t) {
+                    System.err.println("Error in shred " + shred.getId() + ": " + t.getMessage());
                     t.printStackTrace();
                 } finally {
                     shred.cleanup();

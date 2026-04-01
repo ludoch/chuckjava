@@ -28,6 +28,9 @@ public class ChucKIntegrationTest {
         }
 
         String filter = System.getProperty("dynamicTestFilter");
+        String specificFile = System.getProperty("specificTestFile");
+        String maxNumStr = System.getProperty("maxTestNumber");
+        int maxNum = maxNumStr != null ? Integer.parseInt(maxNumStr) : Integer.MAX_VALUE;
 
         return Files.walk(testRoot)
                 .filter(p -> p.toString().endsWith(".ck"))
@@ -39,8 +42,20 @@ public class ChucKIntegrationTest {
                     }
                     return true;
                 })
-           ///     .filter(p -> p.toString().contains("01-Basic"))
-                .filter(p -> filter == null || p.toString().contains(filter))
+                .filter(p -> {
+                    // Extract number prefix if possible
+                    String fileName = p.getFileName().toString();
+                    String prefix = fileName.split("-")[0].split("\\.")[0];
+                    try {
+                        int num = Integer.parseInt(prefix);
+                        if (num > maxNum) return false;
+                    } catch (NumberFormatException ignored) {}
+                    
+                    if (specificFile != null) {
+                        return p.toString().endsWith("/" + specificFile) || p.toString().equals(specificFile);
+                    }
+                    return filter == null || p.toString().contains(filter);
+                })
                 .filter(p -> System.getProperty("includeStress") != null || !p.toString().contains("04-Stress"))
                 .sorted()
                 .map(p -> DynamicTest.dynamicTest(testRoot.relativize(p).toString(), () -> runTest(p)));

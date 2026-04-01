@@ -56,6 +56,8 @@ public class ChuckEmitter {
      * Tracks variable name → declared type for operator overload dispatch.
      */
     private final Map<String, String> varTypes = new HashMap<>();
+    /** Tracks variable name -> declared as const. */
+    private final java.util.Set<String> constants = new java.util.HashSet<>();
 
     private final Map<String, UserClassDescriptor> userClassRegistry = new HashMap<>();
     /**
@@ -88,12 +90,13 @@ public class ChuckEmitter {
     // Additional core UGens not in UGenRegistry
     private static final java.util.Set<String> CORE_UGENS = java.util.Set.of(
             "OscIn", "OscOut", "OscMsg", "FileIO", "IO", "Std", "Math", "Machine", "UGen", "UGen_Multi", "UGen_Stereo",
-            "UAna", "Shred", "Thread", "ChucK"
+            "UAna", "Shred", "Thread", "ChucK", "Event"
     );
 
     // Core non-UGen data types
     private static final java.util.Set<String> CORE_DATA_TYPES = java.util.Set.of(
-            "int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar", "Object", "Array"
+            "int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar", "Object", "Array", "Type",
+            "MidiMsg", "HidMsg", "OscMsg", "FileIO", "IO", "SerialIO", "OscIn", "OscOut", "OscBundle", "MidiIn", "MidiOut", "Hid", "StringTokenizer", "RegEx", "Reflect"
     );
 
     private boolean isKnownUGenType(String type) {
@@ -102,6 +105,34 @@ public class ChuckEmitter {
 
     private boolean isKnownType(String type) {
         return isKnownUGenType(type) || CORE_DATA_TYPES.contains(type) || userClassRegistry.containsKey(type);
+    }
+
+    private String getMethodKey(String name, List<String> argTypes) {
+        StringBuilder sb = new StringBuilder(name).append(":");
+        if (argTypes == null || argTypes.isEmpty()) return sb.append("0").toString();
+        for (int i = 0; i < argTypes.size(); i++) {
+            sb.append(argTypes.get(i));
+            if (i < argTypes.size() - 1) sb.append(",");
+        }
+        return sb.toString();
+    }
+
+    private String resolveMethodKey(String className, String mName, List<String> callArgTypes) {
+        UserClassDescriptor desc = userClassRegistry.get(className);
+        if (desc == null) return mName + ":" + (callArgTypes != null ? callArgTypes.size() : 0);
+
+        // 1. Try exact match with types
+        String fullKey = getMethodKey(mName, callArgTypes);
+        String t = className;
+        while (t != null) {
+            UserClassDescriptor d = userClassRegistry.get(t);
+            if (d == null) break;
+            if (d.methods().containsKey(fullKey) || d.staticMethods().containsKey(fullKey)) return fullKey;
+            t = d.parentName();
+        }
+
+        // 2. Fallback to name:argc
+        return mName + ":" + (callArgTypes != null ? callArgTypes.size() : 0);
     }
 
     public ChuckEmitter() {
@@ -252,6 +283,14 @@ public class ChuckEmitter {
                 }
                 if (bin.op() == ChuckAST.Operator.SHIFT_LEFT) {
                     yield lhsType;
+                }
+                yield null;
+            }
+            case ChuckAST.DotExp dot -> {
+                String baseType = getExprType(dot.base());
+                if (baseType == null) yield null;
+                if (baseType.equals("complex") || baseType.equals("polar") || baseType.startsWith("vec")) {
+                    yield "float";
                 }
                 yield null;
             }
@@ -666,7 +705,7 @@ public class ChuckEmitter {
                         }
                     }
                 }
-                String key = s.name() + ":" + s.argNames().size();
+                String key = getMethodKey(s.name(), s.argTypes());
                 ChuckCode funcCode = functions.get(key);
                 if (funcCode == null) {
                     funcCode = new ChuckCode(s.name());
@@ -698,6 +737,11 @@ public class ChuckEmitter {
                 currentFuncHasReturn = prevHasReturn;
                 inStaticFuncContext = prevStaticCtx;
 
+                if (functions.containsKey(key)) {
+                    throw new RuntimeException(currentFile + ":" + s.line() + ":" + s.column()
+                            + ": error: cannot overload function with identical arguments -- '"
+                            + s.name() + "' already defined");
+                }
                 functions.put(key, funcCode);
                 if (s.returnType() != null && !s.returnType().equals("void")) {
                     functionReturnTypes.put(key, s.returnType());
@@ -890,7 +934,7 @@ public class ChuckEmitter {
                         }
                     }
 
-                    String methodKey = methodName + ":" + m.argNames().size();
+                    String methodKey = getMethodKey(methodName, m.argTypes());
                     if (definedMethods.contains(methodKey)) {
                         throw new RuntimeException(currentFile + ":" + m.line() + ":" + m.column()
                                 + ": error: cannot overload function with identical arguments -- '"
@@ -1143,6 +1187,12 @@ public class ChuckEmitter {
                 }
             }
             case ChuckAST.DeclExp e -> {
+                // Check for undefined type (not a known class, UGen, or core type)
+                if (!isKnownType(e.type())) {
+                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
+                            + ": error: undefined type '" + e.type() + "'");
+                }
+
                 // Check for 'new' on primitive types or undefined types
                 if (e.name().startsWith("@new_")) {
                     boolean isArrayNew = e.name().startsWith("@new_array_");
@@ -1150,11 +1200,6 @@ public class ChuckEmitter {
                     if (primitives.contains(e.type()) && !isArrayNew) {
                         throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
                                 + ": error: cannot use 'new' on primitive type '" + e.type() + "'");
-                    }
-                    // Check for undefined type (not a known class or UGen)
-                    if (!userClassRegistry.containsKey(e.type()) && !isKnownUGenType(e.type()) && !primitives.contains(e.type())) {
-                        throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
-                                + ": error: undefined type '" + e.type() + "'");
                     }
                 }
                 // Check for static variable declared outside class scope
@@ -1167,6 +1212,9 @@ public class ChuckEmitter {
                     emptyArrayVars.add(e.name());
                 }
                 varTypes.put(e.name(), e.type()); // track variable type
+                if (e.isConst()) {
+                    constants.add(e.name());
+                }
                 int argCount = 0;
                 boolean isUserClass = userClassRegistry.containsKey(e.type());
                 boolean forceGlobal = e.isGlobal();
@@ -2295,25 +2343,29 @@ public class ChuckEmitter {
                     for (ChuckAST.Exp arg : e.args()) {
                         emitExpression(arg, code);
                     }
-                    code.addInstruction(new CallMethod(dot.member(), e.args().size()));
+                    List<String> argTypes = e.args().stream().map(this::getExprType).toList();
+                    String baseType = getExprType(dot.base());
+                    String resolvedKey = (baseType != null) ? resolveMethodKey(baseType, dot.member(), argTypes) : getMethodKey(dot.member(), argTypes);
+                    code.addInstruction(new CallMethod(dot.member(), e.args().size(), resolvedKey));
                 } else if (e.base() instanceof ChuckAST.IdExp id) {
-                    String key = id.name() + ":" + e.args().size();
+                    List<String> argTypes = e.args().stream().map(this::getExprType).toList();
+                    String key = getMethodKey(id.name(), argTypes);
 
                     // Constructor chain: Foo(args) or this(args) from within a method of class Foo
                     if (currentClass != null && (id.name().equals(currentClass) || id.name().equals("this"))) {
-                        String ctorKey = currentClass + ":" + e.args().size();
+                        String ctorKey = getMethodKey(currentClass, argTypes);
                         UserClassDescriptor cd = userClassRegistry.get(currentClass);
                         if (cd != null && cd.methods().containsKey(ctorKey)) {
                             code.addInstruction(new PushThis());
                             for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                            code.addInstruction(new CallMethod(currentClass, e.args().size()));
+                            code.addInstruction(new CallMethod(currentClass, e.args().size(), ctorKey));
                             return;
                         }
                     }
 
                     if (currentClass != null && userClassRegistry.containsKey(currentClass)) {
-                        UserClassDescriptor d = userClassRegistry.get(currentClass);
-                        ChuckCode target = resolveStaticMethod(currentClass, key);
+                        String resolvedKey = resolveMethodKey(currentClass, id.name(), argTypes);
+                        ChuckCode target = resolveStaticMethod(currentClass, resolvedKey);
                         if (target != null) {
                             for (ChuckAST.Exp arg : e.args()) {
                                 emitExpression(arg, code);
@@ -2327,6 +2379,13 @@ public class ChuckEmitter {
                             emitExpression(arg, code);
                         }
                         code.addInstruction(new CallFunc(functions.get(key), e.args().size()));
+                    } else {
+                        // Try fallback to name:argc
+                        String fallbackKey = id.name() + ":" + e.args().size();
+                        if (functions.containsKey(fallbackKey)) {
+                            for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                            code.addInstruction(new CallFunc(functions.get(fallbackKey), e.args().size()));
+                        }
                     }
                 }
             }
@@ -2335,9 +2394,16 @@ public class ChuckEmitter {
                 switch (e.call().base()) {
                     case ChuckAST.IdExp id -> {
                         funcName = id.name();
-                        String key = funcName + ":" + e.call().args().size();
+                        List<String> argTypes = e.call().args().stream().map(this::getExprType).toList();
+                        String key = getMethodKey(funcName, argTypes);
 
                         ChuckCode target = resolveStaticMethod(currentClass, key);
+                        if (target == null) {
+                            // Try fallback to name:argc
+                            String fallbackKey = funcName + ":" + e.call().args().size();
+                            target = resolveStaticMethod(currentClass, fallbackKey);
+                        }
+                        
                         if (target != null) {
                             for (ChuckAST.Exp arg : e.call().args()) {
                                 emitExpression(arg, code);
@@ -2353,11 +2419,22 @@ public class ChuckEmitter {
                             code.addInstruction(new Spork(functions.get(key), e.call().args().size()));
                             return;
                         }
+                        
+                        // Try fallback for regular functions
+                        String fallbackKey = funcName + ":" + e.call().args().size();
+                        if (functions.containsKey(fallbackKey)) {
+                            for (ChuckAST.Exp arg : e.call().args()) {
+                                emitExpression(arg, code);
+                            }
+                            code.addInstruction(new Spork(functions.get(fallbackKey), e.call().args().size()));
+                            return;
+                        }
                     }
                     case ChuckAST.DotExp dot -> {
+                        List<String> argTypes = e.call().args().stream().map(this::getExprType).toList();
                         if (dot.base() instanceof ChuckAST.IdExp id && userClassRegistry.containsKey(id.name())) {
-                            String staticKey = dot.member() + ":" + e.call().args().size();
-                            ChuckCode target = resolveStaticMethod(id.name(), staticKey);
+                            String resolvedKey = resolveMethodKey(id.name(), dot.member(), argTypes);
+                            ChuckCode target = resolveStaticMethod(id.name(), resolvedKey);
                             if (target != null) {
                                 for (ChuckAST.Exp arg : e.call().args()) {
                                     emitExpression(arg, code);
@@ -2370,7 +2447,9 @@ public class ChuckEmitter {
                         for (ChuckAST.Exp arg : e.call().args()) {
                             emitExpression(arg, code);
                         }
-                        code.addInstruction(new SporkMethod(dot.member(), e.call().args().size()));
+                        String baseType = getExprType(dot.base());
+                        String resolvedKey = (baseType != null) ? resolveMethodKey(baseType, dot.member(), argTypes) : getMethodKey(dot.member(), argTypes);
+                        code.addInstruction(new SporkMethod(dot.member(), e.call().args().size(), resolvedKey));
                         return;
                     }
                     default -> {
@@ -2401,10 +2480,31 @@ public class ChuckEmitter {
         }
     }
 
-    private void emitChuckTarget(ChuckAST.Exp target, ChuckCode code) {
-        switch (target) {
+    private void emitChuckTarget(Object target, ChuckCode code) {
+        if (target instanceof List<?> list) {
+            if (list.size() > 1) {
+                // Find first element to get line/column
+                int line = 0, col = 0;
+                if (!list.isEmpty() && list.get(0) instanceof ChuckAST.DeclExp de) {
+                    line = de.line(); col = de.column();
+                }
+                throw new RuntimeException(currentFile + ":" + line + ":" + col + ": error: cannot '=>' from/to a multi-variable declaration");
+            }
+            if (!list.isEmpty()) emitChuckTarget(list.get(0), code);
+            return;
+        }
+        
+        if (!(target instanceof ChuckAST.Exp)) return;
+        ChuckAST.Exp exp = (ChuckAST.Exp) target;
+
+        switch (exp) {
             case ChuckAST.IdExp e -> {
-                String type = getVarType(target);
+                if (e.name().equals("pi") || e.name().equals("e") || e.name().equals("maybe") || 
+                    e.name().equals("true") || e.name().equals("false") || e.name().equals("null") ||
+                    constants.contains(e.name())) {
+                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column() + ": error: cannot assign to read-only value '" + e.name() + "'");
+                }
+                String type = getVarType(exp);
                 boolean isUGen = type != null && (isKnownUGenType(type) || isSubclassOfUGen(type));
 
                 if (e.name().equals("now")) {
@@ -2426,7 +2526,7 @@ public class ChuckEmitter {
 
                 if (isUGen) {
                     // If target is a UGen variable, we do a ChuckTo connection
-                    emitExpression(target, code);
+                    emitExpression(exp, code);
                     code.addInstruction(new org.chuck.core.ChuckTo());
                 } else {
                     // Otherwise it's a value assignment
@@ -2531,11 +2631,11 @@ public class ChuckEmitter {
                     emitChuckTarget(e.lhs(), code);
                     emitChuckTarget(e.rhs(), code);
                 } else {
-                    emitExpression(target, code);
+                    emitExpression(exp, code);
                 }
             }
             default ->
-                emitExpression(target, code);
+                emitExpression(exp, code);
         }
     }
 
@@ -3771,7 +3871,12 @@ public class ChuckEmitter {
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
             long idx = s.reg.popLong();
-            ChuckArray arr = (ChuckArray) s.reg.popObject();
+            Object rawArr = s.reg.popObject();
+            if (!(rawArr instanceof ChuckArray arr)) {
+                // pop the value anyway to keep stack balanced
+                s.reg.pop();
+                return;
+            }
 
             boolean isObj = s.reg.isObject(0), isDbl = s.reg.isDouble(0);
             Object valObj = isObj ? s.reg.popObject() : null;
@@ -4179,10 +4284,16 @@ public class ChuckEmitter {
 
         String mName;
         int a;
+        String fullKey;
 
         SporkMethod(String m, int argCount) {
+            this(m, argCount, null);
+        }
+
+        SporkMethod(String m, int argCount, String key) {
             mName = m;
             a = argCount;
+            fullKey = key;
         }
 
         @Override
@@ -4190,7 +4301,8 @@ public class ChuckEmitter {
             Object[] args = new Object[a];
             for (int i = a - 1; i >= 0; i--) {
                 if (s.reg.isObject(0)) {
-                    args[i] = s.reg.popObject();
+                    Object o = s.reg.popObject();
+                    args[i] = (o == null) ? "" : o;
                 } else if (s.reg.isDouble(0)) {
                     args[i] = s.reg.popAsDouble();
                 } else {
@@ -4203,12 +4315,17 @@ public class ChuckEmitter {
                 return;
             }
 
-            ChuckCode target = uo.methods.get(mName);
+            String key = (fullKey != null) ? fullKey : (mName + ":" + a);
+            String fallbackKey = mName + ":" + a;
+            ChuckCode target = uo.methods.get(key);
+            if (target == null) target = uo.methods.get(fallbackKey);
+            
             boolean isStatic = false;
             if (target == null) {
                 UserClassDescriptor d = vm.getUserClass(uo.className);
                 if (d != null) {
-                    target = d.staticMethods().get(mName + ":" + a);
+                    target = d.staticMethods().get(key);
+                    if (target == null) target = d.staticMethods().get(fallbackKey);
                     isStatic = (target != null);
                 }
             }
@@ -4295,6 +4412,26 @@ public class ChuckEmitter {
             }
             if (n.equals("size") && obj instanceof ChuckArray arr) {
                 s.reg.push((long) arr.size());
+            } else if (obj instanceof ChuckArray arr && arr.vecTag != null) {
+                // Special fields for complex/polar/vec
+                switch (arr.vecTag) {
+                    case "complex" -> {
+                        if (n.equals("re")) { s.reg.push(arr.getFloat(0)); return; }
+                        if (n.equals("im")) { s.reg.push(arr.getFloat(1)); return; }
+                    }
+                    case "polar" -> {
+                        if (n.equals("mag")) { s.reg.push(arr.getFloat(0)); return; }
+                        if (n.equals("phase")) { s.reg.push(arr.getFloat(1)); return; }
+                    }
+                    case String t when t.startsWith("vec") -> {
+                        if (n.equals("x")) { s.reg.push(arr.getFloat(0)); return; }
+                        if (n.equals("y")) { s.reg.push(arr.getFloat(1)); return; }
+                        if (n.equals("z")) { s.reg.push(arr.getFloat(2)); return; }
+                        if (n.equals("w")) { s.reg.push(arr.getFloat(3)); return; }
+                    }
+                    default -> {}
+                }
+                s.reg.push(0L);
             } else if (obj instanceof UserObject uo) {
                 ChuckObject fo = uo.getObjectField(n);
                 if (fo != null) {
@@ -4910,6 +5047,15 @@ public class ChuckEmitter {
                     for (int i = 0; i < argc; i++) {
                         Object val = args[i];
                         switch (val) {
+                            case null -> {
+                                if (!pts[i].isPrimitive()) {
+                                    coe[i] = null;
+                                    score += 3;
+                                } else {
+                                    valid = false;
+                                    break;
+                                }
+                            }
                             case Long l -> {
                                 if (pts[i] == long.class || pts[i] == Long.class) {
                                     coe[i] = l;
@@ -5117,10 +5263,16 @@ public class ChuckEmitter {
 
         String mName;
         int a;
+        String fullKey;
 
         CallMethod(String m, int v) {
+            this(m, v, null);
+        }
+
+        CallMethod(String m, int v, String key) {
             mName = m;
             a = v;
+            fullKey = key;
         }
 
         @Override
@@ -5130,7 +5282,8 @@ public class ChuckEmitter {
             for (int i = a - 1; i >= 0; i--) {
                 isD[i] = s.reg.isDouble(0);
                 if (s.reg.isObject(0)) {
-                    args[i] = s.reg.popObject();
+                    Object o = s.reg.popObject();
+                    args[i] = (o == null) ? "" : o;
                 } else if (isD[i]) {
                     args[i] = s.reg.popAsDouble();
                 } else {
@@ -5150,7 +5303,8 @@ public class ChuckEmitter {
             // 1. Check for User-defined methods (including static called via instance)
             UserObject uo = (obj instanceof UserObject) ? (UserObject) obj : null;
             if (uo != null) {
-                String key = mName + ":" + a;
+                String key = (fullKey != null) ? fullKey : (mName + ":" + a);
+                String fallbackKey = mName + ":" + a;
                 ChuckCode target = null;
                 String t = uo.className;
                 for (int depth = 0; depth < 16 && t != null; depth++) {
@@ -5164,6 +5318,15 @@ public class ChuckEmitter {
                     }
                     if (desc.staticMethods().containsKey(key)) {
                         target = desc.staticMethods().get(key);
+                        break;
+                    }
+                    // Try fallback
+                    if (desc.methods().containsKey(fallbackKey)) {
+                        target = desc.methods().get(fallbackKey);
+                        break;
+                    }
+                    if (desc.staticMethods().containsKey(fallbackKey)) {
+                        target = desc.staticMethods().get(fallbackKey);
                         break;
                     }
                     t = desc.parentName();
@@ -5560,9 +5723,12 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckArray rhs = (ChuckArray) s.reg.popObject();
-            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            Object rObj = s.reg.popObject();
+            Object lObj = s.reg.popObject();
+            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
+            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.vecTag = "complex";
             result.setFloat(0, lhs.getFloat(0) + rhs.getFloat(0));
             result.setFloat(1, lhs.getFloat(1) + rhs.getFloat(1));
             s.reg.pushObject(result);
@@ -5576,9 +5742,12 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckArray rhs = (ChuckArray) s.reg.popObject();
-            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            Object rObj = s.reg.popObject();
+            Object lObj = s.reg.popObject();
+            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
+            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.vecTag = "complex";
             result.setFloat(0, lhs.getFloat(0) - rhs.getFloat(0));
             result.setFloat(1, lhs.getFloat(1) - rhs.getFloat(1));
             s.reg.pushObject(result);
@@ -5592,11 +5761,14 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckArray rhs = (ChuckArray) s.reg.popObject();
-            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            Object rObj = s.reg.popObject();
+            Object lObj = s.reg.popObject();
+            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
+            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
             double a = lhs.getFloat(0), b = lhs.getFloat(1);
             double c = rhs.getFloat(0), d = rhs.getFloat(1);
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.vecTag = "complex";
             result.setFloat(0, a * c - b * d);
             result.setFloat(1, a * d + b * c);
             s.reg.pushObject(result);
@@ -5610,12 +5782,15 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckArray rhs = (ChuckArray) s.reg.popObject();
-            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            Object rObj = s.reg.popObject();
+            Object lObj = s.reg.popObject();
+            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
+            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
             double a = lhs.getFloat(0), b = lhs.getFloat(1);
             double c = rhs.getFloat(0), d = rhs.getFloat(1);
             double denom = c * c + d * d;
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.vecTag = "complex";
             if (denom < 1e-300) {
                 result.setFloat(0, 0.0);
                 result.setFloat(1, 0.0);
@@ -5637,13 +5812,16 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckArray rhs = (ChuckArray) s.reg.popObject();
-            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            Object rObj = s.reg.popObject();
+            Object lObj = s.reg.popObject();
+            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
+            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
             double r1 = lhs.getFloat(0), t1 = lhs.getFloat(1);
             double r2 = rhs.getFloat(0), t2 = rhs.getFloat(1);
             double re = r1 * Math.cos(t1) + r2 * Math.cos(t2);
             double im = r1 * Math.sin(t1) + r2 * Math.sin(t2);
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.vecTag = "polar";
             result.setFloat(0, Math.sqrt(re * re + im * im));
             result.setFloat(1, Math.atan2(im, re));
             s.reg.pushObject(result);
@@ -5657,13 +5835,16 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckArray rhs = (ChuckArray) s.reg.popObject();
-            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            Object rObj = s.reg.popObject();
+            Object lObj = s.reg.popObject();
+            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
+            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
             double r1 = lhs.getFloat(0), t1 = lhs.getFloat(1);
             double r2 = rhs.getFloat(0), t2 = rhs.getFloat(1);
             double re = r1 * Math.cos(t1) - r2 * Math.cos(t2);
             double im = r1 * Math.sin(t1) - r2 * Math.sin(t2);
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.vecTag = "polar";
             result.setFloat(0, Math.sqrt(re * re + im * im));
             result.setFloat(1, Math.atan2(im, re));
             s.reg.pushObject(result);
@@ -5677,9 +5858,12 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckArray rhs = (ChuckArray) s.reg.popObject();
-            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            Object rObj = s.reg.popObject();
+            Object lObj = s.reg.popObject();
+            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
+            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.vecTag = "polar";
             result.setFloat(0, lhs.getFloat(0) * rhs.getFloat(0));
             result.setFloat(1, lhs.getFloat(1) + rhs.getFloat(1));
             s.reg.pushObject(result);
@@ -5693,10 +5877,13 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckArray rhs = (ChuckArray) s.reg.popObject();
-            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            Object rObj = s.reg.popObject();
+            Object lObj = s.reg.popObject();
+            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
+            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
             double mag = rhs.getFloat(0);
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
+            result.vecTag = "polar";
             result.setFloat(0, mag < 1e-300 ? 0.0 : lhs.getFloat(0) / mag);
             result.setFloat(1, lhs.getFloat(1) - rhs.getFloat(1));
             s.reg.pushObject(result);
@@ -5713,8 +5900,10 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckArray rhs = (ChuckArray) s.reg.popObject();
-            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            Object rObj = s.reg.popObject();
+            Object lObj = s.reg.popObject();
+            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
+            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
             int len = Math.min(lhs.size(), rhs.size());
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, len);
             result.vecTag = lhs.vecTag;
@@ -5732,8 +5921,10 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckArray rhs = (ChuckArray) s.reg.popObject();
-            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            Object rObj = s.reg.popObject();
+            Object lObj = s.reg.popObject();
+            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
+            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
             int len = Math.min(lhs.size(), rhs.size());
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, len);
             result.vecTag = lhs.vecTag;
@@ -5885,8 +6076,10 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckArray rhs = (ChuckArray) s.reg.popObject();
-            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            Object rObj = s.reg.popObject();
+            Object lObj = s.reg.popObject();
+            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
+            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
             int len = Math.min(lhs.size(), rhs.size());
             double dot = 0.0;
             for (int i = 0; i < len; i++) {
@@ -5900,8 +6093,10 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckArray rhs = (ChuckArray) s.reg.popObject();
-            ChuckArray lhs = (ChuckArray) s.reg.popObject();
+            Object rObj = s.reg.popObject();
+            Object lObj = s.reg.popObject();
+            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 3);
+            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 3);
             ChuckArray result = lhs.cross(rhs);
             s.reg.pushObject(result);
         }

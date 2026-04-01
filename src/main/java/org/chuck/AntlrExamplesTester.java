@@ -28,10 +28,18 @@ public class AntlrExamplesTester {
             
             int passed = 0;
             int failed = 0;
+            int expectedFailures = 0;
+            int unexpectedPasses = 0;
             List<String> failureDetails = new ArrayList<>();
 
             for (Path file : ckFiles) {
-                System.out.print("Testing: " + file + " ... ");
+                String pathStr = file.toString().replace('\\', '/');
+                String fileName = file.getFileName().toString();
+                boolean isErrorTest = pathStr.contains("06-Errors") || fileName.contains("error-") || fileName.equals("114.ck");
+                boolean isDisabled = pathStr.contains(".disabled") || pathStr.contains(".deps");
+                boolean shouldFail = isErrorTest || isDisabled;
+                
+                System.out.print("Testing: " + pathStr + (shouldFail ? " [Expected Failure]" : "") + " ... ");
                 try {
                     String source = Files.readString(file);
                     
@@ -64,21 +72,35 @@ public class AntlrExamplesTester {
                     
                     // 3. Emit (Optional but good for full check)
                     ChuckEmitter emitter = new ChuckEmitter();
-                    emitter.emit(ast, file.getFileName().toString());
+                    emitter.emit(ast, fileName);
 
-                    System.out.println("✅ PASSED");
-                    passed++;
+                    if (shouldFail) {
+                        System.out.println("❌ FAILED (Expected failure but passed)");
+                        failed++;
+                        unexpectedPasses++;
+                        failureDetails.add(pathStr + ": Expected failure but passed");
+                    } else {
+                        System.out.println("✅ PASSED");
+                        passed++;
+                    }
                 } catch (Exception e) {
-                    System.out.println("❌ FAILED");
-                    failed++;
-                    failureDetails.add(file + ": " + e.getMessage());
+                    if (shouldFail) {
+                        System.out.println("✅ PASSED (Expected failure)");
+                        passed++;
+                        expectedFailures++;
+                    } else {
+                        System.out.println("❌ FAILED");
+                        failed++;
+                        failureDetails.add(pathStr + ": " + e.getMessage());
+                    }
                 }
             }
 
             System.out.println("\n--- Batch Test Results ---");
-            System.out.println("TOTAL:  " + ckFiles.size());
-            System.out.println("PASSED: " + passed);
-            System.out.println("FAILED: " + failed);
+            System.out.println("TOTAL:             " + ckFiles.size());
+            System.out.println("PASSED:            " + passed + " (incl. " + expectedFailures + " expected failures)");
+            System.out.println("FAILED:            " + failed + " (incl. " + unexpectedPasses + " unexpected passes)");
+
             
             if (failed > 0) {
                 System.out.println("\nFailure Details:");

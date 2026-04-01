@@ -225,14 +225,7 @@ public class ChuckCLI {
                         if (verbose > 0) System.out.println("[CLI] Timeout reached, stopping...");
                         break;
                     }
-                    boolean anyRunning = false;
-                    for (ChuckShred s : initialShreds) {
-                        if (!s.isDone()) {
-                            anyRunning = true;
-                            break;
-                        }
-                    }
-                    if (!loop && !anyRunning) break;
+                    if (!loop && vm.getActiveShredCount() == 0) break;
                     Thread.sleep(100);
                 }
             }

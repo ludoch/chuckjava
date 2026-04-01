@@ -91,6 +91,12 @@ import org.chuck.audio.WvOut2;
 import org.chuck.audio.WvOutUGen;
 import org.chuck.audio.ZCR;
 
+import org.chuck.audio.CNoise;
+import org.chuck.audio.FullRect;
+import org.chuck.audio.HalfRect;
+import org.chuck.audio.SubNoise;
+import org.chuck.audio.ZeroX;
+
 /**
  * Centralized registry for all built-in Unit Generators.
  * Eliminates the need for manual Set/Switch duplication in the compiler.
@@ -113,6 +119,8 @@ public class UGenRegistry {
         register("PulseOsc", (sr, args) -> new PulseOsc(sr));
         register("Phasor", (sr, args) -> new Phasor(sr));
         register("Noise", (sr, args) -> new Noise());
+        register("SubNoise", (sr, args) -> new SubNoise());
+        register("CNoise", (sr, args) -> new CNoise());
         register("Impulse", (sr, args) -> new Impulse());
         register("Step", (sr, args) -> new Step());
         
@@ -148,6 +156,9 @@ public class UGenRegistry {
         register("PitShift", (sr, args) -> new PitShift());
         register("Dyno", (sr, args) -> new Dyno(sr));
         register("Modulate", (sr, args) -> new Modulate(sr));
+        register("FullRect", (sr, args) -> new FullRect());
+        register("HalfRect", (sr, args) -> new HalfRect());
+        register("ZeroX", (sr, args) -> new ZeroX());
 
         // --- Panning & Mixing ---
         register("Pan2", (sr, args) -> new Pan2());

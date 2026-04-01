@@ -40,43 +40,43 @@ public class ChuckStack {
         isDouble[sp] = false;
         sp++;
     }
+public long popLong() {
+    if (sp <= 0) return 0L;
+    sp--;
+    long raw = primitives[sp];
+    long val = isDouble[sp] ? Math.round(Double.longBitsToDouble(raw)) : raw;
+    objects[sp] = null;
+    primitives[sp] = 0;
+    isDouble[sp] = false;
+    isObject[sp] = false;
+    return val;
+}
 
-    public long popLong() {
-        if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow: sp=" + sp);
-        sp--;
-        long raw = primitives[sp];
-        long val = isDouble[sp] ? Math.round(Double.longBitsToDouble(raw)) : raw;
-        objects[sp] = null;
-        primitives[sp] = 0;
-        isDouble[sp] = false;
-        isObject[sp] = false;
-        return val;
-    }
+public double popDouble() {
+    if (sp <= 0) return 0.0;
+    sp--;
+    long raw = primitives[sp];
+    double val = isDouble[sp] ? Double.longBitsToDouble(raw) : (double) raw;
+    objects[sp] = null;
+    primitives[sp] = 0;
+    isDouble[sp] = false;
+    isObject[sp] = false;
+    return val;
+}
 
-    public double popDouble() {
-        if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow: sp=" + sp);
-        sp--;
-        long raw = primitives[sp];
-        double val = isDouble[sp] ? Double.longBitsToDouble(raw) : (double) raw;
-        objects[sp] = null;
-        primitives[sp] = 0;
-        isDouble[sp] = false;
-        isObject[sp] = false;
-        return val;
-    }
-
-    public Object popObject() {
-        if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow: sp=" + sp);
-        sp--;
-        Object obj = objects[sp];
-        objects[sp] = null;
-        isObject[sp] = false;
-        isDouble[sp] = false;
-        return obj;
-    }
+public Object popObject() {
+    if (sp <= 0) return null;
+    sp--;
+    Object o = objects[sp];
+    objects[sp] = null;
+    primitives[sp] = 0;
+    isDouble[sp] = false;
+    isObject[sp] = false;
+    return o;
+}
 
     public Object pop() {
-        if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow");
+        if (sp <= 0) return null;
         if (isObject[sp - 1]) return popObject();
         if (isDouble[sp - 1]) return popDouble();
         return popLong();
@@ -87,7 +87,7 @@ public class ChuckStack {
     }
 
     public double popAsDouble() {
-        if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow");
+        if (sp <= 0) return 0.0;
         int idx = sp - 1;
         if (isObject[idx]) {
             Object o = popObject();
@@ -107,7 +107,7 @@ public class ChuckStack {
     }
 
     public long popAsLong() {
-        if (sp <= 0) throw new ArrayIndexOutOfBoundsException("ChucK stack underflow");
+        if (sp <= 0) return 0L;
         int idx = sp - 1;
         if (isObject[idx]) {
             Object o = popObject();
@@ -135,8 +135,16 @@ public class ChuckStack {
         sp = newSp;
     }
 
-    public boolean isObject(int depth) { return isObject[sp - 1 - depth]; }
-    public boolean isDouble(int depth) { return isDouble[sp - 1 - depth]; }
+    public boolean isObject(int depth) { 
+        int idx = sp - 1 - depth;
+        if (idx < 0 || idx >= sp) return false;
+        return isObject[idx]; 
+    }
+    public boolean isDouble(int depth) { 
+        int idx = sp - 1 - depth;
+        if (idx < 0 || idx >= sp) return false;
+        return isDouble[idx]; 
+    }
     public Object peekObject(int depth) { return objects[sp - 1 - depth]; }
     public long peekLong(int depth) { return primitives[sp - 1 - depth]; }
     public double peekAsDouble(int depth) {

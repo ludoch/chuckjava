@@ -25,60 +25,18 @@ public class ChuckPrint implements ChuckInstr {
             Object v = values[i];
             switch (v) {
                 case Double dv -> {
-                    String formatted;
-                    if (Double.isInfinite(dv)) formatted = dv > 0 ? "inf" : "-inf";
-                    else if (Double.isNaN(dv)) formatted = "nan";
-                    else formatted = String.format("%.6f", dv);
-                    sb.append(formatted);
+                    if (Double.isInfinite(dv)) sb.append(dv > 0 ? "inf" : "-inf");
+                    else if (Double.isNaN(dv)) sb.append("nan");
+                    else sb.append(String.format("%.6f", dv));
                 }
                 case Float fv -> {
                     double dv = fv.doubleValue();
-                    String formatted;
-                    if (Double.isInfinite(dv)) formatted = dv > 0 ? "inf" : "-inf";
-                    else if (Double.isNaN(dv)) formatted = "nan";
-                    else formatted = String.format("%.6f", dv);
-                    sb.append(formatted);
+                    if (Double.isInfinite(dv)) sb.append(dv > 0 ? "inf" : "-inf");
+                    else if (Double.isNaN(dv)) sb.append("nan");
+                    else sb.append(String.format("%.6f", dv));
                 }
                 case Long lv -> sb.append(lv.toString());
                 case ChuckUGen ugen -> sb.append(String.format("%.6f", ugen.getLastOut()));
-                case ChuckArray arr -> {
-                    String tag = arr.vecTag;
-                    if ("vec2".equals(tag) || "vec3".equals(tag) || "vec4".equals(tag)) {
-                        sb.append("@(");
-                        for (int j = 0; j < arr.size(); j++) {
-                            if (arr.isDoubleAt(j)) sb.append(String.format("%.4f", arr.getFloat(j)));
-                            else sb.append(arr.getInt(j));
-                            if (j < arr.size() - 1) sb.append(",");
-                        }
-                        sb.append(")");
-                    } else if ("complex".equals(tag)) {
-                        sb.append("#(");
-                        for (int j = 0; j < arr.size(); j++) {
-                            if (arr.isDoubleAt(j)) sb.append(String.format("%.4f", arr.getFloat(j)));
-                            else sb.append(arr.getInt(j));
-                            if (j < arr.size() - 1) sb.append(",");
-                        }
-                        sb.append(")");
-                    } else if ("polar".equals(tag)) {
-                        sb.append("%(");
-                        for (int j = 0; j < arr.size(); j++) {
-                            if (arr.isDoubleAt(j)) sb.append(String.format("%.4f", arr.getFloat(j)));
-                            else sb.append(arr.getInt(j));
-                            if (j < arr.size() - 1) sb.append(",");
-                        }
-                        sb.append(")");
-                    } else {
-                        // Regular array
-                        sb.append("@(");
-                        for (int j = 0; j < arr.size(); j++) {
-                            if (arr.isObjectAt(j)) sb.append(arr.getObject(j));
-                            else if (arr.isDoubleAt(j)) sb.append(String.format("%.6f", arr.getFloat(j)));
-                            else sb.append(arr.getInt(j));
-                            if (j < arr.size() - 1) sb.append(",");
-                        }
-                        sb.append(")");
-                    }
-                }
                 case null -> sb.append("null");
                 default -> sb.append(v.toString());
             }

@@ -4,7 +4,7 @@ grammar ChuckANTLR;
  * ChucK ANTLR4 Grammar - Cleaned up for non-combined usage
  */
 
-program : (directive | statement | functionDef | classDef)* EOF ;
+program : (directive | statement | functionDef | classDefinition)* EOF ;
 
 directive
     : REFERENCE_TAG IMPORT STRING                        // @import "file.ck"
@@ -22,7 +22,7 @@ statement
     | returnStatement                                      # returnStmt
     | printStatement                                       # printStmt
     | blockStatement                                       # blockStmt
-    | expression SEMI                                      # expressionStmt
+    | expression (COMMA expression)* SEMI                  # expressionStmt
     | switchStatement                                      # switchStmt
     | BREAK SEMI                                           # breakStmt
     | CONTINUE SEMI                                        # continueStmt
@@ -49,7 +49,7 @@ variableDecl
     ;
 
 accessModifier
-    : PUBLIC | PRIVATE | PROTECTED | GLOBAL
+    : PUBLIC | PRIVATE | PROTECTED | GLOBAL | CONST
     ;
 
 arrayDimension
@@ -62,7 +62,7 @@ expressionList
 
 // --- Definitions ---
 functionDef
-    : (accessModifier? (STATIC? FUN | FUN STATIC?) | PUBLIC) type? functionName LPAREN formalParameters? RPAREN postfixOpToken? statement
+    : (accessModifier? (STATIC? FUN | FUN STATIC?) | PUBLIC) type? (functionName LPAREN formalParameters? RPAREN | REFERENCE_TAG? OPERATOR LPAREN formalParameters? RPAREN postfixOpToken) statement
     ;
 
 postfixOpToken : PLUS_PLUS | MINUS_MINUS ;
@@ -70,7 +70,7 @@ postfixOpToken : PLUS_PLUS | MINUS_MINUS ;
 functionName
     : ID
     | REFERENCE_TAG ID
-    | REFERENCE_TAG? OPERATOR operatorToken?
+    | REFERENCE_TAG? OPERATOR (operatorToken | LPAREN operatorToken RPAREN)?
     ;
 
 operatorToken
@@ -87,8 +87,8 @@ formalParameter
     : type REFERENCE_TAG? ID (arrayDimension)*
     ;
 
-classDef
-    : accessModifier? CLASS ID (EXTENDS typeName)? LBRACE (directive | statement | functionDef)* RBRACE
+classDefinition
+    : accessModifier? CLASS ID (EXTENDS typeName)? LBRACE (directive | statement | functionDef | classDefinition)* RBRACE
     ;
 
 type
@@ -111,7 +111,7 @@ memberName
 // --- Expressions ---
 expression
     : primary                                              # primaryExp
-    | accessModifier? STATIC? type variableDecl (COMMA variableDecl)* # declExp
+    | accessModifier? STATIC? CONST? type variableDecl (COMMA variableDecl)* # declExp
     | prefixOp expression                                   # unaryOp
     | expression CAST type                                 # castExp
     | expression COLON_COLON expression                   # durationOp
@@ -196,6 +196,7 @@ OPERATOR     : 'operator';
 TRUE         : 'true';
 FALSE        : 'false';
 NULL         : 'null';
+CONST        : 'const';
 
 CHUCK_OP     : '=>' | '@=>' | '!=>' | '=^' | '<=>' | '=<' | '+=>' | '-=>' | '*=>' | '/=>' | '%=>' | '&=>' | '|=>' | '^=>' | '<<=>' | '>>=>' | '-->' ;
 

@@ -1,5 +1,6 @@
 package org.chuck.core;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Map;
 
@@ -62,7 +63,38 @@ public class SetMemberIntByName implements ChuckInstr {
             called = tryInvokeObj(rawObj, setter, valObj);
             if (!called) called = tryInvokeObj(rawObj, memberName, valObj);
         } else {
-            called = tryInvoke(rawObj, setter, doubleVal);
+            // Special fields for complex/polar/vec
+            if (rawObj instanceof ChuckArray arr && arr.vecTag != null) {
+                if (arr.vecTag.equals("complex")) {
+                    if (memberName.equals("re")) { arr.setFloat(0, doubleVal); called = true; }
+                    else if (memberName.equals("im")) { arr.setFloat(1, doubleVal); called = true; }
+                } else if (arr.vecTag.equals("polar")) {
+                    if (memberName.equals("mag")) { arr.setFloat(0, doubleVal); called = true; }
+                    else if (memberName.equals("phase")) { arr.setFloat(1, doubleVal); called = true; }
+                } else if (arr.vecTag.startsWith("vec")) {
+                    switch (memberName) {
+                        case "x" -> {
+                            arr.setFloat(0, doubleVal);
+                            called = true;
+                        }
+                        case "y" -> {
+                            arr.setFloat(1, doubleVal);
+                            called = true;
+                        }
+                        case "z" -> {
+                            arr.setFloat(2, doubleVal);
+                            called = true;
+                        }
+                        case "w" -> {
+                            arr.setFloat(3, doubleVal);
+                            called = true;
+                        }
+                        default -> {
+                        }
+                    }
+                }
+            }
+            if (!called) called = tryInvoke(rawObj, setter, doubleVal);
             if (!called) called = tryInvoke(rawObj, memberName, doubleVal);
         }
         
@@ -94,7 +126,7 @@ public class SetMemberIntByName implements ChuckInstr {
                 else if (ft == long.class) f.setLong(rawObj, (long) doubleVal);
                 else if (ft == float.class) f.setFloat(rawObj, (float) doubleVal);
                 else if (ft == double.class) f.setDouble(rawObj, doubleVal);
-            } catch (Exception ignored) {}
+            } catch (IllegalAccessException | IllegalArgumentException | NoSuchFieldException ignored) {}
         }
 
         // Push the value back so the chuck expression can be chained
@@ -121,7 +153,7 @@ public class SetMemberIntByName implements ChuckInstr {
             
             try {
                 m.invoke(obj, finalVal); return true;
-            } catch (Exception ignored) {}
+            } catch (IllegalAccessException | InvocationTargetException ignored) {}
         }
         return false;
     }
@@ -145,7 +177,7 @@ public class SetMemberIntByName implements ChuckInstr {
                 } else if (p == boolean.class || p == Boolean.class) {
                     m.invoke(obj, doubleVal != 0.0); return true;
                 }
-            } catch (Exception ignored) {}
+            } catch (IllegalAccessException | InvocationTargetException ignored) {}
         }
         return false;
     }

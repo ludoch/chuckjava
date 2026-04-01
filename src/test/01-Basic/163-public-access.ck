@@ -15,7 +15,10 @@ public class X
     {
         // roundabout way
         if( go2() == 12 )
+        {
+            <<< "Reached eval" >>>;
             Machine.eval( "<<<\"success\">>>;" );
+        }
     }
 
     fun int go2()

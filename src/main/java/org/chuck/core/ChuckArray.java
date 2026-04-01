@@ -226,6 +226,34 @@ public class ChuckArray extends ChuckObject {
         if (size() >= 4) setFloat(3, w);
     }
 
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        if ("complex".equals(vecTag)) {
+            return String.format("#(%.4f,%.4f)", getNumeric(0), getNumeric(1));
+        } else if ("polar".equals(vecTag)) {
+            return String.format("%%(%.4f,%.4f*pi)", getNumeric(0), getNumeric(1) / Math.PI);
+        } else if (vecTag != null && vecTag.startsWith("vec")) {
+            sb.append("@(");
+            for (int i = 0; i < size(); i++) {
+                sb.append(String.format("%.4f", getNumeric(i)));
+                if (i < size() - 1) sb.append(",");
+            }
+            sb.append(")");
+            return sb.toString();
+        } else {
+            sb.append("@(");
+            for (int i = 0; i < size(); i++) {
+                if (isObjectAt(i)) sb.append(getObject(i));
+                else if (isDoubleAt(i)) sb.append(String.format("%.6f", getFloat(i)));
+                else sb.append(getInt(i));
+                if (i < size() - 1) sb.append(",");
+            }
+            sb.append(")");
+            return sb.toString();
+        }
+    }
+
     /** Magnitude (length) of the vector. */
     public double magnitude() {
         double sum = 0;

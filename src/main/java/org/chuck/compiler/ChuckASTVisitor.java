@@ -15,7 +15,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     @Override
     public List<ChuckAST.Stmt> visitProgram(ProgramContext ctx) {
         return ctx.children.stream()
-                .filter(c -> c instanceof StatementContext || c instanceof FunctionDefContext || c instanceof ClassDefContext)
+                .filter(c -> c instanceof StatementContext || c instanceof FunctionDefContext || c instanceof ClassDefinitionContext)
                 .map(c -> (ChuckAST.Stmt) visit(c))
                 .filter(s -> s != null)
                 .collect(Collectors.toList());
@@ -38,21 +38,26 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
     @Override 
     public ChuckAST.Stmt visitExpressionStmt(ExpressionStmtContext ctx) { 
-        Object result = visit(ctx.expression());
-        return switch (result) {
-            case List<?> list -> {
-                List<ChuckAST.Stmt> stmts = new ArrayList<>();
+        List<ChuckAST.Exp> flattened = new ArrayList<>();
+        for (ExpressionContext ectx : ctx.expression()) {
+            Object result = visit(ectx);
+            if (result instanceof List<?> list) {
                 for (Object item : list) {
-                    if (item instanceof ChuckAST.Exp exp) {
-                        stmts.add(new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()));
-                    }
+                    if (item instanceof ChuckAST.Exp exp) flattened.add(exp);
                 }
-                yield (stmts.size() == 1) ? stmts.get(0) : new ChuckAST.BlockStmt(stmts, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+            } else if (result instanceof ChuckAST.Exp exp) {
+                flattened.add(exp);
             }
-            case ChuckAST.Stmt stmt -> stmt;
-            case ChuckAST.Exp exp -> new ChuckAST.ExpStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-            default -> null;
-        };
+        }
+        
+        if (flattened.size() == 1) {
+            return new ChuckAST.ExpStmt(flattened.get(0), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        } else {
+            List<ChuckAST.Stmt> stmts = flattened.stream()
+                    .map(e -> new ChuckAST.ExpStmt(e, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()))
+                    .collect(Collectors.toList());
+            return new ChuckAST.BlockStmt(stmts, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        }
     }
 
     // --- Statement Implementations ---
@@ -175,6 +180,15 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         
         boolean isGlobal = ctx.accessModifier() != null && ctx.accessModifier().GLOBAL() != null;
         boolean isStatic = ctx.STATIC() != null;
+        boolean isConst = ctx.CONST() != null || (ctx.accessModifier() != null && ctx.accessModifier().CONST() != null);
+
+        if (ctx.variableDecl().size() > 1) {
+            for (VariableDeclContext v : ctx.variableDecl()) {
+                if (v.CHUCK_OP() != null) {
+                    throw new RuntimeException("assignment not allowed in multi-variable declaration");
+                }
+            }
+        }
 
         for (VariableDeclContext v : ctx.variableDecl()) {
             List<ChuckAST.Exp> arraySizes = new ArrayList<>();
@@ -197,11 +211,20 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
             // vec/complex/polar are value types stored as ChuckArrays — instantiate, don't treat as null reference
             
-            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(typeStr, v.ID().getText(), arraySizes, null, isRef, isStatic, isGlobal,
+            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(typeStr, v.ID().getText(), arraySizes, null, isRef, isStatic, isGlobal, isConst,
                     v.getStart().getLine(), v.getStart().getCharPositionInLine());            
             
             if (v.CHUCK_OP() != null) {
-                ChuckAST.Exp rhs = (ChuckAST.Exp) visit(v.expression());
+                Object result = visit(v.expression());
+                ChuckAST.Exp rhs;
+                if (result instanceof List<?> list) {
+                    if (list.size() > 1) {
+                        throw new RuntimeException("cannot '=>' from/to a multi-variable declaration");
+                    }
+                    rhs = (ChuckAST.Exp) list.get(0);
+                } else {
+                    rhs = (ChuckAST.Exp) result;
+                }
                 ChuckAST.Operator op = mapChuckOp(v.CHUCK_OP().getText());
                 decls.add(new ChuckAST.BinaryExp(declExp, op, rhs, v.getStart().getLine(), v.getStart().getCharPositionInLine()));
             } else {
@@ -263,8 +286,21 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         Object left = visit(ctx.expression(0));
         Object right = visit(ctx.expression(1));
         
-        ChuckAST.Exp lExp = left instanceof ChuckAST.Exp ? (ChuckAST.Exp) left : new ChuckAST.IntExp(0, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-        ChuckAST.Exp rExp = right instanceof ChuckAST.Exp ? (ChuckAST.Exp) right : new ChuckAST.IntExp(0, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        ChuckAST.Exp lExp;
+        if (left instanceof List<?> list) {
+            if (list.size() > 1) throw new RuntimeException("cannot '=>' from/to a multi-variable declaration");
+            lExp = (ChuckAST.Exp) list.get(0);
+        } else {
+            lExp = (ChuckAST.Exp) left;
+        }
+
+        ChuckAST.Exp rExp;
+        if (right instanceof List<?> list) {
+            if (list.size() > 1) throw new RuntimeException("cannot '=>' from/to a multi-variable declaration");
+            rExp = (ChuckAST.Exp) list.get(0);
+        } else {
+            rExp = (ChuckAST.Exp) right;
+        }
         
         return new ChuckAST.BinaryExp(lExp, op, rExp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
@@ -340,7 +376,30 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     @Override public ChuckAST.Exp visitStringLit(StringLitContext ctx) { 
         String s = ctx.getText();
         if (s.length() < 2) return new ChuckAST.StringExp("", ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-        return new ChuckAST.StringExp(s.substring(1, s.length() - 1), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); 
+        String content = s.substring(1, s.length() - 1);
+        return new ChuckAST.StringExp(unescape(content), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); 
+    }
+
+    private String unescape(String s) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\\' && i + 1 < s.length()) {
+                char next = s.charAt(++i);
+                switch (next) {
+                    case 'n' -> sb.append('\n');
+                    case 'r' -> sb.append('\r');
+                    case 't' -> sb.append('\t');
+                    case '\"' -> sb.append('\"');
+                    case '\'' -> sb.append('\'');
+                    case '\\' -> sb.append('\\');
+                    default -> sb.append(next);
+                }
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
     @Override public ChuckAST.Exp visitTrueLit(TrueLitContext ctx) { return new ChuckAST.IntExp(1, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); }
     @Override public ChuckAST.Exp visitFalseLit(FalseLitContext ctx) { return new ChuckAST.IntExp(0, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); }
@@ -413,12 +472,26 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     @Override
     public ChuckAST.Stmt visitFunctionDef(FunctionDefContext ctx) {
         String retType = ctx.type() != null ? ctx.type().getText() : "void";
-        String name = ctx.functionName().getText();
+        String name = "";
+        if (ctx.functionName() != null) {
+            name = ctx.functionName().getText();
+        } else if (ctx.OPERATOR() != null) {
+            name = (ctx.REFERENCE_TAG() != null ? "@" : "") + "operator";
+        }
+        
+        if (ctx.postfixOpToken() != null) {
+            name += ctx.postfixOpToken().getText();
+        }
+
         boolean isPublic = ctx.PUBLIC() != null || (ctx.accessModifier() != null && ctx.accessModifier().PUBLIC() != null);
         boolean isStatic = ctx.STATIC() != null;
 
         if (name.startsWith("@operator") || name.startsWith("operator")) {
             String opSym = name.startsWith("@operator") ? name.substring("@operator".length()).trim() : name.substring("operator".length()).trim();
+            // Handle formal parenthesis notation like @operator(%)
+            if (opSym.startsWith("(") && opSym.endsWith(")")) {
+                opSym = opSym.substring(1, opSym.length() - 1).trim();
+            }
             if (isPublic) name = "__pub_op__" + opSym;
             else name = "__op__" + opSym;
         }
@@ -435,11 +508,11 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     }
 
     @Override
-    public ChuckAST.Stmt visitClassDef(ClassDefContext ctx) {
+    public ChuckAST.Stmt visitClassDefinition(ClassDefinitionContext ctx) {
         String name = ctx.ID().getText();
         String parentName = ctx.EXTENDS() != null ? ctx.typeName().getText() : null;
         List<ChuckAST.Stmt> body = ctx.children.stream()
-            .filter(c -> c instanceof StatementContext || c instanceof FunctionDefContext)
+            .filter(c -> c instanceof StatementContext || c instanceof FunctionDefContext || c instanceof ClassDefinitionContext)
             .map(c -> (ChuckAST.Stmt) visit(c))
             .filter(s -> s != null)
             .collect(Collectors.toList());
@@ -474,7 +547,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         // Special prefix to signal emitter this is a 'new' expression
         String namePrefix = isArray ? "@new_array_" : "@new_";
         return new ChuckAST.DeclExp(typeStr, namePrefix + ctx.getStart().getLine() + "_" + ctx.getStart().getCharPositionInLine(), 
-                arraySizes, callArgs, false, false, false, 
+                arraySizes, callArgs, false, false, false, false, 
                 ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 }

@@ -5,6 +5,7 @@ import org.chuck.core.ChuckVM;
 
 import java.io.File;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.HashMap;
@@ -89,7 +90,7 @@ public class ChuginLoader {
                     }
                 }
             }
-        } catch (Exception e) {
+        } catch (IllegalAccessException | IllegalArgumentException | InstantiationException | NoSuchMethodException | InvocationTargetException e) {
             System.err.println("Failed to instantiate chugin type " + type + ": " + e.getMessage());
             return null;
         }
