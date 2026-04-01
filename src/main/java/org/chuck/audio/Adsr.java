@@ -1,7 +1,8 @@
 package org.chuck.audio;
 
-import jdk.incubator.vector.FloatVector;
 import static org.chuck.audio.VectorAudio.SPECIES;
+
+import jdk.incubator.vector.FloatVector;
 
 /**
  * An Attack, Decay, Sustain, Release envelope generator.
@@ -145,33 +146,29 @@ public class Adsr extends ChuckUGen {
         lastTickTime = systemTime;
 
         switch (state) {
-            case ATTACK_ENUM:
+            case ATTACK_ENUM -> {
                 currentLevel += attackInc;
                 if (currentLevel >= 1.0f) {
                     currentLevel = 1.0f;
                     state = State.DECAY_ENUM;
                 }
-                break;
-            case DECAY_ENUM:
+            }
+            case DECAY_ENUM -> {
                 currentLevel -= decayInc;
                 if (currentLevel <= sustainLevel) {
                     currentLevel = sustainLevel;
                     state = State.SUSTAIN_ENUM;
                 }
-                break;
-            case SUSTAIN_ENUM:
-                currentLevel = sustainLevel;
-                break;
-            case RELEASE_ENUM:
+            }
+            case SUSTAIN_ENUM -> currentLevel = sustainLevel;
+            case RELEASE_ENUM -> {
                 currentLevel -= releaseInc;
                 if (currentLevel <= 0.0f) {
                     currentLevel = 0.0f;
                     state = State.DONE_ENUM;
                 }
-                break;
-            case DONE_ENUM:
-                currentLevel = 0.0f;
-                break;
+            }
+            case DONE_ENUM -> currentLevel = 0.0f;
         }
     }
     

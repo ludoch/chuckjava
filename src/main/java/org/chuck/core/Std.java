@@ -4,6 +4,9 @@ package org.chuck.core;
  * Standard library functions for ChucK.
  */
 public class Std {
+    /** Shared seeded Random instance for srandom/shuffle. */
+    public static java.util.Random rng = new java.util.Random();
+
     /**
      * Converts a MIDI note number to a frequency in Hertz.
      */

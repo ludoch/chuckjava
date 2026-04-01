@@ -24,7 +24,7 @@ public class MidiOut extends ChuckObject {
             if (!device.isOpen()) device.open();
             receiver = device.getReceiver();
             return 1;
-        } catch (Exception e) {
+        } catch (MidiUnavailableException e) {
             System.err.println("MidiOut: Error opening port " + port + ": " + e.getMessage());
             return 0;
         }

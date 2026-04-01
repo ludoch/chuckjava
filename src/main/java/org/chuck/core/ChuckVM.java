@@ -247,9 +247,7 @@ public class ChuckVM {
         boolean doLog;
         try {
             doLog = !activeShreds.isEmpty();
-            // If sporking while other shreds are running (e.g. Machine.eval/add),
-            // schedule for next sample to avoid processing in the same runShredsAt call.
-            long wt = doLog ? currentTime.get() + 1 : currentTime.get();
+            long wt = currentTime.get();
             shred.setWakeTime(wt);
             shreduler.offer(shred);
             activeShreds.put(shred.getId(), shred);

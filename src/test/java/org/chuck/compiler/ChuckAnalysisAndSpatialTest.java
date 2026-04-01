@@ -38,7 +38,7 @@ public class ChuckAnalysisAndSpatialTest {
         });
         ChuckASTVisitor visitor = new ChuckASTVisitor();
         @SuppressWarnings("unchecked")
-        List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
+        List<org.chuck.compiler.ChuckAST.Stmt> ast = (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
         ChuckEmitter emitter = new ChuckEmitter();
         ChuckCode code = emitter.emit(ast, "Test");
         ChuckVM vm = new ChuckVM(44100);

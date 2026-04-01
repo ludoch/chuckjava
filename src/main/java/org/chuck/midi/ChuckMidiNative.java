@@ -106,12 +106,13 @@ public class ChuckMidiNative {
     }
 
     public void close() {
-        if (!rtmidiIn.equals(MemorySegment.NULL)) {
-            try {
-                closeIn.invoke(rtmidiIn);
-                rtmidiIn = MemorySegment.NULL;
-            } catch (Throwable t) {}
+        try (arena) {
+            if (!rtmidiIn.equals(MemorySegment.NULL)) {
+                try {
+                    closeIn.invoke(rtmidiIn);
+                    rtmidiIn = MemorySegment.NULL;
+                } catch (Throwable t) {}
+            }
         }
-        arena.close();
     }
 }

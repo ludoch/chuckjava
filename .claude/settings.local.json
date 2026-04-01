@@ -30,7 +30,10 @@
       "Bash(find /c/Users/ludo/a/chuckjava/src/test/java/org/chuck/compiler -name \"*.java\" -exec wc -l {})",
       "Bash(head -50 /c/Users/ludo/a/chuckjava/examples/basic/*.ck)",
       "Bash(find C:/Users/ludo/a/chuckjava/target/surefire-reports -name *.txt)",
-      "Bash(find C:/Users/ludo/a/chuckjava/src/test -name *.ck -path *01-Basic*)"
+      "Bash(find C:/Users/ludo/a/chuckjava/src/test -name *.ck -path *01-Basic*)",
+      "Bash(do echo:*)",
+      "Read(//c/Users/ludo/a/chuckjava/src/test/01-Basic/**)",
+      "Bash(done)"
     ]
   }
 }

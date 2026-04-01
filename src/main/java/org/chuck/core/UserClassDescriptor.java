@@ -14,12 +14,18 @@ public record UserClassDescriptor(
     Map<String, ChuckCode> staticMethods,
     Map<String, Long> staticInts,
     Map<String, Boolean> staticIsDouble,
-    Map<String, Object> staticObjects
+    Map<String, Object> staticObjects,
+    ChuckCode preCtorCode
 ) {
     public UserClassDescriptor(String name, String parentName, List<String[]> fields, Map<String, ChuckCode> methods, Map<String, ChuckCode> staticMethods) {
-        this(name, parentName, fields, methods, staticMethods, 
-             new java.util.concurrent.ConcurrentHashMap<>(), 
-             new java.util.concurrent.ConcurrentHashMap<>(), 
-             new java.util.concurrent.ConcurrentHashMap<>());
+        this(name, parentName, fields, methods, staticMethods,
+             new java.util.concurrent.ConcurrentHashMap<>(),
+             new java.util.concurrent.ConcurrentHashMap<>(),
+             new java.util.concurrent.ConcurrentHashMap<>(),
+             null);
+    }
+    public UserClassDescriptor(String name, String parentName, List<String[]> fields, Map<String, ChuckCode> methods, Map<String, ChuckCode> staticMethods,
+                               Map<String, Long> staticInts, Map<String, Boolean> staticIsDouble, Map<String, Object> staticObjects) {
+        this(name, parentName, fields, methods, staticMethods, staticInts, staticIsDouble, staticObjects, null);
     }
 }

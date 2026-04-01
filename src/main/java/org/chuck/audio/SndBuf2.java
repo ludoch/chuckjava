@@ -1,6 +1,9 @@
 package org.chuck.audio;
 
-import org.chuck.core.ChuckType;
+import java.io.IOException;
+
+import javax.sound.sampled.UnsupportedAudioFileException;
+
 
 /**
  * SndBuf2: Stereo sample playback.
@@ -65,7 +68,7 @@ public class SndBuf2 extends StereoUGen {
                 }
             }
             ais.close();
-        } catch (Exception e) {
+        } catch (IOException | UnsupportedAudioFileException e) {
             samples = new float[2][0];
         }
         pos = 0;

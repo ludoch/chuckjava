@@ -16,7 +16,7 @@ public class Bowed extends ChuckUGen {
     private float vibratoGain = 0.0f;
     @SuppressWarnings("unused")
     private double freq = 220.0;
-    private float sampleRate;
+    private final float sampleRate;
     
     private double phase = 0.0;
 

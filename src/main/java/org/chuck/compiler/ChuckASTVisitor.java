@@ -339,7 +339,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     }
     @Override public ChuckAST.Exp visitTrueLit(TrueLitContext ctx) { return new ChuckAST.IntExp(1, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); }
     @Override public ChuckAST.Exp visitFalseLit(FalseLitContext ctx) { return new ChuckAST.IntExp(0, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); }
-    @Override public ChuckAST.Exp visitNullLit(NullLitContext ctx) { return new ChuckAST.IntExp(0, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); }
+    @Override public ChuckAST.Exp visitNullLit(NullLitContext ctx) { return new ChuckAST.IdExp("null", ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); }
     @Override public ChuckAST.Exp visitNowExp(NowExpContext ctx) { return new ChuckAST.IdExp("now", ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); }
     @Override public ChuckAST.Exp visitMeExp(MeExpContext ctx) { return new ChuckAST.IdExp("me", ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); }
     @Override public ChuckAST.Exp visitIdExp(IdExpContext ctx) { return new ChuckAST.IdExp(ctx.getText(), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); }
@@ -359,6 +359,13 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     public ChuckAST.Exp visitCallExp(CallExpContext ctx) {
         List<ChuckAST.Exp> args = ctx.expressionList() != null ? (List<ChuckAST.Exp>) visit(ctx.expressionList()) : new ArrayList<>();
         return new ChuckAST.CallExp((ChuckAST.Exp) visit(ctx.primary()), args, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
+
+    @Override
+    public ChuckAST.Exp visitCastExp(ChuckANTLRParser.CastExpContext ctx) {
+        ChuckAST.Exp value = (ChuckAST.Exp) visit(ctx.expression());
+        String targetType = ctx.type().getText();
+        return new ChuckAST.CastExp(value, targetType, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     @Override

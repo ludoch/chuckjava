@@ -1,14 +1,14 @@
 package org.chuck;
 
-import org.chuck.core.ChuckVM;
-import org.chuck.audio.ChuckAudio;
-import org.chuck.core.ChuckDSL;
-import org.junit.jupiter.api.Test;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+
+import org.chuck.core.ChuckDSL;
+import org.chuck.core.ChuckVM;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 public class PolyphonyDSLTest {
 

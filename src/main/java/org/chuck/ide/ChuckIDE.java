@@ -1,34 +1,5 @@
 package org.chuck.ide;
 
-import javafx.application.Application;
-import javafx.application.Platform;
-import javafx.geometry.Bounds;
-import javafx.geometry.Insets;
-import javafx.geometry.Orientation;
-import javafx.scene.Scene;
-import javafx.scene.canvas.Canvas;
-import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.control.*;
-import javafx.scene.input.KeyCode;
-import javafx.scene.input.KeyCodeCombination;
-import javafx.scene.input.KeyCombination;
-import javafx.scene.input.KeyEvent;
-import javafx.scene.input.MouseEvent;
-import javafx.scene.layout.*;
-import javafx.scene.paint.Color;
-import javafx.stage.FileChooser;
-import javafx.stage.Popup;
-import javafx.stage.Stage;
-import org.chuck.audio.ChuckAudio;
-import org.chuck.audio.FFT;
-import org.chuck.audio.UAnaBlob;
-import org.chuck.core.*;
-import org.chuck.hid.HidMsg;
-import org.fxmisc.richtext.CodeArea;
-import org.fxmisc.richtext.LineNumberFactory;
-import org.fxmisc.richtext.model.StyleSpans;
-import org.fxmisc.richtext.model.StyleSpansBuilder;
-
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -41,6 +12,67 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import org.chuck.audio.ChuckAudio;
+import org.chuck.audio.FFT;
+import org.chuck.audio.UAnaBlob;
+import org.chuck.core.ChuckCode;
+import org.chuck.core.ChuckDSL;
+import org.chuck.core.ChuckShred;
+import org.chuck.core.ChuckVM;
+import org.chuck.hid.HidMsg;
+import org.fxmisc.richtext.CodeArea;
+import org.fxmisc.richtext.LineNumberFactory;
+import org.fxmisc.richtext.model.StyleSpans;
+import org.fxmisc.richtext.model.StyleSpansBuilder;
+
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.geometry.Bounds;
+import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
+import javafx.scene.Scene;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
+import javafx.scene.control.ChoiceDialog;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListCell;
+import javafx.scene.control.ListView;
+import javafx.scene.control.Menu;
+import javafx.scene.control.MenuBar;
+import javafx.scene.control.MenuItem;
+import javafx.scene.control.Separator;
+import javafx.scene.control.SeparatorMenuItem;
+import javafx.scene.control.Slider;
+import javafx.scene.control.SplitPane;
+import javafx.scene.control.Tab;
+import javafx.scene.control.TabPane;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextInputDialog;
+import javafx.scene.control.ToolBar;
+import javafx.scene.control.TreeCell;
+import javafx.scene.control.TreeItem;
+import javafx.scene.control.TreeView;
+import javafx.scene.input.KeyCode;
+import javafx.scene.input.KeyCodeCombination;
+import javafx.scene.input.KeyCombination;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.Pane;
+import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
+import javafx.scene.layout.StackPane;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.stage.FileChooser;
+import javafx.stage.Popup;
+import javafx.stage.Stage;
 
 /**
  * Professional desktop IDE for ChucK-Java (JDK 25).
@@ -176,7 +208,7 @@ public class ChuckIDE extends Application {
                 try {
                     int v = Integer.parseInt(arg.substring("--verbose:".length()));
                     audio.setVerbose(v);
-                } catch (Exception ignored) {}
+                } catch (NumberFormatException ignored) {}
             }
         }
         
@@ -613,7 +645,7 @@ public class ChuckIDE extends Application {
                 })
                 .distinct()
                 .collect(Collectors.toList());
-        } catch (Exception e) {
+        } catch (ClassNotFoundException e) {
             // Fallback to static member list if reflection fails
             return MEMBER_CANDIDATES;
         }
@@ -724,10 +756,12 @@ public class ChuckIDE extends Application {
             Alert a = new Alert(Alert.AlertType.INFORMATION);
             a.setTitle("About ChucK-Java");
             a.setHeaderText("ChucK-Java — JDK 25 port");
-            a.setContentText(
-                "A modern port of the ChucK strongly-timed music language to Java 25.\n\n" +
-                "Features: Virtual Threads, Vector API, JavaFX IDE with syntax highlighting.\n\n" +
-                "Original ChucK: https://chuck.stanford.edu/");
+            a.setContentText("""
+                             A modern port of the ChucK strongly-timed music language to Java 25.
+                             
+                             Features: Virtual Threads, Vector API, JavaFX IDE with syntax highlighting.
+                             
+                             Original ChucK: https://chuck.stanford.edu/""");
             a.showAndWait();
         });
         helpMenu.getItems().add(aboutItem);
@@ -747,7 +781,7 @@ public class ChuckIDE extends Application {
             dialog.setTitle("Scope Window");
             dialog.setHeaderText("Enter window size in samples");
             dialog.showAndWait().ifPresent(s -> {
-                try { scope.setWindowSize(Integer.parseInt(s)); } catch (Exception ignored) {}
+                try { scope.setWindowSize(Integer.parseInt(s)); } catch (NumberFormatException ignored) {}
             });
         });
         vizMenu.getItems().addAll(fftSize, scopeSize);

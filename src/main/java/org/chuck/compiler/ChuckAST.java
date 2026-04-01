@@ -53,6 +53,7 @@ public sealed interface ChuckAST {
     record SporkExp(CallExp call, int line, int column) implements Exp {}
     record DeclExp(String type, String name, java.util.List<Exp> arraySizes, Exp callArgs, boolean isReference, boolean isStatic, boolean isGlobal, int line, int column) implements Exp {}
     record TernaryExp(Exp condition, Exp thenExp, Exp elseExp, int line, int column) implements Exp {}
+    record CastExp(Exp value, String targetType, int line, int column) implements Exp {}
 
     // --- Statement Nodes ---
 

@@ -1,5 +1,7 @@
 package org.chuck.core;
 
+import java.lang.reflect.InvocationTargetException;
+
 import org.chuck.audio.ChuckUGen;
 
 /**
@@ -63,6 +65,7 @@ public class ChuckDSL {
      * Compiles a Java DSL file into a Runnable that can be sporked.
      * The class in the file must implement org.chuck.core.Shred or have a shred() method.
      */
+    @SuppressWarnings("CallToPrintStackTrace")
     public static Runnable load(java.nio.file.Path path) throws Exception {
         var compiler = javax.tools.ToolProvider.getSystemJavaCompiler();
         if (compiler == null) throw new RuntimeException("JDK Compiler not found. Ensure you are running on a full JDK.");
@@ -109,7 +112,7 @@ public class ChuckDSL {
                     var method = clazz.getMethod("shred");
                     method.invoke(instance);
                 }
-            } catch (Exception e) {
+            } catch (IllegalAccessException | IllegalArgumentException | InstantiationException | NoSuchMethodException | InvocationTargetException e) {
                 System.err.println("Runtime error in Java Shred: " + className);
                 e.printStackTrace();
             }

@@ -10,12 +10,8 @@ public class BeeThree extends ChuckUGen {
     private final SinOsc op2;   // second harmonic
     private final SinOsc op3;   // sub-harmonic
     private final Adsr env;
-    private double baseFreq = 440.0;
-    @SuppressWarnings("unused")
-    private final float sampleRate;
 
     public BeeThree(float sampleRate) {
-        this.sampleRate = sampleRate;
         this.op1 = new SinOsc(sampleRate);
         this.op2 = new SinOsc(sampleRate);
         this.op3 = new SinOsc(sampleRate);
@@ -26,7 +22,6 @@ public class BeeThree extends ChuckUGen {
     }
 
     public void setFreq(double freq) {
-        this.baseFreq = freq;
         op1.setFreq(freq);          // fundamental (8' drawbar)
         op2.setFreq(freq * 2.0);    // octave (4' drawbar)
         op3.setFreq(freq * 0.5);    // sub-octave (16' drawbar)

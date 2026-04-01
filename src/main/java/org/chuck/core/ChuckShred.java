@@ -58,10 +58,27 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     private final ReentrantLock lock = new ReentrantLock();
     private final Condition condition = lock.newCondition();
     
+    /** The shred that sporked this one, or null for the top-level shred. */
+    private ChuckShred parentShred = null;
+
     public ChuckShred(ChuckCode code) {
         super(new ChuckType("Shred", ChuckType.OBJECT, 0, 0));
         this.id = ID_GENERATOR.getAndIncrement();
         this.code = code;
+    }
+
+    public void setParentShred(ChuckShred parent) { this.parentShred = parent; }
+
+    /** Returns the parent shred (the shred that sporked this one), or null if top-level. */
+    public ChuckShred parent() { return parentShred; }
+
+    /** Returns the top-level ancestor shred. For top-level shreds, returns this. */
+    public ChuckShred ancestor() {
+        ChuckShred cur = this;
+        while (cur.parentShred != null) {
+            cur = cur.parentShred;
+        }
+        return cur;
     }
     
     private ChuckEvent eventWaitingOn = null;
