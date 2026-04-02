@@ -16,11 +16,13 @@ public class EqualAny implements ChuckInstr {
         boolean isDouble2 = s.reg.isDoubleAt(sp - 2);
         
         boolean equal = false;
-        if (isObj1 && isObj2) {
+        if (s.reg.isObject(0) && s.reg.isObject(1)) {
             Object o1 = s.reg.popObject();
             Object o2 = s.reg.popObject();
-            equal = (o1 == o2 || (o1 != null && o1.equals(o2)));
-        } else if (isDouble1 || isDouble2) {
+            if (o1 == o2) equal = true;
+            else if (o1 == null || o2 == null) equal = false;
+            else equal = o1.toString().equals(o2.toString());
+        } else if (s.reg.isDouble(0) || s.reg.isDouble(1) || s.reg.isObject(0) || s.reg.isObject(1)) {
             double v1 = s.reg.popAsDouble();
             double v2 = s.reg.popAsDouble();
             equal = (v1 == v2);

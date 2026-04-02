@@ -125,6 +125,34 @@ public Object popObject() {
         }
     }
 
+    public void dup() {
+        if (sp <= 0) throw new RuntimeException("ChucK stack underflow on Dup");
+        int src = sp - 1;
+        if (isObject[src]) pushObject(objects[src]);
+        else if (isDouble[src]) push(Double.longBitsToDouble(primitives[src]));
+        else push(primitives[src]);
+    }
+
+    public void swap() {
+        if (sp < 2) throw new RuntimeException("ChucK stack underflow on Swap");
+        int i1 = sp - 1, i2 = sp - 2;
+        
+        long tmpP = primitives[i1];
+        boolean tmpD = isDouble[i1];
+        boolean tmpO = isObject[i1];
+        Object tmpObj = objects[i1];
+        
+        primitives[i1] = primitives[i2];
+        isDouble[i1] = isDouble[i2];
+        isObject[i1] = isObject[i2];
+        objects[i1] = objects[i2];
+        
+        primitives[i2] = tmpP;
+        isDouble[i2] = tmpD;
+        isObject[i2] = tmpO;
+        objects[i2] = tmpObj;
+    }
+
     public int getSp() { return sp; }
     public void setSp(int newSp) {
         for (int i = newSp; i < sp; i++) {

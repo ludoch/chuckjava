@@ -44,6 +44,19 @@ import org.chuck.core.StringTokenizer;
 import org.chuck.core.UGenRegistry;
 import org.chuck.core.UserClassDescriptor;
 import org.chuck.core.UserObject;
+import org.chuck.core.instr.ArithmeticInstrs;
+import org.chuck.core.instr.LogicInstrs;
+import org.chuck.core.instr.StackInstrs;
+import org.chuck.core.instr.ControlInstrs;
+import org.chuck.core.instr.TypeInstrs;
+import org.chuck.core.instr.ObjectInstrs;
+import org.chuck.core.instr.PushInstrs;
+import org.chuck.core.instr.MachineCall;
+import org.chuck.core.instr.ComplexInstrs;
+import org.chuck.core.instr.PolarInstrs;
+import org.chuck.core.instr.VecInstrs;
+import org.chuck.core.instr.FieldInstrs;
+import org.chuck.core.instr.VarInstrs;
 
 /**
  * Emits executable VM instructions from a parsed AST.
@@ -95,7 +108,7 @@ public class ChuckEmitter {
 
     // Core non-UGen data types
     private static final java.util.Set<String> CORE_DATA_TYPES = java.util.Set.of(
-            "int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar", "Object", "Array", "Type",
+            "int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar", "Object", "Array", "Type", "auto",
             "MidiMsg", "HidMsg", "OscMsg", "FileIO", "IO", "SerialIO", "OscIn", "OscOut", "OscBundle", "MidiIn", "MidiOut", "Hid", "StringTokenizer", "RegEx", "Reflect"
     );
 
@@ -412,7 +425,7 @@ public class ChuckEmitter {
                     }
                 }
                 emitExpression(s.exp(), code);
-                code.addInstruction(new Pop());
+                code.addInstruction(new StackInstrs.Pop());
             }
             case ChuckAST.WhileStmt s -> {
                 int startPc = code.getNumInstructions();
@@ -423,15 +436,15 @@ public class ChuckEmitter {
                 int jumpIdx = code.getNumInstructions();
                 code.addInstruction(null); // placeholder for JumpIfFalse
                 emitStatement(s.body(), code);
-                code.addInstruction(new Jump(startPc));
+                code.addInstruction(new ControlInstrs.Jump(startPc));
                 int endPc = code.getNumInstructions();
-                code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
+                code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfFalse(endPc));
 
                 for (int jump : breakJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(endPc));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(endPc));
                 }
                 for (int jump : continueJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(startPc));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(startPc));
                 }
             }
             case ChuckAST.UntilStmt s -> {
@@ -440,19 +453,19 @@ public class ChuckEmitter {
                 breakJumps.push(new ArrayList<>());
 
                 emitExpression(s.condition(), code);
-                code.addInstruction(new LogicalNot());
+                code.addInstruction(new LogicInstrs.LogicalNot());
                 int jumpIdx = code.getNumInstructions();
                 code.addInstruction(null); // placeholder for JumpIfFalse
                 emitStatement(s.body(), code);
-                code.addInstruction(new Jump(startPc));
+                code.addInstruction(new ControlInstrs.Jump(startPc));
                 int endPc = code.getNumInstructions();
-                code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
+                code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfFalse(endPc));
 
                 for (int jump : breakJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(endPc));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(endPc));
                 }
                 for (int jump : continueJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(startPc));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(startPc));
                 }
             }
             case ChuckAST.DoStmt s -> {
@@ -467,16 +480,16 @@ public class ChuckEmitter {
 
                 emitExpression(s.condition(), code);
                 if (s.isUntil()) {
-                    code.addInstruction(new LogicalNot());
+                    code.addInstruction(new LogicInstrs.LogicalNot());
                 }
-                code.addInstruction(new JumpIfTrue(bodyStart));
+                code.addInstruction(new ControlInstrs.JumpIfTrue(bodyStart));
                 int endPc = code.getNumInstructions();
 
                 for (int jump : breakJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(endPc));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(endPc));
                 }
                 for (int jump : continueJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(condStart));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(condStart));
                 }
             }
             case ChuckAST.BreakStmt _ -> {
@@ -503,15 +516,15 @@ public class ChuckEmitter {
                     if (c.isDefault()) {
                         defaultCase = c;
                     } else {
-                        code.addInstruction(new Duplicate());
+                        code.addInstruction(new StackInstrs.Dup());
                         emitExpression(c.match(), code);
-                        code.addInstruction(new EqualAny());
+                        code.addInstruction(new LogicInstrs.EqualsAny());
                         caseConditionJumps.add(code.getNumInstructions());
                         code.addInstruction(null); // JumpIfTrue
                     }
                 }
 
-                code.addInstruction(new Pop()); // pop switch value if no match
+                code.addInstruction(new StackInstrs.Pop()); // pop switch value if no match
                 int jumpToDefaultOrEnd = code.getNumInstructions();
                 code.addInstruction(null); // Jump to default or end
 
@@ -520,8 +533,8 @@ public class ChuckEmitter {
                     if (c.isDefault()) {
                         defaultBodyStartIndex = code.getNumInstructions();
                     } else {
-                        code.replaceInstruction(caseConditionJumps.get(caseIdx++), new JumpIfTrue(code.getNumInstructions()));
-                        code.addInstruction(new Pop()); // pop switch value before body executes
+                        code.replaceInstruction(caseConditionJumps.get(caseIdx++), new ControlInstrs.JumpIfTrue(code.getNumInstructions()));
+                        code.addInstruction(new StackInstrs.Pop()); // pop switch value before body executes
                     }
                     for (ChuckAST.Stmt b : c.body()) {
                         emitStatement(b, code);
@@ -538,13 +551,13 @@ public class ChuckEmitter {
                 int endPc = code.getNumInstructions();
 
                 if (defaultCase != null) {
-                    code.replaceInstruction(jumpToDefaultOrEnd, new Jump(defaultBodyStartIndex));
+                    code.replaceInstruction(jumpToDefaultOrEnd, new ControlInstrs.Jump(defaultBodyStartIndex));
                 } else {
-                    code.replaceInstruction(jumpToDefaultOrEnd, new Jump(endPc));
+                    code.replaceInstruction(jumpToDefaultOrEnd, new ControlInstrs.Jump(endPc));
                 }
 
                 for (int jump : breakJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(endPc));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(endPc));
                 }
             }
             case ChuckAST.ForStmt s -> {
@@ -556,7 +569,7 @@ public class ChuckEmitter {
                 if (s.condition() instanceof ChuckAST.ExpStmt es) {
                     emitExpression(es.exp(), code);
                 } else {
-                    code.addInstruction(new PushInt(1)); // truthy
+                    code.addInstruction(new PushInstrs.PushInt(1)); // truthy
                 }
                 int jumpIdx = code.getNumInstructions();
                 code.addInstruction(null); // placeholder for JumpIfFalse
@@ -566,17 +579,17 @@ public class ChuckEmitter {
                 int updateStart = code.getNumInstructions();
                 if (s.update() != null) {
                     emitExpression(s.update(), code);
-                    code.addInstruction(new Pop()); // pop update result
+                    code.addInstruction(new StackInstrs.Pop()); // pop update result
                 }
-                code.addInstruction(new Jump(startPc));
+                code.addInstruction(new ControlInstrs.Jump(startPc));
 
                 int endPc = code.getNumInstructions();
-                code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
+                code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfFalse(endPc));
                 for (int jump : breakJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(endPc));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(endPc));
                 }
                 for (int jump : continueJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(updateStart));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(updateStart));
                 }
             }
             case ChuckAST.BlockStmt s -> {
@@ -627,12 +640,12 @@ public class ChuckEmitter {
                         scope.put(s.name(), offset);
                         code.addInstruction(new InstantiateSetAndPushLocal(s.type(), offset, 0, s.isReference(), false, userClassRegistry));
                     }
-                    code.addInstruction(new Dup());
+                    code.addInstruction(new StackInstrs.Dup());
                     for (ChuckAST.Exp arg : call.args()) {
                         emitExpression(arg, code);
                     }
-                    code.addInstruction(new CallMethod(s.type(), call.args().size()));
-                    code.addInstruction(new Pop());
+                    code.addInstruction(new ObjectInstrs.CallMethod(s.type(), call.args().size()));
+                    code.addInstruction(new StackInstrs.Pop());
                 } else {
                     if (s.callArgs() instanceof ChuckAST.CallExp call) {
                         for (ChuckAST.Exp arg : call.args()) {
@@ -648,7 +661,7 @@ public class ChuckEmitter {
                     }
 
                     if (isVec && !s.isReference() && argCount == 0) {
-                        code.addInstruction(new PushInt(0)); // dummy size for instantiation
+                        code.addInstruction(new PushInstrs.PushInt(0)); // dummy size for instantiation
                         argCount = 1;
                     }
 
@@ -657,7 +670,7 @@ public class ChuckEmitter {
                     if (useGlobal) {
                         globalVarTypes.put(s.name(), s.type());
                         code.addInstruction(new InstantiateSetAndPushGlobal(s.type(), s.name(), argCount, s.isReference(), isArrayDecl, userClassRegistry));
-                        code.addInstruction(new Pop());
+                        code.addInstruction(new StackInstrs.Pop());
                     } else {
                         Map<String, Integer> scope = localScopes.peek();
                         Integer offset = scope.get(s.name());
@@ -666,7 +679,7 @@ public class ChuckEmitter {
                             scope.put(s.name(), offset);
                         }
                         code.addInstruction(new InstantiateSetAndPushLocal(s.type(), offset, argCount, s.isReference(), isArrayDecl, userClassRegistry));
-                        code.addInstruction(new Pop());
+                        code.addInstruction(new StackInstrs.Pop());
                     }
                 }
             }
@@ -901,9 +914,9 @@ public class ChuckEmitter {
                             && bexp.rhs() instanceof ChuckAST.DeclExp rDecl
                             && fieldNames.contains(rDecl.name())) {
                         emitExpression(bexp.lhs(), preCtorCodeLocal);
-                        preCtorCodeLocal.addInstruction(new PushThis());
+                        preCtorCodeLocal.addInstruction(new StackInstrs.PushThis());
                         preCtorCodeLocal.addInstruction(new SetMemberIntByName(rDecl.name()));
-                        preCtorCodeLocal.addInstruction(new Pop());
+                        preCtorCodeLocal.addInstruction(new StackInstrs.Pop());
                         continue;
                     }
                     emitStatement(bodyStmt, preCtorCodeLocal);
@@ -1009,13 +1022,13 @@ public class ChuckEmitter {
                     int thenEndIdx = code.getNumInstructions();
                     code.addInstruction(null); // placeholder for Jump (skip else)
                     int elseStartIdx = code.getNumInstructions();
-                    code.replaceInstruction(jumpIdx, new JumpIfFalse(elseStartIdx));
+                    code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfFalse(elseStartIdx));
                     emitStatement(s.elseBranch(), code);
                     int elseEndIdx = code.getNumInstructions();
-                    code.replaceInstruction(thenEndIdx, new Jump(elseEndIdx));
+                    code.replaceInstruction(thenEndIdx, new ControlInstrs.Jump(elseEndIdx));
                 } else {
                     int endIdx = code.getNumInstructions();
-                    code.replaceInstruction(jumpIdx, new JumpIfFalse(endIdx));
+                    code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfFalse(endIdx));
                 }
             }
             case ChuckAST.ForEachStmt s -> {
@@ -1030,15 +1043,15 @@ public class ChuckEmitter {
                 scope.put(collName, collOffset);
                 emitExpression(s.collection(), code);
                 code.addInstruction(new StoreLocal(collOffset));
-                code.addInstruction(new Pop());
+                code.addInstruction(new StackInstrs.Pop());
 
                 // 2. Initialize index local to 0
                 String idxName = "__idx_" + s.iterName() + "_" + s.line() + "_" + s.column();
                 int idxOffset = scope.size();
                 scope.put(idxName, idxOffset);
-                code.addInstruction(new PushInt(0));
+                code.addInstruction(new PushInstrs.PushInt(0));
                 code.addInstruction(new StoreLocal(idxOffset));
-                code.addInstruction(new Pop());
+                code.addInstruction(new StackInstrs.Pop());
 
                 // 3. Loop start
                 int startPc = code.getNumInstructions();
@@ -1048,8 +1061,8 @@ public class ChuckEmitter {
                 // 4. Condition: idx < collection.size()
                 code.addInstruction(new LoadLocal(idxOffset));
                 code.addInstruction(new LoadLocal(collOffset));
-                code.addInstruction(new CallMethod("size", 0));
-                code.addInstruction(new LessThanAny());
+                code.addInstruction(new ObjectInstrs.CallMethod("size", 0));
+                code.addInstruction(new LogicInstrs.LessThanAny());
 
                 int jumpIdx = code.getNumInstructions();
                 code.addInstruction(null); // placeholder for JumpIfFalse
@@ -1070,7 +1083,7 @@ public class ChuckEmitter {
                     varTypes.put(s.iterName(), s.iterType());
                 }
                 code.addInstruction(new StoreLocal(iterOffset));
-                code.addInstruction(new Pop());
+                code.addInstruction(new StackInstrs.Pop());
 
                 // 7. Loop body
                 emitStatement(s.body(), code);
@@ -1078,23 +1091,23 @@ public class ChuckEmitter {
                 // 8. Update: idx++
                 int updateStart = code.getNumInstructions();
                 code.addInstruction(new LoadLocal(idxOffset));
-                code.addInstruction(new PushInt(1));
-                code.addInstruction(new AddAny());
+                code.addInstruction(new PushInstrs.PushInt(1));
+                code.addInstruction(new ArithmeticInstrs.AddAny());
                 code.addInstruction(new StoreLocal(idxOffset));
-                code.addInstruction(new Pop());
+                code.addInstruction(new StackInstrs.Pop());
 
                 // 9. Jump back to condition
-                code.addInstruction(new Jump(startPc));
+                code.addInstruction(new ControlInstrs.Jump(startPc));
 
                 // 10. Loop end
                 int endPc = code.getNumInstructions();
-                code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
+                code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfFalse(endPc));
 
                 for (int jump : breakJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(endPc));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(endPc));
                 }
                 for (int jump : continueJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(updateStart));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(updateStart));
                 }
             }
             case ChuckAST.RepeatStmt s -> {
@@ -1109,7 +1122,7 @@ public class ChuckEmitter {
                 // Store count in local
                 emitExpression(s.count(), code);
                 code.addInstruction(new StoreLocal(cntOffset));
-                code.addInstruction(new Pop());
+                code.addInstruction(new StackInstrs.Pop());
 
                 int startPc = code.getNumInstructions();
                 continueJumps.push(new ArrayList<>());
@@ -1117,8 +1130,8 @@ public class ChuckEmitter {
 
                 // Condition: counter > 0
                 code.addInstruction(new LoadLocal(cntOffset));
-                code.addInstruction(new PushInt(0));
-                code.addInstruction(new GreaterThanAny());
+                code.addInstruction(new PushInstrs.PushInt(0));
+                code.addInstruction(new LogicInstrs.GreaterThanAny());
                 int jumpIdx = code.getNumInstructions();
                 code.addInstruction(null); // placeholder for JumpIfFalse
 
@@ -1128,20 +1141,20 @@ public class ChuckEmitter {
                 // Decrement counter
                 int updateStart = code.getNumInstructions();
                 code.addInstruction(new LoadLocal(cntOffset));
-                code.addInstruction(new PushInt(1));
-                code.addInstruction(new MinusAny());
+                code.addInstruction(new PushInstrs.PushInt(1));
+                code.addInstruction(new ArithmeticInstrs.MinusAny());
                 code.addInstruction(new StoreLocal(cntOffset));
-                code.addInstruction(new Pop());
-                code.addInstruction(new Jump(startPc));
+                code.addInstruction(new StackInstrs.Pop());
+                code.addInstruction(new ControlInstrs.Jump(startPc));
 
                 int endPc = code.getNumInstructions();
-                code.replaceInstruction(jumpIdx, new JumpIfFalse(endPc));
+                code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfFalse(endPc));
 
                 for (int jump : breakJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(endPc));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(endPc));
                 }
                 for (int jump : continueJumps.pop()) {
-                    code.replaceInstruction(jump, new Jump(updateStart));
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(updateStart));
                 }
             }
             default -> {
@@ -1152,13 +1165,13 @@ public class ChuckEmitter {
     private void emitExpression(ChuckAST.Exp exp, ChuckCode code) {
         switch (exp) {
             case ChuckAST.IntExp e ->
-                code.addInstruction(new PushInt(e.value()));
+                code.addInstruction(new PushInstrs.PushInt(e.value()));
             case ChuckAST.FloatExp e ->
-                code.addInstruction(new PushFloat(e.value()));
+                code.addInstruction(new PushInstrs.PushFloat(e.value()));
             case ChuckAST.StringExp e ->
-                code.addInstruction(new PushString(e.value()));
+                code.addInstruction(new PushInstrs.PushString(e.value()));
             case ChuckAST.MeExp _ ->
-                code.addInstruction(new PushMe());
+                code.addInstruction(new PushInstrs.PushMe());
             case ChuckAST.UnaryExp e -> {
                 if (e.op() == ChuckAST.Operator.S_OR) {
                     String innerType = getVarType(e.exp());
@@ -1177,9 +1190,9 @@ public class ChuckEmitter {
                 emitExpression(e.exp(), code);
                 switch (e.op()) {
                     case MINUS ->
-                        code.addInstruction(new NegateAny());
+                        code.addInstruction(new ArithmeticInstrs.NegateAny());
                     case S_OR ->
-                        code.addInstruction(new LogicalNot());
+                        code.addInstruction(new LogicInstrs.LogicalNot());
                     case PLUS -> {
                     }
                     default -> {
@@ -1241,11 +1254,11 @@ public class ChuckEmitter {
                     } else {
                         code.addInstruction(new InstantiateSetAndPushGlobal(e.type(), e.name(), 0, e.isReference(), false, userClassRegistry));
                     }
-                    code.addInstruction(new Dup());
+                    code.addInstruction(new StackInstrs.Dup());
                     for (ChuckAST.Exp arg : call.args()) {
                         emitExpression(arg, code);
                     }
-                    code.addInstruction(new CallMethod(e.type(), call.args().size()));
+                    code.addInstruction(new ObjectInstrs.CallMethod(e.type(), call.args().size()));
                 } else {
                     if (e.callArgs() instanceof ChuckAST.CallExp call) {
                         for (ChuckAST.Exp arg : call.args()) {
@@ -1363,7 +1376,7 @@ public class ChuckEmitter {
                 } else if (e.op() == ChuckAST.Operator.APPEND) {
                     emitExpression(e.lhs(), code);
                     emitExpression(e.rhs(), code);
-                    code.addInstruction(new CallMethod("append", 1));
+                    code.addInstruction(new ObjectInstrs.CallMethod("append", 1));
                 } else if (e.op() == ChuckAST.Operator.NEW) {
                     // Check for empty brackets: new SinOsc[] (error-empty-bracket)
                     if (e.rhs() instanceof ChuckAST.IntExp szNew && szNew.value() < 0) {
@@ -1437,15 +1450,15 @@ public class ChuckEmitter {
                     emitExpression(e.lhs(), code);  // push the operand
                     switch (arith) {
                         case PLUS ->
-                            code.addInstruction(new AddAny());
+                            code.addInstruction(new ArithmeticInstrs.AddAny());
                         case MINUS ->
-                            code.addInstruction(new MinusAny());
+                            code.addInstruction(new ArithmeticInstrs.MinusAny());
                         case TIMES ->
-                            code.addInstruction(new TimesAny());
+                            code.addInstruction(new ArithmeticInstrs.TimesAny());
                         case DIVIDE ->
-                            code.addInstruction(new DivideAny());
+                            code.addInstruction(new ArithmeticInstrs.DivideAny());
                         case PERCENT ->
-                            code.addInstruction(new ModuloAny());
+                            code.addInstruction(new ArithmeticInstrs.ModuloAny());
                         default -> {
                         }
                     }
@@ -1477,12 +1490,12 @@ public class ChuckEmitter {
                     emitExpression(e.rhs(), code);  // push current value again (for arithmetic)
                     emitExpression(e.lhs(), code);  // push 1
                     if (isPostfixPlus) {
-                        code.addInstruction(new AddAny());
+                        code.addInstruction(new ArithmeticInstrs.AddAny());
                     } else {
-                        code.addInstruction(new MinusAny());
+                        code.addInstruction(new ArithmeticInstrs.MinusAny());
                     }
                     emitChuckTarget(e.rhs(), code); // store new value, pushes new value back
-                    code.addInstruction(new Pop());  // discard new value, old value remains
+                    code.addInstruction(new StackInstrs.Pop());  // discard new value, old value remains
                 } else if (e.op() == ChuckAST.Operator.WRITE_IO) {
                     emitExpression(e.rhs(), code);
                     emitExpression(e.lhs(), code);
@@ -1622,12 +1635,20 @@ public class ChuckEmitter {
                                 // Also check for method-style overload in user class
                                 UserClassDescriptor desc = userClassRegistry.get(lhsType);
                                 if (desc != null) {
-                                    String mName = desc.methods().containsKey("__pub_op__" + opSymbol + ":1") ? "__pub_op__" + opSymbol
-                                            : (desc.methods().containsKey("__op__" + opSymbol + ":1") ? "__op__" + opSymbol : null);
-                                    if (mName != null) {
+                                    List<String> argTypes = List.of(getExprType(e.rhs()));
+                                    String pubKey = resolveMethodKey(lhsType, "__pub_op__" + opSymbol, argTypes);
+                                    String privKey = resolveMethodKey(lhsType, "__op__" + opSymbol, argTypes);
+                                    
+                                    if (desc.methods().containsKey(pubKey) || desc.staticMethods().containsKey(pubKey)) {
                                         emitExpression(e.lhs(), code);
                                         emitExpression(e.rhs(), code);
-                                        code.addInstruction(new CallMethod(mName, 1));
+                                        code.addInstruction(new ObjectInstrs.CallMethod("__pub_op__" + opSymbol, 1, pubKey));
+                                        return;
+                                    }
+                                    if (desc.methods().containsKey(privKey) || desc.staticMethods().containsKey(privKey)) {
+                                        emitExpression(e.lhs(), code);
+                                        emitExpression(e.rhs(), code);
+                                        code.addInstruction(new ObjectInstrs.CallMethod("__op__" + opSymbol, 1, privKey));
                                         return;
                                     }
                                 }
@@ -1641,13 +1662,13 @@ public class ChuckEmitter {
                             boolean isPolar = "polar".equals(lhsType);
                             ChuckInstr complexInstr = switch (e.op()) {
                                 case PLUS ->
-                                    isPolar ? new PolarAdd() : new ComplexAdd();
+                                    isPolar ? new PolarInstrs.Add() : new ComplexInstrs.Add();
                                 case MINUS ->
-                                    isPolar ? new PolarSub() : new ComplexSub();
+                                    isPolar ? new PolarInstrs.Sub() : new ComplexInstrs.Sub();
                                 case TIMES ->
-                                    isPolar ? new PolarMul() : new ComplexMul();
+                                    isPolar ? new PolarInstrs.Mul() : new ComplexInstrs.Mul();
                                 case DIVIDE ->
-                                    isPolar ? new PolarDiv() : new ComplexDiv();
+                                    isPolar ? new PolarInstrs.Div() : new ComplexInstrs.Div();
                                 default ->
                                     null;
                             };
@@ -1669,7 +1690,7 @@ public class ChuckEmitter {
                             // Emit: vec first (stack expects vec then scalar for VecScale)
                             emitExpression(e.rhs(), code);
                             emitExpression(e.lhs(), code);
-                            code.addInstruction(new VecScale());
+                            code.addInstruction(new VecInstrs.VecScale());
                             return;
                         }
                     }
@@ -1681,13 +1702,13 @@ public class ChuckEmitter {
                                 case PLUS -> {
                                     emitExpression(e.lhs(), code);
                                     emitExpression(e.rhs(), code);
-                                    code.addInstruction(new VecAdd());
+                                    code.addInstruction(new VecInstrs.Add());
                                     return;
                                 }
                                 case MINUS -> {
                                     emitExpression(e.lhs(), code);
                                     emitExpression(e.rhs(), code);
-                                    code.addInstruction(new VecSub());
+                                    code.addInstruction(new VecInstrs.Sub());
                                     return;
                                 }
                                 case TIMES -> {
@@ -1696,7 +1717,7 @@ public class ChuckEmitter {
                                     if (rhsType == null || "float".equals(rhsType) || "int".equals(rhsType)) {
                                         emitExpression(e.lhs(), code);
                                         emitExpression(e.rhs(), code);
-                                        code.addInstruction(new VecScale());
+                                        code.addInstruction(new VecInstrs.VecScale());
                                         return;
                                     }
                                     // vec3/vec4 * vec3/vec4 → cross product
@@ -1704,13 +1725,13 @@ public class ChuckEmitter {
                                             && ("vec3".equals(rhsType) || "vec4".equals(rhsType))) {
                                         emitExpression(e.lhs(), code);
                                         emitExpression(e.rhs(), code);
-                                        code.addInstruction(new VecCross());
+                                        code.addInstruction(new VecInstrs.Cross());
                                         return;
                                     }
                                     // vec * vec → dot product (returns scalar)
                                     emitExpression(e.lhs(), code);
                                     emitExpression(e.rhs(), code);
-                                    code.addInstruction(new VecDot());
+                                    code.addInstruction(new VecInstrs.Dot());
                                     return;
                                 }
                                 default -> {
@@ -1737,31 +1758,31 @@ public class ChuckEmitter {
                     }
                     switch (e.op()) {
                         case PLUS ->
-                            code.addInstruction(new AddAny());
+                            code.addInstruction(new ArithmeticInstrs.AddAny());
                         case MINUS ->
-                            code.addInstruction(new MinusAny());
+                            code.addInstruction(new ArithmeticInstrs.MinusAny());
                         case TIMES ->
-                            code.addInstruction(new TimesAny());
+                            code.addInstruction(new ArithmeticInstrs.TimesAny());
                         case DIVIDE ->
-                            code.addInstruction(new DivideAny());
+                            code.addInstruction(new ArithmeticInstrs.DivideAny());
                         case PERCENT ->
-                            code.addInstruction(new ModuloAny());
+                            code.addInstruction(new ArithmeticInstrs.ModuloAny());
                         case S_OR ->
-                            code.addInstruction(new BitwiseOrAny());
+                            code.addInstruction(new ArithmeticInstrs.BitwiseOrAny());
                         case S_AND ->
-                            code.addInstruction(new BitwiseAndAny());
+                            code.addInstruction(new ArithmeticInstrs.BitwiseAndAny());
                         case LT ->
-                            code.addInstruction(new LessThanAny());
+                            code.addInstruction(new LogicInstrs.LessThanAny());
                         case LE ->
-                            code.addInstruction(new LessOrEqualAny());
+                            code.addInstruction(new LogicInstrs.LessOrEqualAny());
                         case GT ->
-                            code.addInstruction(new GreaterThanAny());
+                            code.addInstruction(new LogicInstrs.GreaterThanAny());
                         case GE ->
-                            code.addInstruction(new GreaterOrEqualAny());
+                            code.addInstruction(new LogicInstrs.GreaterOrEqualAny());
                         case EQ ->
-                            code.addInstruction(new EqualsAny());
+                            code.addInstruction(new LogicInstrs.EqualsAny());
                         case NEQ ->
-                            code.addInstruction(new NotEqualsAny());
+                            code.addInstruction(new LogicInstrs.NotEqualsAny());
                         case DUR_MUL -> {
                             emitExpression(e.lhs(), code);
                             if (e.rhs() instanceof ChuckAST.IdExp id) {
@@ -1789,7 +1810,7 @@ public class ChuckEmitter {
                                 code.addInstruction(null); // placeholder for JumpIfFalse
                                 emitExpression(e.rhs(), code);
                                 int endIdx = code.getNumInstructions();
-                                code.replaceInstruction(jumpIdx, new JumpIfFalseAndPushFalse(endIdx));
+                                code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfFalseAndPushFalse(endIdx));
                             }
                         }
                         case OR -> {
@@ -1805,7 +1826,7 @@ public class ChuckEmitter {
                                 code.addInstruction(null); // placeholder for JumpIfTrue
                                 emitExpression(e.rhs(), code);
                                 int endIdx = code.getNumInstructions();
-                                code.replaceInstruction(jumpIdx, new JumpIfTrueAndPushTrue(endIdx));
+                                code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfTrueAndPushTrue(endIdx));
                             }
                         }
                         case SHIFT_LEFT -> {
@@ -1832,11 +1853,11 @@ public class ChuckEmitter {
                 } else if (e.name().equals("null")) {
                     code.addInstruction(new PushNull());
                 } else if (e.name().equals("true")) {
-                    code.addInstruction(new PushInt(1));
+                    code.addInstruction(new PushInstrs.PushInt(1));
                 } else if (e.name().equals("false")) {
-                    code.addInstruction(new PushInt(0));
+                    code.addInstruction(new PushInstrs.PushInt(0));
                 } else if (e.name().equals("now")) {
-                    code.addInstruction(new PushNow());
+                    code.addInstruction(new PushInstrs.PushNow());
                 } else if (e.name().equals("dac")) {
                     code.addInstruction(new PushDac());
                 } else if (e.name().equals("blackhole")) {
@@ -1844,25 +1865,25 @@ public class ChuckEmitter {
                 } else if (e.name().equals("adc")) {
                     code.addInstruction(new PushAdc());
                 } else if (e.name().equals("me")) {
-                    code.addInstruction(new PushMe());
+                    code.addInstruction(new PushInstrs.PushMe());
                 } else if (e.name().equals("cherr")) {
                     code.addInstruction(new PushCherr());
                 } else if (e.name().equals("chout")) {
                     code.addInstruction(new PushChout());
                 } else if (e.name().equals("Machine")) {
-                    code.addInstruction(new PushMachine());
+                    code.addInstruction(new PushInstrs.PushMachine());
                 } else if (e.name().equals("maybe")) {
                     code.addInstruction(new PushMaybe());
                 } else if (e.name().equals("this")) {
-                    code.addInstruction(new PushThis());
+                    code.addInstruction(new StackInstrs.PushThis());
                 } else if (e.name().equals("second") || e.name().equals("ms") || e.name().equals("samp")
                         || e.name().equals("minute") || e.name().equals("hour")) {
-                    code.addInstruction(new PushInt(1));
+                    code.addInstruction(new PushInstrs.PushInt(1));
                     code.addInstruction(new CreateDuration(e.name()));
                 } else if (e.name().equals("pi")) {
-                    code.addInstruction(new PushFloat(Math.PI));
+                    code.addInstruction(new PushInstrs.PushFloat(Math.PI));
                 } else if (e.name().equals("e")) {
-                    code.addInstruction(new PushFloat(Math.E));
+                    code.addInstruction(new PushInstrs.PushFloat(Math.E));
                 } else if (currentClassFields.contains(e.name())) {
                     code.addInstruction(new GetUserField(e.name()));
                 } else if (currentClass != null && userClassRegistry.get(currentClass) != null
@@ -1876,7 +1897,7 @@ public class ChuckEmitter {
             case ChuckAST.DotExp e -> {
                 // super.field — access field on 'this' (fields are per-instance, not per-class)
                 if (e.base() instanceof ChuckAST.IdExp supId && supId.name().equals("super")) {
-                    code.addInstruction(new PushThis());
+                    code.addInstruction(new StackInstrs.PushThis());
                     code.addInstruction(new GetFieldByName(e.member()));
                     return;
                 }
@@ -1890,7 +1911,7 @@ public class ChuckEmitter {
                 }
                 if (e.base() instanceof ChuckAST.IdExp id && id.name().equals("IO")) {
                     if (e.member().equals("nl") || e.member().equals("newline")) {
-                        code.addInstruction(new PushString("\n"));
+                        code.addInstruction(new PushInstrs.PushString("\n"));
                     } else {
                         code.addInstruction(new GetBuiltinStatic("org.chuck.core.ChuckIO", e.member()));
                     }
@@ -1899,42 +1920,42 @@ public class ChuckEmitter {
                 if (e.base() instanceof ChuckAST.IdExp id && id.name().equals("Math")) {
                     switch (e.member()) {
                         case "INFINITY", "infinity" -> {
-                            code.addInstruction(new PushFloat(Double.POSITIVE_INFINITY));
+                            code.addInstruction(new PushInstrs.PushFloat(Double.POSITIVE_INFINITY));
                             return;
                         }
                         case "NEGATIVE_INFINITY" -> {
-                            code.addInstruction(new PushFloat(Double.NEGATIVE_INFINITY));
+                            code.addInstruction(new PushInstrs.PushFloat(Double.NEGATIVE_INFINITY));
                             return;
                         }
                         case "NaN", "nan" -> {
-                            code.addInstruction(new PushFloat(Double.NaN));
+                            code.addInstruction(new PushInstrs.PushFloat(Double.NaN));
                             return;
                         }
                         case "PI" -> {
-                            code.addInstruction(new PushFloat(Math.PI));
+                            code.addInstruction(new PushInstrs.PushFloat(Math.PI));
                             return;
                         }
                         case "TWO_PI" -> {
-                            code.addInstruction(new PushFloat(2.0 * Math.PI));
+                            code.addInstruction(new PushInstrs.PushFloat(2.0 * Math.PI));
                             return;
                         }
                         case "HALF_PI" -> {
-                            code.addInstruction(new PushFloat(Math.PI / 2.0));
+                            code.addInstruction(new PushInstrs.PushFloat(Math.PI / 2.0));
                             return;
                         }
                         case "E" -> {
-                            code.addInstruction(new PushFloat(Math.E));
+                            code.addInstruction(new PushInstrs.PushFloat(Math.E));
                             return;
                         }
                         case "SQRT2" -> {
-                            code.addInstruction(new PushFloat(Math.sqrt(2.0)));
+                            code.addInstruction(new PushInstrs.PushFloat(Math.sqrt(2.0)));
                             return;
                         }
                     }
                 }
                 if (e.member().equals("size")) {
                     emitExpression(e.base(), code);
-                    code.addInstruction(new CallMethod("size", 0));
+                    code.addInstruction(new ObjectInstrs.CallMethod("size", 0));
                     return;
                 } else if (e.member().equals("zero")) {
                     emitExpression(e.base(), code);
@@ -2001,7 +2022,7 @@ public class ChuckEmitter {
                         }
                         if (isVecType(baseType)) {
                             emitExpression(e.base(), code);
-                            code.addInstruction(new PushInt(vecIdx));
+                            code.addInstruction(new PushInstrs.PushInt(vecIdx));
                             code.addInstruction(new GetArrayInt());
                             return;
                         }
@@ -2019,7 +2040,7 @@ public class ChuckEmitter {
             case ChuckAST.VectorLitExp e -> {
                 for (ChuckAST.Exp el : e.elements()) {
                     emitExpression(el, code);
-                    code.addInstruction(new EnsureFloat());
+                    code.addInstruction(new TypeInstrs.EnsureFloat());
                 }
                 String vTag = switch (e.elements().size()) {
                     case 2 -> "vec2";
@@ -2083,7 +2104,7 @@ public class ChuckEmitter {
                 if (e.base() instanceof ChuckAST.DotExp dot
                         && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("IO")) {
                     if (dot.member().equals("nl") || dot.member().equals("newline")) {
-                        code.addInstruction(new PushString("\n"));
+                        code.addInstruction(new PushInstrs.PushString("\n"));
                         return;
                     }
                 }
@@ -2259,13 +2280,13 @@ public class ChuckEmitter {
                 } else if (e.base() instanceof ChuckAST.DotExp dot && dot.base() instanceof ChuckAST.IdExp id && id.name().equals("Machine")) {
                     String machMember = dot.member();
                     switch (machMember) {
-                        case "realtime" -> code.addInstruction(new PushInt(0));
-                        case "silent" -> code.addInstruction(new PushInt(1));
+                        case "realtime" -> code.addInstruction(new PushInstrs.PushInt(0));
+                        case "silent" -> code.addInstruction(new PushInstrs.PushInt(1));
                         default -> {
                             for (ChuckAST.Exp arg : e.args()) {
                                 emitExpression(arg, code);
                             }
-                            code.addInstruction(new MachineCall(machMember, e.args().size()));
+                            code.addInstruction(new org.chuck.core.instr.MachineCall(machMember, e.args().size()));
                         }
                     }
                 } else if (e.base() instanceof ChuckAST.DotExp dot
@@ -2276,7 +2297,7 @@ public class ChuckEmitter {
                             if (!e.args().isEmpty()) {
                                 emitExpression(e.args().get(0), code);
                             } else {
-                                code.addInstruction(new PushInt(0));
+                                code.addInstruction(new PushInstrs.PushInt(0));
                             }
                             code.addInstruction(new MeDir());
                         }
@@ -2285,17 +2306,18 @@ public class ChuckEmitter {
                             if (!e.args().isEmpty()) {
                                 emitExpression(e.args().get(0), code);
                             } else {
-                                code.addInstruction(new PushInt(0));
+                                code.addInstruction(new PushInstrs.PushInt(0));
                             }
                             code.addInstruction(new MeArg());
                         }
+                        case "id" -> code.addInstruction(new MeId());
                         case "exit" -> code.addInstruction(new MeExit());
                         default -> {
-                            code.addInstruction(new PushMe());
+                            code.addInstruction(new PushInstrs.PushMe());
                             for (ChuckAST.Exp arg : e.args()) {
                                 emitExpression(arg, code);
                             }
-                            code.addInstruction(new CallMethod(dot.member(), e.args().size()));
+                            code.addInstruction(new ObjectInstrs.CallMethod(dot.member(), e.args().size()));
                         }
                     }
                 } else if (e.base() instanceof ChuckAST.DotExp dot) {
@@ -2308,7 +2330,7 @@ public class ChuckEmitter {
                             for (ChuckAST.Exp arg : e.args()) {
                                 emitExpression(arg, code);
                             }
-                            code.addInstruction(new CallSuperMethod(parentName, dot.member(), e.args().size()));
+                            code.addInstruction(new ObjectInstrs.CallSuperMethod(parentName, dot.member(), e.args().size()));
                             return;
                         }
                     }
@@ -2339,14 +2361,28 @@ public class ChuckEmitter {
                             }
                         }
                     }
+                    List<String> argTypes = e.args().stream().map(this::getExprType).toList();
+                    String baseType = getExprType(dot.base());
+                    if (baseType == null && dot.base() instanceof ChuckAST.IdExp idBase && userClassRegistry.containsKey(idBase.name())) {
+                        baseType = idBase.name();
+                    }
+                    String resolvedKey = (baseType != null) ? resolveMethodKey(baseType, dot.member(), argTypes) : getMethodKey(dot.member(), argTypes);
+                    
+                    // One last check: if we found a base class name
+                    if (baseType != null && userClassRegistry.containsKey(baseType)) {
+                        ChuckCode target = resolveStaticMethod(baseType, resolvedKey);
+                        if (target != null) {
+                            for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
+                            code.addInstruction(new CallFunc(target, e.args().size()));
+                            return;
+                        }
+                    }
+
                     emitExpression(dot.base(), code);
                     for (ChuckAST.Exp arg : e.args()) {
                         emitExpression(arg, code);
                     }
-                    List<String> argTypes = e.args().stream().map(this::getExprType).toList();
-                    String baseType = getExprType(dot.base());
-                    String resolvedKey = (baseType != null) ? resolveMethodKey(baseType, dot.member(), argTypes) : getMethodKey(dot.member(), argTypes);
-                    code.addInstruction(new CallMethod(dot.member(), e.args().size(), resolvedKey));
+                    code.addInstruction(new ObjectInstrs.CallMethod(dot.member(), e.args().size(), resolvedKey));
                 } else if (e.base() instanceof ChuckAST.IdExp id) {
                     List<String> argTypes = e.args().stream().map(this::getExprType).toList();
                     String key = getMethodKey(id.name(), argTypes);
@@ -2356,9 +2392,9 @@ public class ChuckEmitter {
                         String ctorKey = getMethodKey(currentClass, argTypes);
                         UserClassDescriptor cd = userClassRegistry.get(currentClass);
                         if (cd != null && cd.methods().containsKey(ctorKey)) {
-                            code.addInstruction(new PushThis());
+                            code.addInstruction(new StackInstrs.PushThis());
                             for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
-                            code.addInstruction(new CallMethod(currentClass, e.args().size(), ctorKey));
+                            code.addInstruction(new ObjectInstrs.CallMethod(currentClass, e.args().size(), ctorKey));
                             return;
                         }
                     }
@@ -2408,7 +2444,7 @@ public class ChuckEmitter {
                             for (ChuckAST.Exp arg : e.call().args()) {
                                 emitExpression(arg, code);
                             }
-                            code.addInstruction(new Spork(target, e.call().args().size()));
+                            code.addInstruction(new ObjectInstrs.Spork(target, e.call().args().size()));
                             return;
                         }
 
@@ -2416,7 +2452,7 @@ public class ChuckEmitter {
                             for (ChuckAST.Exp arg : e.call().args()) {
                                 emitExpression(arg, code);
                             }
-                            code.addInstruction(new Spork(functions.get(key), e.call().args().size()));
+                            code.addInstruction(new ObjectInstrs.Spork(functions.get(key), e.call().args().size()));
                             return;
                         }
                         
@@ -2426,30 +2462,42 @@ public class ChuckEmitter {
                             for (ChuckAST.Exp arg : e.call().args()) {
                                 emitExpression(arg, code);
                             }
-                            code.addInstruction(new Spork(functions.get(fallbackKey), e.call().args().size()));
+                            code.addInstruction(new ObjectInstrs.Spork(functions.get(fallbackKey), e.call().args().size()));
                             return;
                         }
                     }
                     case ChuckAST.DotExp dot -> {
                         List<String> argTypes = e.call().args().stream().map(this::getExprType).toList();
+                        String baseClassName = null;
                         if (dot.base() instanceof ChuckAST.IdExp id && userClassRegistry.containsKey(id.name())) {
-                            String resolvedKey = resolveMethodKey(id.name(), dot.member(), argTypes);
-                            ChuckCode target = resolveStaticMethod(id.name(), resolvedKey);
+                            baseClassName = id.name();
+                        } else {
+                            String bt = getExprType(dot.base());
+                            if (bt != null && userClassRegistry.containsKey(bt)) {
+                                baseClassName = bt;
+                            }
+                        }
+
+                        if (baseClassName != null) {
+                            String resolvedKey = resolveMethodKey(baseClassName, dot.member(), argTypes);
+                            ChuckCode target = resolveStaticMethod(baseClassName, resolvedKey);
                             if (target != null) {
+                                System.out.println("DEBUG: Emitting static spork for " + baseClassName + "." + dot.member());
                                 for (ChuckAST.Exp arg : e.call().args()) {
                                     emitExpression(arg, code);
                                 }
-                                code.addInstruction(new Spork(target, e.call().args().size()));
+                                code.addInstruction(new ObjectInstrs.Spork(target, e.call().args().size()));
                                 return;
                             }
                         }
+                        
                         emitExpression(dot.base(), code);
                         for (ChuckAST.Exp arg : e.call().args()) {
                             emitExpression(arg, code);
                         }
                         String baseType = getExprType(dot.base());
                         String resolvedKey = (baseType != null) ? resolveMethodKey(baseType, dot.member(), argTypes) : getMethodKey(dot.member(), argTypes);
-                        code.addInstruction(new SporkMethod(dot.member(), e.call().args().size(), resolvedKey));
+                        code.addInstruction(new ObjectInstrs.SporkMethod(dot.member(), e.call().args().size(), resolvedKey));
                         return;
                     }
                     default -> {
@@ -2464,16 +2512,16 @@ public class ChuckEmitter {
                 emitExpression(e.thenExp(), code);
                 int jumpEndIdx = code.getNumInstructions();
                 code.addInstruction(null); // placeholder Jump to end
-                code.replaceInstruction(jumpFalseIdx, new JumpIfFalse(code.getNumInstructions()));
+                code.replaceInstruction(jumpFalseIdx, new ControlInstrs.JumpIfFalse(code.getNumInstructions()));
                 emitExpression(e.elseExp(), code);
-                code.replaceInstruction(jumpEndIdx, new Jump(code.getNumInstructions()));
+                code.replaceInstruction(jumpEndIdx, new ControlInstrs.Jump(code.getNumInstructions()));
             }
             case ChuckAST.CastExp e -> {
                 emitExpression(e.value(), code);
                 switch (e.targetType()) {
-                    case "int" -> code.addInstruction(new CastToInt());
-                    case "float" -> code.addInstruction(new CastToFloat());
-                    case "string" -> code.addInstruction(new CastToString());
+                    case "int" -> code.addInstruction(new TypeInstrs.CastToInt());
+                    case "float" -> code.addInstruction(new TypeInstrs.CastToFloat());
+                    case "string" -> code.addInstruction(new TypeInstrs.CastToString());
                     // other types: leave value as-is (e.g. casting to a class type is a no-op)
                 }
             }
@@ -2580,7 +2628,7 @@ public class ChuckEmitter {
                         }
                         if (isVecType(baseType)) {
                             emitExpression(e.base(), code);
-                            code.addInstruction(new PushInt(vecIdx));
+                            code.addInstruction(new PushInstrs.PushInt(vecIdx));
                             code.addInstruction(new SetArrayInt());
                             return;
                         }
@@ -2610,7 +2658,7 @@ public class ChuckEmitter {
                     // ChuckTo pops source & target, pushes target back.
                     // Stack is now: [..., target]
                 } else {
-                    code.addInstruction(new Pop());
+                    code.addInstruction(new StackInstrs.Pop());
                     // Stack is now: [..., source]
                 }
 
@@ -2651,7 +2699,7 @@ public class ChuckEmitter {
                 emitExpression(rhs, code);
                 code.addInstruction(new StackSwap());
                 code.addInstruction(new StoreLocalOrGlobal(r.name()));
-                code.addInstruction(new Pop());
+                code.addInstruction(new StackInstrs.Pop());
                 code.addInstruction(new StoreLocalOrGlobal(l.name()));
             }
         } else {
@@ -2661,7 +2709,7 @@ public class ChuckEmitter {
             if (rhs instanceof ChuckAST.IdExp rid) {
                 code.addInstruction(new StoreLocalOrGlobal(rid.name()));
             }
-            code.addInstruction(new Pop());
+            code.addInstruction(new StackInstrs.Pop());
             if (lhs instanceof ChuckAST.IdExp lid) {
                 code.addInstruction(new StoreLocalOrGlobal(lid.name()));
             }
@@ -2872,190 +2920,6 @@ public class ChuckEmitter {
         }
     }
 
-    static class LogicalNot implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.getSp() == 0) {
-                return;
-            }
-            double v = s.reg.popAsDouble();
-            s.reg.push(v == 0.0 ? 1 : 0);
-        }
-    }
-
-    static class NegateAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.getSp() == 0) {
-                return;
-            }
-            if (s.reg.isObject(0)) {
-                Object obj = s.reg.popObject();
-                if (obj instanceof ChuckArray arr) {
-                    s.reg.pushObject(arr.negate());
-                } else {
-                    s.reg.pushObject(obj); // no-op for unknown objects
-                }
-            } else if (s.reg.isDouble(0)) {
-                s.reg.push(-s.reg.popAsDouble());
-            } else {
-                s.reg.push(-s.reg.popLong());
-            }
-        }
-    }
-
-    static class TimesAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isObject(0) || s.reg.isObject(1)) {
-                Object r = s.reg.pop();
-                Object l = s.reg.pop();
-                if (r instanceof ChuckDuration rd && l instanceof Number ln) {
-                    s.reg.pushObject(new ChuckDuration(rd.samples() * ln.doubleValue()));
-                } else if (l instanceof ChuckDuration ld && r instanceof Number rn) {
-                    s.reg.pushObject(new ChuckDuration(ld.samples() * rn.doubleValue()));
-                } else if (r instanceof ChuckDuration rd && l instanceof ChuckDuration ld) {
-                    s.reg.pushObject(new ChuckDuration(ld.samples() * rd.samples()));
-                } else {
-                    s.reg.push(0L); // Default fallback
-                }
-            } else if (s.reg.isDouble(0) || s.reg.isDouble(1)) {
-                double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-                s.reg.push(l * r);
-            } else {
-                long r = s.reg.popLong(), l = s.reg.popLong();
-                s.reg.push(l * r);
-            }
-        }
-    }
-
-    static class DivideAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isObject(0) || s.reg.isObject(1)) {
-                Object r = s.reg.pop();
-                Object l = s.reg.pop();
-                if (r instanceof ChuckDuration rd && l instanceof ChuckDuration ld) {
-                    if (rd.samples() == 0) {
-                        throw new RuntimeException("DivideByZero");
-                    }
-                    s.reg.push((double) ld.samples() / rd.samples());
-                } else if (l instanceof ChuckDuration ld && r instanceof Number rn) {
-                    if (rn.doubleValue() == 0) {
-                        throw new RuntimeException("DivideByZero");
-                    }
-                    s.reg.pushObject(new ChuckDuration(ld.samples() / rn.doubleValue()));
-                } else if (r instanceof ChuckDuration rd && l instanceof Number ln) {
-                    // samples / dur -> float ratio
-                    if (rd.samples() == 0) {
-                        throw new RuntimeException("DivideByZero");
-                    }
-                    s.reg.push(ln.doubleValue() / rd.samples());
-                } else {
-                    s.reg.push(0.0);
-                }
-                return;
-            }
-            if (s.reg.isDouble(0) || s.reg.isDouble(1)) {
-                double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-                if (r != 0) {
-                    s.reg.push(l / r);
-                } else {
-                    throw new RuntimeException("DivideByZero");
-                }
-            } else {
-                long r = s.reg.popAsLong(), l = s.reg.popAsLong();
-                if (r != 0) {
-                    s.reg.push((double) l / r);
-                } else {
-                    throw new RuntimeException("DivideByZero");
-                }
-            }
-        }
-    }
-
-    static class ModuloAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isDouble(0) || s.reg.isDouble(1)) {
-                double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-                if (r != 0) {
-                    s.reg.push(l % r);
-                } else {
-                    s.reg.push(0.0);
-                }
-            } else {
-                long r = s.reg.popAsLong(), l = s.reg.popAsLong();
-                if (r != 0) {
-                    s.reg.push(l % r);
-                } else {
-                    s.reg.push(0L);
-                }
-            }
-        }
-    }
-
-    static class BitwiseOrAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            long r = s.reg.popLong(), l = s.reg.popLong();
-            s.reg.push(l | r);
-        }
-    }
-
-    static class BitwiseAndAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            long r = s.reg.popLong(), l = s.reg.popLong();
-            s.reg.push(l & r);
-        }
-    }
-
-    static class NotEqualsAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isObject(0) || s.reg.isObject(1)) {
-                Object r = s.reg.pop(), l = s.reg.pop();
-                if (l == r) {
-                    s.reg.push(0);
-                } else if (l == null || r == null) {
-                    s.reg.push(1);
-                } else {
-                    s.reg.push(!l.toString().equals(r.toString()) ? 1 : 0);
-                }
-            } else {
-                double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-                s.reg.push(l != r ? 1 : 0);
-            }
-        }
-    }
-
-    static class LogicalAnd implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-            s.reg.push((l != 0.0 && r != 0.0) ? 1 : 0);
-        }
-    }
-
-    static class LogicalOr implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-            s.reg.push((l != 0.0 || r != 0.0) ? 1 : 0);
-        }
-    }
-
     static class CreateEventConjunction implements ChuckInstr {
 
         @Override
@@ -3151,112 +3015,6 @@ public class ChuckEmitter {
         }
     }
 
-    static class Jump implements ChuckInstr {
-
-        int target;
-
-        Jump(int t) {
-            target = t;
-        }
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            s.setPc(target - 1);
-        }
-    }
-
-    static class JumpIfFalseAndPushFalse implements ChuckInstr {
-
-        int target;
-
-        JumpIfFalseAndPushFalse(int t) {
-            target = t;
-        }
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.getSp() == 0) {
-                return;
-            }
-            if (s.reg.popAsDouble() == 0.0) {
-                s.reg.push(0);
-                s.setPc(target - 1);
-            }
-        }
-    }
-
-    static class JumpIfTrueAndPushTrue implements ChuckInstr {
-
-        int target;
-
-        JumpIfTrueAndPushTrue(int t) {
-            target = t;
-        }
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.getSp() == 0) {
-                return;
-            }
-            if (s.reg.popAsDouble() != 0.0) {
-                s.reg.push(1);
-                s.setPc(target - 1);
-            }
-        }
-    }
-
-    static class JumpIfFalse implements ChuckInstr {
-
-        int target;
-
-        JumpIfFalse(int t) {
-            target = t;
-        }
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.getSp() == 0) {
-                return;
-            }
-            if (s.reg.popAsDouble() == 0.0) {
-                s.setPc(target - 1);
-            }
-        }
-    }
-
-    static class JumpIfTrue implements ChuckInstr {
-
-        int target;
-
-        JumpIfTrue(int t) {
-            target = t;
-        }
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.getSp() == 0) {
-                return;
-            }
-            if (s.reg.popAsDouble() != 0.0) {
-                s.setPc(target - 1);
-            }
-        }
-    }
-
-    static class PushInt implements ChuckInstr {
-
-        long val;
-
-        PushInt(long v) {
-            val = v;
-        }
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            s.reg.push(val);
-        }
-    }
-
     static class PushNull implements ChuckInstr {
 
         @Override
@@ -3276,42 +3034,6 @@ public class ChuckEmitter {
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
             s.reg.pushObject(val);
-        }
-    }
-
-    static class PushFloat implements ChuckInstr {
-
-        double val;
-
-        PushFloat(double v) {
-            val = v;
-        }
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            s.reg.push(val);
-        }
-    }
-
-    static class PushString implements ChuckInstr {
-
-        String val;
-
-        PushString(String v) {
-            val = v;
-        }
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            s.reg.pushObject(new ChuckString(val));
-        }
-    }
-
-    static class PushNow implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            s.reg.push(vm.getCurrentTime());
         }
     }
 
@@ -3339,27 +3061,11 @@ public class ChuckEmitter {
         }
     }
 
-    static class PushMe implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            s.reg.pushObject(s);
-        }
-    }
-
     static class PushMaybe implements ChuckInstr {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
             s.reg.push(Math.random() < 0.5 ? 1L : 0L);
-        }
-    }
-
-    static class PushMachine implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            s.reg.pushObject(new MachineObject());
         }
     }
 
@@ -3400,33 +3106,6 @@ public class ChuckEmitter {
                 }
                 default ->
                     s.reg.pushObject(l);
-            }
-        }
-    }
-
-    static class Pop implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.getSp() > 0) {
-                s.reg.popLong();
-            }
-        }
-    }
-
-    static class Dup implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.getSp() == 0) {
-                return;
-            }
-            if (s.reg.isObject(0)) {
-                s.reg.pushObject(s.reg.peekObject(0));
-            } else if (s.reg.isDouble(0)) {
-                s.reg.push(Double.longBitsToDouble(s.reg.peekLong(0)));
-            } else {
-                s.reg.push(s.reg.peekLong(0));
             }
         }
     }
@@ -3622,137 +3301,6 @@ public class ChuckEmitter {
         }
     }
 
-    static class AddAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isObject(0) || s.reg.isObject(1)) {
-                Object r = s.reg.pop(), l = s.reg.pop();
-                if (l instanceof ChuckDuration ld && r instanceof ChuckDuration rd) {
-                    s.reg.pushObject(new ChuckDuration(ld.samples() + rd.samples()));
-                } else {
-                    String ls = (l instanceof Double d) ? String.format("%.6f", d) : String.valueOf(l);
-                    String rs = (r instanceof Double d) ? String.format("%.6f", d) : String.valueOf(r);
-                    s.reg.pushObject(new ChuckString(ls + rs));
-                }
-            } else if (s.reg.isDouble(0) || s.reg.isDouble(1)) {
-                double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-                s.reg.push(l + r);
-            } else {
-                long r = s.reg.popLong(), l = s.reg.popLong();
-                s.reg.push(l + r);
-            }
-        }
-    }
-
-    static class MinusAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isObject(0) || s.reg.isObject(1)) {
-                Object r = s.reg.pop(), l = s.reg.pop();
-                if (l instanceof ChuckDuration ld && r instanceof ChuckDuration rd) {
-                    s.reg.pushObject(new ChuckDuration(ld.samples() - rd.samples()));
-                } else {
-                    s.reg.push(0.0);
-                }
-                return;
-            }
-            if (s.reg.isDouble(0) || s.reg.isDouble(1)) {
-                double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-                s.reg.push(l - r);
-            } else {
-                long r = s.reg.popAsLong(), l = s.reg.popAsLong();
-                s.reg.push(l - r);
-            }
-        }
-    }
-
-    static class LessThanAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isObject(0) || s.reg.isObject(1)) {
-                Object r = s.reg.pop(), l = s.reg.pop();
-                s.reg.push(l.toString().compareTo(r.toString()) < 0 ? 1 : 0);
-            } else {
-                double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-                s.reg.push(l < r ? 1 : 0);
-            }
-        }
-    }
-
-    static class GreaterThanAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isObject(0) || s.reg.isObject(1)) {
-                Object r = s.reg.pop(), l = s.reg.pop();
-                s.reg.push(l.toString().compareTo(r.toString()) > 0 ? 1 : 0);
-            } else {
-                double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-                s.reg.push(l > r ? 1 : 0);
-            }
-        }
-    }
-
-    static class LessOrEqualAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isObject(0) || s.reg.isObject(1)) {
-                Object r = s.reg.pop(), l = s.reg.pop();
-                s.reg.push(l.toString().compareTo(r.toString()) <= 0 ? 1 : 0);
-            } else {
-                double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-                s.reg.push(l <= r ? 1 : 0);
-            }
-        }
-    }
-
-    static class GreaterOrEqualAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isObject(0) || s.reg.isObject(1)) {
-                Object r = s.reg.pop(), l = s.reg.pop();
-                s.reg.push(l.toString().compareTo(r.toString()) >= 0 ? 1 : 0);
-            } else {
-                double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-                s.reg.push(l >= r ? 1 : 0);
-            }
-        }
-    }
-
-    static class EqualsAny implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isObject(0) || s.reg.isObject(1)) {
-                Object r = s.reg.pop(), l = s.reg.pop();
-                if (l == r) {
-                    s.reg.push(1);
-                } else {
-                    switch (l) {
-                        case null ->
-                            s.reg.push(r == null ? 1 : 0);
-                        default -> {
-                            switch (r) {
-                                case null ->
-                                    s.reg.push(0);
-                                default ->
-                                    s.reg.push(l.toString().equals(r.toString()) ? 1 : 0);
-                            }
-                        }
-                    }
-                }
-            } else {
-                double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-                s.reg.push(l == r ? 1 : 0);
-            }
-        }
-    }
-
     static class Yield implements ChuckInstr {
 
         @Override
@@ -3943,17 +3491,6 @@ public class ChuckEmitter {
                 // Bitwise left shift on integers
                 long lhsLong = s.reg.popLong();
                 s.reg.push(lhsLong << rhsLong);
-            }
-        }
-    }
-
-    static class EnsureFloat implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            if (!s.reg.isDouble(0) && !s.reg.isObject(0)) {
-                long v = s.reg.popLong();
-                s.reg.push((double) v);
             }
         }
     }
@@ -4235,122 +3772,6 @@ public class ChuckEmitter {
 
         @Override
         public void execute(ChuckVM vm, ChuckShred s) {
-        }
-    }
-
-    static class Spork implements ChuckInstr {
-
-        ChuckCode t;
-        int a;
-
-        Spork(ChuckCode target, int argCount) {
-            t = target;
-            a = argCount;
-            if (t.getNumInstructions() == 0 || !(t.getInstruction(0) instanceof MoveArgs)) {
-                t.prependInstruction(new MoveArgs(a));
-            }
-        }
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            ChuckShred ns = new ChuckShred(t);
-            Object[] args = new Object[a];
-            for (int i = a - 1; i >= 0; i--) {
-                if (s.reg.getSp() > 0) {
-                    if (s.reg.isObject(0)) {
-                        args[i] = s.reg.popObject();
-                    } else if (s.reg.isDouble(0)) {
-                        args[i] = s.reg.popAsDouble();
-                    } else {
-                        args[i] = s.reg.popLong();
-                    }
-                }
-            }
-            for (Object arg : args) {
-                switch (arg) {
-                    case ChuckObject co -> ns.reg.pushObject(co);
-                    case Double d -> ns.reg.push(d);
-                    case Long l -> ns.reg.push(l);
-                    case null, default -> ns.reg.pushObject(arg);
-                }
-            }
-            ns.setParentShred(s);
-            vm.spork(ns);
-            s.reg.pushObject(ns);
-        }
-    }
-
-    static class SporkMethod implements ChuckInstr {
-
-        String mName;
-        int a;
-        String fullKey;
-
-        SporkMethod(String m, int argCount) {
-            this(m, argCount, null);
-        }
-
-        SporkMethod(String m, int argCount, String key) {
-            mName = m;
-            a = argCount;
-            fullKey = key;
-        }
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object[] args = new Object[a];
-            for (int i = a - 1; i >= 0; i--) {
-                if (s.reg.isObject(0)) {
-                    Object o = s.reg.popObject();
-                    args[i] = (o == null) ? "" : o;
-                } else if (s.reg.isDouble(0)) {
-                    args[i] = s.reg.popAsDouble();
-                } else {
-                    args[i] = s.reg.popLong();
-                }
-            }
-            Object obj = s.reg.popObject();
-            if (!(obj instanceof UserObject uo)) {
-                s.reg.pushObject(null);
-                return;
-            }
-
-            String key = (fullKey != null) ? fullKey : (mName + ":" + a);
-            String fallbackKey = mName + ":" + a;
-            ChuckCode target = uo.methods.get(key);
-            if (target == null) target = uo.methods.get(fallbackKey);
-            
-            boolean isStatic = false;
-            if (target == null) {
-                UserClassDescriptor d = vm.getUserClass(uo.className);
-                if (d != null) {
-                    target = d.staticMethods().get(key);
-                    if (target == null) target = d.staticMethods().get(fallbackKey);
-                    isStatic = (target != null);
-                }
-            }
-            if (target == null) {
-                s.reg.pushObject(null);
-                return;
-            }
-            if (target.getNumInstructions() == 0 || !(target.getInstruction(0) instanceof MoveArgs)) {
-                target.prependInstruction(new MoveArgs(a));
-            }
-            ChuckShred ns = new ChuckShred(target);
-            for (Object arg : args) {
-                switch (arg) {
-                    case ChuckObject co -> ns.reg.pushObject(co);
-                    case Double d -> ns.reg.push(d);
-                    case Long l -> ns.reg.push(l);
-                    case null, default -> ns.reg.pushObject(arg);
-                }
-            }
-            if (!isStatic) {
-                ns.thisStack.push(uo);
-            }
-            ns.setParentShred(s);
-            vm.spork(ns);
-            s.reg.pushObject(ns);
         }
     }
 
@@ -5563,6 +4984,12 @@ public class ChuckEmitter {
         }
     }
 
+    static class MeId implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            s.reg.push((long) s.id());
+        }
+    }
+
     static class MeExit implements ChuckInstr {
 
         @Override
@@ -5571,8 +4998,8 @@ public class ChuckEmitter {
         }
     }
 
-    static class MachineObject extends ChuckObject {
 
+    static class MachineObject extends ChuckObject {
         MachineObject() {
             super(new ChuckType("Machine", ChuckType.OBJECT, 0, 0));
         }
@@ -5606,499 +5033,4 @@ public class ChuckEmitter {
         }
     }
 
-    static class MachineCall implements ChuckInstr {
-
-        String method;
-        int argc;
-
-        MachineCall(String m, int a) {
-            method = m;
-            argc = a;
-        }
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object[] args = new Object[argc];
-            for (int i = argc - 1; i >= 0; i--) {
-                if (s.reg.isObject(0)) {
-                    args[i] = s.reg.popObject();
-                } else if (s.reg.isDouble(0)) {
-                    args[i] = s.reg.popAsDouble();
-                } else {
-                    args[i] = s.reg.popLong();
-                }
-            }
-            switch (method) {
-                case "add" -> {
-                    String path = args.length > 0 ? String.valueOf(args[0]) : "";
-                    s.reg.push((long) vm.add(path));
-                }
-                case "remove" -> {
-                    long id = args.length > 0 ? ((Number) args[0]).longValue() : 0;
-                    vm.removeShred((int) id);
-                    s.reg.push(id);
-                }
-                case "replace" -> {
-                    long id = args.length > 0 ? ((Number) args[0]).longValue() : 0;
-                    String path = args.length > 1 ? String.valueOf(args[1]) : "";
-                    s.reg.push((long) vm.replace((int) id, path));
-                }
-                case "status" -> {
-                    vm.status();
-                    s.reg.push(0L);
-                }
-                case "clear", "removeAll" -> {
-                    vm.clear();
-                    s.reg.push(0L);
-                }
-                case "eval" -> {
-                    String src = args.length > 0 ? String.valueOf(args[0]) : "";
-                    long id = vm.eval(src);
-                    s.reg.push(id);
-                    // Yield to give the newly sporked shred a chance to run.
-                    // spork() schedules new shreds at currentTime+1, so we advance by 1 sample.
-                    vm.advanceTime(1);
-                }
-                case "numShreds" ->
-                    s.reg.push((long) vm.getActiveShredCount());
-                case "shredExists" -> {
-                    int sid = args.length > 0 ? ((Number) args[0]).intValue() : 0;
-                    s.reg.push(vm.shredExists(sid) ? 1L : 0L);
-                }
-                case "shreds" -> {
-                    int[] ids = vm.getActiveShredIds();
-                    org.chuck.core.ChuckArray arr = new org.chuck.core.ChuckArray(org.chuck.core.ChuckType.ARRAY, ids.length);
-                    for (int i = 0; i < ids.length; i++) {
-                        arr.setInt(i, ids[i]);
-                    }
-                    s.reg.pushObject(arr);
-                }
-                case "crash" -> {
-                    vm.print("[chuck]: (VM) crash! (by request)\n");
-                    System.exit(1);
-                }
-                case "resetID" -> {
-                    vm.resetShredId();
-                    s.reg.push(0L);
-                }
-                case "clearVM" -> {
-                    vm.clear();
-                    s.reg.push(0L);
-                }
-                case "gc" -> {
-                    vm.gc();
-                    s.reg.push(0L);
-                }
-                case "version" ->
-                    s.reg.pushObject(new ChuckString(vm.getVersion()));
-                case "platform" ->
-                    s.reg.pushObject(new ChuckString(vm.getPlatform()));
-                case "loglevel" -> {
-                    if (argc > 0) {
-                        vm.setLogLevel(((Number) args[0]).intValue());
-                        s.reg.push(0L);
-                    } else {
-                        s.reg.push((long) vm.getLogLevel());
-                    }
-                }
-                case "setloglevel" -> {
-                    vm.setLogLevel(args.length > 0 ? ((Number) args[0]).intValue() : 1);
-                    s.reg.push(0L);
-                }
-                case "timeofday" ->
-                    s.reg.push(Double.doubleToRawLongBits(vm.getTimeOfDay()));
-                default ->
-                    s.reg.push(0L);
-            }
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Built-in complex arithmetic instructions
-    // -------------------------------------------------------------------------
-    /**
-     * complex + complex : element-wise (re+re, im+im)
-     */
-    public static class ComplexAdd implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object rObj = s.reg.popObject();
-            Object lObj = s.reg.popObject();
-            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
-            result.vecTag = "complex";
-            result.setFloat(0, lhs.getFloat(0) + rhs.getFloat(0));
-            result.setFloat(1, lhs.getFloat(1) + rhs.getFloat(1));
-            s.reg.pushObject(result);
-        }
-    }
-
-    /**
-     * complex - complex : element-wise
-     */
-    public static class ComplexSub implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object rObj = s.reg.popObject();
-            Object lObj = s.reg.popObject();
-            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
-            result.vecTag = "complex";
-            result.setFloat(0, lhs.getFloat(0) - rhs.getFloat(0));
-            result.setFloat(1, lhs.getFloat(1) - rhs.getFloat(1));
-            s.reg.pushObject(result);
-        }
-    }
-
-    /**
-     * complex * complex : (a+bi)(c+di) = (ac-bd) + (ad+bc)i
-     */
-    public static class ComplexMul implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object rObj = s.reg.popObject();
-            Object lObj = s.reg.popObject();
-            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
-            double a = lhs.getFloat(0), b = lhs.getFloat(1);
-            double c = rhs.getFloat(0), d = rhs.getFloat(1);
-            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
-            result.vecTag = "complex";
-            result.setFloat(0, a * c - b * d);
-            result.setFloat(1, a * d + b * c);
-            s.reg.pushObject(result);
-        }
-    }
-
-    /**
-     * complex / complex : (a+bi)/(c+di) = ((ac+bd) + (bc-ad)i) / (c²+d²)
-     */
-    public static class ComplexDiv implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object rObj = s.reg.popObject();
-            Object lObj = s.reg.popObject();
-            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
-            double a = lhs.getFloat(0), b = lhs.getFloat(1);
-            double c = rhs.getFloat(0), d = rhs.getFloat(1);
-            double denom = c * c + d * d;
-            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
-            result.vecTag = "complex";
-            if (denom < 1e-300) {
-                result.setFloat(0, 0.0);
-                result.setFloat(1, 0.0);
-            } else {
-                result.setFloat(0, (a * c + b * d) / denom);
-                result.setFloat(1, (b * c - a * d) / denom);
-            }
-            s.reg.pushObject(result);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Built-in polar arithmetic instructions
-    // -------------------------------------------------------------------------
-    /**
-     * polar + polar : convert to rectangular, add, convert back
-     */
-    public static class PolarAdd implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object rObj = s.reg.popObject();
-            Object lObj = s.reg.popObject();
-            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
-            double r1 = lhs.getFloat(0), t1 = lhs.getFloat(1);
-            double r2 = rhs.getFloat(0), t2 = rhs.getFloat(1);
-            double re = r1 * Math.cos(t1) + r2 * Math.cos(t2);
-            double im = r1 * Math.sin(t1) + r2 * Math.sin(t2);
-            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
-            result.vecTag = "polar";
-            result.setFloat(0, Math.sqrt(re * re + im * im));
-            result.setFloat(1, Math.atan2(im, re));
-            s.reg.pushObject(result);
-        }
-    }
-
-    /**
-     * polar - polar : convert to rectangular, subtract, convert back
-     */
-    public static class PolarSub implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object rObj = s.reg.popObject();
-            Object lObj = s.reg.popObject();
-            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
-            double r1 = lhs.getFloat(0), t1 = lhs.getFloat(1);
-            double r2 = rhs.getFloat(0), t2 = rhs.getFloat(1);
-            double re = r1 * Math.cos(t1) - r2 * Math.cos(t2);
-            double im = r1 * Math.sin(t1) - r2 * Math.sin(t2);
-            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
-            result.vecTag = "polar";
-            result.setFloat(0, Math.sqrt(re * re + im * im));
-            result.setFloat(1, Math.atan2(im, re));
-            s.reg.pushObject(result);
-        }
-    }
-
-    /**
-     * polar * polar : (r1*r2, θ1+θ2)
-     */
-    public static class PolarMul implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object rObj = s.reg.popObject();
-            Object lObj = s.reg.popObject();
-            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
-            result.vecTag = "polar";
-            result.setFloat(0, lhs.getFloat(0) * rhs.getFloat(0));
-            result.setFloat(1, lhs.getFloat(1) + rhs.getFloat(1));
-            s.reg.pushObject(result);
-        }
-    }
-
-    /**
-     * polar / polar : (r1/r2, θ1-θ2)
-     */
-    public static class PolarDiv implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object rObj = s.reg.popObject();
-            Object lObj = s.reg.popObject();
-            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
-            double mag = rhs.getFloat(0);
-            ChuckArray result = new ChuckArray(ChuckType.ARRAY, 2);
-            result.vecTag = "polar";
-            result.setFloat(0, mag < 1e-300 ? 0.0 : lhs.getFloat(0) / mag);
-            result.setFloat(1, lhs.getFloat(1) - rhs.getFloat(1));
-            s.reg.pushObject(result);
-        }
-    }
-
-    // -------------------------------------------------------------------------
-    // Built-in vec element-wise arithmetic instructions
-    // -------------------------------------------------------------------------
-    /**
-     * vec + vec : element-wise addition
-     */
-    public static class VecAdd implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object rObj = s.reg.popObject();
-            Object lObj = s.reg.popObject();
-            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
-            int len = Math.min(lhs.size(), rhs.size());
-            ChuckArray result = new ChuckArray(ChuckType.ARRAY, len);
-            result.vecTag = lhs.vecTag;
-            for (int i = 0; i < len; i++) {
-                result.setFloat(i, lhs.getFloat(i) + rhs.getFloat(i));
-            }
-            s.reg.pushObject(result);
-        }
-    }
-
-    /**
-     * vec - vec : element-wise subtraction
-     */
-    public static class VecSub implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object rObj = s.reg.popObject();
-            Object lObj = s.reg.popObject();
-            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
-            int len = Math.min(lhs.size(), rhs.size());
-            ChuckArray result = new ChuckArray(ChuckType.ARRAY, len);
-            result.vecTag = lhs.vecTag;
-            for (int i = 0; i < len; i++) {
-                result.setFloat(i, lhs.getFloat(i) - rhs.getFloat(i));
-            }
-            s.reg.pushObject(result);
-        }
-    }
-
-    /**
-     * vec * scalar (float/int) : scale all elements
-     */
-    public static class VecScale implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            double scalar = s.reg.popAsDouble();
-            ChuckArray vec = (ChuckArray) s.reg.popObject();
-            ChuckArray result = new ChuckArray(ChuckType.ARRAY, vec.size());
-            result.vecTag = vec.vecTag;
-            for (int i = 0; i < vec.size(); i++) {
-                result.setFloat(i, vec.getFloat(i) * scalar);
-            }
-            s.reg.pushObject(result);
-        }
-    }
-
-    /** $ int cast: pops a value, pushes it as a long (truncation). */
-    static class CastToInt implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) {
-            s.reg.push(s.reg.popAsLong());
-        }
-    }
-
-    /** $ float cast: pops a value, pushes it as a double. */
-    static class CastToFloat implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) {
-            s.reg.push(s.reg.popAsDouble());
-        }
-    }
-
-    /** $ string cast: pops a value, pushes it as a ChuckString. */
-    static class CastToString implements ChuckInstr {
-        @Override public void execute(ChuckVM vm, ChuckShred s) {
-            Object val = s.reg.pop();
-            String str = switch (val) {
-                case Long l -> String.valueOf(l);
-                case Double d -> String.format("%.6f", d);
-                case null -> "null";
-                default -> val.toString();
-            };
-            s.reg.pushObject(new ChuckString(str));
-        }
-    }
-
-    /**
-     * Pushes the current 'this' object from thisStack onto the reg stack.
-     */
-    static class PushThis implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            s.reg.pushObject(s.thisStack.isEmpty() ? null : s.thisStack.peek());
-        }
-    }
-
-    /**
-     * Calls a method on 'this' starting lookup from startClass (for super
-     * dispatch).
-     */
-    static class CallSuperMethod implements ChuckInstr {
-
-        String startClass, mName;
-        int a;
-
-        CallSuperMethod(String sc, String m, int argc) {
-            startClass = sc;
-            mName = m;
-            a = argc;
-        }
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object[] args = new Object[a];
-            boolean[] isD = new boolean[a];
-            for (int i = a - 1; i >= 0; i--) {
-                isD[i] = s.reg.isDouble(0);
-                if (s.reg.isObject(0)) {
-                    args[i] = s.reg.popObject();
-                } else if (isD[i]) {
-                    args[i] = s.reg.popAsDouble();
-                } else {
-                    args[i] = s.reg.popLong();
-                }
-            }
-            // 'this' comes from thisStack (not reg stack)
-            UserObject uo = s.thisStack.isEmpty() ? null : s.thisStack.peek();
-            // Resolve method starting from startClass, walking up the hierarchy
-            String t = startClass;
-            ChuckCode target = null;
-            for (int depth = 0; depth < 16 && t != null; depth++) {
-                UserClassDescriptor desc = vm.getUserClass(t);
-                if (desc == null) {
-                    break;
-                }
-                String key = mName + ":" + a;
-                if (desc.methods().containsKey(key)) {
-                    target = desc.methods().get(key);
-                    break;
-                }
-                if (desc.staticMethods().containsKey(key)) {
-                    target = desc.staticMethods().get(key);
-                    break;
-                }
-                t = desc.parentName();
-            }
-            if (target == null) {
-                return;
-            }
-            // Call the resolved method (same as CallMethod's user-defined path)
-            s.mem.pushObject(s.getCode());
-            s.mem.push((long) s.getPc());
-            s.mem.push((long) s.getFramePointer());
-            s.mem.push((long) s.reg.getSp());
-            s.setFramePointer(s.mem.getSp());
-            for (int i = 0; i < a; i++) {
-                Object arg = args[i];
-                if (arg instanceof ChuckObject co) {
-                    s.mem.pushObject(co);
-                } else if (isD[i]) {
-                    s.mem.push((Double) arg);
-                } else if (arg instanceof Long l) {
-                    s.mem.push(l);
-                } else {
-                    s.mem.pushObject(arg);
-                }
-            }
-            s.thisStack.push(uo); // always push so ReturnMethod can pop
-            s.setCode(target);
-            s.setPc(-1);
-        }
-    }
-
-    /**
-     * vec * vec : dot product, returns scalar (float)
-     */
-    public static class VecDot implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object rObj = s.reg.popObject();
-            Object lObj = s.reg.popObject();
-            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 2);
-            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 2);
-            int len = Math.min(lhs.size(), rhs.size());
-            double dot = 0.0;
-            for (int i = 0; i < len; i++) {
-                dot += lhs.getFloat(i) * rhs.getFloat(i);
-            }
-            s.reg.push(dot);
-        }
-    }
-
-    public static class VecCross implements ChuckInstr {
-
-        @Override
-        public void execute(ChuckVM vm, ChuckShred s) {
-            Object rObj = s.reg.popObject();
-            Object lObj = s.reg.popObject();
-            ChuckArray rhs = (rObj instanceof ChuckArray ra) ? ra : new ChuckArray(ChuckType.ARRAY, 3);
-            ChuckArray lhs = (lObj instanceof ChuckArray la) ? la : new ChuckArray(ChuckType.ARRAY, 3);
-            ChuckArray result = lhs.cross(rhs);
-            s.reg.pushObject(result);
-        }
-    }
 }

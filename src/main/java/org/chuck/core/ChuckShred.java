@@ -94,15 +94,16 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
      * @return true if the shred should be woken up and removed from the event's waiting list.
      */
     public boolean notifyTriggered(ChuckEvent e, ChuckVM vm) {
-        return switch (eventWaitingOn) {
-            case null -> true;
-            case ChuckEventDisjunction _ -> true;
-            case ChuckEventConjunction conj -> {
-                conjunctionTriggered.add(e);
-                yield conjunctionTriggered.containsAll(conj.getEvents());
+        if (eventWaitingOn == null) return true;
+        if (eventWaitingOn instanceof ChuckEventDisjunction) return true;
+        if (eventWaitingOn instanceof ChuckEventConjunction conj) {
+            conjunctionTriggered.add(e);
+            for (ChuckEvent ce : conj.getEvents()) {
+                if (!conjunctionTriggered.contains(ce)) return false;
             }
-            default -> true;
-        };
+            return true;
+        }
+        return true;
     }
 
     public int getId() { return id; }
