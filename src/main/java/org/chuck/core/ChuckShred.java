@@ -295,10 +295,8 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     public void cleanup() {
         isRunning = false;
         isDone = true;
-        // System.out.println("DEBUG Shred " + id + " cleaning up " + ownedUGens.size() + " UGens");
         // Disconnect all UGens created by this shred
         for (org.chuck.audio.ChuckUGen ugen : ownedUGens) {
-            // System.out.println("DEBUG Shred " + id + " unchucking " + ugen);
             ugen.unchuckAll();
         }
         ownedUGens.clear();

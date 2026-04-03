@@ -1730,7 +1730,6 @@ public class ChuckEmitter {
                                         return;
                                     }
                                     // vec * vec → dot product (returns scalar)
-                                    System.out.println("DEBUG: Emitter emitting Dot via * for types " + lhsType + ", " + rhsType);
                                     emitExpression(e.lhs(), code);
                                     emitExpression(e.rhs(), code);
                                     code.addInstruction(new VecInstrs.Dot());
@@ -2373,7 +2372,6 @@ public class ChuckEmitter {
                     String baseType = getExprType(dot.base());
                     if (baseType != null && (baseType.equals("vec2") || baseType.equals("vec3") || baseType.equals("vec4")
                             || baseType.equals("complex") || baseType.equals("polar")) && dot.member().equals("dot")) {
-                        System.out.println("DEBUG: Emitter emitting Dot for " + baseType);
                         emitExpression(dot.base(), code);
                         for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
                         code.addInstruction(new VecInstrs.Dot());

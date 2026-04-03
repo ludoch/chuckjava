@@ -51,7 +51,6 @@ public class SetMemberIntByName implements ChuckInstr {
         } else {
             doubleVal = shred.reg.popAsDouble();
         }
-        System.out.println("DEBUG: SetMemberIntByName member=" + memberName + " isObjVal=" + isObjVal + " doubleVal=" + doubleVal + " valObj=" + valObj);
 
         // Build conventional setter name: "freq" -> "setFreq"
         String setter = "set"
