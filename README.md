@@ -1,12 +1,12 @@
 # ChucK-Java (JDK 25 Migration)
 
-## Progress Update (2026-03-18)
+## Progress Update (2026-04-03)
 
 ### Integration Test Coverage
 
 | Suite | Tests | Passing | Notes |
 |-------|-------|---------|-------|
-| **01-Basic** | 242 | 230 | Core language, math, control flow, arrays, classes, operator overloading |
+| **01-Basic** | 243 | 235 | Core language, math, control flow, arrays, classes, complex/polar |
 | **02-UGens** | 75 | 75 ✅ | All oscillators, filters, effects, physical models |
 | **03-Modules** | 14 | 14 ✅ | FileIO (text + binary), OSC networking, seek |
 | **04-Stress** | 15 | 8 | Deep recursion, large arrays, concurrency edge cases |
@@ -15,7 +15,7 @@
 | **07-Imports** | 9 | 9 ✅ | `#include` / machine imports |
 | **ChuckAntlrNewFeaturesTest** | 23 | 23 ✅ | Ternary, switch/case, HPF/BPF/BRF, BlitSaw/BlitSquare |
 | **ChuckMachineApiTest** | 16 | 16 ✅ | Full `me.*` and `Machine.*` shred API |
-| **Total** | **555** | **468 (84%)** | |
+| **Total** | **556** | **473 (85%)** | |
 
 ### Bugs Fixed & Language Improvements
 
@@ -75,6 +75,12 @@
 | 52 | **Built-in `vec2`/`vec3`/`vec4` arithmetic** — Element-wise `+`, `-`; scalar `*`; dot product (`vec * vec → float`). | ✅ Fixed |
 | 53 | **`SFM` (Spectral Flatness Measure) UAna** — Geometric/arithmetic mean ratio of the magnitude spectrum; 0 = tonal, 1 = noisy. Chains after `FFT`. | ✅ Fixed |
 | 54 | **`Kurtosis` UAna** — Normalized 4th central moment of the magnitude spectrum; high = impulsive, low = sustained. Chains after `FFT`. | ✅ Fixed |
+| 55 | **`ChuckArray.sort()`** — Implemented sorting for all types (int, float, complex, polar, vec, string). | ✅ Fixed |
+| 56 | **`Math.rtop()` / `ptor()`** — Added conversion between rectangular and polar forms. | ✅ Fixed |
+| 57 | **Assignment Chaining (`5 => arr[0] => x`)** — Fixed array assignments to leave the object on the stack for chaining. | ✅ Fixed |
+| 58 | **Math Shadowing Fix** — Ensured variables named `e` or `pi` take precedence over constants. | ✅ Fixed |
+| 59 | **Duration to Float Conversion** — Implicitly convert `dur` to samples when passed to numeric method parameters. | ✅ Fixed |
+| 60 | **Missing Object Instantiation** — Added `Hid` and `MidiIn` to the object factory to prevent declaration-time NPEs. | ✅ Fixed |
 
 ### New Features
 

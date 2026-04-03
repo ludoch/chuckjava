@@ -465,6 +465,12 @@ Math.exp(x)
 Math.isinf(x)       // returns 1 if infinite
 Math.isnan(x)       // returns 1 if NaN
 Math.equal(a, b)    // floating-point equality
+Math.re(c)          // get real part of complex
+Math.im(c)          // get imaginary part of complex
+Math.mag(p)         // get magnitude of polar/complex
+Math.phase(p)       // get phase of polar/complex
+Math.rtop(c, p)     // convert complex to polar (supports arrays)
+Math.ptor(p, c)     // convert polar to complex (supports arrays)
 Math.dbtolin(db)    // dB to linear amplitude
 Math.dbtopow(db)    // dB to power
 Math.lintodb(lin)   // linear to dB

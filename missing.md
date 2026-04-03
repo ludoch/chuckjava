@@ -150,7 +150,7 @@ From C++ `ulib_ai.cpp`:
 | `complex` as first-class type (`#(re, im)`) | ✅ Implemented — literals, field accessors, arithmetic |
 | `polar` as first-class type (`%(mag, phase)`) | ✅ Implemented — literals, field accessors, arithmetic |
 | `vec2`/`vec3`/`vec4` with `.x/.y/.z/.w` | ✅ Implemented — literals, field read/write, arithmetic |
-| Arrays of complex / vec types | ⚠️ Partial — `complex arr[N]` allocates but element-wise ops untested |
+| Arrays of complex / vec types | ✅ Implemented — full support for allocation, sorting, and `Math.rtop/ptor` conversions |
 
 ---
 

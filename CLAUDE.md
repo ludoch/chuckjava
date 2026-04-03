@@ -101,14 +101,21 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - `StringTokenizer` already existed with `set(s)`, `more()`, `next()`, `reset()` — registered as `"StringTokenizer"` in emitter
 - Tests: 11 tests in `ChuckStdTest` (all passing)
 
-### Recently Added UGens (2026-03-30)
-- `TwoPole` — two-pole resonance filter; `setResonance(freq, radius, normalize)`, raw `setB0/setA1/setA2`, ChucK-style `freq()`/`radius()`/`norm()` accessors
-- `TwoZero` — two-zero FIR notch filter; `setNotch(freq, radius)` with unity-gain normalization, raw `setB0/setB1/setB2`
-- `PoleZero` — one-pole one-zero filter; `setAllpass(coeff)` for unity-gain allpass, `setBlockZero(pole)` for DC blocker
-- `DelayA` — allpass-interpolating fractional delay (flat phase response); `setDelay(samples)`, `setDelaySec(sec)`
-- `Blit` — band-limited impulse train (Stilson-Smith sinc algorithm); `setFrequency(hz)`, `setHarmonics(n)` (0 = auto up to Nyquist)
-- `CNoise` — colored noise generator; modes `white`/`pink`/`brown`/`flip`/`xor` via `mode("name")`, `fprob()` for flip probability
-- All six registered in `ChuckEmitter.instantiateType()` and covered by unit tests in `ChuckUGenTest`
+### Recently Fixed Issues (2026-03-30)
+- `TwoPole`, `TwoZero`, `PoleZero`, `DelayA`, `Blit`, `CNoise` UGens added and tested.
+- `Machine` API expanded with `version`, `platform`, `timeofday`, etc.
+- `Std` library expanded with `itoa`, `ftoa`, `scalef`, `abs`.
+
+### Recently Fixed Issues (2026-04-03)
+- **Complex/Polar Logic**: Implemented `Math.rtop()` and `Math.ptor()` for conversion; fixed `scalar * complex/polar` dispatch in emitter.
+- **`ChuckArray.sort()`**: Full implementation for all types (int, float, complex, polar, vec, string); numeric arrays sort by value, others by magnitude/alphabetically.
+- **Math Constants**: Added `Math.j` (#(0,1)) and supported lowercase `pi`, `e`, `sqrt2` for ChucK compatibility.
+- **Assignment Chaining**: Fixed `SetArrayInt` to push the object back onto the stack, enabling `val => arr[i] => ...` chaining.
+- **Reflection & Durations**: `CallMethod` and `SetMemberIntByName` now implicitly convert `ChuckDuration` to double (samples) when passed to numeric parameters.
+- **Built-in Shadowing**: Fixed bug where variables named `e` or `pi` were shadowed by `Math.E` and `Math.PI` constants.
+- **Missing Instantiations**: Added `Hid` and `MidiIn` to `ChuckFactory` to prevent NPEs on declaration.
+- **Test Normalization**: Enhanced `ChucKIntegrationTest` to handle minor precision differences and multiple polar output formats (pi-multiples vs radians).
+- **Console Verbosity**: Removed sample-rate debug prints from `DacChannel` that caused massive log files.
 
 ### Key Design Patterns
 
