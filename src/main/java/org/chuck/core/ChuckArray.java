@@ -108,6 +108,19 @@ public class ChuckArray extends ChuckObject {
         types.clear();
     }
 
+    public void zero() {
+        for (int i = 0; i < types.size(); i++) {
+            byte t = types.get(i);
+            if (t == 0) intData.set(i, 0L);
+            else if (t == 1) floatData.set(i, 0.0);
+            else if (t == 2) {
+                Object o = objectData.get(i);
+                if (o instanceof ChuckArray a) a.zero();
+                else objectData.set(i, null);
+            }
+        }
+    }
+
     // append (<<) support
     public ChuckArray append(long val) {
         int idx = types.size();

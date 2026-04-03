@@ -29,4 +29,32 @@ public class PushInstrs {
     public static class PushMachine implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(new MachineObject()); }
     }
+
+    public static class PushNull implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(null); }
+    }
+
+    public static class PushDac implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(vm.dac); }
+    }
+
+    public static class PushAdc implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(vm.adc); }
+    }
+
+    public static class PushBlackhole implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(vm.blackhole); }
+    }
+
+    public static class PushCherr implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(vm.getGlobalObject("cherr")); }
+    }
+
+    public static class PushChout implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.pushObject(vm.getGlobalObject("chout")); }
+    }
+
+    public static class PushMaybe implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.push(Math.random() > 0.5 ? 1L : 0L); }
+    }
 }

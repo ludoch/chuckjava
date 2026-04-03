@@ -44,7 +44,7 @@ public long popLong() {
     if (sp <= 0) return 0L;
     sp--;
     long raw = primitives[sp];
-    long val = isDouble[sp] ? Math.round(Double.longBitsToDouble(raw)) : raw;
+    long val = isDouble[sp] ? (long)Double.longBitsToDouble(raw) : raw;
     objects[sp] = null;
     primitives[sp] = 0;
     isDouble[sp] = false;

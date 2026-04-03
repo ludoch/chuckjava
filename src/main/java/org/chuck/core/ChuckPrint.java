@@ -16,12 +16,19 @@ public class ChuckPrint implements ChuckInstr {
     public void execute(ChuckVM vm, ChuckShred shred) {
         StringBuilder sb = new StringBuilder();
         // Popping from stack in reverse order of how they were pushed
-        Object[] values = new Object[numArgs];
-        for (int i = numArgs - 1; i >= 0; i--) {
-            values[i] = shred.reg.pop();
+        int argc = numArgs;
+        Object[] values = new Object[argc];
+        for (int i = argc - 1; i >= 0; i--) {
+            if (shred.reg.isObject(0)) {
+                values[i] = shred.reg.popObject();
+            } else if (shred.reg.isDouble(0)) {
+                values[i] = shred.reg.popAsDouble();
+            } else {
+                values[i] = shred.reg.popAsLong();
+            }
         }
         
-        for (int i = 0; i < numArgs; i++) {
+        for (int i = 0; i < argc; i++) {
             Object v = values[i];
             switch (v) {
                 case Double dv -> {
@@ -40,7 +47,7 @@ public class ChuckPrint implements ChuckInstr {
                 case null -> sb.append("null");
                 default -> sb.append(v.toString());
             }
-            if (i < numArgs - 1) sb.append(" ");
+            if (i < argc - 1) sb.append(" ");
         }
         
         vm.print(sb.toString() + "\n");

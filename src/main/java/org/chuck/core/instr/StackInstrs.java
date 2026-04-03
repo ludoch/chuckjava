@@ -22,4 +22,13 @@ public class StackInstrs {
             s.reg.pushObject(s.thisStack.isEmpty() ? null : s.thisStack.peek());
         }
     }
+
+    public static class PeekStack implements ChuckInstr {
+        int depth; public PeekStack(int d) { depth = d; }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            if (s.reg.isObject(depth)) s.reg.pushObject(s.reg.peekObject(depth));
+            else if (s.reg.isDouble(depth)) s.reg.push(s.reg.peekAsDouble(depth));
+            else s.reg.push(s.reg.peekLong(depth));
+        }
+    }
 }

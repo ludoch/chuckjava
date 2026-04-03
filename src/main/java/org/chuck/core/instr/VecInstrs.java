@@ -55,11 +55,7 @@ public class VecInstrs {
                 s.reg.push(0.0);
                 return;
             }
-            int len = Math.min(lhs.size(), rhs.size());
-            double dot = 0.0;
-            for (int i = 0; i < len; i++) {
-                dot += lhs.getFloat(i) * rhs.getFloat(i);
-            }
+            double dot = lhs.dot(rhs);
             s.reg.push(dot);
         }
     }

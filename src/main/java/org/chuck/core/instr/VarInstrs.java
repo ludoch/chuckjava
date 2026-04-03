@@ -35,6 +35,7 @@ public class VarInstrs {
         String name; public SetGlobalObjectOrInt(String n) { name = n; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             if (s.reg.isObject(0)) vm.setGlobalObject(name, s.reg.peekObject(0));
+            else if (s.reg.isDouble(0)) vm.setGlobalFloat(name, s.reg.peekAsDouble(0));
             else vm.setGlobalInt(name, s.reg.peekLong(0));
         }
     }
@@ -43,28 +44,93 @@ public class VarInstrs {
         String name; public GetGlobalObjectOrInt(String n) { name = n; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             Object obj = vm.getGlobalObject(name);
-            if (obj != null) s.reg.pushObject(obj);
-            else s.reg.push(vm.getGlobalInt(name));
+            if (obj != null) {
+                s.reg.pushObject(obj);
+            } else if (vm.isGlobalDouble(name)) {
+                s.reg.push(Double.longBitsToDouble(vm.getGlobalInt(name)));
+            } else {
+                s.reg.push(vm.getGlobalInt(name));
+            }
         }
     }
 
-    public static class InstantiateSetAndPushLocal implements ChuckInstr {
-        String type; int offset, argc; boolean isRef, isStatic; Map<String, UserClassDescriptor> rm;
-        public InstantiateSetAndPushLocal(String t, int o, int a, boolean ref, boolean s, Map<String, UserClassDescriptor> reg) {
-            type = t; offset = o; argc = a; isRef = ref; isStatic = s; rm = reg;
-        }
+    public static class MoveArgs implements ChuckInstr {
+        int a; public MoveArgs(int v) { a = v; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            Object[] args = new Object[argc];
-            for (int i = argc - 1; i >= 0; i--) args[i] = s.reg.pop();
-            ChuckObject obj = null;
-            if (!isRef) {
-                // Simplified instantiation logic for refactor
-                // In practice this calls back into ChuckEmitter.instantiateType
-                // We'll move that logic to a common place if needed
+            // If this is a new shred (entry point or sporked), initialize frame
+            if (s.mem.getSp() == 0) {
+                s.mem.pushObject(null); // savedCode
+                s.mem.push(0);          // savedPc
+                s.mem.push(0);          // savedFp
+                s.mem.push(0);          // savedSp
+                s.setFramePointer(4);
             }
-            int idx = s.getFramePointer() + offset;
-            s.mem.setRef(idx, obj);
-            s.reg.pushObject(obj);
+            
+            if (a <= 0) return;
+            
+            Object[] args = new Object[a];
+            boolean[] isD = new boolean[a];
+            for (int i = a - 1; i >= 0; i--) {
+                if (s.reg.getSp() > 0) {
+                    isD[i] = s.reg.isDouble(0);
+                    if (s.reg.isObject(0)) {
+                        args[i] = s.reg.popObject();
+                    } else if (isD[i]) {
+                        args[i] = s.reg.popAsDouble();
+                    } else {
+                        args[i] = s.reg.popAsLong();
+                    }
+                }
+            }
+            for (int i = 0; i < a; i++) {
+                Object arg = args[i];
+                if (arg instanceof ChuckObject co) s.mem.pushObject(co);
+                else if (isD[i]) s.mem.push((Double) arg);
+                else if (arg instanceof Long l) s.mem.push(l);
+                else s.mem.pushObject(arg); // Strings, etc.
+            }
+        }
+    }
+
+    public static class SwapLocal implements ChuckInstr {
+        int o1, o2;
+        public SwapLocal(int a, int b) { o1 = a; o2 = b; }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            int fp = s.getFramePointer();
+            int i1 = fp + o1, i2 = fp + o2;
+            long d1 = s.mem.getData(i1);
+            Object r1 = s.mem.getRef(i1);
+            boolean isObj1 = s.mem.isObjectAt(i1);
+            boolean isDbl1 = s.mem.isDoubleAt(i1);
+
+            if (s.mem.isObjectAt(i2)) s.mem.setRef(i1, s.mem.getRef(i2));
+            else if (s.mem.isDoubleAt(i2)) s.mem.setData(i1, Double.longBitsToDouble(s.mem.getData(i2)));
+            else s.mem.setData(i1, s.mem.getData(i2));
+
+            if (isObj1) s.mem.setRef(i2, r1);
+            else if (isDbl1) s.mem.setData(i2, Double.longBitsToDouble(d1));
+            else s.mem.setData(i2, d1);
+
+            if (s.mem.isObjectAt(i1)) s.reg.pushObject(s.mem.getRef(i1));
+            else if (s.mem.isDoubleAt(i1)) s.reg.push(Double.longBitsToDouble(s.mem.getData(i1)));
+            else s.reg.push(s.mem.getData(i1));
+        }
+    }
+
+    public static class StoreLocalOrGlobal implements ChuckInstr {
+        String name; Integer offset;
+        public StoreLocalOrGlobal(String n, Integer o) { name = n; offset = o; }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            if (offset != null) {
+                int idx = s.getFramePointer() + offset;
+                if (s.reg.isObject(0)) s.mem.setRef(idx, (ChuckObject) s.reg.peekObject(0));
+                else if (s.reg.isDouble(0)) s.mem.setData(idx, s.reg.peekAsDouble(0));
+                else s.mem.setData(idx, s.reg.peekLong(0));
+            } else {
+                if (s.reg.isObject(0)) vm.setGlobalObject(name, s.reg.peekObject(0));
+                else if (s.reg.isDouble(0)) vm.setGlobalFloat(name, s.reg.peekAsDouble(0));
+                else vm.setGlobalInt(name, s.reg.peekLong(0));
+            }
         }
     }
 }

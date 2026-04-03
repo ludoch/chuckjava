@@ -150,9 +150,8 @@ public class ChuckAnalysisAndSpatialTest {
             <<< d >>>;
             """, 1);
         // 1*4 + 2*5 + 3*6 = 4+10+18 = 32
-        assertFalse(out.isEmpty());
         assertFalse(out.isEmpty(), "output was empty");
-        assertTrue(out.get(0).contains("32.0") || out.get(0).contains("32"), "got: " + out.get(0));
+        assertEquals("32.000000", out.get(0).trim());
     }
 
     // -------------------------------------------------------------------------
