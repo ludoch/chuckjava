@@ -160,7 +160,10 @@ public class ChuckCLI {
             }
 
             ChuckVM vm = new ChuckVM(sampleRate);
-            vm.addPrintListener(System.out::println);
+            vm.addPrintListener(text -> {
+                System.out.print(text);
+                System.out.flush();
+            });
             
             if (loop) {
                 org.chuck.network.ChuckMachineServer server = new org.chuck.network.ChuckMachineServer(vm);

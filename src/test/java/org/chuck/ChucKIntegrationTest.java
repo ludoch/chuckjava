@@ -77,7 +77,7 @@ public class ChucKIntegrationTest {
         
         final StringBuilder output = new StringBuilder();
         vm.addPrintListener(text -> {
-            if (output.length() < 100000) output.append(text).append('\n');
+            if (output.length() < 100000) output.append(text);
         });
 
         // Capture stdout and stderr

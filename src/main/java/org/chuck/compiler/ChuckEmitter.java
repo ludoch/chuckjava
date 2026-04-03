@@ -139,6 +139,10 @@ public class ChuckEmitter {
     }
 
     private void initGlobalTypes() {
+        initGlobalTypes(null);
+    }
+
+    private void initGlobalTypes(Map<String, String> existing) {
         this.globalVarTypes.put("dac", "UGen");
         this.globalVarTypes.put("adc", "UGen");
         this.globalVarTypes.put("blackhole", "UGen");
@@ -146,6 +150,7 @@ public class ChuckEmitter {
         this.globalVarTypes.put("cherr", "IO");
         this.globalVarTypes.put("me", "Shred");
         this.globalVarTypes.put("Machine", "Machine");
+        if (existing != null) this.globalVarTypes.putAll(existing);
     }
 
     /**
@@ -352,13 +357,17 @@ public class ChuckEmitter {
     }
 
     public ChuckCode emit(List<ChuckAST.Stmt> statements, String programName) {
+        return emit(statements, programName, null);
+    }
+
+    public ChuckCode emit(List<ChuckAST.Stmt> statements, String programName, Map<String, String> existingGlobals) {
         localScopes.clear();
         // Push a top-level local scope so script variables are shred-local
         localScopes.push(new HashMap<>());
 
         varTypes.clear();
         globalVarTypes.clear();
-        initGlobalTypes();
+        initGlobalTypes(existingGlobals);
         currentFile = programName;
         // Empty/comment-only programs are errors in ChucK
         boolean hasContent = statements.stream().anyMatch(s
@@ -404,6 +413,8 @@ public class ChuckEmitter {
     }
 
     private void emitStatement(ChuckAST.Stmt stmt, ChuckCode code) {
+        if (stmt == null) return;
+        if (code != null) code.setActiveLineNumber(stmt.line());
         switch (stmt) {
             case ChuckAST.ExpStmt s -> {
                 // Check for standalone undefined variable (e.g. `x;`) — error-nspc-no-crash
@@ -1164,6 +1175,8 @@ public class ChuckEmitter {
     }
 
     private void emitExpression(ChuckAST.Exp exp, ChuckCode code) {
+        if (exp == null) return;
+        if (code != null) code.setActiveLineNumber(exp.line());
         switch (exp) {
             case ChuckAST.IntExp e ->
                 code.addInstruction(new PushInstrs.PushInt(e.value()));
@@ -1449,18 +1462,54 @@ public class ChuckEmitter {
                     };
                     emitExpression(e.rhs(), code);  // push current value of target
                     emitExpression(e.lhs(), code);  // push the operand
-                    switch (arith) {
-                        case PLUS ->
-                            code.addInstruction(new ArithmeticInstrs.AddAny());
-                        case MINUS ->
-                            code.addInstruction(new ArithmeticInstrs.MinusAny());
-                        case TIMES ->
-                            code.addInstruction(new ArithmeticInstrs.TimesAny());
-                        case DIVIDE ->
-                            code.addInstruction(new ArithmeticInstrs.DivideAny());
-                        case PERCENT ->
-                            code.addInstruction(new ArithmeticInstrs.ModuloAny());
-                        default -> {
+                    String targetType = getExprType(e.rhs());
+                    if (isVecType(targetType)) {
+                        switch (arith) {
+                            case PLUS -> {
+                                if ("complex".equals(targetType)) code.addInstruction(new ComplexInstrs.Add());
+                                else if ("polar".equals(targetType)) code.addInstruction(new PolarInstrs.Add());
+                                else code.addInstruction(new VecInstrs.Add());
+                            }
+                            case MINUS -> {
+                                if ("complex".equals(targetType)) code.addInstruction(new ComplexInstrs.Sub());
+                                else if ("polar".equals(targetType)) code.addInstruction(new PolarInstrs.Sub());
+                                else code.addInstruction(new VecInstrs.Sub());
+                            }
+                            case TIMES -> {
+                                String opType = getExprType(e.lhs());
+                                if ("complex".equals(targetType) && "complex".equals(opType)) code.addInstruction(new ComplexInstrs.Mul());
+                                else if ("polar".equals(targetType) && "polar".equals(opType)) code.addInstruction(new PolarInstrs.Mul());
+                                else if (opType == null || "float".equals(opType) || "int".equals(opType)) code.addInstruction(new VecInstrs.VecScale());
+                                else code.addInstruction(new ArithmeticInstrs.TimesAny());
+                            }
+                            case DIVIDE -> {
+                                String opType = getExprType(e.lhs());
+                                if ("complex".equals(targetType) && "complex".equals(opType)) code.addInstruction(new ComplexInstrs.Div());
+                                else if ("polar".equals(targetType) && "polar".equals(opType)) code.addInstruction(new PolarInstrs.Div());
+                                else if (opType == null || "float".equals(opType) || "int".equals(opType)) {
+                                    code.addInstruction(new PushInstrs.PushFloat(1.0));
+                                    code.addInstruction(new StackInstrs.Swap());
+                                    code.addInstruction(new ArithmeticInstrs.DivideAny());
+                                    code.addInstruction(new VecInstrs.VecScale());
+                                }
+                                else code.addInstruction(new ArithmeticInstrs.DivideAny());
+                            }
+                            default -> code.addInstruction(new ArithmeticInstrs.AddAny());
+                        }
+                    } else {
+                        switch (arith) {
+                            case PLUS ->
+                                code.addInstruction(new ArithmeticInstrs.AddAny());
+                            case MINUS ->
+                                code.addInstruction(new ArithmeticInstrs.MinusAny());
+                            case TIMES ->
+                                code.addInstruction(new ArithmeticInstrs.TimesAny());
+                            case DIVIDE ->
+                                code.addInstruction(new ArithmeticInstrs.DivideAny());
+                            case PERCENT ->
+                                code.addInstruction(new ArithmeticInstrs.ModuloAny());
+                            default -> {
+                            }
                         }
                     }
                     emitChuckTarget(e.rhs(), code);
@@ -1695,26 +1744,42 @@ public class ChuckEmitter {
                             return;
                         }
                     }
-                    // Check for vec2/vec3/vec4 element-wise arithmetic
+                    // Check for vec/complex/polar element-wise arithmetic
                     {
                         String lhsType = getExprType(e.lhs());
-                        if ("vec2".equals(lhsType) || "vec3".equals(lhsType) || "vec4".equals(lhsType)) {
+                        if (isVecType(lhsType)) {
                             switch (e.op()) {
                                 case PLUS -> {
                                     emitExpression(e.lhs(), code);
                                     emitExpression(e.rhs(), code);
-                                    code.addInstruction(new VecInstrs.Add());
+                                    if ("complex".equals(lhsType)) code.addInstruction(new ComplexInstrs.Add());
+                                    else if ("polar".equals(lhsType)) code.addInstruction(new PolarInstrs.Add());
+                                    else code.addInstruction(new VecInstrs.Add());
                                     return;
                                 }
                                 case MINUS -> {
                                     emitExpression(e.lhs(), code);
                                     emitExpression(e.rhs(), code);
-                                    code.addInstruction(new VecInstrs.Sub());
+                                    if ("complex".equals(lhsType)) code.addInstruction(new ComplexInstrs.Sub());
+                                    else if ("polar".equals(lhsType)) code.addInstruction(new PolarInstrs.Sub());
+                                    else code.addInstruction(new VecInstrs.Sub());
                                     return;
                                 }
                                 case TIMES -> {
-                                    // vec * scalar: check if rhs is scalar (float/int)
                                     String rhsType = getExprType(e.rhs());
+                                    if ("complex".equals(lhsType) && "complex".equals(rhsType)) {
+                                        emitExpression(e.lhs(), code);
+                                        emitExpression(e.rhs(), code);
+                                        code.addInstruction(new ComplexInstrs.Mul());
+                                        return;
+                                    }
+                                    if ("polar".equals(lhsType) && "polar".equals(rhsType)) {
+                                        emitExpression(e.lhs(), code);
+                                        emitExpression(e.rhs(), code);
+                                        code.addInstruction(new PolarInstrs.Mul());
+                                        return;
+                                    }
+                                    // vec * scalar or complex * scalar
                                     if (rhsType == null || "float".equals(rhsType) || "int".equals(rhsType)) {
                                         emitExpression(e.lhs(), code);
                                         emitExpression(e.rhs(), code);
@@ -1734,6 +1799,31 @@ public class ChuckEmitter {
                                     emitExpression(e.rhs(), code);
                                     code.addInstruction(new VecInstrs.Dot());
                                     return;
+                                }
+                                case DIVIDE -> {
+                                    String rhsType = getExprType(e.rhs());
+                                    if ("complex".equals(lhsType) && "complex".equals(rhsType)) {
+                                        emitExpression(e.lhs(), code);
+                                        emitExpression(e.rhs(), code);
+                                        code.addInstruction(new ComplexInstrs.Div());
+                                        return;
+                                    }
+                                    if ("polar".equals(lhsType) && "polar".equals(rhsType)) {
+                                        emitExpression(e.lhs(), code);
+                                        emitExpression(e.rhs(), code);
+                                        code.addInstruction(new PolarInstrs.Div());
+                                        return;
+                                    }
+                                    // complex / scalar
+                                    if (rhsType == null || "float".equals(rhsType) || "int".equals(rhsType)) {
+                                        emitExpression(e.lhs(), code);
+                                        emitExpression(e.rhs(), code);
+                                        code.addInstruction(new PushInstrs.PushFloat(1.0));
+                                        code.addInstruction(new StackInstrs.Swap());
+                                        code.addInstruction(new ArithmeticInstrs.DivideAny());
+                                        code.addInstruction(new VecInstrs.VecScale());
+                                        return;
+                                    }
                                 }
                                 default -> {
                                 } // fall through to generic
@@ -1776,8 +1866,7 @@ public class ChuckEmitter {
                             code.addInstruction(new LogicInstrs.LessThanAny());
                         case LE -> {
                             String lt = getExprType(e.lhs());
-                            if ("IO".equals(lt) || "FileIO".equals(lt)) {                                emitExpression(e.rhs(), code);
-                                emitExpression(e.lhs(), code);
+                            if ("IO".equals(lt) || "FileIO".equals(lt)) {
                                 code.addInstruction(new MiscInstrs.ChuckWriteIO());
                             } else {
                                 code.addInstruction(new LogicInstrs.LessOrEqualAny());
@@ -1800,8 +1889,6 @@ public class ChuckEmitter {
                             }
                         }
                         case WRITE_IO -> {
-                            emitExpression(e.lhs(), code);
-                            emitExpression(e.rhs(), code);
                             code.addInstruction(new MiscInstrs.ChuckWriteIO());
                         }
                         case AND -> {
@@ -1847,6 +1934,8 @@ public class ChuckEmitter {
             }
             case ChuckAST.IdExp e -> {
                 Integer localOffset = getLocalOffset(e.name());
+                String varType = getVarType(e);
+                
                 if (e.name().equals("this") && currentClass == null) {
                     throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
                             + ": error: keyword 'this' cannot be used outside class definition");
@@ -1855,8 +1944,12 @@ public class ChuckEmitter {
                     throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
                             + ": error: keyword 'super' cannot be used inside static functions");
                 }
+                
                 if (localOffset != null) {
                     code.addInstruction(new VarInstrs.LoadLocal(localOffset));
+                } else if (varType != null) {
+                    // It's a known variable (global), use GetGlobalObjectOrInt
+                    code.addInstruction(new VarInstrs.GetGlobalObjectOrInt(e.name()));
                 } else if (e.name().equals("null")) {
                     code.addInstruction(new PushInstrs.PushNull());
                 } else if (e.name().equals("true")) {
@@ -1938,24 +2031,30 @@ public class ChuckEmitter {
                             code.addInstruction(new PushInstrs.PushFloat(Double.NaN));
                             return;
                         }
-                        case "PI" -> {
+                        case "PI", "pi" -> {
                             code.addInstruction(new PushInstrs.PushFloat(Math.PI));
                             return;
                         }
-                        case "TWO_PI" -> {
+                        case "TWO_PI", "two_pi" -> {
                             code.addInstruction(new PushInstrs.PushFloat(2.0 * Math.PI));
                             return;
                         }
-                        case "HALF_PI" -> {
+                        case "HALF_PI", "half_pi" -> {
                             code.addInstruction(new PushInstrs.PushFloat(Math.PI / 2.0));
                             return;
                         }
-                        case "E" -> {
+                        case "E", "e" -> {
                             code.addInstruction(new PushInstrs.PushFloat(Math.E));
                             return;
                         }
-                        case "SQRT2" -> {
+                        case "SQRT2", "sqrt2" -> {
                             code.addInstruction(new PushInstrs.PushFloat(Math.sqrt(2.0)));
+                            return;
+                        }
+                        case "j" -> {
+                            code.addInstruction(new PushInstrs.PushFloat(0.0));
+                            code.addInstruction(new PushInstrs.PushFloat(1.0));
+                            code.addInstruction(new ArrayInstrs.NewArrayFromStack(2, "complex"));
                             return;
                         }
                     }
@@ -2536,6 +2635,8 @@ public class ChuckEmitter {
                     case "int" -> code.addInstruction(new TypeInstrs.CastToInt());
                     case "float" -> code.addInstruction(new TypeInstrs.CastToFloat());
                     case "string" -> code.addInstruction(new TypeInstrs.CastToString());
+                    case "complex" -> code.addInstruction(new TypeInstrs.CastToComplex());
+                    case "polar" -> code.addInstruction(new TypeInstrs.CastToPolar());
                     // other types: leave value as-is (e.g. casting to a class type is a no-op)
                 }
             }

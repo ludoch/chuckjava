@@ -17,6 +17,7 @@ public class ChuckTo implements ChuckInstr {
         Object rawRhs = shred.reg.popObject();
         Object rawLhs = shred.reg.popObject();
         
+        // System.out.println("Connecting " + rawLhs + " => " + rawRhs);
         if (rawRhs instanceof ChuckUGen rhs && rawLhs instanceof ChuckUGen lhs) {
             lhs.chuckTo(rhs);
         }

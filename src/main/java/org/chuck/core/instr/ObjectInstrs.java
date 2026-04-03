@@ -108,6 +108,10 @@ public class ObjectInstrs {
                             if (pts[i] == double.class || pts[i] == Double.class) { coe[i] = d; score += 3; }
                             else if (pts[i] == float.class || pts[i] == Float.class) { coe[i] = d.floatValue(); score += 2; }
                             else { valid = false; break; }
+                        } else if (val instanceof ChuckDuration cd) {
+                            if (pts[i] == double.class || pts[i] == Double.class) { coe[i] = cd.samples(); score += 3; }
+                            else if (pts[i] == float.class || pts[i] == Float.class) { coe[i] = (float) cd.samples(); score += 2; }
+                            else { valid = false; break; }
                         } else if (val instanceof ChuckString cs) {
                             if (pts[i] == String.class) { coe[i] = cs.toString(); score += 3; }
                             else { valid = false; break; }
@@ -120,19 +124,27 @@ public class ObjectInstrs {
                     if (valid && score > bestScore) { bestScore = score; bestMethod = m; bestArgs = coe; }
                 }
                 if (bestMethod != null) {
-                    Object res = bestMethod.invoke(obj, bestArgs);
-                    if (bestMethod.getReturnType() == void.class) {
-                        s.reg.pushObject(obj);
-                    } else if (res == null) {
-                        s.reg.pushObject(null);
-                    } else {
-                        Class<?> rt = bestMethod.getReturnType();
-                        if (rt == int.class || rt == long.class || rt == Integer.class || rt == Long.class) s.reg.push(((Number) res).longValue());
-                        else if (rt == float.class || rt == double.class || rt == Float.class || rt == Double.class) s.reg.push(((Number) res).doubleValue());
-                        else if (res instanceof String str) s.reg.pushObject(new ChuckString(str));
-                        else s.reg.pushObject(res);
+                    try {
+                        Object res = bestMethod.invoke(obj, bestArgs);
+                        if (bestMethod.getReturnType() == void.class) {
+                            s.reg.pushObject(obj);
+                        } else if (res == null) {
+                            s.reg.pushObject(null);
+                        } else {
+                            Class<?> rt = bestMethod.getReturnType();
+                            if (rt == int.class || rt == long.class || rt == Integer.class || rt == Long.class) s.reg.push(((Number) res).longValue());
+                            else if (rt == float.class || rt == double.class || rt == Float.class || rt == Double.class) s.reg.push(((Number) res).doubleValue());
+                            else if (res instanceof String str) s.reg.pushObject(new ChuckString(str));
+                            else s.reg.pushObject(res);
+                        }
+                        return;
+                    } catch (InvocationTargetException ite) {
+                        Throwable cause = ite.getCause();
+                        if (cause instanceof RuntimeException re) throw re;
+                        throw new RuntimeException(ite.getClass().getSimpleName() + ": " + ite.getMessage());
+                    } catch (Exception e) {
+                        throw new RuntimeException(e.getClass().getSimpleName() + ": " + e.getMessage());
                     }
-                    return;
                 }
             } catch (Exception e) {}
 
@@ -410,12 +422,14 @@ public class ObjectInstrs {
                 if (t.equals("float")) { 
                     vm.setGlobalFloat(n, 0.0); 
                     s.reg.push(0.0); 
-                } else { 
+                } else if (t.equals("int")) { 
                     vm.setGlobalInt(n, 0L); 
-                    s.reg.push(0L); 
+                    s.reg.push(0L);
+                } else {
+                    vm.setGlobalObject(n, null);
+                    s.reg.pushObject(null);
                 }
-            }
-        }
+            }        }
     }
 
     public static class CallBuiltinStatic implements ChuckInstr {
@@ -455,6 +469,10 @@ public class ObjectInstrs {
                         } else if (val instanceof Double d) {
                             if (pts[i] == double.class || pts[i] == Double.class) { coe[i] = d; score += 3; }
                             else if (pts[i] == float.class || pts[i] == Float.class) { coe[i] = d.floatValue(); score += 2; }
+                            else { valid = false; break; }
+                        } else if (val instanceof ChuckDuration cd) {
+                            if (pts[i] == double.class || pts[i] == Double.class) { coe[i] = cd.samples(); score += 3; }
+                            else if (pts[i] == float.class || pts[i] == Float.class) { coe[i] = (float) cd.samples(); score += 2; }
                             else { valid = false; break; }
                         } else if (val instanceof ChuckString cs) {
                             if (pts[i] == String.class) { coe[i] = cs.toString(); score += 3; }

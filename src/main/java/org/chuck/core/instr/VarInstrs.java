@@ -34,8 +34,11 @@ public class VarInstrs {
     public static class SetGlobalObjectOrInt implements ChuckInstr {
         String name; public SetGlobalObjectOrInt(String n) { name = n; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            if (s.reg.isObject(0)) vm.setGlobalObject(name, s.reg.peekObject(0));
-            else if (s.reg.isDouble(0)) vm.setGlobalFloat(name, s.reg.peekAsDouble(0));
+            if (s.reg.isObject(0)) {
+                Object val = s.reg.peekObject(0);
+                // System.out.println("Setting global object " + name + " = " + val);
+                vm.setGlobalObject(name, val);
+            } else if (s.reg.isDouble(0)) vm.setGlobalFloat(name, s.reg.peekAsDouble(0));
             else vm.setGlobalInt(name, s.reg.peekLong(0));
         }
     }
@@ -43,9 +46,8 @@ public class VarInstrs {
     public static class GetGlobalObjectOrInt implements ChuckInstr {
         String name; public GetGlobalObjectOrInt(String n) { name = n; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            Object obj = vm.getGlobalObject(name);
-            if (obj != null) {
-                s.reg.pushObject(obj);
+            if (vm.isGlobalObject(name)) {
+                s.reg.pushObject(vm.getGlobalObject(name));
             } else if (vm.isGlobalDouble(name)) {
                 s.reg.push(Double.longBitsToDouble(vm.getGlobalInt(name)));
             } else {

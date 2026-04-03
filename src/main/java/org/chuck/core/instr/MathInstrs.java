@@ -41,6 +41,62 @@ public class MathInstrs {
                 case "isnan" -> { s.reg.push(Double.isNaN(s.reg.popAsDouble()) ? 1L : 0L); return; }
                 case "pow" -> { double exp = s.reg.popAsDouble(), base = s.reg.popAsDouble(); s.reg.push(Math.pow(base, exp)); return; }
                 case "srandom" -> { long seed = (long) s.reg.popAsDouble(); Std.rng = new java.util.Random(seed); s.reg.push(0.0); return; }
+                case "euclidean" -> {
+                    Object b = s.reg.popObject();
+                    Object a = s.reg.popObject();
+                    if (a instanceof ChuckArray aa && b instanceof ChuckArray bb) {
+                        s.reg.push(aa.euclideanDistance(bb));
+                    } else {
+                        s.reg.push(0.0);
+                    }
+                    return;
+                }
+                case "rtop" -> {
+                    Object b = s.reg.popObject();
+                    Object a = s.reg.popObject();
+                    if (a instanceof ChuckArray aa && b instanceof ChuckArray bb) {
+                        int len = Math.min(aa.size(), bb.size());
+                        for (int i = 0; i < len; i++) {
+                            Object elemA = aa.getObject(i);
+                            Object elemB = bb.getObject(i);
+                            if (elemA instanceof ChuckArray ca && elemB instanceof ChuckArray cb) {
+                                double re = ca.getFloat(0), im = ca.getFloat(1);
+                                cb.setFloat(0, Math.sqrt(re * re + im * im));
+                                cb.setFloat(1, Math.atan2(im, re));
+                            } else if (aa.vecTag != null && aa.vecTag.equals("complex") && bb.vecTag != null && bb.vecTag.equals("polar")) {
+                                double re = aa.getFloat(0), im = aa.getFloat(1);
+                                bb.setFloat(0, Math.sqrt(re * re + im * im));
+                                bb.setFloat(1, Math.atan2(im, re));
+                                break;
+                            }
+                        }
+                    }
+                    s.reg.pushObject(b);
+                    return;
+                }
+                case "ptor" -> {
+                    Object b = s.reg.popObject();
+                    Object a = s.reg.popObject();
+                    if (a instanceof ChuckArray aa && b instanceof ChuckArray bb) {
+                        int len = Math.min(aa.size(), bb.size());
+                        for (int i = 0; i < len; i++) {
+                            Object elemA = aa.getObject(i);
+                            Object elemB = bb.getObject(i);
+                            if (elemA instanceof ChuckArray ca && elemB instanceof ChuckArray cb) {
+                                double mag = ca.getFloat(0), phase = ca.getFloat(1);
+                                cb.setFloat(0, mag * Math.cos(phase));
+                                cb.setFloat(1, mag * Math.sin(phase));
+                            } else if (aa.vecTag != null && aa.vecTag.equals("polar") && bb.vecTag != null && bb.vecTag.equals("complex")) {
+                                double mag = aa.getFloat(0), phase = aa.getFloat(1);
+                                bb.setFloat(0, mag * Math.cos(phase));
+                                bb.setFloat(1, mag * Math.sin(phase));
+                                break;
+                            }
+                        }
+                    }
+                    s.reg.pushObject(b);
+                    return;
+                }
                 default -> {}
             }
             double v = s.reg.popAsDouble();

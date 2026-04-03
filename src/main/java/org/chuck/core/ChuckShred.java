@@ -187,9 +187,9 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
         try {
             this.instructionCount = 0;
             this.wakeTime += samples;
-            isRunning = false;
-            condition.signal();
-            while (!isRunning && !isDone) {   // exit if abort() was called
+            this.isRunning = false;
+            condition.signal(); // Signal execute() loop that we are done for now
+            while (!isRunning && !isDone) {
                 condition.await();
             }
         } catch (InterruptedException e) {
@@ -203,10 +203,11 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     public void suspendOnEvent() {
         lock.lock();
         try {
-            isRunning = false;
-            isWaiting = true;
-            condition.signal(); // Tell VM we are parked
-            while (!isRunning && !isDone) {   // exit if abort() was called
+            this.instructionCount = 0;
+            this.isRunning = false;
+            this.isWaiting = true;
+            condition.signal(); // Signal execute() loop that we are parking
+            while (!isRunning && !isDone) {
                 condition.await();
             }
         } catch (InterruptedException e) {
@@ -235,7 +236,24 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
                     if (instr == null) break;
 
                     // Execute instruction
-                    instr.execute(vm, this);
+                    try {
+                        instr.execute(vm, this);
+                    } catch (RuntimeException e) {
+                        e.printStackTrace(); // Print to stderr for debugging
+                        int line = code.getLineNumber(pc);
+                        String rawMsg = e.getMessage();
+                        if (rawMsg == null) rawMsg = e.getClass().getSimpleName();
+                        String type = rawMsg.contains(":") ? rawMsg.split(":")[0] : rawMsg;
+                        String msg = String.format("[chuck]:(EXCEPTION) %s: on line[%d] in shred[id=%d:%s]",
+                                type, line, id, code.getName());
+                        if (rawMsg.contains("index[")) {
+                            msg += " " + rawMsg.substring(rawMsg.indexOf("index["));
+                        }
+                        vm.print(msg + "\n");
+                        isDone = true;
+                        isRunning = false;
+                        return;
+                    }
 
                     // Advance PC
                     pc++;

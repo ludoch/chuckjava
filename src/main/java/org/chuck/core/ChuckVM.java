@@ -142,6 +142,22 @@ public class ChuckVM {
     public Object getGlobalObject(String name) {
         return globalObjects.get(name);
     }
+
+    public Map<String, String> getGlobalTypes() {
+        Map<String, String> types = new HashMap<>();
+        for (String name : globalIsObject.keySet()) {
+            if (globalIsObject.get(name)) {
+                Object o = globalObjects.get(name);
+                if (o instanceof ChuckObject co) types.put(name, co.getType().getName());
+                else types.put(name, "Object");
+            } else if (globalIsDouble.getOrDefault(name, false)) {
+                types.put(name, "float");
+            } else {
+                types.put(name, "int");
+            }
+        }
+        return types;
+    }
     
     // Printing support
     public interface PrintListener {
@@ -179,11 +195,10 @@ public class ChuckVM {
     }
 
     public void print(String text) {
-        String msg = text.endsWith("\n") ? text.substring(0, text.length() - 1) : text;
+        if (text == null) return;
         for (PrintListener listener : printListeners) {
-            listener.onPrint(msg);
+            listener.onPrint(text);
         }
-        // Also print to stdout by default
     }
 
     public long getCurrentTime() {
@@ -341,7 +356,7 @@ public class ChuckVM {
             processImports(ast, absName, importStack, compiledFiles, fileImportedFunctions);
             importedFunctions.putAll(fileImportedFunctions);
 
-            ChuckCode code = emitter.emit(ast, name);
+            ChuckCode code = emitter.emit(ast, name, getGlobalTypes());
             ChuckShred shred = new ChuckShred(code);
             return spork(shred);
         } catch (Exception e) {

@@ -59,7 +59,7 @@ public class MachineCall implements ChuckInstr {
                 String src = args.length > 0 ? String.valueOf(args[0]) : "";
                 long id = vm.eval(src);
                 s.reg.push(id);
-                vm.advanceTime(1);
+                s.yield(0);
             }
             case "numShreds" -> s.reg.push((long) vm.getActiveShredCount());
             case "shredExists" -> {

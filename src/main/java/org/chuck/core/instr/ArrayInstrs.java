@@ -8,9 +8,10 @@ public class ArrayInstrs {
             long idx = s.reg.popLong();
             Object raw = s.reg.popObject();
             if (raw instanceof ChuckArray a) {
-                if (a.isObjectAt((int) idx)) s.reg.pushObject(a.getObject((int) idx));
-                else if (a.isDoubleAt((int) idx)) s.reg.push(a.getFloat((int) idx));
-                else s.reg.push(a.getInt((int) idx));
+                int i = a.resolveIndex(idx);
+                if (a.isObjectAt(i)) s.reg.pushObject(a.getObject(i));
+                else if (a.isDoubleAt(i)) s.reg.push(a.getFloat(i));
+                else s.reg.push(a.getInt(i));
             } else {
                 s.reg.push(0L);
             }
@@ -22,12 +23,22 @@ public class ArrayInstrs {
             long idx = s.reg.popLong();
             Object raw = s.reg.popObject();
             if (!(raw instanceof ChuckArray a)) {
-                s.reg.pop(); // discard the value being set
-                return;
+                return; // Value stays on stack
             }
-            if (s.reg.isObject(0)) a.setObject((int) idx, s.reg.popObject());
-            else if (s.reg.isDouble(0)) a.setFloat((int) idx, s.reg.popAsDouble());
-            else a.setInt((int) idx, s.reg.popLong());
+            int i = a.resolveIndex(idx);
+            if (s.reg.isObject(0)) {
+                Object val = s.reg.popObject();
+                a.setObject(i, val);
+                s.reg.pushObject(val);
+            } else if (s.reg.isDouble(0)) {
+                double val = s.reg.popAsDouble();
+                a.setFloat(i, val);
+                s.reg.push(val);
+            } else {
+                long val = s.reg.popLong();
+                a.setInt(i, val);
+                s.reg.push(val);
+            }
         }
     }
 

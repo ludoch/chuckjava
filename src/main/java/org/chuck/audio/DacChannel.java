@@ -36,9 +36,6 @@ public class DacChannel extends ChuckUGen {
         }
         
         lastOut = sum * gain;
-        if (Math.abs(lastOut) > 1e-6 && systemTime % 4410 == 0) {
-            System.out.println("[VM] DAC[" + channelIndex + "] sum=" + lastOut + " at " + systemTime);
-        }
         lastTickTime = systemTime;
         return lastOut;
     }

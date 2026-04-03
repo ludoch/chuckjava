@@ -8,24 +8,23 @@ import java.util.Map;
 
 /**
  * Represents an array in ChucK.
- * ChucK arrays can be both indexed and associative.
- * They are dynamic and can grow via the append (<<) operator.
+ * ChucK arrays can be both indexed (int) and associative (string).
  */
 public class ChuckArray extends ChuckObject {
     private final List<Long> intData = new ArrayList<>();
     private final List<Double> floatData = new ArrayList<>();
     private final List<Object> objectData = new ArrayList<>();
-    private final List<Byte> types = new ArrayList<>(); // 0=int, 1=float, 2=object
-    
-    // For associative behavior
+    private final List<Byte> types = new ArrayList<>(); // 0=int, 1=float, 2=obj
     private final Map<String, Long> assocInt = new HashMap<>();
-    @SuppressWarnings("unused")
     private final Map<String, Double> assocFloat = new HashMap<>();
-    @SuppressWarnings("unused")
     private final Map<String, Object> assocObject = new HashMap<>();
-
-    /** Non-null for vec2/vec3/vec4/complex/polar; null for regular arrays. */
+    
+    // Vector tag (e.g. "vec3", "complex", "polar") for formatting
     public String vecTag = null;
+
+    public ChuckArray(ChuckType type) {
+        super(type);
+    }
 
     public ChuckArray(ChuckType type, int size) {
         super(type);
@@ -37,16 +36,19 @@ public class ChuckArray extends ChuckObject {
         }
     }
 
+    private void ensureCapacity(int index) {
+        while (types.size() <= index) {
+            intData.add(0L);
+            floatData.add(0.0);
+            objectData.add(null);
+            types.add((byte)0);
+        }
+    }
+
     public void setInt(int index, long value) {
         ensureCapacity(index);
         intData.set(index, value);
         types.set(index, (byte)0);
-    }
-
-    public long getInt(int index) {
-        if (index < 0) index = intData.size() + index;
-        if (index < 0 || index >= intData.size()) return 0;
-        return intData.get(index);
     }
 
     public void setFloat(int index, double value) {
@@ -56,9 +58,21 @@ public class ChuckArray extends ChuckObject {
     }
 
     public double getFloat(int index) {
-        if (index < 0) index = floatData.size() + index;
-        if (index < 0 || index >= floatData.size()) return 0.0;
-        return floatData.get(index);
+        if (index < 0) index = types.size() + index;
+        if (index < 0 || index >= types.size()) return 0.0;
+        byte t = types.get(index);
+        if (t == 1) return floatData.get(index);
+        if (t == 0) return (double) intData.get(index);
+        return 0.0;
+    }
+
+    public long getInt(int index) {
+        if (index < 0) index = types.size() + index;
+        if (index < 0 || index >= types.size()) return 0L;
+        byte t = types.get(index);
+        if (t == 0) return intData.get(index);
+        if (t == 1) return floatData.get(index).longValue();
+        return 0L;
     }
 
     public boolean isDoubleAt(int index) {
@@ -85,8 +99,106 @@ public class ChuckArray extends ChuckObject {
         return objectData.get(index);
     }
 
+    public void sort() {
+        if (types.isEmpty()) return;
+
+        // Create a list of indices and sort them based on the data
+        List<Integer> indices = new ArrayList<>();
+        for (int i = 0; i < types.size(); i++) indices.add(i);
+
+        indices.sort((i, j) -> {
+            byte ti = types.get(i), tj = types.get(j);
+            if (ti != tj) return Byte.compare(ti, tj);
+            
+            if (ti == 0) return Long.compare(intData.get(i), intData.get(j));
+            if (ti == 1) return Double.compare(floatData.get(i), floatData.get(j));
+            if (ti == 2) {
+                Object oi = objectData.get(i), oj = objectData.get(j);
+                if (oi instanceof ChuckString si && oj instanceof ChuckString sj) 
+                    return si.toString().compareTo(sj.toString());
+                if (oi instanceof ChuckArray ai && oj instanceof ChuckArray aj) {
+                    // Sort by magnitude
+                    double mi = ai.dot(ai), mj = aj.dot(aj);
+                    if (Math.abs(mi - mj) > 1e-9) return Double.compare(mi, mj);
+                    // Tie-break by components
+                    int len = Math.min(ai.size(), aj.size());
+                    for (int k = 0; k < len; k++) {
+                        int cmp = Double.compare(ai.getFloat(k), aj.getFloat(k));
+                        if (cmp != 0) return cmp;
+                    }
+                    return Integer.compare(ai.size(), aj.size());
+                }
+                if (oi == null) return (oj == null) ? 0 : -1;
+                if (oj == null) return 1;
+                return Integer.compare(oi.hashCode(), oj.hashCode());
+            }
+            return 0;
+        });
+
+        // Reorder all parallel lists
+        List<Byte> newTypes = new ArrayList<>();
+        List<Long> newIntData = new ArrayList<>();
+        List<Double> newFloatData = new ArrayList<>();
+        List<Object> newObjectData = new ArrayList<>();
+
+        for (int idx : indices) {
+            newTypes.add(types.get(idx));
+            newIntData.add(intData.get(idx));
+            newFloatData.add(floatData.get(idx));
+            newObjectData.add(objectData.get(idx));
+        }
+
+        types.clear(); types.addAll(newTypes);
+        intData.clear(); intData.addAll(newIntData);
+        floatData.clear(); floatData.addAll(newFloatData);
+        objectData.clear(); objectData.addAll(newObjectData);
+    }
+
+    public void reverse() {
+        int left = 0, right = types.size() - 1;
+        while (left < right) {
+            byte tl = types.get(left), tr = types.get(right);
+            long il = intData.get(left), ir = intData.get(right);
+            double fl = floatData.get(left), fr = floatData.get(right);
+            Object ol = objectData.get(left), or = objectData.get(right);
+
+            types.set(left, tr); types.set(right, tl);
+            intData.set(left, ir); intData.set(right, il);
+            floatData.set(left, fr); floatData.set(right, fl);
+            objectData.set(left, or); objectData.set(right, ol);
+
+            left++; right--;
+        }
+    }
+
+    public void shuffle() {
+        java.util.Random rng = Std.rng;
+        for (int i = types.size() - 1; i > 0; i--) {
+            int j = rng.nextInt(i + 1);
+            
+            byte tj = types.get(j), ti = types.get(i);
+            long ij = intData.get(j), ii = intData.get(i);
+            double fj = floatData.get(j), fi = floatData.get(i);
+            Object oj = objectData.get(j), oi = objectData.get(i);
+
+            types.set(i, tj); types.set(j, ti);
+            intData.set(i, ij); intData.set(j, ii);
+            floatData.set(i, fj); floatData.set(j, fi);
+            objectData.set(i, oj); objectData.set(j, oi);
+        }
+    }
+
     public int size() {
         return types.size();
+    }
+
+    public int resolveIndex(long idx) {
+        int i = (int) idx;
+        if (i < 0) i = types.size() + i;
+        if (i < 0 || i >= types.size()) {
+            throw new RuntimeException("ArrayOutofBounds: index[" + idx + "] size[" + types.size() + "]");
+        }
+        return i;
     }
 
     public void popOut(int index) {
@@ -99,6 +211,15 @@ public class ChuckArray extends ChuckObject {
 
     public void erase(int index) {
         popOut(index);
+    }
+
+    // Associative access
+    public void setAssocInt(String key, long value) { assocInt.put(key, value); }
+    public long getAssocInt(String key) { return assocInt.getOrDefault(key, 0L); }
+
+    /** Remove first element. */
+    public void popFront() {
+        if (size() > 0) popOut(0);
     }
 
     public void clear() {
@@ -139,6 +260,11 @@ public class ChuckArray extends ChuckObject {
     }
 
     public ChuckArray append(Object val) {
+        if (val instanceof Long l) return append(l.longValue());
+        if (val instanceof Double d) return append(d.doubleValue());
+        if (val instanceof Integer i) return append((long)i);
+        if (val instanceof Float f) return append((double)f);
+        
         int idx = types.size();
         ensureCapacity(idx);
         objectData.set(idx, val);
@@ -146,166 +272,43 @@ public class ChuckArray extends ChuckObject {
         return this;
     }
 
-    private void ensureCapacity(int index) {
-        while (types.size() <= index) {
-            intData.add(0L);
-            floatData.add(0.0);
-            objectData.add(null);
-            types.add((byte)0);
-        }
-    }
-
-    // Associative access
-    public void setAssocInt(String key, long value) { assocInt.put(key, value); }
-    public long getAssocInt(String key) { return assocInt.getOrDefault(key, 0L); }
-
-    /** Remove first element. */
-    public void popFront() {
-        if (types.isEmpty()) return;
-        intData.remove(0);
-        floatData.remove(0);
-        objectData.remove(0);
-        types.remove(0);
-    }
-
-    /** Remove elements from index `from` (inclusive) to `to` (exclusive). */
-    public void erase(int from, int to) {
-        from = Math.max(0, from);
-        to = Math.min(types.size(), to);
-        for (int i = to - 1; i >= from; i--) {
-            intData.remove(i);
-            floatData.remove(i);
-            objectData.remove(i);
-            types.remove(i);
-        }
-    }
-
-    /** Shuffle elements in place (Fisher-Yates). */
-    public void shuffle() {
-        java.util.Random rng = new java.util.Random();
-        for (int i = types.size() - 1; i > 0; i--) {
-            int j = rng.nextInt(i + 1);
-            // Swap all parallel arrays
-            Long ti = intData.get(i), tj = intData.get(j);
-            intData.set(i, tj); intData.set(j, ti);
-            Double fi = floatData.get(i), fj = floatData.get(j);
-            floatData.set(i, fj); floatData.set(j, fi);
-            Object oi = objectData.get(i), oj = objectData.get(j);
-            objectData.set(i, oj); objectData.set(j, oi);
-            Byte byi = types.get(i), byj = types.get(j);
-            types.set(i, byj); types.set(j, byi);
-        }
-    }
-
-    /** Shuffle using a seeded Random (for Math.srandom determinism). */
-    public void shuffle(java.util.Random rng) {
-        for (int i = types.size() - 1; i > 0; i--) {
-            int j = rng.nextInt(i + 1);
-            Long ti = intData.get(i), tj = intData.get(j);
-            intData.set(i, tj); intData.set(j, ti);
-            Double fi = floatData.get(i), fj = floatData.get(j);
-            floatData.set(i, fj); floatData.set(j, fi);
-            Object oi = objectData.get(i), oj = objectData.get(j);
-            objectData.set(i, oj); objectData.set(j, oi);
-            Byte byi = types.get(i), byj = types.get(j);
-            types.set(i, byj); types.set(j, byi);
-        }
-    }
-
-    /** Get a double value regardless of how it was stored. */
-    public double getNumeric(int index) {
-        if (index < 0) index = types.size() + index;
-        if (index < 0 || index >= types.size()) return 0.0;
-        if (types.get(index) == 1) return floatData.get(index);
-        return (double) intData.get(index);
-    }
-
-    // --- vec2/vec3/vec4 methods ---
-
-    /** Set all components. Supports 2, 3, or 4 args depending on vec type. */
-    public void set(double x, double y) {
-        if (size() >= 1) setFloat(0, x);
-        if (size() >= 2) setFloat(1, y);
-    }
-    public void set(double x, double y, double z) {
-        if (size() >= 1) setFloat(0, x);
-        if (size() >= 2) setFloat(1, y);
-        if (size() >= 3) setFloat(2, z);
-    }
-    public void set(double x, double y, double z, double w) {
-        if (size() >= 1) setFloat(0, x);
-        if (size() >= 2) setFloat(1, y);
-        if (size() >= 3) setFloat(2, z);
-        if (size() >= 4) setFloat(3, w);
+    // ChucK .size()
+    public int size(int s) {
+        if (s < 0) s = 0;
+        while (size() > s) popOut(size() - 1);
+        while (size() < s) ensureCapacity(s - 1);
+        return size();
     }
 
     @Override
     public String toString() {
-        StringBuilder sb = new StringBuilder();
         if ("complex".equals(vecTag)) {
-            return String.format("#(%.4f,%.4f)", getNumeric(0), getNumeric(1));
-        } else if ("polar".equals(vecTag)) {
-            return String.format("%%(%.4f,%.4f*pi)", getNumeric(0), getNumeric(1) / Math.PI);
-        } else if (vecTag != null && vecTag.startsWith("vec")) {
-            sb.append("@(");
+            return String.format("#(%.6f,%.6f)", getFloat(0), getFloat(1));
+        }
+        if ("polar".equals(vecTag)) {
+            // ChucK formats polar as %(mag, (phase/pi)*pi)
+            return String.format("%%(%.6f,%.6f*pi)", getFloat(0), getFloat(1) / Math.PI);
+        }
+        if (vecTag != null && vecTag.startsWith("vec")) {
+            StringBuilder sb = new StringBuilder("@(");
             for (int i = 0; i < size(); i++) {
-                sb.append(String.format("%.4f", getNumeric(i)));
-                if (i < size() - 1) sb.append(",");
-            }
-            sb.append(")");
-            return sb.toString();
-        } else {
-            sb.append("@(");
-            for (int i = 0; i < size(); i++) {
-                if (isObjectAt(i)) sb.append(getObject(i));
-                else if (isDoubleAt(i)) sb.append(String.format("%.6f", getFloat(i)));
-                else sb.append(getInt(i));
+                sb.append(String.format("%.6f", getFloat(i)));
                 if (i < size() - 1) sb.append(",");
             }
             sb.append(")");
             return sb.toString();
         }
-    }
-
-    /** Magnitude (length) of the vector. */
-    public double magnitude() {
-        double sum = 0;
+        StringBuilder sb = new StringBuilder("[");
         for (int i = 0; i < size(); i++) {
-            double v = getFloat(i);
-            sum += v * v;
+            if (isObjectAt(i)) sb.append(getObject(i));
+            else if (isDoubleAt(i)) sb.append(String.format("%.6f", getFloat(i)));
+            else sb.append(getInt(i));
+            if (i < size() - 1) sb.append(",");
         }
-        return Math.sqrt(sum);
+        sb.append("]");
+        return sb.toString();
     }
 
-    /** Normalize in place (makes the vector unit length). */
-    public ChuckArray normalize() {
-        double mag = magnitude();
-        if (mag > 0) {
-            for (int i = 0; i < size(); i++) {
-                setFloat(i, getFloat(i) / mag);
-            }
-        }
-        return this;
-    }
-
-    /** Cross product (vec3/vec4). For vec4, uses first 3 components and sets w=0. */
-    public ChuckArray cross(ChuckArray other) {
-        boolean isVec4 = "vec4".equals(vecTag) || "vec4".equals(other.vecTag);
-        int resultSize = isVec4 ? 4 : 3;
-        ChuckArray result = new ChuckArray(ChuckType.ARRAY, resultSize);
-        result.vecTag = isVec4 ? "vec4" : "vec3";
-        if (size() >= 3 && other.size() >= 3) {
-            double ax = getFloat(0), ay = getFloat(1), az = getFloat(2);
-            double bx = other.getFloat(0), by = other.getFloat(1), bz = other.getFloat(2);
-            result.setFloat(0, ay * bz - az * by);
-            result.setFloat(1, az * bx - ax * bz);
-            result.setFloat(2, ax * by - ay * bx);
-            if (isVec4) result.setFloat(3, 0.0);
-        }
-        return result;
-    }
-
-    /** Dot product. Returns a scalar (double). */
     public double dot(ChuckArray other) {
         double sum = 0;
         int len = Math.min(size(), other.size());
@@ -315,6 +318,16 @@ public class ChuckArray extends ChuckObject {
         return sum;
     }
 
+    public double euclideanDistance(ChuckArray other) {
+        double sumSq = 0;
+        int len = Math.min(size(), other.size());
+        for (int i = 0; i < len; i++) {
+            double diff = getFloat(i) - other.getFloat(i);
+            sumSq += diff * diff;
+        }
+        return Math.sqrt(sumSq);
+    }
+
     /** Negate all components, returns new array. */
     public ChuckArray negate() {
         ChuckArray result = new ChuckArray(ChuckType.ARRAY, size());
@@ -322,6 +335,17 @@ public class ChuckArray extends ChuckObject {
         for (int i = 0; i < size(); i++) {
             result.setFloat(i, -getFloat(i));
         }
+        return result;
+    }
+
+    public ChuckArray cross(ChuckArray other) {
+        ChuckArray result = new ChuckArray(ChuckType.ARRAY, 3);
+        result.vecTag = "vec3";
+        double a1 = getFloat(0), a2 = getFloat(1), a3 = getFloat(2);
+        double b1 = other.getFloat(0), b2 = other.getFloat(1), b3 = other.getFloat(2);
+        result.setFloat(0, a2 * b3 - a3 * b2);
+        result.setFloat(1, a3 * b1 - a1 * b3);
+        result.setFloat(2, a1 * b2 - a2 * b1);
         return result;
     }
 }

@@ -63,7 +63,9 @@ public class ChuckFactory {
             case "vec4" -> { ChuckArray v = new ChuckArray(ChuckType.ARRAY, 4); v.vecTag = "vec4"; yield v; }
             case "complex" -> { ChuckArray v = new ChuckArray(ChuckType.ARRAY, 2); v.vecTag = "complex"; yield v; }
             case "polar" -> { ChuckArray v = new ChuckArray(ChuckType.ARRAY, 2); v.vecTag = "polar"; yield v; }
+            case "MidiIn" -> new org.chuck.midi.MidiIn(vm);
             case "MidiOut" -> new MidiOut();
+            case "Hid" -> new org.chuck.hid.Hid();
             case "SerialIO" -> new SerialIO();
             case "OscBundle" -> new OscBundle();
             case "RegEx" -> new RegEx();

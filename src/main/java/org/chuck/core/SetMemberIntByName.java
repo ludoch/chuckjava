@@ -144,6 +144,14 @@ public class SetMemberIntByName implements ChuckInstr {
             Object finalVal = val;
             if (val instanceof ChuckString && params[0] == String.class) {
                 finalVal = val.toString();
+            } else if (val instanceof ChuckDuration cd && (params[0] == double.class || params[0] == Double.class)) {
+                finalVal = cd.samples();
+            } else if (val instanceof ChuckDuration cd && (params[0] == float.class || params[0] == Float.class)) {
+                finalVal = (float) cd.samples();
+            } else if (val instanceof ChuckDuration cd && (params[0] == int.class || params[0] == Integer.class)) {
+                finalVal = (int) cd.samples();
+            } else if (val instanceof ChuckDuration cd && (params[0] == long.class || params[0] == Long.class)) {
+                finalVal = (long) cd.samples();
             } else if (val instanceof Number && (params[0] == float.class || params[0] == Float.class)) {
                 finalVal = ((Number) val).floatValue();
             } else if (val != null && !params[0].isAssignableFrom(val.getClass())) {

@@ -37,8 +37,8 @@ public class MiscInstrs {
 
     public static class ChuckWriteIO implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            Object dest = s.reg.popObject();
             Object val = s.reg.pop();
+            Object dest = s.reg.popObject();
             
             String outStr = (val instanceof Double d) ? String.format("%.6f", d) : String.valueOf(val);
             

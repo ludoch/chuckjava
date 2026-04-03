@@ -25,13 +25,11 @@ public class ChuckIO extends ChuckObject {
 
     // Overloaded write methods for <= operator
     public ChuckIO write(String s) {
-        stream.print(s);
-        vm.print(s); // Also route to IDE console
+        vm.print(s); 
         return this;
     }
 
     public ChuckIO write(long l) {
-        stream.print(l);
         vm.print(String.valueOf(l));
         return this;
     }
@@ -40,8 +38,6 @@ public class ChuckIO extends ChuckObject {
         String s = java.math.BigDecimal.valueOf(d).stripTrailingZeros().toPlainString();
         // Handle case where stripTrailingZeros leaves a .0
         if (s.endsWith(".0")) s = s.substring(0, s.length() - 2);
-        // Handle whole numbers that became e.g. "3"
-        stream.print(s);
         vm.print(s);
         return this;
     }
@@ -49,13 +45,13 @@ public class ChuckIO extends ChuckObject {
     public ChuckIO write(Object o) {
         if (o instanceof Double d) return write(d.doubleValue());
         if (o instanceof Long l) return write(l.longValue());
-        stream.print(o);
+        if (o instanceof ChuckString cs) return write(cs.toString());
         vm.print(String.valueOf(o));
         return this;
     }
 
     // Static helper for IO.newline()
     public static String newline() {
-        return System.lineSeparator();
+        return "\n";
     }
 }
