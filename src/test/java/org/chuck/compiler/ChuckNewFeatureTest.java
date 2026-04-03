@@ -71,6 +71,6 @@ public class ChuckNewFeatureTest {
         
         assertTrue(shred.isDone());
         assertEquals(1, output.size());
-        assertEquals("20 10", output.get(0));
+        assertEquals("20 10", output.get(0).stripTrailing());
     }
 }

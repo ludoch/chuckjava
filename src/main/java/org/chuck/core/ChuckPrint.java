@@ -12,6 +12,26 @@ public class ChuckPrint implements ChuckInstr {
         this.numArgs = numArgs;
     }
 
+    private String formatValue(Object v) {
+        switch (v) {
+            case Double dv -> {
+                if (Double.isInfinite(dv)) return dv > 0 ? "inf" : "-inf";
+                if (Double.isNaN(dv)) return "nan";
+                return String.format("%.6f", dv);
+            }
+            case Float fv -> {
+                double dv = fv.doubleValue();
+                if (Double.isInfinite(dv)) return dv > 0 ? "inf" : "-inf";
+                if (Double.isNaN(dv)) return "nan";
+                return String.format("%.6f", dv);
+            }
+            case Long lv -> { return lv.toString(); }
+            case ChuckUGen ugen -> { return String.format("%.6f", (double) ugen.getLastOut()); }
+            case null -> { return "null"; }
+            default -> { return v.toString(); }
+        }
+    }
+
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
         StringBuilder sb = new StringBuilder();
@@ -29,24 +49,7 @@ public class ChuckPrint implements ChuckInstr {
         }
         
         for (int i = 0; i < argc; i++) {
-            Object v = values[i];
-            switch (v) {
-                case Double dv -> {
-                    if (Double.isInfinite(dv)) sb.append(dv > 0 ? "inf" : "-inf");
-                    else if (Double.isNaN(dv)) sb.append("nan");
-                    else sb.append(String.format("%.6f", dv));
-                }
-                case Float fv -> {
-                    double dv = fv.doubleValue();
-                    if (Double.isInfinite(dv)) sb.append(dv > 0 ? "inf" : "-inf");
-                    else if (Double.isNaN(dv)) sb.append("nan");
-                    else sb.append(String.format("%.6f", dv));
-                }
-                case Long lv -> sb.append(lv.toString());
-                case ChuckUGen ugen -> sb.append(String.format("%.6f", ugen.getLastOut()));
-                case null -> sb.append("null");
-                default -> sb.append(v.toString());
-            }
+            sb.append(formatValue(values[i]));
             if (i < argc - 1) sb.append(" ");
         }
         

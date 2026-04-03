@@ -35,91 +35,194 @@ public class MathInstrs {
         String fn;
         public MathFunc(String f) { fn = f; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            switch (fn) {
-                case "equal" -> { double b = s.reg.popAsDouble(), a = s.reg.popAsDouble(); s.reg.push(Math.abs(a - b) < 1e-6 ? 1 : 0); return; }
-                case "isinf" -> { s.reg.push(Double.isInfinite(s.reg.popAsDouble()) ? 1L : 0L); return; }
-                case "isnan" -> { s.reg.push(Double.isNaN(s.reg.popAsDouble()) ? 1L : 0L); return; }
-                case "pow" -> { double exp = s.reg.popAsDouble(), base = s.reg.popAsDouble(); s.reg.push(Math.pow(base, exp)); return; }
-                case "srandom" -> { long seed = (long) s.reg.popAsDouble(); Std.rng = new java.util.Random(seed); s.reg.push(0.0); return; }
-                case "euclidean" -> {
-                    Object b = s.reg.popObject();
-                    Object a = s.reg.popObject();
-                    if (a instanceof ChuckArray aa && b instanceof ChuckArray bb) {
-                        s.reg.push(aa.euclideanDistance(bb));
-                    } else {
-                        s.reg.push(0.0);
+            // Check for complex/polar objects first
+            if (s.reg.isObject(0)) {
+                Object obj = s.reg.peekObject(0);
+                if (obj instanceof ChuckArray a) {
+                    if ("complex".equals(a.vecTag) || "polar".equals(a.vecTag)) {
+                        s.reg.popObject(); // remove the first arg
+                        double re, im;
+                        if ("polar".equals(a.vecTag)) {
+                            double mag = a.getFloat(0), phase = a.getFloat(1);
+                            re = mag * Math.cos(phase); im = mag * Math.sin(phase);
+                        } else {
+                            re = a.getFloat(0); im = a.getFloat(1);
+                        }
+
+                        // Special cases that return scalar
+                        switch (fn) {
+                            case "re" -> { s.reg.push(re); return; }
+                            case "im" -> { s.reg.push(im); return; }
+                            case "mag" -> { s.reg.push(Math.sqrt(re*re + im*im)); return; }
+                            case "phase" -> { s.reg.push(Math.atan2(im, re)); return; }
+                            case "abs" -> { s.reg.push(Math.sqrt(re*re + im*im)); return; }
+                            case "isnan" -> { s.reg.push((Double.isNaN(re) || Double.isNaN(im)) ? 1L : 0L); return; }
+                            case "isinf" -> { s.reg.push((Double.isInfinite(re) || Double.isInfinite(im)) ? 1L : 0L); return; }
+                        }
+
+                        ChuckArray res = new ChuckArray(ChuckType.ARRAY, 2);
+                        res.vecTag = "complex"; // Default complex result
+
+                        switch (fn) {
+                            case "sin" -> { res.setFloat(0, Math.sin(re) * Math.cosh(im)); res.setFloat(1, Math.cos(re) * Math.sinh(im)); }
+                            case "cos" -> { res.setFloat(0, Math.cos(re) * Math.cosh(im)); res.setFloat(1, -Math.sin(re) * Math.sinh(im)); }
+                            case "tan" -> {
+                                double den = Math.cos(2*re) + Math.cosh(2*im);
+                                res.setFloat(0, Math.sin(2*re) / den);
+                                res.setFloat(1, Math.sinh(2*im) / den);
+                            }
+                            case "asin" -> {
+                                double re2 = re*re - im*im, im2 = 2*re*im;
+                                double dre = 1 - re2, dim = -im2;
+                                double r = Math.sqrt(Math.sqrt(dre*dre + dim*dim)), t = Math.atan2(dim, dre) / 2.0;
+                                double sre = r*Math.cos(t), sim = r*Math.sin(t);
+                                double lre = -im + sre, lim = re + sim;
+                                double lr = Math.sqrt(lre*lre + lim*lim), lt = Math.atan2(lim, lre);
+                                res.setFloat(0, lt); res.setFloat(1, -Math.log(lr));
+                            }
+                            case "acos" -> {
+                                double re2 = re*re - im*im, im2 = 2*re*im;
+                                double dre = 1 - re2, dim = -im2;
+                                double r = Math.sqrt(Math.sqrt(dre*dre + dim*dim)), t = Math.atan2(dim, dre) / 2.0;
+                                double sre = r*Math.cos(t), sim = r*Math.sin(t);
+                                double lre = -im + sre, lim = re + sim;
+                                double lr = Math.sqrt(lre*lre + lim*lim), lt = Math.atan2(lim, lre);
+                                res.setFloat(0, Math.PI/2.0 - lt); res.setFloat(1, Math.log(lr));
+                            }
+                            case "atan" -> {
+                                double nre = re, nim = 1 + im, dre = -re, dim = 1 - im;
+                                double dmag2 = dre*dre + dim*dim;
+                                double qre = (nre*dre + nim*dim)/dmag2, qim = (nim*dre - nre*dim)/dmag2;
+                                double qr = Math.sqrt(qre*qre + qim*qim), qt = Math.atan2(qim, qre);
+                                res.setFloat(0, -qt/2.0); res.setFloat(1, Math.log(qr)/2.0);
+                            }
+                            case "atan2" -> {
+                                double bre, bim;
+                                if (s.reg.isObject(0)) {
+                                    Object bObj = s.reg.popObject();
+                                    if (bObj instanceof ChuckArray b) {
+                                        if ("polar".equals(b.vecTag)) {
+                                            double bmag = b.getFloat(0), bph = b.getFloat(1);
+                                            bre = bmag * Math.cos(bph); bim = bmag * Math.sin(bph);
+                                        } else { bre = b.getFloat(0); bim = b.getFloat(1); }
+                                    } else bre = bim = 0;
+                                } else { bre = s.reg.popAsDouble(); bim = 0; }
+                                res.setFloat(0, Math.atan2(re, bre)); res.setFloat(1, 0.0);
+                            }
+                            case "pow" -> {
+                                double bre, bim;
+                                if (s.reg.isObject(0)) {
+                                    Object bObj = s.reg.popObject();
+                                    if (bObj instanceof ChuckArray b) {
+                                        if ("polar".equals(b.vecTag)) {
+                                            double bmag = b.getFloat(0), bph = b.getFloat(1);
+                                            bre = bmag * Math.cos(bph); bim = bmag * Math.sin(bph);
+                                        } else { bre = b.getFloat(0); bim = b.getFloat(1); }
+                                    } else bre = bim = 0;
+                                } else { bre = s.reg.popAsDouble(); bim = 0; }
+                                double lr = Math.log(Math.sqrt(re*re + im*im)), lt = Math.atan2(im, re);
+                                double are = bre*lr - bim*lt, aim = bre*lt + bim*lr, expAre = Math.exp(are);
+                                res.setFloat(0, expAre * Math.cos(aim)); res.setFloat(1, expAre * Math.sin(aim));
+                            }
+                            case "sqrt" -> {
+                                double r = Math.sqrt(Math.sqrt(re * re + im * im)), theta = Math.atan2(im, re) / 2.0;
+                                res.setFloat(0, r * Math.cos(theta)); res.setFloat(1, r * Math.sin(theta));
+                            }
+                            case "floor" -> { res.setFloat(0, Math.floor(re)); res.setFloat(1, Math.floor(im)); }
+                            case "ceil" -> { res.setFloat(0, Math.ceil(re)); res.setFloat(1, Math.ceil(im)); }
+                            case "log" -> { res.setFloat(0, Math.log(Math.sqrt(re*re + im*im))); res.setFloat(1, Math.atan2(im, re)); }
+                            case "exp" -> { double expRe = Math.exp(re); res.setFloat(0, expRe * Math.cos(im)); res.setFloat(1, expRe * Math.sin(im)); }
+                            default -> { res.setFloat(0, 0.0); res.setFloat(1, 0.0); }
+                        }
+                        
+                        // If original was polar, convert result back to polar
+                        if ("polar".equals(a.vecTag)) {
+                            double rre = res.getFloat(0), rim = res.getFloat(1);
+                            res.vecTag = "polar";
+                            res.setFloat(0, Math.sqrt(rre*rre + rim*rim));
+                            res.setFloat(1, Math.atan2(rim, rre));
+                        }
+                        s.reg.pushObject(res);
+                        return;
                     }
-                    return;
+                }
+            }
+
+            // Fallback to primitive handling
+            switch (fn) {
+                case "equal" -> { double b = s.reg.popAsDouble(), a = s.reg.popAsDouble(); s.reg.push(Math.abs(a - b) < 1e-6 ? 1 : 0); }
+                case "isinf" -> { s.reg.push(Double.isInfinite(s.reg.popAsDouble()) ? 1L : 0L); }
+                case "isnan" -> { s.reg.push(Double.isNaN(s.reg.popAsDouble()) ? 1L : 0L); }
+                case "pow" -> { double exp = s.reg.popAsDouble(), base = s.reg.popAsDouble(); s.reg.push(Math.pow(base, exp)); }
+                case "atan2" -> { double x = s.reg.popAsDouble(), y = s.reg.popAsDouble(); s.reg.push(Math.atan2(y, x)); }
+                case "srandom" -> { long seed = (long) s.reg.popAsDouble(); Std.rng = new java.util.Random(seed); s.reg.push(0.0); }
+                case "euclidean" -> {
+                    Object b = s.reg.popObject(), a = s.reg.popObject();
+                    if (a instanceof ChuckArray aa && b instanceof ChuckArray bb) s.reg.push(aa.euclideanDistance(bb));
+                    else s.reg.push(0.0);
                 }
                 case "rtop" -> {
-                    Object b = s.reg.popObject();
-                    Object a = s.reg.popObject();
+                    Object b = s.reg.popObject(), a = s.reg.popObject();
                     if (a instanceof ChuckArray aa && b instanceof ChuckArray bb) {
-                        int len = Math.min(aa.size(), bb.size());
-                        for (int i = 0; i < len; i++) {
-                            Object elemA = aa.getObject(i);
-                            Object elemB = bb.getObject(i);
-                            if (elemA instanceof ChuckArray ca && elemB instanceof ChuckArray cb) {
-                                double re = ca.getFloat(0), im = ca.getFloat(1);
-                                cb.setFloat(0, Math.sqrt(re * re + im * im));
-                                cb.setFloat(1, Math.atan2(im, re));
-                            } else if (aa.vecTag != null && aa.vecTag.equals("complex") && bb.vecTag != null && bb.vecTag.equals("polar")) {
-                                double re = aa.getFloat(0), im = aa.getFloat(1);
-                                bb.setFloat(0, Math.sqrt(re * re + im * im));
-                                bb.setFloat(1, Math.atan2(im, re));
-                                break;
+                        if ("complex".equals(aa.vecTag) && "polar".equals(bb.vecTag)) {
+                            double re = aa.getFloat(0), im = aa.getFloat(1);
+                            bb.setFloat(0, Math.sqrt(re*re + im*im)); bb.setFloat(1, Math.atan2(im, re));
+                        } else {
+                            int len = Math.min(aa.size(), bb.size());
+                            for (int i = 0; i < len; i++) {
+                                Object elemA = aa.getObject(i), elemB = bb.getObject(i);
+                                if (elemA instanceof ChuckArray ca && elemB instanceof ChuckArray cb) {
+                                    double re = ca.getFloat(0), im = ca.getFloat(1);
+                                    cb.setFloat(0, Math.sqrt(re * re + im * im)); cb.setFloat(1, Math.atan2(im, re));
+                                }
                             }
                         }
                     }
                     s.reg.pushObject(b);
-                    return;
                 }
                 case "ptor" -> {
-                    Object b = s.reg.popObject();
-                    Object a = s.reg.popObject();
+                    Object b = s.reg.popObject(), a = s.reg.popObject();
                     if (a instanceof ChuckArray aa && b instanceof ChuckArray bb) {
-                        int len = Math.min(aa.size(), bb.size());
-                        for (int i = 0; i < len; i++) {
-                            Object elemA = aa.getObject(i);
-                            Object elemB = bb.getObject(i);
-                            if (elemA instanceof ChuckArray ca && elemB instanceof ChuckArray cb) {
-                                double mag = ca.getFloat(0), phase = ca.getFloat(1);
-                                cb.setFloat(0, mag * Math.cos(phase));
-                                cb.setFloat(1, mag * Math.sin(phase));
-                            } else if (aa.vecTag != null && aa.vecTag.equals("polar") && bb.vecTag != null && bb.vecTag.equals("complex")) {
-                                double mag = aa.getFloat(0), phase = aa.getFloat(1);
-                                bb.setFloat(0, mag * Math.cos(phase));
-                                bb.setFloat(1, mag * Math.sin(phase));
-                                break;
+                        if ("polar".equals(aa.vecTag) && "complex".equals(bb.vecTag)) {
+                            double mag = aa.getFloat(0), phase = aa.getFloat(1);
+                            bb.setFloat(0, mag * Math.cos(phase)); bb.setFloat(1, mag * Math.sin(phase));
+                        } else {
+                            int len = Math.min(aa.size(), bb.size());
+                            for (int i = 0; i < len; i++) {
+                                Object elemA = aa.getObject(i), elemB = bb.getObject(i);
+                                if (elemA instanceof ChuckArray ca && elemB instanceof ChuckArray cb) {
+                                    double mag = ca.getFloat(0), phase = ca.getFloat(1);
+                                    cb.setFloat(0, mag * Math.cos(phase)); cb.setFloat(1, mag * Math.sin(phase));
+                                }
                             }
                         }
                     }
                     s.reg.pushObject(b);
-                    return;
                 }
-                default -> {}
+                default -> {
+                    double v = s.reg.popAsDouble();
+                    double res = switch (fn) {
+                        case "sin" -> Math.sin(v);
+                        case "cos" -> Math.cos(v);
+                        case "tan" -> Math.tan(v);
+                        case "asin" -> Math.asin(v);
+                        case "acos" -> Math.acos(v);
+                        case "atan" -> Math.atan(v);
+                        case "sqrt" -> Math.sqrt(v);
+                        case "abs" -> Math.abs(v);
+                        case "floor" -> Math.floor(v);
+                        case "ceil" -> Math.ceil(v);
+                        case "log" -> Math.log(v);
+                        case "log2" -> Math.log(v) / Math.log(2);
+                        case "log10" -> Math.log10(v);
+                        case "exp" -> Math.exp(v);
+                        case "round" -> (double) Math.round(v);
+                        case "trunc" -> (double) (long) v;
+                        default -> v;
+                    };
+                    s.reg.push(res);
+                }
             }
-            double v = s.reg.popAsDouble();
-            double res = switch (fn) {
-                case "sin" -> Math.sin(v);
-                case "cos" -> Math.cos(v);
-                case "sqrt" -> Math.sqrt(v);
-                case "abs" -> Math.abs(v);
-                case "floor" -> Math.floor(v);
-                case "ceil" -> Math.ceil(v);
-                case "log" -> Math.log(v);
-                case "log2" -> Math.log(v) / Math.log(2);
-                case "log10" -> Math.log10(v);
-                case "exp" -> Math.exp(v);
-                case "round" -> (double) Math.round(v);
-                case "trunc" -> (double) (long) v;
-                case "tan" -> Math.tan(v);
-                case "asin" -> Math.asin(v);
-                case "acos" -> Math.acos(v);
-                case "atan" -> Math.atan(v);
-                default -> v;
-            };
-            s.reg.push(res);
         }
     }
 

@@ -1736,7 +1736,7 @@ public class ChuckEmitter {
                         String rhsTypeS = getExprType(e.rhs());
                         if (e.op() == ChuckAST.Operator.TIMES
                                 && ("float".equals(lhsTypeS) || "int".equals(lhsTypeS))
-                                && ("vec2".equals(rhsTypeS) || "vec3".equals(rhsTypeS) || "vec4".equals(rhsTypeS))) {
+                                && isVecType(rhsTypeS)) {
                             // Emit: vec first (stack expects vec then scalar for VecScale)
                             emitExpression(e.rhs(), code);
                             emitExpression(e.lhs(), code);

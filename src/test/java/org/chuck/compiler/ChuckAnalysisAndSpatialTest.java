@@ -43,7 +43,7 @@ public class ChuckAnalysisAndSpatialTest {
         ChuckCode code = emitter.emit(ast, "Test");
         ChuckVM vm = new ChuckVM(44100);
         List<String> output = Collections.synchronizedList(new ArrayList<>());
-        vm.addPrintListener(output::add);
+        vm.addPrintListener(s1 -> output.add(s1.stripTrailing()));
         vm.spork(new ChuckShred(code));
         Thread.sleep(150);
         vm.advanceTime(samples);

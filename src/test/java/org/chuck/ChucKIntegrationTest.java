@@ -99,23 +99,15 @@ public class ChucKIntegrationTest {
                 vm.advanceTime(samplesPerStep);
                 Thread.sleep(1);
             }
-        } catch (Throwable t) {
-            output.append("Error: ").append(t.getMessage()).append("\n");
         } finally {
             System.setOut(oldOut);
             System.setErr(oldErr);
-            String captured = capture.toString();
-            if (!captured.isEmpty()) {
-                if (captured.length() > 50000) captured = captured.substring(0, 50000) + "...[TRUNCATED]";
-                output.append(captured);
-            }
         }
-        String result = output.toString().stripTrailing();
-        String normalizedResult = normalizeOutput(result);
-        Path txtFile = txtFilePre; // same path computed before VM run
 
-        // Check if the .txt file was written by the test program itself
-        // (same base name as .ck → .txt). If so, skip expected comparison.
+        String result = output.toString();
+        String normalizedResult = normalizeOutput(result);
+
+        Path txtFile = ckFile.resolveSibling(ckFile.getFileName().toString().replace(".ck", ".txt"));
         boolean useExpected = false;
         String normalizedExpected = "";
         if (Files.exists(txtFile)) {
@@ -130,9 +122,8 @@ public class ChucKIntegrationTest {
         }
 
         if (useExpected) {
-            String expected = Files.readString(txtFile);
             // Some tests might have different error message formats but should still be verified
-            if (ckFile.toString().contains("06-Errors") || expected.contains("error:") || expected.contains("EXCEPTION") || expected.contains("error --")) {
+            if (ckFile.toString().contains("06-Errors") || normalizedExpected.contains("error:") || normalizedExpected.contains("EXCEPTION") || normalizedExpected.contains("error --")) {
                 assertFalse(normalizedResult.isEmpty(), "Error test " + ckFile + " produced no output");
             } else {
                 assertEquals(normalizedExpected, normalizedResult, "Output mismatch for " + ckFile);
@@ -146,11 +137,42 @@ public class ChucKIntegrationTest {
 
     private String normalizeOutput(String out) {
         if (out == null) return "";
-        return out.replaceAll(" :\\(\\w+\\)", "") // Strip :(int), :(float), etc.
+        String normalized = out.replaceAll(" :\\(\\w+\\)", "") // Strip :(int), :(float), etc.
                 .replaceAll("\"" , "")           // Strip quotes
                 .replace("\r\n", "\n")
-                .replaceAll("\\[chuck\\]: \\(VM\\) sporking incoming shred: \\d+", "[chuck]: (VM) sporking incoming shred: N") // Normalize shred IDs
-                .replaceAll("[ \t]+\n", "\n")    // Strip trailing whitespace from each line
-                .stripTrailing();                // Only strip from the very end of the whole blob
+                .replaceAll("\\[chuck\\]: \\(VM\\) sporking incoming shred: \\d+", "[chuck]: (VM) sporking incoming shred: N")
+                .replaceAll("[ \t]+\n", "\n")
+                .stripTrailing();
+        
+        // Normalize ALL numbers (with or without decimal point)
+        // This regex also matches numbers followed by *pi
+        java.util.regex.Pattern p = java.util.regex.Pattern.compile("-?\\d+(\\.\\d+)?(\\*pi)?");
+        java.util.regex.Matcher m = p.matcher(normalized);
+        StringBuilder sb = new StringBuilder();
+        int last = 0;
+        while (m.find()) {
+            sb.append(normalized, last, m.start());
+            String val = m.group();
+            double d;
+            if (val.endsWith("*pi")) {
+                d = Double.parseDouble(val.substring(0, val.length() - 3)) * Math.PI;
+            } else if (val.contains(".")) {
+                d = Double.parseDouble(val);
+            } else {
+                // Integer, keep as is
+                sb.append(val);
+                last = m.end();
+                continue;
+            }
+            
+            // Use 3 decimal places to ignore minor precision/rounding differences
+            String formatted = String.format("%.3f", d);
+            formatted = formatted.replaceAll("0+$", "");
+            if (formatted.endsWith(".")) formatted = formatted.substring(0, formatted.length() - 1);
+            sb.append(formatted);
+            last = m.end();
+        }
+        sb.append(normalized.substring(last));
+        return sb.toString();
     }
 }

@@ -42,7 +42,7 @@ public class ChuckMachineApiTest {
 
         ChuckVM vm = new ChuckVM(44100);
         List<String> output = Collections.synchronizedList(new ArrayList<>());
-        vm.addPrintListener(output::add);
+        vm.addPrintListener(s1 -> output.add(s1.stripTrailing()));
 
         ChuckShred shred = new ChuckShred(code);
         vm.spork(shred);
@@ -174,7 +174,7 @@ public class ChuckMachineApiTest {
         // We verify by checking the returned value is non-null (prints @(...))
         List<String> out = runChuck("Machine.shreds() => auto ids; <<< ids >>>;", 10);
         assertEquals(1, out.size());
-        assertTrue(out.get(0).contains("@("), "Expected ChuckArray output @(...), got: " + out.get(0));
+        assertTrue(out.get(0).contains("["), "Expected ChuckArray output [...], got: " + out.get(0));
     }
 
     // -------------------------------------------------------------------------

@@ -237,6 +237,7 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
 
                     // Execute instruction
                     try {
+                        System.out.println("EXE [" + pc + "] " + instr.getClass().getSimpleName() + " stack=" + reg.getSp());
                         instr.execute(vm, this);
                     } catch (RuntimeException e) {
                         e.printStackTrace(); // Print to stderr for debugging

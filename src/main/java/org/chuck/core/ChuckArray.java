@@ -108,17 +108,27 @@ public class ChuckArray extends ChuckObject {
 
         indices.sort((i, j) -> {
             byte ti = types.get(i), tj = types.get(j);
+            
+            // If both are numeric (0 or 1), compare by double value
+            if (ti <= 1 && tj <= 1) {
+                return Double.compare(getFloat(i), getFloat(j));
+            }
+            
             if (ti != tj) return Byte.compare(ti, tj);
             
-            if (ti == 0) return Long.compare(intData.get(i), intData.get(j));
-            if (ti == 1) return Double.compare(floatData.get(i), floatData.get(j));
             if (ti == 2) {
                 Object oi = objectData.get(i), oj = objectData.get(j);
                 if (oi instanceof ChuckString si && oj instanceof ChuckString sj) 
                     return si.toString().compareTo(sj.toString());
                 if (oi instanceof ChuckArray ai && oj instanceof ChuckArray aj) {
                     // Sort by magnitude
-                    double mi = ai.dot(ai), mj = aj.dot(aj);
+                    double mi, mj;
+                    if ("polar".equals(ai.vecTag)) mi = ai.getFloat(0);
+                    else mi = ai.dot(ai);
+                    
+                    if ("polar".equals(aj.vecTag)) mj = aj.getFloat(0);
+                    else mj = aj.dot(aj);
+
                     if (Math.abs(mi - mj) > 1e-9) return Double.compare(mi, mj);
                     // Tie-break by components
                     int len = Math.min(ai.size(), aj.size());
@@ -286,7 +296,6 @@ public class ChuckArray extends ChuckObject {
             return String.format("#(%.6f,%.6f)", getFloat(0), getFloat(1));
         }
         if ("polar".equals(vecTag)) {
-            // ChucK formats polar as %(mag, (phase/pi)*pi)
             return String.format("%%(%.6f,%.6f*pi)", getFloat(0), getFloat(1) / Math.PI);
         }
         if (vecTag != null && vecTag.startsWith("vec")) {

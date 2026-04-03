@@ -39,8 +39,13 @@ public class VecInstrs {
             }
             ChuckArray result = new ChuckArray(ChuckType.ARRAY, vec.size());
             result.vecTag = vec.vecTag;
-            for (int i = 0; i < vec.size(); i++) {
-                result.setFloat(i, vec.getFloat(i) * scalar);
+            if ("polar".equals(vec.vecTag)) {
+                result.setFloat(0, vec.getFloat(0) * scalar);
+                result.setFloat(1, vec.getFloat(1));
+            } else {
+                for (int i = 0; i < vec.size(); i++) {
+                    result.setFloat(i, vec.getFloat(i) * scalar);
+                }
             }
             s.reg.pushObject(result);
         }
