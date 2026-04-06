@@ -102,8 +102,6 @@ public abstract class ChuckUGen extends ChuckObject {
             for (ChuckUGen src : sources) {
                 sum += src.tick(systemTime);
             }
-            if (Math.abs(sum) > 1e-6) {
-            }
 
             lastOut = compute(sum, systemTime) * gain;
             lastTickTime = systemTime;

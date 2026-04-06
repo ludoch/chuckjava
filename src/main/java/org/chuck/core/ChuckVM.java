@@ -334,26 +334,30 @@ public class ChuckVM {
         while (now.get() < targetTime) {
             long currentTime = now.get();
 
-            // 1. Collect all shreds ready to run at this time
-            java.util.List<ChuckShred> ready = new java.util.ArrayList<>();
-            shredulerLock.lock();
-            try {
-                while (!shreduler.isEmpty() && shreduler.peek().getWakeTime() <= currentTime) {
-                    ready.add(shreduler.poll());
+            // 1. Run all shreds scheduled for this time (allow 0-yield chaining)
+            int safety = 0;
+            while (safety++ < 1000) {
+                java.util.List<ChuckShred> ready = new java.util.ArrayList<>();
+                shredulerLock.lock();
+                try {
+                    while (!shreduler.isEmpty() && shreduler.peek().getWakeTime() <= currentTime) {
+                        ready.add(shreduler.poll());
+                    }
+                } finally {
+                    shredulerLock.unlock();
                 }
-            } finally {
-                shredulerLock.unlock();
+
+                if (ready.isEmpty()) break;
+
+                for (ChuckShred nextShred : ready) {
+                    nextShred.resume(this);
+                    if (!nextShred.isDone() && !nextShred.isWaiting()) {
+                        schedule(nextShred);
+                    }
+                }
             }
 
-            // 2. Run them once per sample
-            for (ChuckShred nextShred : ready) {
-                nextShred.resume(this);
-                if (!nextShred.isDone() && !nextShred.isWaiting()) {
-                    schedule(nextShred);
-                }
-            }
-
-            // 3. Roots are the DAC channels
+            // 2. Roots are the DAC channels
             for (DacChannel chan : dacChannels) {
                 chan.tick(currentTime);
             }
