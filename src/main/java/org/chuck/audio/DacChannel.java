@@ -14,6 +14,12 @@ public class DacChannel extends ChuckUGen {
     }
 
     @Override
+    public float getChannelLastOut(int i) {
+        if (i == channelIndex) return lastOut;
+        return 0.0f;
+    }
+
+    @Override
     protected float compute(float input, long systemTime) {
         return input;
     }
