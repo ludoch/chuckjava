@@ -189,7 +189,18 @@ public class ObjectInstrs {
                 java.lang.reflect.Method bestMethod = null;
                 Object[] bestArgs = null;
                 int bestScore = -1;
-                for (java.lang.reflect.Method m : obj.getClass().getMethods()) {
+                // In GraalVM native image, unregistered subclasses return empty from getMethods().
+                // Walk up the hierarchy until we find a registered class (e.g. ChuckUGen).
+                // Method.invoke() still does virtual dispatch on the actual instance.
+                java.lang.reflect.Method[] reflMethods = obj.getClass().getMethods();
+                if (reflMethods.length == 0) {
+                    Class<?> parent = obj.getClass().getSuperclass();
+                    while (parent != null && reflMethods.length == 0) {
+                        reflMethods = parent.getMethods();
+                        parent = parent.getSuperclass();
+                    }
+                }
+                for (java.lang.reflect.Method m : reflMethods) {
                     if (!m.getName().equals(mName) || m.getParameterCount() != a) continue;
                     Class<?>[] pts = m.getParameterTypes();
                     Object[] coe = new Object[a];

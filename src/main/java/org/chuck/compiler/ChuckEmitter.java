@@ -1303,7 +1303,7 @@ public class ChuckEmitter {
                     // Skip static variable initializers
                     if (bodyStmt instanceof ChuckAST.ExpStmt es2
                             && es2.exp() instanceof ChuckAST.BinaryExp bexp2
-                            && bexp2.op() == ChuckAST.Operator.CHUCK
+                            && (bexp2.op() == ChuckAST.Operator.CHUCK || bexp2.op() == ChuckAST.Operator.AT_CHUCK)
                             && bexp2.rhs() instanceof ChuckAST.DeclExp rDecl2
                             && rDecl2.isStatic()) {
                         continue;
