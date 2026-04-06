@@ -88,7 +88,7 @@ jobs:
       - name: Build IDE bundle
         # skipAot=true: AOT training run launches the app (GUI), not suitable for headless CI.
         # The bundle still works; users can regenerate the cache locally after install.
-        run: mvn -Pide-bundle package -DskipTests -B -Djpackage.type=${{ matrix.jpackage-type }} -DskipAot=true
+        run: mvn -Pide-bundle package -DskipTests -B "-Djpackage.type=${{ matrix.jpackage-type }}" -DskipAot=true
 
       - name: Upload IDE bundle
         uses: actions/upload-artifact@v4
