@@ -1,9 +1,6 @@
 package org.chuck.core.instr;
 
-import org.chuck.core.ChuckInstr;
-import org.chuck.core.ChuckObject;
-import org.chuck.core.ChuckShred;
-import org.chuck.core.ChuckVM;
+import org.chuck.core.*;
 
 public class VarInstrs {
     public static class LoadLocal implements ChuckInstr {

@@ -345,7 +345,7 @@ public class ChuckVM {
                 shredulerLock.unlock();
             }
 
-            // 2. Run them once
+            // 2. Run them once per sample
             for (ChuckShred nextShred : ready) {
                 nextShred.resume(this);
                 if (!nextShred.isDone() && !nextShred.isWaiting()) {
