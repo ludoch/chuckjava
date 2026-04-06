@@ -171,4 +171,28 @@ public class Std {
         }
         return arr;
     }
+
+    /** Random integer in [0, RAND_MAX] (2147483647). */
+    public static long rand() {
+        return (long) rng.nextInt(Integer.MAX_VALUE);
+    }
+
+    /** Random float in [0.0, 1.0). */
+    public static double randf() {
+        return rng.nextDouble();
+    }
+
+    /**
+     * Execute a shell command and return the exit code.
+     * Inherits the current process stdin/stdout/stderr.
+     */
+    public static long system(String cmd) {
+        try {
+            ProcessBuilder pb = new ProcessBuilder(cmd.split("\\s+"));
+            pb.inheritIO();
+            return pb.start().waitFor();
+        } catch (Exception e) {
+            return -1L;
+        }
+    }
 }

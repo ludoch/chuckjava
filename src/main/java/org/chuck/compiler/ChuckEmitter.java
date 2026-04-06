@@ -578,7 +578,7 @@ public class ChuckEmitter {
             for (ChuckAST.Stmt i : imported) registerClassNames(i);
         } else if (stmt instanceof ChuckAST.ClassDefStmt s) {
             if (!userClassRegistry.containsKey(s.name())) {
-                userClassRegistry.put(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>()));
+                userClassRegistry.put(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, s.isAbstract(), s.isInterface()));
             }
             for (ChuckAST.Stmt inner : s.body()) {
                 registerClassNames(inner);
@@ -1232,7 +1232,7 @@ public class ChuckEmitter {
                 // methodCodes/staticMethodCodes are mutable maps; stubs added in pass 1 below become visible here.
                 userClassRegistry.put(s.name(), new UserClassDescriptor(
                         s.name(), s.parentName(), fieldDefs, staticFieldDefs, methodCodes, staticMethodCodes,
-                        staticInts, staticIsDouble, staticObjects));
+                        staticInts, staticIsDouble, staticObjects, null, s.isAbstract(), s.isInterface()));
 
                 // Track methods defined so far to detect duplicates
                 java.util.Set<String> definedMethods = new java.util.HashSet<>();
@@ -1378,7 +1378,9 @@ public class ChuckEmitter {
                         staticInts,
                         staticIsDouble,
                         staticObjects,
-                        finalPreCtorCode);
+                        finalPreCtorCode,
+                        s.isAbstract(),
+                        s.isInterface());
 
                 // Add static methods to the main methods map too, for resolution on instances
                 methodCodes.putAll(staticMethodCodes);
@@ -1528,6 +1530,21 @@ public class ChuckEmitter {
                 }
                 for (int jump : continueJumps.pop()) {
                     code.replaceInstruction(jump, new ControlInstrs.Jump(updateStart));
+                }
+            }
+            case ChuckAST.LoopStmt s -> {
+                // Infinite loop: emit body, jump back — only break exits
+                int startPc = code.getNumInstructions();
+                continueJumps.push(new ArrayList<>());
+                breakJumps.push(new ArrayList<>());
+                emitStatement(s.body(), code);
+                code.addInstruction(new ControlInstrs.Jump(startPc));
+                int endPc = code.getNumInstructions();
+                for (int jump : breakJumps.pop()) {
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(endPc));
+                }
+                for (int jump : continueJumps.pop()) {
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(startPc));
                 }
             }
             default -> {
@@ -2534,6 +2551,20 @@ public class ChuckEmitter {
                         code.addInstruction(new FieldInstrs.GetBuiltinStatic("org.chuck.core.Std", e.member()));
                         return;
                     }
+                    if (id.name().equals("Machine")) {
+                        // Property-style read: Machine.realtime, Machine.silent, Machine.intsize, etc.
+                        switch (e.member()) {
+                            case "realtime"  -> code.addInstruction(new PushInstrs.PushInt(0));
+                            case "silent"    -> code.addInstruction(new PushInstrs.PushInt(1));
+                            case "intsize"   -> code.addInstruction(new PushInstrs.PushInt(64));
+                            case "version"   -> code.addInstruction(new org.chuck.core.instr.MachineCall("version", 0));
+                            case "platform", "os" -> code.addInstruction(new org.chuck.core.instr.MachineCall("platform", 0));
+                            case "loglevel"  -> code.addInstruction(new org.chuck.core.instr.MachineCall("loglevel", 0));
+                            case "timeofday" -> code.addInstruction(new org.chuck.core.instr.MachineCall("timeofday", 0));
+                            default          -> code.addInstruction(new org.chuck.core.instr.MachineCall(e.member(), 0));
+                        }
+                        return;
+                    }
                     if (id.name().equals("RegEx")) {
                         code.addInstruction(new FieldInstrs.GetBuiltinStatic("org.chuck.core.RegEx", e.member()));
                         return;
@@ -2927,6 +2958,14 @@ public class ChuckEmitter {
                     case "polar" -> code.addInstruction(new TypeInstrs.CastToPolar());
                     // other types: leave value as-is (e.g. casting to a class type is a no-op)
                 }
+            }
+            case ChuckAST.TypeofExp e -> {
+                emitExpression(e.expr(), code);
+                code.addInstruction(new TypeInstrs.TypeofInstr());
+            }
+            case ChuckAST.InstanceofExp e -> {
+                emitExpression(e.expr(), code);
+                code.addInstruction(new TypeInstrs.InstanceofInstr(e.typeName()));
             }
         }
     }

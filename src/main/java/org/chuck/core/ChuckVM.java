@@ -399,14 +399,44 @@ public class ChuckVM {
 
     public void resetShredId() {
         nextShredId = 1;
+        ChuckShred.resetIdCounter();
     }
+
+    /** eval(source, args[]) — spork eval'd shred with string arguments. */
+    public int eval(String source, ChuckArray argArr) {
+        int id = run(source, "eval");
+        if (id > 0 && argArr != null) {
+            ChuckShred shred = activeShreds.get(id);
+            if (shred != null) {
+                String[] strArgs = new String[argArr.size()];
+                for (int i = 0; i < argArr.size(); i++) {
+                    Object v = argArr.getObject(i);
+                    strArgs[i] = v != null ? v.toString() : "";
+                }
+                shred.setArgs(strArgs);
+            }
+        }
+        return id;
+    }
+
+    /** Remove the most recently sporked shred; returns its ID or -1 if none. */
+    public int removeLastShred() {
+        if (activeShreds.isEmpty()) return -1;
+        int lastId = activeShreds.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1);
+        if (lastId > 0) removeShred(lastId);
+        return lastId;
+    }
+
+    // Machine API
+    private static final String VERSION = "1.5.4.0 (java)";
+    private int logLevel = 1;
 
     public void gc() {
         System.gc();
     }
 
-    public String getVersion() { return "1.0.0 (Java)"; }
-    public String getPlatform() { return System.getProperty("os.name"); }
+    public String getVersion() { return VERSION; }
+    public String getPlatform() { return System.getProperty("os.name", "unknown"); }
 
     public void clear() {
         activeShreds.values().forEach(s -> s.setDone(true));
@@ -444,7 +474,6 @@ public class ChuckVM {
         return sb.toString();
     }
 
-    private int logLevel = 0;
     public void setLogLevel(int level) { this.logLevel = level; }
     public int getLogLevel() { return logLevel; }
 }

@@ -54,12 +54,15 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         List<ChuckAST.Exp> flattened = new ArrayList<>();
         for (ExpressionContext ectx : ctx.expression()) {
             Object result = visit(ectx);
-            if (result instanceof List<?> list) {
-                for (Object item : list) {
-                    if (item instanceof ChuckAST.Exp exp) flattened.add(exp);
+            switch (result) {
+                case List<?> list -> {
+                    for (Object item : list) {
+                        if (item instanceof ChuckAST.Exp exp) flattened.add(exp);
+                    }
                 }
-            } else if (result instanceof ChuckAST.Exp exp) {
-                flattened.add(exp);
+                case ChuckAST.Exp exp -> flattened.add(exp);
+                default -> {
+                }
             }
         }
         
@@ -160,6 +163,12 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     @Override
     public ChuckAST.Stmt visitRepeatStatement(RepeatStatementContext ctx) {
         return new ChuckAST.RepeatStmt((ChuckAST.Exp) visit(ctx.expression()), (ChuckAST.Stmt) visit(ctx.statement()),
+            ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
+
+    @Override
+    public ChuckAST.Stmt visitLoopStatement(ChuckANTLRParser.LoopStatementContext ctx) {
+        return new ChuckAST.LoopStmt((ChuckAST.Stmt) visit(ctx.statement()),
             ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
@@ -554,12 +563,15 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     public ChuckAST.Stmt visitClassDefinition(ClassDefinitionContext ctx) {
         String name = ctx.ID().getText();
         String parentName = ctx.EXTENDS() != null ? ctx.typeName().getText() : null;
+        boolean isAbstract = ctx.ABSTRACT() != null
+            || (ctx.accessModifier() != null && ctx.accessModifier().ABSTRACT() != null);
+        boolean isInterface = ctx.INTERFACE() != null;
         List<ChuckAST.Stmt> body = ctx.children.stream()
             .filter(c -> c instanceof StatementContext || c instanceof FunctionDefContext || c instanceof ClassDefinitionContext)
             .map(c -> (ChuckAST.Stmt) visit(c))
             .filter(s -> s != null)
             .collect(Collectors.toList());
-        return new ChuckAST.ClassDefStmt(name, parentName, body, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return new ChuckAST.ClassDefStmt(name, parentName, body, isAbstract, isInterface, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     @Override
@@ -569,6 +581,17 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     }
 
     @Override
+    public ChuckAST.Exp visitTypeofExp(ChuckANTLRParser.TypeofExpContext ctx) {
+        ChuckAST.Exp expr = (ChuckAST.Exp) visit(ctx.expression());
+        return new ChuckAST.TypeofExp(expr, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
+
+    public ChuckAST.Exp visitInstanceofExp(ChuckANTLRParser.InstanceofExpContext ctx) {
+        ChuckAST.Exp expr = (ChuckAST.Exp) visit(ctx.expression());
+        String typeName = ctx.typeName().getText();
+        return new ChuckAST.InstanceofExp(expr, typeName, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
+
     public ChuckAST.Exp visitNewExp(NewExpContext ctx) {
         String typeStr = ctx.typeName().getText();
         List<ChuckAST.Exp> arraySizes = new ArrayList<>();

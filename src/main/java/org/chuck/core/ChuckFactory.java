@@ -7,6 +7,8 @@ import java.util.Map;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.chugin.ChuginLoader;
 import org.chuck.hid.HidMsg;
+import org.chuck.hid.HidOut;
+import org.chuck.midi.MidiFileIn;
 import org.chuck.midi.MidiMsg;
 import org.chuck.midi.MidiOut;
 import org.chuck.network.OscBundle;
@@ -34,6 +36,9 @@ public class ChuckFactory {
 
         UserClassDescriptor d = (rm != null && rm.containsKey(t)) ? rm.get(t) : (vm != null ? vm.getUserClass(t) : null);
         if (d != null) {
+            if (d.isAbstract() || d.isInterface()) {
+                throw new RuntimeException("cannot instantiate abstract class or interface '" + t + "'");
+            }
             UserObject uo = new UserObject(t, d.fields(), d.methods(), extendsEvent(t, rm, vm));
             uo.setTickCode(findMethod(t, "tick:1", rm, vm), s, vm);
             
@@ -80,7 +85,11 @@ public class ChuckFactory {
             case "polar" -> new ChuckArray("polar", 2);
             case "MidiIn" -> new org.chuck.midi.MidiIn(vm);
             case "MidiOut" -> new MidiOut();
+            case "MidiFileIn" -> new MidiFileIn();
             case "Hid" -> new org.chuck.hid.Hid();
+            case "HidOut" -> new HidOut();
+            case "ConsoleInput" -> new ConsoleInput();
+            case "KBHit" -> new KBHit();
             case "SerialIO" -> new SerialIO();
             case "OscBundle" -> new OscBundle();
             case "RegEx" -> new RegEx();
@@ -88,12 +97,20 @@ public class ChuckFactory {
             case "FileIO" -> new FileIO();
             case "StringTokenizer" -> new StringTokenizer();
             case "Object" -> new ChuckObject(ChuckType.OBJECT);
+            case "Type"   -> new ChuckTypeObj("void");
             case "Event" -> new ChuckEvent();
             case "OscIn" -> new OscIn(vm);
+            case "OscEvent" -> new org.chuck.network.OscEvent(vm);
             case "OscOut" -> new OscOut();
             case "OscMsg" -> new OscMsg();
             case "MidiMsg" -> new MidiMsg();
             case "HidMsg" -> new HidMsg();
+            case "KNN" -> new org.chuck.core.ai.KNN();
+            case "KNN2" -> new org.chuck.core.ai.KNN2();
+            case "SVM" -> new org.chuck.core.ai.SVM();
+            case "MLP" -> new org.chuck.core.ai.MLP();
+            case "HMM" -> new org.chuck.core.ai.HMM();
+            case "PCA" -> new org.chuck.core.ai.PCA();
             default -> null;
         };
     }

@@ -54,6 +54,10 @@ public sealed interface ChuckAST {
     record DeclExp(String type, String name, java.util.List<Exp> arraySizes, Exp callArgs, boolean isReference, boolean isStatic, boolean isGlobal, boolean isConst, int line, int column) implements Exp {}
     record TernaryExp(Exp condition, Exp thenExp, Exp elseExp, int line, int column) implements Exp {}
     record CastExp(Exp value, String targetType, int line, int column) implements Exp {}
+    /** typeof(expr) — returns the runtime type name of expr as a string */
+    record TypeofExp(Exp expr, int line, int column) implements Exp {}
+    /** instanceof(expr, TypeName) — returns 1 if expr is an instance of TypeName, else 0 */
+    record InstanceofExp(Exp expr, String typeName, int line, int column) implements Exp {}
 
     // --- Statement Nodes ---
 
@@ -79,9 +83,11 @@ public sealed interface ChuckAST {
     
     record FuncDefStmt(String returnType, String name, java.util.List<String> argTypes, java.util.List<String> argNames, Stmt body, boolean isStatic, int line, int column) implements Stmt {}
 
-    record ClassDefStmt(String name, String parentName, java.util.List<Stmt> body, int line, int column) implements Stmt {}
+    record ClassDefStmt(String name, String parentName, java.util.List<Stmt> body, boolean isAbstract, boolean isInterface, int line, int column) implements Stmt {}
 
     record RepeatStmt(Exp count, Stmt body, int line, int column) implements Stmt {}
+
+    record LoopStmt(Stmt body, int line, int column) implements Stmt {}
 
     record ForEachStmt(String iterType, String iterName, Exp collection, Stmt body, int line, int column) implements Stmt {}
 

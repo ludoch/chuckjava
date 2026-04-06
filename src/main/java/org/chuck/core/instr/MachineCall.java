@@ -109,6 +109,40 @@ public class MachineCall implements ChuckInstr {
                 s.reg.push(0L);
             }
             case "timeofday" -> s.reg.push(Double.doubleToRawLongBits(vm.getTimeOfDay()));
+            // alias: os() same as platform()
+            case "os" -> s.reg.pushObject(new ChuckString(vm.getPlatform()));
+            // intsize() — pointer/int size in bits on this platform
+            case "intsize" -> s.reg.push((long)(Long.SIZE));
+            // printStatus() — dump active shreds to console
+            case "printStatus" -> { vm.status(); s.reg.push(0L); }
+            // printTimeCheck() — timing diagnostics (no-op stub; returns 0)
+            case "printTimeCheck" -> s.reg.push(0L);
+            // removeLastShred() — remove most recently sporked shred
+            case "removeLastShred" -> {
+                int removed = vm.removeLastShred();
+                s.reg.push((long) removed);
+            }
+            // spork(string) — spork a .ck file by path, like Machine.add()
+            case "spork" -> {
+                String path = args.length > 0 ? String.valueOf(args[0]) : "";
+                s.reg.push((long) vm.add(path));
+            }
+            // eval(string, args[]) — eval ChucK source with argument array
+            case "evalWithArgs" -> {
+                String src = args.length > 0 ? String.valueOf(args[0]) : "";
+                ChuckArray argArr = args.length > 1 && args[1] instanceof ChuckArray a ? a : null;
+                long id = vm.eval(src, argArr);
+                s.reg.push(id);
+                s.yield(0);
+            }
+            // operator namespace stack stubs
+            case "operatorsPush", "operatorsPop" -> s.reg.push(0L);
+            case "operatorsStackLevel" -> s.reg.push(0L);
+            // refcount/sp debug stubs
+            case "refcount", "sp_reg", "sp_mem" -> s.reg.push(0L);
+            // silent()/realtime() already handled in emitter; keep here for dynamic dispatch
+            case "silent" -> s.reg.push(1L);
+            case "realtime" -> s.reg.push(0L);
             default -> s.reg.push(0L);
         }
     }
