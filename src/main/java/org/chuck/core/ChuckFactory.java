@@ -7,6 +7,8 @@ import java.util.Map;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.chugin.ChuginLoader;
 import org.chuck.hid.HidMsg;
+import org.chuck.hid.HidOut;
+import org.chuck.midi.MidiFileIn;
 import org.chuck.midi.MidiMsg;
 import org.chuck.midi.MidiOut;
 import org.chuck.network.OscBundle;
@@ -65,7 +67,11 @@ public class ChuckFactory {
             case "polar" -> { ChuckArray v = new ChuckArray(ChuckType.ARRAY, 2); v.vecTag = "polar"; yield v; }
             case "MidiIn" -> new org.chuck.midi.MidiIn(vm);
             case "MidiOut" -> new MidiOut();
+            case "MidiFileIn" -> new MidiFileIn();
             case "Hid" -> new org.chuck.hid.Hid();
+            case "HidOut" -> new HidOut();
+            case "ConsoleInput" -> new ConsoleInput();
+            case "KBHit" -> new KBHit();
             case "SerialIO" -> new SerialIO();
             case "OscBundle" -> new OscBundle();
             case "RegEx" -> new RegEx();

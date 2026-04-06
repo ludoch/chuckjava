@@ -88,6 +88,11 @@
 | 63 | **`Clarinet.compute()` silent** — `envelope.tick()` returned 0 because Envelope has no audio sources. Fixed by reading the ramp level via `envelope.getValue()` after advancing state with `tick()`. | ✅ Fixed |
 | 64 | **`ChuckShred` reflection in native image** — `me.running()` / `me.numArgs()` returned `null` in GraalVM native image because `CallMethod` dispatches via `Class.getMethods()` and `ChuckShred` was not registered for reflection. Added `allPublicMethods` to `reflect-config.json`. | ✅ Fixed |
 | 65 | **Math library gap-fill** — Implemented 20 missing `Math.*` functions: `sinh/cosh/tanh`, `hypot`, `fmod`, `remainder`, `min/max`, `exp2`, `nextpow2/ensurePow2`, `random2/random2f/randomf`, `gauss`, `map/map2/remap`, `clampi/clampf`, `cossim`, and 8 fast scalar approximations (`ssin` etc.). | ✅ Fixed |
+| 66 | **Std library gap-fill** — Added `Std.rand()`, `Std.randf()`, `Std.system(cmd)`. | ✅ Fixed |
+| 67 | **`ConsoleInput`** — New class: `readline()`, `prompt(string)`, `ready()`. Reads from `System.in`. | ✅ Fixed |
+| 68 | **`KBHit`** — New class: `kbhit()`, `getchar()`. Background virtual thread queues keypresses non-blocking. | ✅ Fixed |
+| 69 | **`MidiFileIn`** — New class: reads Standard MIDI files, merges/sorts all tracks, exposes `read(MidiMsg)`, `more()`, `rewind()`, `numTracks()`, `resolution()`. | ✅ Fixed |
+| 70 | **`HidOut`** — New stub class: API-complete, `open()` returns 0 (native USB HID output unavailable in JVM without extra libraries). | ✅ Fixed |
 
 ### New Features
 

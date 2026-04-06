@@ -155,11 +155,11 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 
 ### 6.1 Missing Std functions
 
-| Function | Description |
-|----------|-------------|
-| `Std.rand()` | Random integer in [0, RAND_MAX] |
-| `Std.randf()` | Random float in [0, 1) |
-| `Std.system(cmd)` | Execute a shell command (security note: opt-in only) |
+| Function | Description | Status |
+|----------|-------------|--------|
+| `Std.rand()` | Random integer in [0, RAND_MAX] | ✅ Done |
+| `Std.randf()` | Random float in [0, 1) | ✅ Done |
+| `Std.system(cmd)` | Execute a shell command via `ProcessBuilder` | ✅ Done |
 
 ---
 
@@ -195,8 +195,8 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 
 | Class | Status | Description |
 |-------|--------|-------------|
-| `ConsoleInput` | ❌ Missing | Reads a line from stdin; used in interactive ChucK programs |
-| `KBHit` | ❌ Missing | Non-blocking keyboard press detection (`kbhit()` returns 1 if key waiting) |
+| `ConsoleInput` | ✅ Done | `readline()`, `prompt(string)`, `ready()`, `can_wait()` |
+| `KBHit` | ✅ Done | `kbhit()` / `hit()`, `getchar()`, `can_wait()` — background virtual thread queues keypresses |
 | `StringTokenizer` | ✅ Done | `set(s)`, `more()`, `next()`, `reset()` implemented |
 | `RegEx` | ✅ Done | Pattern matching via `java.util.regex` |
 | `Type` / `Function` introspection | ❌ Missing | Reflect on type names, method signatures at runtime |
@@ -212,8 +212,8 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | `OscIn` / `OscOut` / `OscMsg` / `OscBundle` | ✅ Done |
 | `Hid` / `HidMsg` | ✅ Done |
 | `SerialIO` | ⚠️ Stub (functional for basic use; no hardware serial port) |
-| `MidiFileIn` | ❌ Missing — reads Standard MIDI files for sequencing |
-| `HidOut` | ❌ Missing — send HID output (force feedback, LED, etc.) |
+| `MidiFileIn` | ✅ Done — `open(string)`, `read(MidiMsg)`, `more()`, `rewind()`, `close()`, `size()`, `numTracks()`, `resolution()` |
+| `HidOut` | ✅ Done (stub) — `open(num)`, `send(HidMsg)`, `close()`, `name()`, `num()` — always returns 0 (native HID output requires platform libs) |
 
 ---
 
@@ -257,8 +257,8 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | `AutoCorr`, `XCorr` UAnas | Used in pitch detection and audio fingerprinting examples |
 | `FeatureCollector` + AI/ML | The entire `examples/ai/` directory depends on these |
 | `Chroma` UAna | Used in key/chord detection examples |
-| `ConsoleInput` / `KBHit` | Interactive terminal programs (`examples/std/kbhit.ck`) |
-| Missing Math: `min`, `max`, `tanh`, `sinh`, `cosh` | Used constantly in audio processing |
+| `ConsoleInput` / `KBHit` | ✅ Done — interactive terminal programs now supported |
+| Missing Math: `min`, `max`, `tanh`, `sinh`, `cosh` | ✅ Done — all Math section 5.2 functions implemented |
 | `DCT` / `IDCT` | Used in MFCC-adjacent analysis and compression examples |
 
 ### Medium — affects completeness but workarounds exist

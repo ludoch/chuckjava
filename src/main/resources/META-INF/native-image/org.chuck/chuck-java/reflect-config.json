@@ -74,6 +74,26 @@
     "allPublicMethods": true
   },
   {
+    "name": "org.chuck.core.ConsoleInput",
+    "allPublicMethods": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "org.chuck.core.KBHit",
+    "allPublicMethods": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "org.chuck.midi.MidiFileIn",
+    "allPublicMethods": true,
+    "allDeclaredMethods": true
+  },
+  {
+    "name": "org.chuck.hid.HidOut",
+    "allPublicMethods": true,
+    "allDeclaredMethods": true
+  },
+  {
     "name": "java.lang.reflect.Method",
     "allPublicMethods": true
   }

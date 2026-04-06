@@ -180,6 +180,21 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - **`Delay.compute()` always returned 0** — A redundant tick-deduplication guard (`if (systemTime == lastTickTime) return lastOut`) was inside `compute()`, which is called *after* `ChuckUGen.tick()` already sets `lastTickTime = systemTime`. The check was always true, so the delay buffer was never read or written. Removed the guard; `Delay` now works correctly for echo/feedback effects.
 - **`Clarinet.compute()` silent** — `breathPressure = envelope.tick(systemTime)` returned 0 because the Envelope has no audio sources (input = 0) and `compute()` returns `input * value`. Fixed by calling `envelope.tick()` to advance the ramp, then reading the actual level via `envelope.getValue()`.
 
+### Stdlib Additions (2026-04-06)
+
+**Std library (`Std.java`):**
+- `Std.rand()` — random int in [0, RAND_MAX]
+- `Std.randf()` — random float in [0.0, 1.0)
+- `Std.system(cmd)` — execute a shell command via `ProcessBuilder`; returns exit code
+
+**New stdlib classes:**
+- `ConsoleInput` — `readline()`, `prompt(string)`, `ready()`, `can_wait()`; shared `BufferedReader` on `System.in`
+- `KBHit` — `kbhit()` / `hit()`, `getchar()`, `can_wait()`; background virtual thread queues keypresses from `System.in`
+- `MidiFileIn` — `open(string)`, `read(MidiMsg)`, `more()`, `rewind()`, `close()`, `size()`, `numTracks()`, `resolution()`; uses `javax.sound.midi.MidiSystem`; merges and sorts all tracks by tick
+- `HidOut` — stub; `open()` always returns 0 (native USB HID reports not available in standard Java SE)
+
+All four classes registered in `ChuckFactory` and in `reflect-config.json` for GraalVM native image.
+
 ### Math Library Additions (2026-04-06)
 
 All functions from section 5.2 of `missing.md` are now implemented in `MathInstrs.MathFunc`:
