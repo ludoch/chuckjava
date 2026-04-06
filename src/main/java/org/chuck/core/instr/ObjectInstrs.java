@@ -470,8 +470,17 @@ public class ObjectInstrs {
                     }
                     obj = arr;
                 }
-            } else if (!t.equals("int") && !t.equals("float") && !t.equals("string") && !t.equals("dur") && !t.equals("time")) {
-                obj = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+            } else if (t.equals("string")) {
+                String initVal = "";
+                if (a > 0 && args[0] instanceof ChuckString cs) initVal = cs.toString();
+                else if (a > 0 && args[0] instanceof String sv) initVal = sv;
+                obj = new ChuckString(initVal);
+            } else if (!t.equals("int") && !t.equals("float") && !t.equals("dur") && !t.equals("time")) {
+                obj = ChuckFactory.instantiateType(t, a, args, vm.getSampleRate(), vm, s, rm);
+                if (a > 0 && obj instanceof org.chuck.audio.ChuckUGen ugen && args[0] instanceof Number n2) {
+                    try { ugen.getClass().getMethod("freq", double.class).invoke(ugen, n2.doubleValue()); }
+                    catch (Exception ignored) { try { ugen.setData(0, n2.longValue()); } catch (Exception ignored2) {} }
+                }
             }
 
             if (obj instanceof ChuckObject co) {
@@ -544,8 +553,19 @@ public class ObjectInstrs {
                     }
                     obj = arr;
                 }
-            } else if (!t.equals("int") && !t.equals("float") && !t.equals("string") && !t.equals("dur") && !t.equals("time")) {
-                obj = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+            } else if (t.equals("string")) {
+                // string ctor arg: string s("hello") initializes the value
+                String initVal = "";
+                if (a > 0 && args[0] instanceof ChuckString cs) initVal = cs.toString();
+                else if (a > 0 && args[0] instanceof String sv) initVal = sv;
+                obj = new ChuckString(initVal);
+            } else if (!t.equals("int") && !t.equals("float") && !t.equals("dur") && !t.equals("time")) {
+                obj = ChuckFactory.instantiateType(t, a, args, vm.getSampleRate(), vm, s, rm);
+                // Apply single numeric ctor arg to UGen (e.g. SinOsc s(440) sets freq=440)
+                if (a > 0 && obj instanceof org.chuck.audio.ChuckUGen ugen && args[0] instanceof Number n2) {
+                    try { ugen.getClass().getMethod("freq", double.class).invoke(ugen, n2.doubleValue()); }
+                    catch (Exception ignored) { try { ugen.setData(0, n2.longValue()); } catch (Exception ignored2) {} }
+                }
             }
 
             if (obj instanceof ChuckObject co) {
@@ -699,10 +719,19 @@ public class ObjectInstrs {
                         obj = arr;
                     }
                 }
+            } else if (t.equals("string")) {
+                String initVal = "";
+                if (a > 0 && args[0] instanceof ChuckString cs) initVal = cs.toString();
+                else if (a > 0 && args[0] instanceof String sv) initVal = sv;
+                obj = new ChuckString(initVal);
             } else {
-                obj = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+                obj = ChuckFactory.instantiateType(t, a, args, vm.getSampleRate(), vm, s, rm);
+                if (a > 0 && obj instanceof org.chuck.audio.ChuckUGen ugen && args[0] instanceof Number n2) {
+                    try { ugen.getClass().getMethod("freq", double.class).invoke(ugen, n2.doubleValue()); }
+                    catch (Exception ignored) { try { ugen.setData(0, n2.longValue()); } catch (Exception ignored2) {} }
+                }
             }
-            
+
             if (obj instanceof ChuckObject co) {
                 uo_this.setObjectField(n, co);
                 if (co instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.chuck.core.AdvanceTime;
 import org.chuck.core.CallFunc;
@@ -1752,7 +1753,8 @@ public class ChuckEmitter {
                     globalVarTypes.put(e.name(), e.type());
                 }
 
-                if (isUserClass && e.callArgs() instanceof ChuckAST.CallExp call) {
+                boolean isBuiltinPseudoClass = Set.of("string", "vec2", "vec3", "vec4", "complex", "polar").contains(e.type());
+                if (isUserClass && !isBuiltinPseudoClass && e.callArgs() instanceof ChuckAST.CallExp call) {
                     if (inPreCtor) {
                         code.addInstruction(new StackInstrs.PushThis());
                         code.addInstruction(new ObjectInstrs.InstantiateSetAndPushField(getBaseType(e.type()), e.name(), 0, e.isReference(), false, userClassRegistry));
@@ -1790,10 +1792,6 @@ public class ChuckEmitter {
                     }
 
                     boolean isObject = isObjectType(e.type());
-                    if (isObject && !e.isReference() && argCount == 0) {
-                        code.addInstruction(new PushInstrs.PushInt(0)); // dummy size for instantiation
-                        argCount = 1;
-                    }
 
                     boolean isArrayDecl = !e.arraySizes().isEmpty();
                     boolean useGlobal = forceGlobal || localScopes.size() <= 1;
