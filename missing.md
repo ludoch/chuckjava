@@ -241,7 +241,7 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | `complex` / `polar` first-class types | ✅ Done |
 | `vec2` / `vec3` / `vec4` | ✅ Done |
 | `null` literal | ✅ Done |
-| `auto` type inference | ⚠️ Grammar has token; emitter does not fully resolve inferred types |
+| `auto` type inference | ✅ Done — inferred from RHS expression at compile time |
 | `typeof` operator | ✅ Implemented |
 | `instanceof` operator | ✅ Implemented |
 | `abstract` classes | ✅ Implemented |

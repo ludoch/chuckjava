@@ -3,7 +3,16 @@ package org.chuck.core.instr;
 import org.chuck.core.*;
 
 public class ArithmeticInstrs {
-    
+
+    private static double toDouble(Object o) {
+        return switch (o) {
+            case null -> 0.0;
+            case ChuckDuration cd -> cd.samples();
+            case Number n -> n.doubleValue();
+            default -> 0.0;
+        };
+    }
+
     public static class AddAny implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             if (s.reg.getSp() < 2) return;
@@ -100,7 +109,9 @@ public class ArithmeticInstrs {
                     if (rmag == 0) s.reg.pushObject(new ChuckArray("polar", new double[]{0, 0}));
                     else s.reg.pushObject(new ChuckArray("polar", new double[]{la.getFloat(0) / rmag, la.getFloat(1) - ra.getFloat(1)}));
                 } else {
-                    s.reg.push(0.0);
+                    // ChuckDuration / ChuckDuration = float ratio
+                    double rVal = toDouble(r), lVal = toDouble(l);
+                    s.reg.push(rVal == 0.0 ? 0.0 : lVal / rVal);
                 }
                 return;
             }
