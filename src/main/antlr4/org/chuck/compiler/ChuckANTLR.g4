@@ -49,7 +49,7 @@ variableDecl
     ;
 
 accessModifier
-    : PUBLIC | PRIVATE | PROTECTED | GLOBAL | CONST
+    : PUBLIC | PRIVATE | PROTECTED | GLOBAL | CONST | ABSTRACT
     ;
 
 arrayDimension
@@ -88,7 +88,8 @@ formalParameter
     ;
 
 classDefinition
-    : accessModifier? CLASS ID (EXTENDS typeName)? LBRACE (directive | statement | functionDef | classDefinition)* RBRACE
+    : accessModifier? ABSTRACT? CLASS ID (EXTENDS typeName)? LBRACE (directive | statement | functionDef | classDefinition)* RBRACE
+    | accessModifier? INTERFACE ID (EXTENDS typeName)? LBRACE (functionDef | classDefinition)* RBRACE
     ;
 
 type
@@ -104,7 +105,7 @@ memberName
     : ID
     | INT_TYPE | FLOAT_TYPE | TIME_TYPE | DUR_TYPE | VOID_TYPE | COMPLEX_TYPE | POLAR_TYPE | STRING_TYPE | EVENT_TYPE | AUTO
     | IF | ELSE | WHILE | UNTIL | FOR | REPEAT | DO | RETURN | BREAK | CONTINUE | SWITCH | CASE | DEFAULT
-    | FUN | CLASS | EXTENDS | PUBLIC | PRIVATE | STATIC | PROTECTED | GLOBAL
+    | FUN | CLASS | EXTENDS | PUBLIC | PRIVATE | STATIC | PROTECTED | GLOBAL | ABSTRACT | INTERFACE
     | SPORK | NOW | ME | NEW | TYPEOF | INSTANCEOF
     ;
 
@@ -183,7 +184,9 @@ ME      : 'me';
 NEW        : 'new';
 TYPEOF     : 'typeof';
 INSTANCEOF : 'instanceof';
-AUTO    : 'auto';
+AUTO     : 'auto';
+ABSTRACT : 'abstract';
+INTERFACE: 'interface';
 
 INT_TYPE     : 'int';
 FLOAT_TYPE   : 'float';

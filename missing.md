@@ -105,10 +105,10 @@ The typical ChucK AI workflow is: `Flip → FeatureCollector → KNN/MLP` for re
 |---------|-------------|-------------|-------|
 | `typeof` | `TYPEOF unary_expression` | ✅ Implemented | Returns the type name as a string |
 | `instanceof` | Used in type checker | ✅ Implemented | Runtime type test (`x instanceof Foo`) |
-| `abstract` class / method | `ABSTRACT` keyword | ❌ Not in grammar | Cannot declare abstract base classes |
-| `interface` | `INTERFACE id_list LBRACE` | ❌ Not in emitter | Grammar has the token but emitter ignores interface bodies |
-| `@construct` | Explicit constructor syntax | ❌ Not in grammar | C++ allows `fun @construct(...)` for custom constructors |
-| `@destruct` | Explicit destructor syntax | ❌ Not in grammar | C++ calls `@destruct` when a shred-owned object is freed |
+| `abstract` class / method | `ABSTRACT` keyword | ✅ Implemented — `abstract class Foo { }` prevents instantiation |
+| `interface` | `INTERFACE id_list LBRACE` | ✅ Implemented — parsed; prevents direct instantiation |
+| `@construct` | Explicit constructor syntax | ✅ Implemented — `fun @construct(...)` parsed via `REFERENCE_TAG ID` in `functionName` |
+| `@destruct` | Explicit destructor syntax | ❌ Not wired — `@destruct` is parsed but not called on object cleanup |
 | `loop` statement | `LOOP LPAREN stmt RPAREN` | ❌ Not in grammar | Explicit named infinite loop (different from `while(true)`) |
 | `@operator` overload syntax | `fun @operator+(...)` | ⚠️ Partial | Java uses `__op__+` naming convention; C++ uses `@operator+` |
 | `static` class variables | `STATIC` in class body | ⚠️ Partial | Declared but not fully initialized between instances |
@@ -239,9 +239,10 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | `auto` type inference | ⚠️ Grammar has token; emitter does not fully resolve inferred types |
 | `typeof` operator | ✅ Implemented |
 | `instanceof` operator | ✅ Implemented |
-| `abstract` classes | ❌ Missing |
-| `interface` definitions | ❌ Missing (token exists in grammar, emitter ignores body) |
-| `@construct` / `@destruct` | ❌ Missing |
+| `abstract` classes | ✅ Implemented |
+| `interface` definitions | ✅ Implemented |
+| `@construct` | ✅ Implemented |
+| `@destruct` | ❌ Parsed but not called on object cleanup |
 | `static` member variables (per-class, not per-instance) | ⚠️ Partial — declared but shared initialization not reliable |
 
 ---
@@ -271,8 +272,9 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | ~~`HnkyTonk`, `FrencHrn`, `KrstlChr`~~ | ✅ Implemented |
 | ~~`Flip` / `UnFlip` UAnas~~ | ✅ Implemented |
 | ~~`MidiFileIn`~~ | ✅ Implemented |
-| `abstract` / `interface` | Class hierarchy patterns |
-| `@construct` / `@destruct` | Explicit lifecycle management |
+| ~~`abstract` / `interface`~~ | ✅ Implemented |
+| ~~`@construct`~~ | ✅ Implemented |
+| `@destruct` | Parsed but not called — would need GC hooks |
 | ~~Missing Math: `gauss`, `nextpow2`, `map`, `fmod`~~ | ✅ All implemented |
 
 ### Lower — niche or debug use

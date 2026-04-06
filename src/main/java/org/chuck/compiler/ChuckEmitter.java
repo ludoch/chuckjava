@@ -378,7 +378,7 @@ public class ChuckEmitter {
         // Pass 0: Register all class names so they are known as types
         for (ChuckAST.Stmt stmt : statements) {
             if (stmt instanceof ChuckAST.ClassDefStmt s) {
-                userClassRegistry.put(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>()));
+                userClassRegistry.put(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, s.isAbstract(), s.isInterface()));
             }
         }
 
@@ -901,7 +901,7 @@ public class ChuckEmitter {
                 // methodCodes/staticMethodCodes are mutable maps; stubs added in pass 1 below become visible here.
                 userClassRegistry.put(s.name(), new UserClassDescriptor(
                         s.name(), s.parentName(), fieldDefs, methodCodes, staticMethodCodes,
-                        staticInts, staticIsDouble, staticObjects));
+                        staticInts, staticIsDouble, staticObjects, null, s.isAbstract(), s.isInterface()));
 
                 // Always compile pre-constructor body into a dedicated ChuckCode.
                 // This runs each time a new instance of this class is created.
@@ -1016,7 +1016,7 @@ public class ChuckEmitter {
                 currentClass = prevClass;
                 currentClassFields = prevFields;
                 ChuckCode finalPreCtorCode = preCtorCodeLocal.getNumInstructions() > 0 ? preCtorCodeLocal : null;
-                UserClassDescriptor descriptor = new UserClassDescriptor(s.name(), s.parentName(), fieldDefs, methodCodes, staticMethodCodes, staticInts, staticIsDouble, staticObjects, finalPreCtorCode);
+                UserClassDescriptor descriptor = new UserClassDescriptor(s.name(), s.parentName(), fieldDefs, methodCodes, staticMethodCodes, staticInts, staticIsDouble, staticObjects, finalPreCtorCode, s.isAbstract(), s.isInterface());
                 userClassRegistry.put(s.name(), descriptor);
                 if (code != null) {
                     code.addInstruction(new MiscInstrs.RegisterClass(s.name(), descriptor));

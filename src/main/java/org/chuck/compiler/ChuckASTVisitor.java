@@ -514,12 +514,15 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     public ChuckAST.Stmt visitClassDefinition(ClassDefinitionContext ctx) {
         String name = ctx.ID().getText();
         String parentName = ctx.EXTENDS() != null ? ctx.typeName().getText() : null;
+        boolean isAbstract = ctx.ABSTRACT() != null
+            || (ctx.accessModifier() != null && ctx.accessModifier().ABSTRACT() != null);
+        boolean isInterface = ctx.INTERFACE() != null;
         List<ChuckAST.Stmt> body = ctx.children.stream()
             .filter(c -> c instanceof StatementContext || c instanceof FunctionDefContext || c instanceof ClassDefinitionContext)
             .map(c -> (ChuckAST.Stmt) visit(c))
             .filter(s -> s != null)
             .collect(Collectors.toList());
-        return new ChuckAST.ClassDefStmt(name, parentName, body, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return new ChuckAST.ClassDefStmt(name, parentName, body, isAbstract, isInterface, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     @Override

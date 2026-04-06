@@ -23,6 +23,9 @@ public class ChuckFactory {
         
         UserClassDescriptor d = (rm != null && rm.containsKey(t)) ? rm.get(t) : (vm != null ? vm.getUserClass(t) : null);
         if (d != null) {
+            if (d.isAbstract() || d.isInterface()) {
+                throw new RuntimeException("cannot instantiate abstract class or interface '" + t + "'");
+            }
             UserObject uo = new UserObject(t, d.fields(), d.methods(), extendsEvent(t, rm, vm));
             uo.setTickCode(findMethod(t, "tick:1", rm, vm), s, vm);
             

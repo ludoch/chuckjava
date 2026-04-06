@@ -82,7 +82,7 @@ public sealed interface ChuckAST {
     
     record FuncDefStmt(String returnType, String name, java.util.List<String> argTypes, java.util.List<String> argNames, Stmt body, boolean isStatic, int line, int column) implements Stmt {}
 
-    record ClassDefStmt(String name, String parentName, java.util.List<Stmt> body, int line, int column) implements Stmt {}
+    record ClassDefStmt(String name, String parentName, java.util.List<Stmt> body, boolean isAbstract, boolean isInterface, int line, int column) implements Stmt {}
 
     record RepeatStmt(Exp count, Stmt body, int line, int column) implements Stmt {}
 
