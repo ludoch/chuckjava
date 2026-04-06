@@ -22,6 +22,7 @@ import org.chuck.audio.Clarinet;
 import org.chuck.audio.Delay;
 import org.chuck.audio.DelayA;
 import org.chuck.audio.DelayL;
+import org.chuck.audio.DelayP;
 import org.chuck.audio.Dyno;
 import org.chuck.audio.Echo;
 import org.chuck.audio.Envelope;
@@ -164,6 +165,7 @@ public class UGenRegistry {
         register("Delay", (sr, args) -> new Delay((int)(sr * 2), sr));
         register("DelayL", (sr, args) -> new DelayL((int)(sr * 2), sr));
         register("DelayA", (sr, args) -> new DelayA((int)(sr * 2), sr));
+        register("DelayP", (sr, args) -> new DelayP((int)(sr * 2), sr));
         register("Chorus", (sr, args) -> new Chorus(sr));
         register("JCRev", (sr, args) -> new JCRev(sr));
         register("NRev", (sr, args) -> new NRev(sr));
@@ -199,7 +201,9 @@ public class UGenRegistry {
         register("LiSa", (sr, args) -> new LiSa(sr));
         register("LiSa2", (sr, args) -> new LiSa2(sr));
         register("LiSa4", (sr, args) -> new LiSaN(4, sr));
+        register("LiSa6", (sr, args) -> new LiSaN(6, sr));
         register("LiSa8", (sr, args) -> new LiSaN(8, sr));
+        register("LiSa10", (sr, args) -> new LiSaN(10, sr));
         register("LiSa16", (sr, args) -> new LiSaN(16, sr));
 
         // --- STK Instruments ---

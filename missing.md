@@ -173,19 +173,19 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 
 | Function | Description |
 |----------|-------------|
-| `Machine.eval(string)` | ✅ Already implemented — calls `vm.eval()` → `vm.run()` → ANTLR pipeline; works in `chuck.exe` |
-| `Machine.eval(string, args[])` | ❌ Missing — eval with argument list passed to the sporked shred |
-| `Machine.removeLastShred()` | Remove the most recently sporked shred |
-| `Machine.spork(string)` | Spork a file by path from Machine API |
-| `Machine.intsize()` | Platform integer size in bits |
-| `Machine.silent()` | Check/set silent mode |
-| `Machine.realtime()` | Check if running in real-time mode |
-| `Machine.refcount(obj)` | Debug: reference count of an object |
-| `Machine.sp_reg`, `sp_mem` | Debug: current register / memory stack pointer |
-| `Machine.printStatus()` | Print all active shreds to console |
-| `Machine.printTimeCheck()` | Print timing diagnostics |
-| `Machine.operatorsPush()` / `operatorsPop()` / `operatorsStackLevel()` | Operator overload namespace stack |
-| `Machine.os()` | OS name (Java has `platform()` but C++ also exposes `os()` as alias) |
+| `Machine.eval(string)` | ✅ Implemented |
+| `Machine.eval(string, args[])` | ✅ Implemented — `evalWithArgs` case |
+| `Machine.removeLastShred()` | ✅ Implemented |
+| `Machine.spork(string)` | ✅ Implemented |
+| `Machine.intsize()` | ✅ Implemented |
+| `Machine.silent()` | ✅ Implemented (returns 1) |
+| `Machine.realtime()` | ✅ Implemented (returns 0) |
+| `Machine.refcount(obj)` | ✅ Stub — returns 0 |
+| `Machine.sp_reg`, `sp_mem` | ✅ Stubs — return 0 |
+| `Machine.printStatus()` | ✅ Implemented |
+| `Machine.printTimeCheck()` | ✅ Implemented (stub) |
+| `Machine.operatorsPush()` / `operatorsPop()` / `operatorsStackLevel()` | ✅ Stubs |
+| `Machine.os()` | ✅ Implemented (alias for platform()) |
 
 `Machine.eval()` is the most impactful missing item — it enables live coding, on-the-fly code injection, and the ChucK REPL.
 
@@ -273,15 +273,15 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | ~~`MidiFileIn`~~ | ✅ Implemented |
 | `abstract` / `interface` | Class hierarchy patterns |
 | `@construct` / `@destruct` | Explicit lifecycle management |
-| Missing Math: `gauss`, `nextpow2`, `map`, `fmod` | Common in synthesis algorithms |
+| ~~Missing Math: `gauss`, `nextpow2`, `map`, `fmod`~~ | ✅ All implemented |
 
 ### Lower — niche or debug use
 
 | Item | |
 |------|-|
 | `Mesh2D` | Spatial physical model; complex to implement |
-| `DelayP` | Pitch-shifting delay; similar to `DelayL` |
-| `LiSa6`, `LiSa10` | Only 4-variant gap |
+| ~~`DelayP`~~ | ✅ Implemented — two crossfading read-heads, `delay`, `shift` (semitones) |
+| ~~`LiSa6`, `LiSa10`~~ | ✅ Implemented — registered via `LiSaN(6/10, sr)` |
 | `Teabox` | Hardware sensor box; very platform-specific |
 | `Machine.refcount`, `sp_reg`, `sp_mem` | Debug/introspection |
 | `Machine.operatorsPush/Pop` | Namespace management for operator overloads |
