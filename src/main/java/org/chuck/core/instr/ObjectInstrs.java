@@ -1,10 +1,20 @@
 package org.chuck.core.instr;
 
-import org.chuck.core.*;
-import org.chuck.audio.ChuckUGen;
-import java.util.Map;
-import java.util.List;
 import java.lang.reflect.InvocationTargetException;
+import java.util.Map;
+
+import org.chuck.core.ChuckArray;
+import org.chuck.core.ChuckCode;
+import org.chuck.core.ChuckDuration;
+import org.chuck.core.ChuckFactory;
+import org.chuck.core.ChuckInstr;
+import org.chuck.core.ChuckObject;
+import org.chuck.core.ChuckShred;
+import org.chuck.core.ChuckString;
+import org.chuck.core.ChuckType;
+import org.chuck.core.ChuckVM;
+import org.chuck.core.UserClassDescriptor;
+import org.chuck.core.UserObject;
 
 public class ObjectInstrs {
     public static class NewObject implements ChuckInstr {

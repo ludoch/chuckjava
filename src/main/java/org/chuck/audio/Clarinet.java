@@ -47,7 +47,10 @@ public class Clarinet extends ChuckUGen {
 
     @Override
     protected float compute(float input, long systemTime) {
-        float breathPressure = envelope.tick(systemTime);
+        // Advance envelope ramp state; read value directly (envelope has no audio source,
+        // so tick() returns 0 — we need getValue() to get the actual ramp level).
+        envelope.tick(systemTime);
+        float breathPressure = envelope.getValue();
         breathPressure += breathPressure * noiseGain * noise.tick(systemTime);
         breathPressure += breathPressure * vibratoGain * vibrato.tick(systemTime);
 

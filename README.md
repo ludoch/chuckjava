@@ -1,6 +1,6 @@
 # ChucK-Java (JDK 25 Migration)
 
-## Progress Update (2026-04-03)
+## Progress Update (2026-04-05, updated)
 
 ### Integration Test Coverage
 
@@ -15,7 +15,9 @@
 | **07-Imports** | 9 | 9 ✅ | `#include` / machine imports |
 | **ChuckAntlrNewFeaturesTest** | 23 | 23 ✅ | Ternary, switch/case, HPF/BPF/BRF, BlitSaw/BlitSquare |
 | **ChuckMachineApiTest** | 16 | 16 ✅ | Full `me.*` and `Machine.*` shred API |
-| **Total** | **556** | **473 (85%)** | |
+| **DslExamplesTest** | 20 | 20 ✅ | Java DSL shreds: oscillators, filters, effects, instruments |
+| **NativeImageTests** | 108 | 108 ✅ | All non-DSL tests compiled to native via GraalVM |
+| **Total** | **576** | **493 (86%)** | |
 
 ### Bugs Fixed & Language Improvements
 
@@ -81,6 +83,10 @@
 | 58 | **Math Shadowing Fix** — Ensured variables named `e` or `pi` take precedence over constants. | ✅ Fixed |
 | 59 | **Duration to Float Conversion** — Implicitly convert `dur` to samples when passed to numeric method parameters. | ✅ Fixed |
 | 60 | **Missing Object Instantiation** — Added `Hid` and `MidiIn` to the object factory to prevent declaration-time NPEs. | ✅ Fixed |
+| 61 | **`ChuckShred.cleanup()` deadlock** — Java DSL shreds set `isDone=true` but never signalled `condition`, leaving the test thread's `resume()` blocked in `condition.await()` forever. Fixed by calling `condition.signalAll()` inside `cleanup()`. | ✅ Fixed |
+| 62 | **`Delay.compute()` always returned 0** — Redundant tick-deduplication guard inside `compute()` was always true (parent `tick()` sets `lastTickTime` before calling `compute()`). Removed the guard; `Delay` now functions correctly for echo and feedback effects. | ✅ Fixed |
+| 63 | **`Clarinet.compute()` silent** — `envelope.tick()` returned 0 because Envelope has no audio sources. Fixed by reading the ramp level via `envelope.getValue()` after advancing state with `tick()`. | ✅ Fixed |
+| 64 | **`ChuckShred` reflection in native image** — `me.running()` / `me.numArgs()` returned `null` in GraalVM native image because `CallMethod` dispatches via `Class.getMethods()` and `ChuckShred` was not registered for reflection. Added `allPublicMethods` to `reflect-config.json`. | ✅ Fixed |
 
 ### New Features
 
@@ -100,6 +106,19 @@
 - **Master Controls**: Integrated Global Volume slider and live VM Logical Time display.
 - **Console Clear**: Added a dedicated button to clear the output log.
 
+#### 📦 Distribution Targets
+
+Two standalone Windows distributions are now buildable from Maven:
+
+| Target | Maven command | Output | Size | Use case |
+|--------|--------------|--------|------|----------|
+| **Native CLI** | `mvn -Pnative package -DskipTests` | `target/chuck.exe` | ~49 MB | Scripting, CI, headless |
+| **IDE Bundle** | `mvn -Pide-bundle package -DskipTests` | `target/chuck-ide-bundle/chuck-ide/chuck-ide.exe` | ~154 MB | Desktop, double-click IDE |
+
+**Native CLI** (`-Pnative`) is built with GraalVM native-image (requires `JAVA_HOME` pointing at GraalVM JDK 25 installation). JavaFX is excluded; `--gui` prints a helpful error. 108 of 130 unit tests are verified to pass natively (`mvn -Pnative -DskipNativeTests=false test`). The 22 excluded tests use `ChuckDSL.load()` → `javax.tools.JavaCompiler`, which is unavailable in native images.
+
+**IDE Bundle** (`-Pide-bundle`) uses `jpackage --type app-image` to embed a full JRE alongside the fat JAR. The bundled `chuck-ide.exe` runs with no external Java installation needed.
+
 ---
 
 > **Full language reference:** see [LANGUAGE.md](LANGUAGE.md) — operators, types, built-ins, all UGen parameters, CLI flags, and IDE shortcuts.
@@ -110,15 +129,22 @@ A modern migration of the ChucK Strongly-timed Audio Programming Language to JDK
 
 ## ⌨️ Command Line Interface
 
-ChucK-Java now supports a full-featured CLI that mirrors the original ChucK implementation.
+ChucK-Java supports a full-featured CLI that mirrors the original ChucK implementation. It can be invoked via Maven, the fat JAR, or the native `chuck.exe` (built with `-Pnative`).
 
 ### Usage
 ```bash
-# Launch the IDE with files loaded
-./run.sh examples/basic/bar.ck examples/basic/chirp.ck
+# Via Maven exec plugin
+mvn exec:java -Dexec.args="examples/basic/bar.ck"
 
-# Run in headless mode with real-time RMS monitoring
-./run.sh --verbose:2 examples/basic/bar.ck
+# Via fat JAR
+java --enable-preview --add-modules jdk.incubator.vector -jar target/chuck-java-1.0-SNAPSHOT.jar examples/basic/bar.ck
+
+# Via native executable (no JRE needed)
+chuck.exe examples/basic/bar.ck
+
+# Launch JavaFX IDE (fat JAR or mvn javafx:run only — not available in chuck.exe)
+mvn javafx:run
+chuck-ide.exe          # self-contained IDE bundle built with -Pide-bundle
 ```
 
 ### Options
@@ -208,6 +234,43 @@ For full examples, see the `org.chuck.examples.host` package.
 ## 🎸 Java Fluent DSL
 
 ChucK-Java provides a pure-Java Fluent API that allows you to write synthesis logic with the same evocative "chucking" flow as the original language, leveraging **Scoped Values** (JEP 481) for shred-local logical time.
+
+### Examples (`examples_dsl/`)
+
+Ready-to-run Java DSL shreds covering a wide range of synthesis techniques:
+
+| File | Demonstrates |
+|------|-------------|
+| `SineDSL.java` | Basic SinOsc — the simplest possible DSL shred |
+| `FmDSL.java` | FM synthesis with ADSR envelope |
+| `AdsrDSL.java` | ADSR envelope shaping random MIDI notes |
+| `EnvelopeDSL.java` | Linear Envelope on white Noise |
+| `LfoDSL.java` | LFO to `blackhole()`, printing values |
+| `PhasorDSL.java` | Phasor modulating PulseOsc width |
+| `CombDSL.java` | Feedback comb filter (pitched resonance from Noise) |
+| `ChirpDSL.java` | Frequency sweep with a reusable `chirp()` method |
+| `BlitDSL.java` | Band-limited impulse train + JCRev reverb |
+| `HarmonicsDSL.java` | Harmonic series sweep |
+| `WindDSL.java` | Noise → BiQuad resonance filter sweep |
+| `OscillatorsDSL.java` | All 6 oscillator types (Sin/Saw/Tri/Pulse/Sqr + FM) |
+| `Fm2DSL.java` | SinOsc FM via `sync(2)` mode |
+| `Blit2DSL.java` | BLIT + ADSR articulation + JCRev |
+| `LarryDSL.java` | Impulse → BiQuad frequency sweep |
+| `LpfDSL.java` | Noise → LPF with sweeping cutoff |
+| `BpfDSL.java` | Noise → BPF with sweeping center frequency |
+| `ResonZDSL.java` | Noise → ResonZ with sweeping resonance |
+| `ChorusDSL.java` | 4-voice chord (Dm7) through Chorus effect |
+| `ClarDSL.java` | Clarinet physical model melody |
+| `WurleyDSL.java` | Wurley FM electric piano |
+| `PolyphonyDSL.java` | Concurrent shreds via `vm.spork()` |
+| `DslDemo.java` | Hot-reload demo — random notes in infinite loop |
+
+Run any example directly:
+```bash
+./run_dsl.sh examples_dsl/WurleyDSL.java
+```
+
+All non-infinite examples are covered by `DslExamplesTest` (20 JUnit tests).
 
 ### 1. Chaining UGens
 All UGens support the `.chuck(target)` method, which connects the unit and returns the target for further chaining. Note that ChucK-style setters (like `.freq(440)`) return the value set, which breaks the chain. Configure your units before or after connecting them.
@@ -372,18 +435,23 @@ You can now write and run pure-Java ChucK logic directly in the IDE.
 
 ## 🎹 Implemented Unit Generators (UGens)
 
-### Oscillators & Physical Models
--   `SinOsc`, `SawOsc`, `TriOsc`, `PulseOsc`, `SqrOsc`, `Phasor`.
--   `BlitSaw` (band-limited sawtooth, PolyBLEP), `BlitSquare` (band-limited square, PolyBLEP).
--   `Clarinet`, `Mandolin`, `Plucked`, `Rhodey`, `Bowed`, `StifKarp`, `Moog`, `Flute`, `Sitar`.
+### Oscillators
+`SinOsc`, `SawOsc`, `TriOsc`, `PulseOsc`, `SqrOsc`, `Phasor`, `Blit`, `BlitSaw` (PolyBLEP), `BlitSquare` (PolyBLEP)
+
+### Physical Models (STK)
+`Clarinet`, `Mandolin`, `Plucked`, `Rhodey`, `Wurley`, `BeeThree`, `HevyMetl`, `PercFlut`, `TubeBell`, `FMVoices`, `Bowed`, `StifKarp`, `Moog`, `Flute`, `Sitar`, `Brass`, `Saxofony`, `Shakers`
+
+### Filters
+`LPF`, `HPF`, `BPF`, `BRF` (Butterworth), `BiQuad`, `ResonZ`, `OnePole`, `OneZero`, `TwoPole`, `TwoZero`, `PoleZero`, `AllPass`
+
+### Effects & Delays
+`Chorus`, `Echo`, `Delay`, `DelayL`, `DelayA`, `JCRev`, `NRev`, `PRCRev`, `GVerb`, `PitShift`
+
+### Envelopes & Control
+`ADSR`, `Envelope`, `Gain`, `GainDB`, `Step`, `Impulse`, `Noise`, `CNoise`
+
+### Utilities
+`Pan2`, `SndBuf`, `SndBuf2`, `WvOut`, `Blackhole`, `LiSa`
 
 ### Analysis (UAna)
--   `FFT`: Fast Fourier Transform.
--   `IFFT`: Inverse FFT (resynthesis).
--   `RMS`: Power analyzer.
--   `Centroid`: Spectral brightness.
--   `UAnaBlob`: Data container for magnitude and phase.
-
-### Filters, Effects & Utilities
--   `LPF`, `HPF`, `BPF`, `BRF` (Butterworth), `ResonZ`, `Chorus`, `Echo`, `JCRev`, `OnePole`, `OneZero`, `PitShift`.
--   `Pan2`, `ADSR`, `Envelope`, `SndBuf`, `Gain`, `Noise`, `Step`, `Impulse`, `Blackhole`.
+`FFT`, `IFFT`, `RMS`, `Centroid`, `ZCR`, `MFCC`, `SFM`, `Kurtosis`, `UAnaBlob`

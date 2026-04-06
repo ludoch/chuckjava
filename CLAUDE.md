@@ -12,7 +12,7 @@ A Java implementation of the [ChucK](https://chuck.stanford.edu/) strongly-timed
 # Build
 mvn compile
 
-# Run all tests
+# Run all tests (130 JVM tests)
 mvn test
 
 # Run a single test class
@@ -24,9 +24,35 @@ mvn exec:java -Dexec.args="path/to/script.ck"
 # Launch the JavaFX IDE
 mvn javafx:run
 
-# Package
+# Package (fat JAR)
 mvn package
+
+# Build GraalVM native executable (all platforms — requires JAVA_HOME → GraalVM JDK 25)
+#   Windows: set JAVA_HOME=C:\path\to\graalvm-jdk-25
+#   Mac/Linux: export JAVA_HOME=/path/to/graalvm-jdk-25
+mvn -Pnative package -DskipTests
+#   Output: target/chuck  (Linux/Mac)  or  target/chuck.exe  (Windows)
+
+# Run native tests (108 tests, excludes DslExamplesTest + PolyphonyDSLTest)
+mvn -Pnative -DskipNativeTests=false test
+
+# Build self-contained JavaFX IDE bundle (all platforms)
+# Includes AOT cache training run (JEP 483) for faster IDE startup. Add -DskipAot=true to skip.
+mvn -Pide-bundle package -DskipTests                        # app-image (default, all OSes)
+mvn -Pide-bundle package -DskipTests -Djpackage.type=dmg    # macOS disk image
+mvn -Pide-bundle package -DskipTests -Djpackage.type=deb    # Linux .deb (needs dpkg-deb)
+#   Output: target/chuck-ide-bundle/chuck-ide/      (Linux/Windows)
+#           target/chuck-ide-bundle/chuck-ide.app/  (macOS app-image)
+#           target/chuck-ide-bundle/*.dmg            (macOS dmg)
+
+# Build Linux binary via Docker (from any platform with Docker installed)
+docker build --output dist/linux .                          # just the chuck binary
+docker build --target full --output dist/linux .            # binary + IDE bundle
 ```
+
+**JDK upgrade roadmap:** See [JDK_ROADMAP.md](JDK_ROADMAP.md) for analysis of JDK 26/27 features
+(Valhalla value classes, Vector API graduation timeline, Project Leyden AOT, JavaFX 26 Metal,
+Structured Concurrency finalization) and their specific impact on this project.
 
 **Important:** Preview features (`--enable-preview`) and `jdk.incubator.vector` are required — the Maven plugins are already configured for this, but if running `java` directly you must pass these flags.
 
@@ -116,6 +142,78 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - **Missing Instantiations**: Added `Hid` and `MidiIn` to `ChuckFactory` to prevent NPEs on declaration.
 - **Test Normalization**: Enhanced `ChucKIntegrationTest` to handle minor precision differences and multiple polar output formats (pi-multiples vs radians).
 - **Console Verbosity**: Removed sample-rate debug prints from `DacChannel` that caused massive log files.
+
+### Java DSL Examples & Tests (2026-04-05)
+
+**`examples_dsl/` directory** — 19 ready-to-run Java DSL shreds (each implements `Shred`, no `package` declaration):
+
+| File | Source `.ck` | Demonstrates |
+|------|-------------|--------------|
+| `SineDSL.java` | `basic/adsr.ck` | Basic SinOsc |
+| `FmDSL.java` | `basic/fm.ck` | FM with ADSR |
+| `AdsrDSL.java` | `basic/adsr.ck` | ADSR envelope, MIDI-to-freq |
+| `EnvelopeDSL.java` | `basic/envelope.ck` | Linear Envelope on Noise |
+| `LfoDSL.java` | `basic/lfo.ck` | LFO to blackhole, printed values |
+| `PhasorDSL.java` | `basic/phasor.ck` | Phasor modulating PulseOsc width |
+| `CombDSL.java` | `basic/comb.ck` | Feedback comb filter (Noise source) |
+| `ChirpDSL.java` | `basic/chirp.ck` | Frequency sweep with helper method |
+| `BlitDSL.java` | `basic/blit.ck` | BLIT + JCRev, pentatonic scale |
+| `HarmonicsDSL.java` | `basic/harmonics.ck` | Harmonic series sweep |
+| `WindDSL.java` | `basic/wind.ck` | Noise → BiQuad resonance sweep |
+| `OscillatorsDSL.java` | `basic/oscillatronx.ck` | All 6 oscillator types + FM pair |
+| `Fm2DSL.java` | `basic/fm2.ck` | SinOsc FM with `sync(2)` |
+| `Blit2DSL.java` | `basic/blit2.ck` | BLIT + ADSR articulation + JCRev |
+| `LarryDSL.java` | `basic/larry.ck` | Impulse → BiQuad frequency sweep |
+| `LpfDSL.java` | `filter/lpf.ck` | Noise → LPF cutoff sweep |
+| `BpfDSL.java` | `filter/bpf.ck` | Noise → BPF center sweep |
+| `ResonZDSL.java` | `filter/resonz.ck` | Noise → ResonZ sweep |
+| `ChorusDSL.java` | `effects/chorus.ck` | 4-voice Chorus (Dm7 chord) |
+| `ClarDSL.java` | `stk/clarinet.ck` | Clarinet physical model melody |
+| `WurleyDSL.java` | `stk/wurley.ck` | Wurley FM piano, pentatonic |
+| `PolyphonyDSL.java` | — | Concurrent shreds via `vm.spork()` |
+| `DslDemo.java` | — | Hot-reload demo, random notes |
+
+**Tests:** `DslExamplesTest` (20 `@Test` methods) covers every example above except the infinite-loop demo. Each test compiles the `.java` file at runtime via `ChuckDSL.load()`, sporks it into a headless VM, and asserts `maxRms > 0.001`.
+
+### Recently Fixed Issues (2026-04-05)
+- **`ChuckShred.cleanup()` deadlock** — Java DSL shreds (sporked via `spork(Runnable)`) set `isDone=true` but never signalled `condition`, leaving the test thread's `resume()` blocked in `condition.await()` forever. Fixed by acquiring the lock and calling `condition.signalAll()` inside `cleanup()`.
+- **`Delay.compute()` always returned 0** — A redundant tick-deduplication guard (`if (systemTime == lastTickTime) return lastOut`) was inside `compute()`, which is called *after* `ChuckUGen.tick()` already sets `lastTickTime = systemTime`. The check was always true, so the delay buffer was never read or written. Removed the guard; `Delay` now works correctly for echo/feedback effects.
+- **`Clarinet.compute()` silent** — `breathPressure = envelope.tick(systemTime)` returned 0 because the Envelope has no audio sources (input = 0) and `compute()` returns `input * value`. Fixed by calling `envelope.tick()` to advance the ramp, then reading the actual level via `envelope.getValue()`.
+
+### GraalVM Native Image & IDE Bundle (2026-04-05)
+
+**Native executable (`-Pnative` profile):**
+- `NativeMain.java` — headless entry point (no JavaFX dependency)
+- `ChuckCLI.java` — IDE launch now uses `Class.forName()` so native image compiles cleanly
+- `src/main/resources/META-INF/native-image/org.chuck/chuck-java/` — auto-discovered config:
+  - `native-image.properties` — `--enable-preview`, `--add-modules=jdk.incubator.vector`, ANTLR build-time init, `--no-fallback`
+  - `reflect-config.json` — reflection registrations for `Std`, `RegEx`, `Reflect`, `SerialIO`, `ChuckUGen`, `ChuckShred` (needed for `CallMethod` dispatch), ANTLR classes
+  - `resource-config.json` — includes `examples/*.ck` resources
+- No GraalVM path in pom.xml — relies entirely on `JAVA_HOME` pointing at GraalVM JDK 25
+- Output: `target/chuck` (Linux/Mac) or `target/chuck.exe` (Windows) — ~49 MB, no JRE needed
+
+**Native test support (`-DskipNativeTests=false`):**
+- 108 of 130 tests run natively; 22 excluded (`DslExamplesTest` + `PolyphonyDSLTest`) because they use `ChuckDSL.load()` → `javax.tools.JavaCompiler` which is unavailable in native image
+- `ChuckShred.allPublicMethods` in reflect-config fixes `me.running()` / `me.numArgs()` in native image
+
+**IDE bundle (`-Pide-bundle` profile):**
+- Uses `jpackage` to produce a self-contained directory or installer
+- `jpackage.type` property defaults to `app-image`; override per-platform: `dmg`, `deb`, `rpm`, `msi`, `exe`
+- Fat JAR includes `ServicesResourceTransformer` (merges JavaFX `META-INF/services/` entries)
+- Output: `target/chuck-ide-bundle/chuck-ide/` (Linux/Windows) or `.app`/`.dmg` (macOS)
+- **AOT cache (JEP 483, JDK 24+):** build does a training run to generate `chuck.aot` alongside the JAR; the cache is bundled inside the app-image and loaded via `-XX:AOTCache=$APPDIR/lib/app/chuck.aot`. Pre-warms class loading and ANTLR ATN init, reducing IDE startup time. Skip with `-DskipAot=true` (CI and Docker use this automatically).
+
+**Cross-platform CI (`/.github/workflows/build.yml`):**
+- GitHub Actions matrix: `ubuntu-latest`, `macos-latest`, `windows-latest`
+- Each runner: (1) runs JVM tests, (2) builds native CLI, (3) runs 108 native tests, (4) builds IDE bundle
+- macOS builds `.dmg`; Windows/Linux build `app-image`
+- Release job attaches all three native binaries to GitHub Releases automatically
+
+**Docker (`Dockerfile`):**
+- Builds Linux native binary from any platform with Docker installed
+- Based on `ghcr.io/graalvm/native-image-community:25`
+- `docker build --output dist/linux .` → extracts `chuck` binary
+- `docker build --target full --output dist/linux .` → extracts `chuck` + IDE bundle
 
 ### Key Design Patterns
 

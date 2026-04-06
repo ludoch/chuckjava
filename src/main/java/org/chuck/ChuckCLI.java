@@ -24,14 +24,14 @@ public class ChuckCLI {
 
     public void run(String[] args) {
         if (args.length == 0) {
-            org.chuck.ide.ChuckIDE.main(args);
+            launchIDE(args);
             return;
         }
 
         parseArgs(args);
 
         if (forceGui) {
-            org.chuck.ide.ChuckIDE.main(args);
+            launchIDE(args);
             return;
         }
 
@@ -239,6 +239,20 @@ public class ChuckCLI {
         } catch (Exception e) {
             System.err.println("❌ VM Error: " + e.getMessage());
             e.printStackTrace();
+        }
+    }
+
+    private void launchIDE(String[] args) {
+        try {
+            Class<?> ideClass = Class.forName("org.chuck.ide.ChuckIDE");
+            java.lang.reflect.Method main = ideClass.getMethod("main", String[].class);
+            main.invoke(null, (Object) args);
+        } catch (ClassNotFoundException e) {
+            System.err.println("JavaFX IDE is not available in this build. Run a .ck file directly.");
+            System.exit(1);
+        } catch (Exception e) {
+            System.err.println("Failed to launch IDE: " + e.getMessage());
+            System.exit(1);
         }
     }
 

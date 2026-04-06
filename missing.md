@@ -1,178 +1,285 @@
-# ChucK-Java: Missing Features & Gaps
+# ChucK-Java: Gap Analysis vs C++ Reference (`../chuck/`)
 
-This document tracks the features from the original [Stanford ChucK](https://chuck.stanford.edu/) implementation that are currently missing, incomplete, or divergent in this JDK 25 Java port.
+Last reassessed: 2026-04-05. Based on direct comparison of `../chuck/src/core/` against `src/main/java/org/chuck/`.
 
-## 1. Core Language & VM Architecture
-
-| Feature | Status | Description |
-|:---|:---|:---|
-| **Shred References** | Done | `spork ~` now returns a `Shred` object reference. Supports `.id()`, `.exit()`, and `.done()`. |
-| **Event Conjunction** | Done | `e1 && e2 => now` is implemented. Shred waits until all events trigger since the wait began. |
-| **Event Disjunction** | Done | `e1 || e2 => now` is implemented. Shred waits until any event triggers. |
-| **Chugins System** | Done | Dynamic plugin architecture implemented via `ChuginLoader`. Loads `.jar` files from the `chugins/` directory. |
-| **Machine Control** | Done | `Machine.add()`, `Machine.remove()`, `Machine.replace()`, `Machine.status()`, `Machine.eval()`, and `Machine.clear()` are fully implemented. |
-| **me.dir(n)** | Done | Multi-level directory access implemented in `ChuckShred` and `ChuckEmitter`. |
-| **Duration Arithmetic** | Done | Fixed `dur * float`, `dur / float`, and `dur / dur` operations to work correctly with sub-sample precision (double). |
-| **Vectorized Audio** | Done | SIMD-accelerated mixing and oscillators (Sin, Saw, Tri, Pulse, Sqr) using Java Vector API. |
-| **Off-heap Audio** | Done | Off-heap DAC buffers via Project Panama (FFM) to eliminate GC jitter. |
-| **Java Fluent DSL** | Done | Fluent `.chuck(target)` API for UGen chaining in Java. |
-| **Scoped Value Time** | Done | Shred-local logical time context via Scoped Values (JEP 481). |
-| **Java Machine** | Done | Hot-reloading runner for dynamic Java sporking in IDE and CLI. |
-| **Shred Interface** | Done | Standard interface for Java-based shreds. |
-
-## 2. Unit Generators (UGens)
-
-| UGen | Status | Description |
-|:---|:---|:---|
-| **Dyno** | Done | Fully implemented with Envelope Follower and Gain Computer supporting Compressor, Limiter, Expander, and Gate modes. |
-| **Chugraph** | Done | Implemented as a base class with `inlet` and `outlet` support. |
-| **ChuGen** | Done | Implemented with synchronous `tick()` logic execution within the audio thread. |
-| **WvIn / WaveLoop** | Done | Fully implemented with support for loading and looping WAV/AIFF files. |
-| **WvOut** | Done | Implemented as `WvOut` UGen for recording audio to WAV files from within ChucK. |
-| **NRev / PRCRev** | Done | Classic STK reverbs implemented. |
-| **GVerb** | Done | High-quality studio reverb implemented using a multi-delay network. |
-| **PitShift** | Done | Functional time-domain pitch shifter implemented using dual cross-fading delay lines. |
-| **Gen9 / Gen17** | Done | Implemented sum-of-sinusoids (`Gen9`) and Chebyshev polynomials (`Gen17`) for table synthesis and wavefolding. |
-| **Mix2** | Done | 2-channel stereo mixer implemented. |
-| **HalfRect / FullRect** | Done | Signal rectification UGens implemented. |
-| **ZeroX** | Done | Zero-crossing detector implemented. |
-| **SubNoise** | Done | Sub-sampled noise generator implemented. |
-| **Modulate** | Done | Vibrato/Tremolo modulation UGen implemented. |
-| **WarpTable / CurveTable** | Done | Advanced lookup table UGens implemented. |
-| **Pan4 / Pan8 / Pan16** | Done | Multi-channel panners implemented (4, 8, 16 channels). |
-| **Mix4 / Mix8 / Mix16** | Done | Multi-channel mixers implemented (4, 8, 16 channels). |
-| **MultiChannelUGen** | Done | Robust base class for N-channel UGens implemented. |
-
-## 3. I/O & Networking
-
-| Feature | Status | Description |
-|:---|:---|:---|
-| **FileIO** | Done | Fully implemented ASCII and Binary modes, including support for the `<=` streaming operator. |
-| **MidiOut** | Done | Implemented with support for sending MIDI messages using `javax.sound.midi`. |
-| **MidiIn** | Done | Implemented with `RtMidi` binding via FFM API. Full support for `recv(MidiMsg)` and `Event` waiting (`min => now`). |
-| **SerialIO** | Done | Functional stub implemented for debugging. |
-| **OscBundle** | Done | Implemented support for grouping and sending OSC messages. |
-
-## 4. Standard Libraries
-
-| Library | Status | Description |
-|:---|:---|:---|
-| **Std Methods** | Done | Implemented `atoi`, `atof`, `rand2`, `rand2f`, `fabs`, `srand`, `systemTime`, `getenv`, `setenv`, and `range`. |
-| **RegEx** | Done | Pattern matching using `java.util.regex`. |
-| **Reflect** | Done | Shred and object introspection implemented. |
-| **UAna (Flux/Rolloff)** | Done | Spectral feature extractors implemented. |
-
-## 5. IDE & UI
-
-| Feature | Status | Description |
-|:---|:---|:---|
-| **Visualizer Config** | Done | Added UI controls to adjust FFT size and oscilloscope window size. |
-| **Project View** | Done | Added file system management (new file, delete, refresh) and project directory support. |
+Legend: ✅ Done · ⚠️ Partial · ❌ Missing
 
 ---
 
-## 6. Gap Analysis vs C++ Reference (`../chuck/`)
+## 1. Unit Generators (UGens)
 
-### 6.1 Language / Parser / Emitter
+### 1.1 Present in Java (not an issue)
+
+All of these are registered in `UGenRegistry.java` and have concrete implementations:
+
+Oscillators: `SinOsc`, `SawOsc`, `TriOsc`, `SqrOsc`, `PulseOsc`, `Phasor`, `Blit`, `BlitSaw`, `BlitSquare`, `Noise`, `SubNoise`, `CNoise`, `Impulse`, `Step`
+
+Filters: `LPF`/`Lpf`, `HPF`, `BPF`, `BRF`, `ResonZ`, `BiQuad`, `OnePole`, `OneZero`, `TwoPole`, `TwoZero`, `PoleZero`
+
+Effects: `Echo`, `Delay`, `DelayL`, `DelayA`, `Chorus`, `JCRev`, `NRev`, `PRCRev`, `GVerb`, `PitShift`, `Dyno`, `Modulate`, `FullRect`, `HalfRect`, `ZeroX`
+
+Multichannel: `Pan2/4/8/16/N`, `Mix2/4/8/16/N`, `Identity2`, `UGen_Multi`, `UGen_Stereo`
+
+Envelopes: `Envelope`, `Adsr`
+
+Instruments (STK): `Clarinet`, `Mandolin`, `Plucked`, `Rhodey`, `Wurley`, `TubeBell`, `BeeThree`, `FMVoices`, `HevyMetl`, `PercFlut`, `Moog`, `Saxofony`, `Flute`, `Brass`, `Sitar`, `StifKarp`, `Shakers`, `Bowed`
+
+Tables / GenX: `Gen5`, `Gen7`, `Gen9`, `Gen10`, `Gen17`, `GenX`, `WarpTable`, `CurveTable`
+
+Buffers: `SndBuf`, `SndBuf2`, `WvIn`, `WvOut`/`WvOut2`, `WaveLoop`, `LiSa`, `LiSa2`, `LiSa4`, `LiSa8`, `LiSa16`
+
+Utilities: `Gain`, `GainDB`, `Blackhole`, `Adc`
+
+### 1.2 Missing UGens — registered in C++ but absent in Java
+
+| UGen | C++ File | Description |
+|------|----------|-------------|
+| `VoicForm` | `ugen_stk` | Formant voice synthesizer (4-formant singing voice, different from FMVoices) |
+| `ModalBar` | `ugen_stk` | Modal-resonance bar physical model (xylophone, vibraphone, etc.) |
+| `BandedWG` | `ugen_stk` | Banded waveguide (bowed bar, tibetan bowl, etc.) |
+| `BlowBotl` | `ugen_stk` | Blown bottle physical model |
+| `BlowHole` | `ugen_stk` | Clarinet with tonehole and register vent |
+| `HnkyTonk` | `ugen_stk` | FM honky-tonk piano |
+| `FrencHrn` | `ugen_stk` | FM French horn |
+| `KrstlChr` | `ugen_stk` | FM crystal choir |
+| `JetTabl` | `ugen_stk` | Jet table (lookup table used by `Flute`; exposed as standalone UGen in C++) |
+| `Mesh2D` | `ugen_stk` | 2D waveguide mesh (spatial physical model) |
+| `DelayP` | `ugen_xxx` | Pitch-shifting delay (different from `DelayA`/`DelayL`) |
+| `FilterBasic` | `ugen_xxx` | Abstract base exposing `freq`, `Q`, `set` — parent of LPF/HPF/BPF/BRF |
+| `FilterStk` | `ugen_stk` | STK-compatible filter base |
+| `BiQuadStk` | `ugen_stk` | STK BiQuad (distinct from `BiQuad` — different coefficient style) |
+| `Teabox` | `ugen_stk` | Sensor input box (hardware-specific, low priority) |
+| `LiSa6`, `LiSa10` | `ugen_xxx` | 6- and 10-voice LiSa variants (Java has 2/4/8/16 only) |
+
+---
+
+## 2. Unit Analyzers (UAna)
+
+### 2.1 Present in Java
+
+`FFT`, `IFFT`, `RMS`, `Centroid`, `Flux`, `ZeroX`, `ZCR`, `MFCC`, `SFM`, `Kurtosis`, `Rolloff`
+
+### 2.2 Missing UAnas — in C++ but absent in Java
+
+| UAna | Description |
+|------|-------------|
+| `DCT` | Discrete Cosine Transform (forward) — useful for audio compression / feature extraction |
+| `IDCT` | Inverse DCT |
+| `AutoCorr` | Autocorrelation of input buffer — pitch detection, periodicity analysis |
+| `XCorr` | Cross-correlation between two UAna streams |
+| `Chroma` | 12-bin pitch-class profile (chroma features) — key detection |
+| `FeatureCollector` | Aggregates outputs from multiple UAnas into a single feature vector (used with AI/ML) |
+| `Flip` | Copies audio buffer into UAna blob without analysis — enables custom analysis |
+| `UnFlip` | Inverse of Flip: copies UAna blob back to audio buffer |
+
+`FeatureCollector` is particularly important because it bridges the UAna graph to the AI/ML classes (`KNN`, `MLP`, etc.).
+
+---
+
+## 3. AI / ML Library (`ulib_ai.cpp`)
+
+Completely absent in Java. All five classes need implementation:
+
+| Class | Description | Key Methods |
+|-------|-------------|-------------|
+| `KNN` | K-Nearest Neighbor (regression) | `train(float[][], float[][])`, `predict(float[], float[])` |
+| `KNN2` | K-Nearest Neighbor (classification) | `train(float[][], int[])`, `predict(float[], int[])`, `search(float[])` |
+| `SVM` | Support Vector Machine | `train(float[][], int[])`, `predict(float[])`, `save(string)`, `load(string)` |
+| `HMM` | Hidden Markov Model | `train(float[][])`, `generate(float[])`, `viterbi(float[][], int[])`, `forward(float[][])` |
+| `MLP` | Multi-Layer Perceptron | `input/hidden/output(int)`, `train(float[][], float[][])`, `predict(float[])`, activation functions |
+| `PCA` | Principal Component Analysis | `train(float[][])`, `transform(float[], float[])`, `explainedVariance(float[])` |
+
+The typical ChucK AI workflow is: `Flip → FeatureCollector → KNN/MLP` for real-time machine learning on audio.
+
+---
+
+## 4. Language / Grammar
+
+### 4.1 Present in Java grammar (`ChuckANTLR.g4`)
+
+`if/else`, `while`, `until`, `for`, `repeat`, `do-while`, `do-until`, `switch/case/default`, `break`, `continue`, `return`, `null`, `class extends`, `public/private/protected/static/global/const`, `@` references, `complex`/`polar`/`vec` literals, operator overloading, ternary `?:`, `spork`, `new`, `#include`/`@import`.
+
+### 4.2 Missing language features — in C++ grammar but not in Java
+
+| Feature | C++ grammar | Java status | Notes |
+|---------|-------------|-------------|-------|
+| `typeof` | `TYPEOF unary_expression` | ❌ Not in grammar or emitter | Returns the type name as a string |
+| `instanceof` | Used in type checker | ❌ Not in grammar or emitter | Runtime type test (`x instanceof Foo`) |
+| `abstract` class / method | `ABSTRACT` keyword | ❌ Not in grammar | Cannot declare abstract base classes |
+| `interface` | `INTERFACE id_list LBRACE` | ❌ Not in emitter | Grammar has the token but emitter ignores interface bodies |
+| `@construct` | Explicit constructor syntax | ❌ Not in grammar | C++ allows `fun @construct(...)` for custom constructors |
+| `@destruct` | Explicit destructor syntax | ❌ Not in grammar | C++ calls `@destruct` when a shred-owned object is freed |
+| `loop` statement | `LOOP LPAREN stmt RPAREN` | ❌ Not in grammar | Explicit named infinite loop (different from `while(true)`) |
+| `@operator` overload syntax | `fun @operator+(...)` | ⚠️ Partial | Java uses `__op__+` naming convention; C++ uses `@operator+` |
+| `static` class variables | `STATIC` in class body | ⚠️ Partial | Declared but not fully initialized between instances |
+| `public` class-level access | `PUBLIC` in class body | ⚠️ Partial | Parsed but not enforced at runtime |
+| `doc` comments (`/** */`) | `@doc` annotation | ❌ Not in grammar | ChucK doc comment extraction |
+
+---
+
+## 5. Math Library
+
+### 5.1 Present in Java (`MathInstrs.java` + emitter dispatch)
+
+`sin`, `cos`, `tan`, `asin`, `acos`, `atan`, `atan2`, `sqrt`, `pow`, `exp`, `log`, `log2`, `log10`, `floor`, `ceil`, `round`, `trunc`, `abs`, `fabs`, `isinf`, `isnan`, `equal`, `euclidean`, `rtop`, `ptor`, `srandom`/`srand`, constants: `PI`, `TWO_PI`, `e`, `sqrt2`, `j`, `INFINITY`
+
+### 5.2 Missing Math functions — in C++ but not wired in Java
+
+| Function | Description |
+|----------|-------------|
+| `Math.sinh`, `cosh`, `tanh` | Hyperbolic trig |
+| `Math.hypot(x,y)` | Hypotenuse (numerically stable `sqrt(x²+y²)`) |
+| `Math.fmod(x,y)` | Floating-point modulo |
+| `Math.remainder(x,y)` | IEEE remainder |
+| `Math.min(a,b)`, `max(a,b)` | Scalar min/max |
+| `Math.nextpow2(n)` | Next power of 2 ≥ n |
+| `Math.ensurePow2(n)` | Alias for nextpow2 |
+| `Math.exp2(x)` | 2^x |
+| `Math.random()`, `randomf()`, `random2f(a,b)`, `randomize()` | Additional random variants |
+| `Math.gauss(mean, std)` | Gaussian random sample |
+| `Math.map(x, srcMin, srcMax, dstMin, dstMax)` | Same as `Std.scalef`; C++ exposes on Math |
+| `Math.map2(x, srcMin, srcMax, dstMin, dstMax, type)` | Mapped with curve type |
+| `Math.remap` | Alias for map2 |
+| `Math.clampi(x, lo, hi)` | Integer clamp (Java has `Std.clamp` for int but not `Math.clampi`) |
+| `Math.cossim(a[], b[])` | Cosine similarity of two float arrays |
+| `Math.ssin`, `scos`, `stan`, `ssinh`, `scosh`, `stanh`, `sexp`, `sinsqrt` | Fast scalar approximations |
+
+---
+
+## 6. Std Library
+
+### 6.1 Missing Std functions
+
+| Function | Description |
+|----------|-------------|
+| `Std.rand()` | Random integer in [0, RAND_MAX] |
+| `Std.randf()` | Random float in [0, 1) |
+| `Std.system(cmd)` | Execute a shell command (security note: opt-in only) |
+
+---
+
+## 7. Machine API
+
+### 7.1 Present in Java
+
+`Machine.add()`, `replace()`, `remove()`, `removeAllShreds()`, `clearVM()`, `resetShredID()`, `numShreds()`, `shreds()`, `shredExists(id)`, `crash()`, `gc()`, `version()`, `platform()`, `loglevel()`, `setloglevel()`, `timeofday()`
+
+### 7.2 Missing Machine functions
+
+| Function | Description |
+|----------|-------------|
+| `Machine.eval(string)` | ✅ Already implemented — calls `vm.eval()` → `vm.run()` → ANTLR pipeline; works in `chuck.exe` |
+| `Machine.eval(string, args[])` | ❌ Missing — eval with argument list passed to the sporked shred |
+| `Machine.removeLastShred()` | Remove the most recently sporked shred |
+| `Machine.spork(string)` | Spork a file by path from Machine API |
+| `Machine.intsize()` | Platform integer size in bits |
+| `Machine.silent()` | Check/set silent mode |
+| `Machine.realtime()` | Check if running in real-time mode |
+| `Machine.refcount(obj)` | Debug: reference count of an object |
+| `Machine.sp_reg`, `sp_mem` | Debug: current register / memory stack pointer |
+| `Machine.printStatus()` | Print all active shreds to console |
+| `Machine.printTimeCheck()` | Print timing diagnostics |
+| `Machine.operatorsPush()` / `operatorsPop()` / `operatorsStackLevel()` | Operator overload namespace stack |
+| `Machine.os()` | OS name (Java has `platform()` but C++ also exposes `os()` as alias) |
+
+`Machine.eval()` is the most impactful missing item — it enables live coding, on-the-fly code injection, and the ChucK REPL.
+
+---
+
+## 8. Stdlib Classes (non-I/O)
+
+| Class | Status | Description |
+|-------|--------|-------------|
+| `ConsoleInput` | ❌ Missing | Reads a line from stdin; used in interactive ChucK programs |
+| `KBHit` | ❌ Missing | Non-blocking keyboard press detection (`kbhit()` returns 1 if key waiting) |
+| `StringTokenizer` | ✅ Done | `set(s)`, `more()`, `next()`, `reset()` implemented |
+| `RegEx` | ✅ Done | Pattern matching via `java.util.regex` |
+| `Type` / `Function` introspection | ❌ Missing | Reflect on type names, method signatures at runtime |
+
+---
+
+## 9. I/O (all confirmed present in Java)
+
+| Class | Status |
+|-------|--------|
+| `FileIO` (ASCII + binary) | ✅ Done |
+| `MidiIn` / `MidiOut` / `MidiMsg` | ✅ Done |
+| `OscIn` / `OscOut` / `OscMsg` / `OscBundle` | ✅ Done |
+| `Hid` / `HidMsg` | ✅ Done |
+| `SerialIO` | ⚠️ Stub (functional for basic use; no hardware serial port) |
+| `MidiFileIn` | ❌ Missing — reads Standard MIDI files for sequencing |
+| `HidOut` | ❌ Missing — send HID output (force feedback, LED, etc.) |
+
+---
+
+## 10. Event System
 
 | Feature | Status | Notes |
-|:---|:---|:---|
-| `switch`/`case` | ✅ Implemented | AST + ANTLR grammar + emitter (equality-chain) |
-| `goto` / label | ❌ Missing | Not in AST or parser |
-| Ternary `? :` | ✅ Implemented | AST + ANTLR grammar + emitter; precedence above `=>` |
-| `complex` / `polar` types | ✅ Implemented | Field accessors `.re/.im/.mag/.phase`; built-in `+`,`-`,`*`,`/` with correct complex/polar math |
-| `vec2` / `vec3` / `vec4` types | ✅ Implemented | Field accessors `.x/.y/.z/.w`; element-wise `+`,`-`; scalar `*`; dot product |
-| Operator overloading (user classes) | ✅ Implemented | Arithmetic + comparison (`<`,`<=`,`>`,`>=`,`==`,`!=`) + unary + `++`/`--` |
-| `public`/`private`/`protected` on class members | ❌ Missing | No access modifiers |
-| `static` variables in classes | ⚠️ Partial | Not fully initialized |
-| Doc comments | ❌ Missing | Not in AST or parser |
-| **ANTLR4 Parser** | ✅ Done | Now the default and only parser (replacing the hand-written one). |
-
-
-### 6.2 UGens — Missing
-
-**Filters:** ~~`TwoPole`, `TwoZero`, `PoleZero`, `HPF`, `BPF`, `BRF`~~ ✅, `DelayA` (allpass-interp), `DelayP`
-
-**Oscillators / Generators:** ~~`Blit`, `BlitSaw`, `BlitSquare`~~ ✅ (band-limited PolyBLEP), `CNoise` (colored noise)
-
-**FM Instruments (STK):** ~~`BeeThree`, `FMVoices`, `HevyMetl`, `PercFlut`, `TubeBell`, `Wurley`~~ ✅, `HnkyTonk`, `FrencHrn`, `KrstlChr`, `BlowBotl`, `BlowHole`, `BandedWG`
-
-**Multichannel:** ~~`LiSa2`, `WvOut2`, `SndBuf2`, `PanN`, `MixN`~~ ✅, `LiSa4/6/8/10/16`, `WvOut4/8/16`, `SndBuf4/8/16`, `Identity2`
-
-**Spatial:** `Mesh2D` (2D mesh physical model)
-
-### 6.3 Unit Analyzers (UAna) — Missing
-
-Java has: `FFT`, `IFFT`, `RMS`, `Centroid`, `Flux`, `ZeroX`, `ZCR`, `MFCC`, `SFM`, `Kurtosis`, `Rolloff`
-
-| UAna | Status |
-|:---|:---|
-| `MFCC` — Mel-Frequency Cepstral Coefficients | ✅ Implemented (mel filterbank + DCT-II, 13 coeffs) |
-| `Kurtosis` | ✅ Implemented (4th central moment of spectrum) |
-| `SFM` — Spectral Flatness Measure | ✅ Implemented (geometric/arithmetic mean ratio) |
-| `ZCR` — Zero Crossing Rate | ✅ Implemented (frame-based, configurable window) |
-
-### 6.4 Machine API — Missing Functions
-
-| Function | Status |
-|:---|:---|
-| `Machine.crash()` | ✅ Implemented |
-| `Machine.removeAll()` | ✅ Implemented |
-| `Machine.resetID()` | ✅ Implemented |
-| `Machine.clearVM()` | ✅ Implemented |
-| `Machine.shreds()` / `numShreds()` | ✅ Implemented |
-| `Machine.shredExists(id)` | ✅ Implemented |
-| `Machine.setloglevel()` / `getloglevel()` | ✅ Implemented |
-| `Machine.gc()` | ✅ Implemented |
-| `Type` / `Function` introspection classes | ❌ Missing |
-
-### 6.5 AI / ML Library — Completely Absent
-
-From C++ `ulib_ai.cpp`:
-
-| Feature | Status |
-|:---|:---|
-| `SVM` — Support Vector Machine (train, predict, save, load) | ❌ Missing |
-| `KNN` / `KNN2` — K-Nearest Neighbor | ❌ Missing |
-| `HMM` — Hidden Markov Model (train, viterbi, forward) | ❌ Missing |
-
-### 6.6 Event System
-
-| Feature | Status |
-|:---|:---|
-| `Event.can_wait()` | ❌ Missing |
-| `OscEvent` — event triggered by incoming OSC | ❌ Missing |
-
-### 6.7 Type System
-
-| Feature | Status |
-|:---|:---|
-| `complex` as first-class type (`#(re, im)`) | ✅ Implemented — literals, field accessors, arithmetic |
-| `polar` as first-class type (`%(mag, phase)`) | ✅ Implemented — literals, field accessors, arithmetic |
-| `vec2`/`vec3`/`vec4` with `.x/.y/.z/.w` | ✅ Implemented — literals, field read/write, arithmetic |
-| Arrays of complex / vec types | ✅ Implemented — full support for allocation, sorting, and `Math.rtop/ptor` conversions |
+|---------|--------|-------|
+| `Event` base | ✅ Done | `signal()`, `broadcast()`, `wait()`, `can_wait()` |
+| `OscEvent` | ⚠️ Partial | OscIn fires events; standalone `OscEvent` class not exposed |
+| Conjunction `e1 && e2 => now` | ✅ Done | |
+| Disjunction `e1 \|\| e2 => now` | ✅ Done | |
+| Event timeout | ❌ Missing | C++ supports `timeout => now` on event waits |
 
 ---
 
-### Priority
+## 11. Type System
 
-**High** — common in real ChucK programs:
-1. ~~`switch`/`case`~~ ✅ Done
-2. ~~Ternary `? :`~~ ✅ Done
-3. ~~`BPF`, `HPF`, `BRF`~~ ✅ Done
-4. ~~`BlitSaw`, `BlitSquare`~~ ✅ Done
-5. ~~Full `Machine` shred API (`shreds()`, `removeAll()`, etc.)~~ ✅ Done
+| Feature | Status |
+|---------|--------|
+| `complex` / `polar` first-class types | ✅ Done |
+| `vec2` / `vec3` / `vec4` | ✅ Done |
+| `null` literal | ✅ Done |
+| `auto` type inference | ⚠️ Grammar has token; emitter does not fully resolve inferred types |
+| `typeof` operator | ❌ Missing |
+| `instanceof` operator | ❌ Missing |
+| `abstract` classes | ❌ Missing |
+| `interface` definitions | ❌ Missing (token exists in grammar, emitter ignores body) |
+| `@construct` / `@destruct` | ❌ Missing |
+| `static` member variables (per-class, not per-instance) | ⚠️ Partial — declared but shared initialization not reliable |
 
-**Medium** — used in analysis / spatial audio:
-- ~~`vec2`/`vec3`/`vec4`~~ ✅ Done (field accessors + arithmetic)
-- ~~`MFCC`~~ ✅ Done
-- ~~FM instrument variants~~ ✅ Done (`Wurley`, `BeeThree`, `HevyMetl`, `PercFlut`, `TubeBell`, `FMVoices`)
-- ~~`ZCR`~~ ✅ Done
-- ~~Operator overloading~~ ✅ Done (arithmetic + comparison + unary)
-- ~~`SFM`, `Kurtosis`~~ ✅ Done
+---
 
-**Lower** — niche or advanced:
-- AI/ML library (`SVM`, `KNN`, `HMM`)
-- `goto`/label
-- `HnkyTonk`, `FrencHrn`, `KrstlChr` FM instruments
-- `Machine.resetID()`, `Machine.gc()`
+## Priority Summary
+
+### High — blocks real ChucK programs
+
+| Item | Why it matters |
+|------|---------------|
+| `Machine.eval(string, args[])` | `eval(string)` is done; the `args[]` overload for passing arguments to the eval'd shred is missing |
+| `typeof` / `instanceof` | Type-safe polymorphism patterns common in larger programs |
+| `AutoCorr`, `XCorr` UAnas | Used in pitch detection and audio fingerprinting examples |
+| `FeatureCollector` + AI/ML | The entire `examples/ai/` directory depends on these |
+| `Chroma` UAna | Used in key/chord detection examples |
+| `ConsoleInput` / `KBHit` | Interactive terminal programs (`examples/std/kbhit.ck`) |
+| Missing Math: `min`, `max`, `tanh`, `sinh`, `cosh` | Used constantly in audio processing |
+| `DCT` / `IDCT` | Used in MFCC-adjacent analysis and compression examples |
+
+### Medium — affects completeness but workarounds exist
+
+| Item | Why it matters |
+|------|---------------|
+| `VoicForm` | Formant synthesis — distinct from FM-based FMVoices |
+| `ModalBar` | Modal synthesis for pitched percussion |
+| `BandedWG`, `BlowBotl`, `BlowHole` | STK physical models in `examples/stk/` |
+| `HnkyTonk`, `FrencHrn`, `KrstlChr` | FM instrument variants |
+| `Flip` / `UnFlip` UAnas | Needed for custom UAna pipeline construction |
+| `MidiFileIn` | MIDI file playback |
+| `abstract` / `interface` | Class hierarchy patterns |
+| `@construct` / `@destruct` | Explicit lifecycle management |
+| Missing Math: `gauss`, `nextpow2`, `map`, `fmod` | Common in synthesis algorithms |
+
+### Lower — niche or debug use
+
+| Item | |
+|------|-|
+| `Mesh2D` | Spatial physical model; complex to implement |
+| `DelayP` | Pitch-shifting delay; similar to `DelayL` |
+| `LiSa6`, `LiSa10` | Only 4-variant gap |
+| `Teabox` | Hardware sensor box; very platform-specific |
+| `Machine.refcount`, `sp_reg`, `sp_mem` | Debug/introspection |
+| `Machine.operatorsPush/Pop` | Namespace management for operator overloads |
+| `HidOut` | Output HID (rarely used) |
+| `Std.system()` | Shell execution (security risk; low demand) |
+| Fast math approximations (`ssin`, `scos`, etc.) | Performance hints; Java JIT handles this differently |

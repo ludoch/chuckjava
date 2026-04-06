@@ -41,10 +41,6 @@ public class Delay extends ChuckUGen {
 
     @Override
     protected float compute(float input, long systemTime) {
-        if (systemTime != -1 && systemTime == lastTickTime) {
-            return lastOut;
-        }
-        
         // Read delayed sample
         int readPos = (writePos - delaySamples + buffer.length) % buffer.length;
         float out = buffer[readPos];
@@ -53,8 +49,6 @@ public class Delay extends ChuckUGen {
         buffer[writePos] = input;
         writePos = (writePos + 1) % buffer.length;
 
-        lastTickTime = systemTime;
-        lastOut = out;
         return out;
     }
 }

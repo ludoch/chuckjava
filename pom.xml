@@ -34,6 +34,13 @@
             <version>5.14.3</version>
             <scope>test</scope>
         </dependency>
+        <!-- Required for native-image JUnit 5 test execution -->
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-launcher</artifactId>
+            <version>1.14.3</version>
+            <scope>test</scope>
+        </dependency>
 
         <!-- JavaFX -->
         <dependency>
@@ -54,6 +61,256 @@
             <version>0.11.7</version>
         </dependency>
     </dependencies>
+
+    <profiles>
+        <!-- ================================================================
+             native profile — builds a platform-native executable with GraalVM.
+             Prerequisite: JAVA_HOME must point at a GraalVM JDK 25 installation.
+               Windows: set JAVA_HOME=C:\path\to\graalvm-jdk-25
+               Mac/Linux: export JAVA_HOME=/path/to/graalvm-jdk-25
+             Usage:
+               mvn -Pnative package -DskipTests
+             Output (platform-specific name resolved by native-maven-plugin):
+               target/chuck        (Linux / macOS)
+               target/chuck.exe    (Windows)
+             ================================================================ -->
+        <profile>
+            <id>native</id>
+            <properties>
+                <!--
+                  native-maven-plugin discovers native-image automatically from JAVA_HOME.
+                  No path needs to be set here.
+
+                  Native tests default to OFF.  Enable with: -DskipNativeTests=false
+                  Note: DslExamplesTest and PolyphonyDSLTest are excluded from native
+                  tests because they call ChuckDSL.load() → javax.tools (dynamic Java
+                  compilation), which is unavailable in a native image.
+                -->
+                <skipNativeTests>true</skipNativeTests>
+            </properties>
+            <build>
+                <plugins>
+                    <!-- Override compiler to use GraalVM JDK -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <version>3.15.0</version>
+                        <configuration>
+                            <release>25</release>
+                            <compilerArgs>
+                                <arg>--enable-preview</arg>
+                                <arg>--add-modules</arg>
+                                <arg>jdk.incubator.vector</arg>
+                            </compilerArgs>
+                        </configuration>
+                    </plugin>
+                    <!-- Exclude tests that require dynamic Java compilation -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>3.5.5</version>
+                        <configuration>
+                            <argLine>--enable-preview --add-modules jdk.incubator.vector -Xmx2g -Xms128m</argLine>
+                            <excludes>
+                                <exclude>**/ChucKIntegrationTest.java</exclude>
+                                <!-- These use ChuckDSL.load() → javax.tools, incompatible with native image -->
+                                <exclude>**/DslExamplesTest.java</exclude>
+                                <exclude>**/PolyphonyDSLTest.java</exclude>
+                            </excludes>
+                        </configuration>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.graalvm.buildtools</groupId>
+                        <artifactId>native-maven-plugin</artifactId>
+                        <version>0.11.5</version>
+                        <extensions>true</extensions>
+                        <executions>
+                            <!-- Always: build chuck.exe at package phase -->
+                            <execution>
+                                <id>build-native</id>
+                                <goals>
+                                    <goal>compile-no-fork</goal>
+                                </goals>
+                                <phase>package</phase>
+                            </execution>
+                            <!--
+                              Optional: compile tests to native and run them.
+                              Enabled with: -DskipNativeTests=false
+                              Usage: mvn -Pnative -DskipNativeTests=false test
+                            -->
+                            <execution>
+                                <id>test-native</id>
+                                <goals>
+                                    <goal>test</goal>
+                                </goals>
+                                <phase>test</phase>
+                                <configuration>
+                                    <skip>${skipNativeTests}</skip>
+                                    <buildArgs>
+                                        <buildArg>--no-fallback</buildArg>
+                                        <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+                                    </buildArgs>
+                                </configuration>
+                            </execution>
+                        </executions>
+                        <configuration>
+                            <!-- Executable name -->
+                            <imageName>chuck</imageName>
+                            <!-- Use the headless entry point (no JavaFX) -->
+                            <mainClass>org.chuck.NativeMain</mainClass>
+                            <!-- Core flags; detailed config comes from
+                                 META-INF/native-image/…/native-image.properties
+                                 and auto-discovered reflect-config.json -->
+                            <buildArgs>
+                                <buildArg>--no-fallback</buildArg>
+                            </buildArgs>
+                            <skipNativeTests>${skipNativeTests}</skipNativeTests>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+            <!-- Exclude JavaFX dependencies in native profile -->
+            <dependencies>
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-controls</artifactId>
+                    <version>25.0.2</version>
+                    <scope>provided</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.openjfx</groupId>
+                    <artifactId>javafx-fxml</artifactId>
+                    <version>25.0.2</version>
+                    <scope>provided</scope>
+                </dependency>
+                <dependency>
+                    <groupId>org.fxmisc.richtext</groupId>
+                    <artifactId>richtextfx</artifactId>
+                    <version>0.11.7</version>
+                    <scope>provided</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+        <!-- ================================================================
+             ide-bundle profile — packages the JavaFX IDE as a self-contained
+             app-image using jpackage (bundles a JRE; no separate install needed).
+             Usage:
+               mvn -Pide-bundle package -DskipTests
+             The jpackage output type defaults to "app-image" (works on all platforms).
+             Override per-platform for native installer formats:
+               -Djpackage.type=dmg          macOS disk image
+               -Djpackage.type=pkg          macOS package installer
+               -Djpackage.type=deb          Linux Debian package  (needs dpkg-deb)
+               -Djpackage.type=rpm          Linux RPM package     (needs rpmbuild)
+               -Djpackage.type=msi          Windows MSI installer (needs WiX 3.x)
+               -Djpackage.type=exe          Windows NSIS installer
+             Output (app-image):
+               Linux/Windows: target/chuck-ide-bundle/chuck-ide/
+               macOS:         target/chuck-ide-bundle/chuck-ide.app/
+             ================================================================ -->
+        <profile>
+            <id>ide-bundle</id>
+            <properties>
+                <!-- Override on the command line: -Djpackage.type=dmg -->
+                <jpackage.type>app-image</jpackage.type>
+                <!-- Set to true to skip the AOT training run: -DskipAot=true -->
+                <skipAot>false</skipAot>
+            </properties>
+            <build>
+                <plugins>
+                    <!-- 1. Stage the fat JAR in its own directory so jpackage
+                            doesn't pick up stray JARs from target/ -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-antrun-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>stage-jar-for-jpackage</id>
+                                <phase>package</phase>
+                                <goals><goal>run</goal></goals>
+                                <configuration>
+                                    <target>
+                                        <mkdir dir="${project.build.directory}/jpackage-input"/>
+                                        <copy file="${project.build.directory}/${project.build.finalName}.jar"
+                                              tofile="${project.build.directory}/jpackage-input/chuck-java.jar"
+                                              overwrite="true"/>
+                                        <!-- Clean previous bundle so jpackage doesn't complain -->
+                                        <delete dir="${project.build.directory}/chuck-ide-bundle" quiet="true"/>
+                                    </target>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <!-- 1b + 2. AOT training run + jpackage (single exec-maven-plugin block
+                              to avoid duplicate plugin declaration issues in Maven).
+                              AOT training run: JEP 483 (JDK 24+) caches loaded+linked class state
+                              incl. ANTLR ATN init for faster IDE startup. Skip with -DskipAot=true. -->
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.6.3</version>
+                        <executions>
+                            <execution>
+                                <id>aot-training-run</id>
+                                <phase>package</phase>
+                                <goals><goal>exec</goal></goals>
+                                <configuration>
+                                    <skip>${skipAot}</skip>
+                                    <executable>${java.home}/bin/java</executable>
+                                    <arguments>
+                                        <argument>--enable-preview</argument>
+                                        <argument>--add-modules=jdk.incubator.vector</argument>
+                                        <!-- Write cache into jpackage-input/ so jpackage bundles it -->
+                                        <argument>-XX:AOTCache=${project.build.directory}/jpackage-input/chuck.aot</argument>
+                                        <argument>-jar</argument>
+                                        <argument>${project.build.directory}/jpackage-input/chuck-java.jar</argument>
+                                        <argument>--version</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                            <execution>
+                                <id>jpackage-ide</id>
+                                <phase>package</phase>
+                                <goals><goal>exec</goal></goals>
+                                <configuration>
+                                    <!-- Use the JDK that Maven is running under -->
+                                    <executable>${java.home}/bin/jpackage</executable>
+                                    <arguments>
+                                        <!-- type is app-image by default; override with -Djpackage.type=dmg|deb|msi etc. -->
+                                        <argument>--type</argument>
+                                        <argument>${jpackage.type}</argument>
+                                        <argument>--name</argument>
+                                        <argument>chuck-ide</argument>
+                                        <argument>--app-version</argument>
+                                        <argument>1.0.0</argument>
+                                        <!-- Input dir contains our fat JAR + chuck.aot cache -->
+                                        <argument>--input</argument>
+                                        <argument>${project.build.directory}/jpackage-input</argument>
+                                        <argument>--main-jar</argument>
+                                        <argument>chuck-java.jar</argument>
+                                        <argument>--main-class</argument>
+                                        <argument>org.chuck.Launcher</argument>
+                                        <!-- JVM flags passed through to the bundled launcher -->
+                                        <argument>--java-options</argument>
+                                        <argument>--enable-preview</argument>
+                                        <argument>--java-options</argument>
+                                        <argument>--add-modules=jdk.incubator.vector</argument>
+                                        <!-- AOT cache bundled alongside the JAR in lib/app/.
+                                             $APPDIR is expanded by the jpackage launcher on all platforms. -->
+                                        <argument>--java-options</argument>
+                                        <argument>-XX:AOTCache=$APPDIR/lib/app/chuck.aot</argument>
+                                        <argument>--dest</argument>
+                                        <argument>${project.build.directory}/chuck-ide-bundle</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <build>
         <resources>
@@ -113,6 +370,9 @@
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                                     <mainClass>org.chuck.Launcher</mainClass>
                                 </transformer>
+                                <!-- Merge META-INF/services/ files from all JARs;
+                                     required for JavaFX ServiceLoader to find its toolkit implementation -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
                             <filters>
                                 <filter>
