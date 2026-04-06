@@ -26,9 +26,9 @@ public class DslExamplesTest {
      */
     private double runAndMeasure(ChuckVM vm, double seconds) {
         double maxRms = 0.0;
-        int iters = (int)((seconds * SAMPLE_RATE) / BUFFER_SIZE);
-        for (int i = 0; i < iters; i++) {
-            vm.advanceTime(BUFFER_SIZE);
+        long totalSamples = (long)(seconds * SAMPLE_RATE);
+        for (long i = 0; i < totalSamples; i++) {
+            vm.advanceTime(1);
             float sumSq = 0;
             for (int c = 0; c < vm.getNumChannels(); c++) {
                 float s = vm.getChannelLastOut(c);

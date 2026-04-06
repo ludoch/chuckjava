@@ -32,8 +32,9 @@ public class PolyphonyDSLTest {
         
         System.out.println("Testing PolyphonyDSL for " + secondsToTest + " seconds...");
         
-        for (int i = 0; i < (secondsToTest * sampleRate) / bufferSize; i++) {
-            vm.advanceTime(bufferSize);
+        long totalSamples = (long) secondsToTest * sampleRate;
+        for (long i = 0; i < totalSamples; i++) {
+            vm.advanceTime(1);
             
             // Check DAC channels directly
             float sumSq = 0;
@@ -43,10 +44,6 @@ public class PolyphonyDSLTest {
             }
             double rms = Math.sqrt(sumSq / vm.getNumChannels());
             if (rms > maxRMS) maxRMS = rms;
-            
-            if (rms > 1e-6) {
-                // System.out.println("  [Test] Sample " + (i * bufferSize) + " RMS: " + rms);
-            }
         }
 
         System.out.println("Max RMS detected: " + maxRMS);
