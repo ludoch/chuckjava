@@ -35,7 +35,6 @@ public class ChuckStack {
 
     public void pushObject(Object obj) {
         if (sp >= primitives.length) throw new RuntimeException("ChucK stack overflow: " + primitives.length);
-        System.err.println("  PUSH OBJ: " + obj + " at " + sp);
         objects[sp] = obj;
         isObject[sp] = true;
         isDouble[sp] = false;
@@ -46,7 +45,6 @@ public long popLong() {
     sp--;
     long raw = primitives[sp];
     long val = isDouble[sp] ? (long)Double.longBitsToDouble(raw) : raw;
-    System.err.println("  POP LONG: " + val + " from " + sp);
     objects[sp] = null;
     primitives[sp] = 0;
     isDouble[sp] = false;
@@ -59,7 +57,6 @@ public double popDouble() {
     sp--;
     long raw = primitives[sp];
     double val = isDouble[sp] ? Double.longBitsToDouble(raw) : (double) raw;
-    System.err.println("  POP DOUBLE: " + val + " from " + sp);
     objects[sp] = null;
     primitives[sp] = 0;
     isDouble[sp] = false;
@@ -71,7 +68,6 @@ public Object popObject() {
     if (sp <= 0) return null;
     sp--;
     Object o = objects[sp];
-    System.err.println("  POP OBJ: " + o + " from " + sp);
     objects[sp] = null;
     primitives[sp] = 0;
     isDouble[sp] = false;
