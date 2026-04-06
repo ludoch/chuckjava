@@ -349,8 +349,17 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
     }
 
     public void cleanup() {
-        isRunning = false;
-        isDone = true;
+        // Acquire the lock so resume() sees the updated state and wakes up.
+        // Without this, Java DSL shreds (spork(Runnable)) would leave resume()
+        // deadlocked on condition.await() after the shred finishes.
+        lock.lock();
+        try {
+            isRunning = false;
+            isDone = true;
+            condition.signalAll();
+        } finally {
+            lock.unlock();
+        }
         // Disconnect all UGens created by this shred
         for (org.chuck.audio.ChuckUGen ugen : ownedUGens) {
             ugen.unchuckAll();

@@ -1,7 +1,5 @@
 package org.chuck.core;
 
-import org.chuck.core.instr.LogicInstrs;
-
 /**
  * Compares two top elements of the stack for equality.
  */

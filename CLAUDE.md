@@ -12,7 +12,7 @@ A Java implementation of the [ChucK](https://chuck.stanford.edu/) strongly-timed
 # Build
 mvn compile
 
-# Run all tests
+# Run all tests (130 JVM tests)
 mvn test
 
 # Run a single test class
@@ -24,9 +24,35 @@ mvn exec:java -Dexec.args="path/to/script.ck"
 # Launch the JavaFX IDE
 mvn javafx:run
 
-# Package
+# Package (fat JAR)
 mvn package
+
+# Build GraalVM native executable (all platforms — requires JAVA_HOME → GraalVM JDK 25)
+#   Windows: set JAVA_HOME=C:\path\to\graalvm-jdk-25
+#   Mac/Linux: export JAVA_HOME=/path/to/graalvm-jdk-25
+mvn -Pnative package -DskipTests
+#   Output: target/chuck  (Linux/Mac)  or  target/chuck.exe  (Windows)
+
+# Run native tests (108 tests, excludes DslExamplesTest + PolyphonyDSLTest)
+mvn -Pnative -DskipNativeTests=false test
+
+# Build self-contained JavaFX IDE bundle (all platforms)
+# Includes AOT cache training run (JEP 483) for faster IDE startup. Add -DskipAot=true to skip.
+mvn -Pide-bundle package -DskipTests                        # app-image (default, all OSes)
+mvn -Pide-bundle package -DskipTests -Djpackage.type=dmg    # macOS disk image
+mvn -Pide-bundle package -DskipTests -Djpackage.type=deb    # Linux .deb (needs dpkg-deb)
+#   Output: target/chuck-ide-bundle/chuck-ide/      (Linux/Windows)
+#           target/chuck-ide-bundle/chuck-ide.app/  (macOS app-image)
+#           target/chuck-ide-bundle/*.dmg            (macOS dmg)
+
+# Build Linux binary via Docker (from any platform with Docker installed)
+docker build --output dist/linux .                          # just the chuck binary
+docker build --target full --output dist/linux .            # binary + IDE bundle
 ```
+
+**JDK upgrade roadmap:** See [JDK_ROADMAP.md](JDK_ROADMAP.md) for analysis of JDK 26/27 features
+(Valhalla value classes, Vector API graduation timeline, Project Leyden AOT, JavaFX 26 Metal,
+Structured Concurrency finalization) and their specific impact on this project.
 
 **Important:** Preview features (`--enable-preview`) and `jdk.incubator.vector` are required — the Maven plugins are already configured for this, but if running `java` directly you must pass these flags.
 
@@ -129,6 +155,106 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - **Field Access**: Fixed `SetFieldByName` and `GetFieldByName` to correctly handle built-in vector/complex/polar fields and fallback to UGen `setData` for test mocks.
 - **VM Stability**: Optimized the interpreter loop with a safety yield threshold (10,000 instructions) to prevent infinite tight loops from hanging the VM.
 - **Test Infrastructure**: Enhanced integration tests to automatically abort hanging shreds and cap captured output to 10KB.
+
+### Java DSL Examples & Tests (2026-04-05)
+
+**`examples_dsl/` directory** — 19 ready-to-run Java DSL shreds (each implements `Shred`, no `package` declaration):
+
+| File | Source `.ck` | Demonstrates |
+|------|-------------|--------------|
+| `SineDSL.java` | `basic/adsr.ck` | Basic SinOsc |
+| `FmDSL.java` | `basic/fm.ck` | FM with ADSR |
+| `AdsrDSL.java` | `basic/adsr.ck` | ADSR envelope, MIDI-to-freq |
+| `EnvelopeDSL.java` | `basic/envelope.ck` | Linear Envelope on Noise |
+| `LfoDSL.java` | `basic/lfo.ck` | LFO to blackhole, printed values |
+| `PhasorDSL.java` | `basic/phasor.ck` | Phasor modulating PulseOsc width |
+| `CombDSL.java` | `basic/comb.ck` | Feedback comb filter (Noise source) |
+| `ChirpDSL.java` | `basic/chirp.ck` | Frequency sweep with helper method |
+| `BlitDSL.java` | `basic/blit.ck` | BLIT + JCRev, pentatonic scale |
+| `HarmonicsDSL.java` | `basic/harmonics.ck` | Harmonic series sweep |
+| `WindDSL.java` | `basic/wind.ck` | Noise → BiQuad resonance sweep |
+| `OscillatorsDSL.java` | `basic/oscillatronx.ck` | All 6 oscillator types + FM pair |
+| `Fm2DSL.java` | `basic/fm2.ck` | SinOsc FM with `sync(2)` |
+| `Blit2DSL.java` | `basic/blit2.ck` | BLIT + ADSR articulation + JCRev |
+| `LarryDSL.java` | `basic/larry.ck` | Impulse → BiQuad frequency sweep |
+| `LpfDSL.java` | `filter/lpf.ck` | Noise → LPF cutoff sweep |
+| `BpfDSL.java` | `filter/bpf.ck` | Noise → BPF center sweep |
+| `ResonZDSL.java` | `filter/resonz.ck` | Noise → ResonZ sweep |
+| `ChorusDSL.java` | `effects/chorus.ck` | 4-voice Chorus (Dm7 chord) |
+| `ClarDSL.java` | `stk/clarinet.ck` | Clarinet physical model melody |
+| `WurleyDSL.java` | `stk/wurley.ck` | Wurley FM piano, pentatonic |
+| `PolyphonyDSL.java` | — | Concurrent shreds via `vm.spork()` |
+| `DslDemo.java` | — | Hot-reload demo, random notes |
+
+**Tests:** `DslExamplesTest` (20 `@Test` methods) covers every example above except the infinite-loop demo. Each test compiles the `.java` file at runtime via `ChuckDSL.load()`, sporks it into a headless VM, and asserts `maxRms > 0.001`.
+
+### Recently Fixed Issues (2026-04-05)
+- **Complex/Polar Integration**: Fully implemented `complex` and `polar` types, including arithmetic, array initialization, and special formatting in `ChuckPrint`.
+- **Method Call Resolution**: Improved implicit instance method resolution for bare calls within classes.
+- **executeSynchronous Refactor**: Fixed nested method calls in constructors by tracking `framePointer` instead of stack pointer.
+- **Machine.add Arguments**: Implemented support for ChucK-style arguments in `Machine.add("file.ck:arg1:arg2")`.
+- **Std Library**: Implemented `Math.rtop`, `Math.ptor`, `Std.getenv`, and `Std.setenv`.
+- **Unit Test Stability**: Fixed shred ID generator reset on VM initialization to ensure predictable test environments.
+- **Deadlock & Silent UGens**: Fixed `ChuckShred.cleanup()` deadlock and silent `Delay`/`Clarinet` UGens.
+
+### GraalVM Native Image & IDE Bundle (2026-04-05)
+
+**Native executable (`-Pnative` profile):**
+- `NativeMain.java` — headless entry point (no JavaFX dependency)
+- `ChuckCLI.java` — IDE launch now uses `Class.forName()` so native image compiles cleanly
+- `src/main/resources/META-INF/native-image/org.chuck/chuck-java/` — auto-discovered config:
+  - `native-image.properties` — `--enable-preview`, `--add-modules=jdk.incubator.vector`, ANTLR build-time init, `--no-fallback`
+  - `reflect-config.json` — reflection registrations for `Std`, `RegEx`, `Reflect`, `SerialIO`, `ChuckUGen`, `ChuckShred` (needed for `CallMethod` dispatch), ANTLR classes
+  - `resource-config.json` — includes `examples/*.ck` resources
+- No GraalVM path in pom.xml — relies entirely on `JAVA_HOME` pointing at GraalVM JDK 25
+- Output: `target/chuck` (Linux/Mac) or `target/chuck.exe` (Windows) — ~49 MB, no JRE needed
+
+**Native test support (`-DskipNativeTests=false`):**
+- 108 of 130 tests run natively; 22 excluded (`DslExamplesTest` + `PolyphonyDSLTest`) because they use `ChuckDSL.load()` → `javax.tools.JavaCompiler` which is unavailable in native image
+- `ChuckShred.allPublicMethods` in reflect-config fixes `me.running()` / `me.numArgs()` in native image
+
+**IDE bundle (`-Pide-bundle` profile):**
+- Uses `jpackage` to produce a self-contained directory or installer
+- `jpackage.type` property defaults to `app-image`; override per-platform: `dmg`, `deb`, `rpm`, `msi`, `exe`
+- Fat JAR includes `ServicesResourceTransformer` (merges JavaFX `META-INF/services/` entries)
+- Output: `target/chuck-ide-bundle/chuck-ide/` (Linux/Windows) or `.app`/`.dmg` (macOS)
+- **AOT cache (JEP 483, JDK 24+):** build does a training run to generate `chuck.aot` alongside the JAR; the cache is bundled inside the app-image and loaded via `-XX:AOTCache=$APPDIR/lib/app/chuck.aot`. Pre-warms class loading and ANTLR ATN init, reducing IDE startup time. Skip with `-DskipAot=true` (CI and Docker use this automatically).
+
+**Cross-platform CI (`/.github/workflows/build.yml`):**
+- GitHub Actions matrix: `ubuntu-latest`, `macos-latest`, `windows-latest`
+- Each runner: (1) runs JVM tests, (2) builds native CLI, (3) runs 108 native tests, (4) builds IDE bundle
+- macOS builds `.dmg`; Windows/Linux build `app-image`
+- Release job attaches all three native binaries to GitHub Releases automatically
+
+**Docker (`Dockerfile`):**
+- Builds Linux native binary from any platform with Docker installed
+- Based on `ghcr.io/graalvm/native-image-community:25`
+- `docker build --output dist/linux .` → extracts `chuck` binary
+- `docker build --target full --output dist/linux .` → extracts `chuck` + IDE bundle
+
+## Architecture
+
+The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `ChuckASTVisitor` → AST → `ChuckEmitter` → `ChuckCode` (bytecode) → `ChuckVM` executes via `ChuckShred`s.
+
+### Packages
+
+- **`org.chuck`** — Entry point (`Main.java`): reads a `.ck` file, wires together the compile pipeline, and runs it.
+- **`org.chuck.compiler`** — Compiler pipeline:
+  - `ChuckANTLR.g4` — ANTLR4 grammar for the ChucK language
+  - `ChuckASTVisitor` — maps ANTLR parse tree to `ChuckAST`
+  - `ChuckEmitter` — walks the AST and emits `ChuckInstr` instances into a `ChuckCode` object
+- **`org.chuck.core`** — VM runtime:
+  - `ChuckVM` — manages the shreduler (priority queue by wake time), global variables (`dac`, `blackhole`, ints, objects), and drives the UGen audio graph sample-by-sample
+  - `ChuckShred` — a concurrent execution unit backed by a Java Virtual Thread; uses `ReentrantLock`/`Condition` to yield/resume at sample-accurate times
+  - `ChuckCode` / `ChuckInstr` — bytecode container and instruction interface
+  - `ChuckStack` — register (`reg`) and memory (`mem`) stacks per shred
+  - Individual instruction classes (`PushInt`, `PushFloat`, `AdvanceTime`, `ChuckTo`, `CallFunc`, etc.)
+- **`org.chuck.audio`** — Unit Generator (UGen) graph:
+  - `ChuckUGen` (abstract base) — pull-based tick mechanism; `tick(long systemTime)` is idempotent per sample
+  - Concrete UGens: oscillators (`SinOsc`, `SawOsc`, `TriOsc`, `SqrOsc`, `PulseOsc`, `Phasor`, `BlitSaw`, `BlitSquare`), filters (`LPF`, `HPF`, `BPF`, `BRF`, `ResonZ`), effects (`Echo`, `Delay`, `Chorus`, `JCRev`, `AllPass`), envelopes (`Adsr`, `Envelope`), instruments (`Clarinet`, `Mandolin`, `Plucked`, `Rhodey`, `Wurley`, `BeeThree`, `HevyMetl`, `PercFlut`, `TubeBell`, `FMVoices`), analyzers (`ZCR`, `MFCC`, `SFM`, `Kurtosis`, `RMS`, `Centroid`, `FFT`, `IFFT`), utilities (`Gain`, `Pan2`, `Noise`, `Impulse`, `Step`, `Blackhole`, `SndBuf`, `WvOut`)
+  - `ChuckAudio` — Java `SourceDataLine` audio output; calls `vm.advanceTime(bufferSize)` per buffer
+- **`org.chuck.ide`** — `ChuckIDE`: a JavaFX-based code editor with syntax highlighting (RichTextFX)
+- **`org.chuck.midi`** — `MidiIn`/`ChuckMidi` for MIDI input support
 
 ### Key Design Patterns
 

@@ -57,6 +57,7 @@
                 <transformer>
                   <mainClass>org.chuck.Launcher</mainClass>
                 </transformer>
+                <transformer />
               </transformers>
               <filters>
                 <filter>
@@ -110,6 +111,165 @@
       </plugin>
     </plugins>
   </build>
+  <profiles>
+    <profile>
+      <id>native</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-compiler-plugin</artifactId>
+            <version>3.15.0</version>
+            <configuration>
+              <release>25</release>
+              <compilerArgs>
+                <arg>--enable-preview</arg>
+                <arg>--add-modules</arg>
+                <arg>jdk.incubator.vector</arg>
+              </compilerArgs>
+            </configuration>
+          </plugin>
+          <plugin>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <version>3.5.5</version>
+            <configuration>
+              <argLine>--enable-preview --add-modules jdk.incubator.vector -Xmx2g -Xms128m</argLine>
+              <excludes>
+                <exclude>**/ChucKIntegrationTest.java</exclude>
+                <exclude>**/DslExamplesTest.java</exclude>
+                <exclude>**/PolyphonyDSLTest.java</exclude>
+              </excludes>
+            </configuration>
+          </plugin>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <version>0.11.5</version>
+            <extensions>true</extensions>
+            <executions>
+              <execution>
+                <id>build-native</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>compile-no-fork</goal>
+                </goals>
+              </execution>
+              <execution>
+                <id>test-native</id>
+                <phase>test</phase>
+                <goals>
+                  <goal>test</goal>
+                </goals>
+                <configuration>
+                  <skip>${skipNativeTests}</skip>
+                  <buildArgs>
+                    <buildArg>--no-fallback</buildArg>
+                    <buildArg>-H:+ReportExceptionStackTraces</buildArg>
+                  </buildArgs>
+                </configuration>
+              </execution>
+            </executions>
+            <configuration>
+              <imageName>chuck</imageName>
+              <mainClass>org.chuck.NativeMain</mainClass>
+              <buildArgs>
+                <buildArg>--no-fallback</buildArg>
+              </buildArgs>
+              <skipNativeTests>${skipNativeTests}</skipNativeTests>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+      <dependencies>
+        <dependency>
+          <groupId>org.openjfx</groupId>
+          <artifactId>javafx-controls</artifactId>
+          <version>25.0.2</version>
+          <scope>provided</scope>
+        </dependency>
+        <dependency>
+          <groupId>org.openjfx</groupId>
+          <artifactId>javafx-fxml</artifactId>
+          <version>25.0.2</version>
+          <scope>provided</scope>
+        </dependency>
+        <dependency>
+          <groupId>org.fxmisc.richtext</groupId>
+          <artifactId>richtextfx</artifactId>
+          <version>0.11.7</version>
+          <scope>provided</scope>
+        </dependency>
+      </dependencies>
+      <properties>
+        <skipNativeTests>true</skipNativeTests>
+        <graalvm.home>C:/Users/ludo/Downloads/graalvm-jdk-25_windows-x64_bin/graalvm-jdk-25.0.2+10.1</graalvm.home>
+      </properties>
+    </profile>
+    <profile>
+      <id>ide-bundle</id>
+      <build>
+        <plugins>
+          <plugin>
+            <artifactId>maven-antrun-plugin</artifactId>
+            <version>3.1.0</version>
+            <executions>
+              <execution>
+                <id>stage-jar-for-jpackage</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>run</goal>
+                </goals>
+                <configuration>
+                  <target>
+                    <mkdir />
+                    <copy />
+                    <delete />
+                  </target>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.codehaus.mojo</groupId>
+            <artifactId>exec-maven-plugin</artifactId>
+            <version>3.6.3</version>
+            <executions>
+              <execution>
+                <id>jpackage-ide</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <executable>C:\Program Files\Zulu\zulu-25/bin/jpackage</executable>
+                  <arguments>
+                    <argument>--type</argument>
+                    <argument>app-image</argument>
+                    <argument>--name</argument>
+                    <argument>chuck-ide</argument>
+                    <argument>--app-version</argument>
+                    <argument>1.0.0</argument>
+                    <argument>--input</argument>
+                    <argument>C:\Users\ludo\a\chuckjava\target/jpackage-input</argument>
+                    <argument>--main-jar</argument>
+                    <argument>chuck-java.jar</argument>
+                    <argument>--main-class</argument>
+                    <argument>org.chuck.Launcher</argument>
+                    <argument>--java-options</argument>
+                    <argument>--enable-preview</argument>
+                    <argument>--java-options</argument>
+                    <argument>--add-modules=jdk.incubator.vector</argument>
+                    <argument>--dest</argument>
+                    <argument>C:\Users\ludo\a\chuckjava\target/chuck-ide-bundle</argument>
+                  </arguments>
+                  <mainClass>org.chuck.Main</mainClass>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
   <dependencies>
     <dependency>
       <groupId>org.junit.jupiter</groupId>
@@ -135,6 +295,22 @@
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter-engine</artifactId>
       <version>5.14.3</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <artifactId>junit-platform-engine</artifactId>
+          <groupId>org.junit.platform</groupId>
+        </exclusion>
+        <exclusion>
+          <artifactId>apiguardian-api</artifactId>
+          <groupId>org.apiguardian</groupId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <version>1.14.3</version>
       <scope>test</scope>
       <exclusions>
         <exclusion>

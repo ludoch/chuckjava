@@ -1,7 +1,11 @@
 package org.chuck.core.instr;
 
-import org.chuck.core.*;
-import java.util.Map;
+import org.chuck.core.ChuckArray;
+import org.chuck.core.ChuckInstr;
+import org.chuck.core.ChuckShred;
+import org.chuck.core.ChuckString;
+import org.chuck.core.ChuckType;
+import org.chuck.core.ChuckVM;
 
 public class MachineCall implements ChuckInstr {
     String method;

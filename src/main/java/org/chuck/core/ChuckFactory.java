@@ -1,18 +1,18 @@
 package org.chuck.core;
 
-import org.chuck.audio.*;
-import org.chuck.core.instr.*;
-import org.chuck.chugin.ChuginLoader;
-import org.chuck.midi.MidiMsg;
-import org.chuck.midi.MidiOut;
-import org.chuck.network.OscIn;
-import org.chuck.network.OscOut;
-import org.chuck.network.OscMsg;
-import org.chuck.network.OscBundle;
-import org.chuck.hid.HidMsg;
-import java.util.Map;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+
+import org.chuck.audio.ChuckUGen;
+import org.chuck.chugin.ChuginLoader;
+import org.chuck.hid.HidMsg;
+import org.chuck.midi.MidiMsg;
+import org.chuck.midi.MidiOut;
+import org.chuck.network.OscBundle;
+import org.chuck.network.OscIn;
+import org.chuck.network.OscMsg;
+import org.chuck.network.OscOut;
 
 public class ChuckFactory {
 
