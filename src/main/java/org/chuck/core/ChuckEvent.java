@@ -11,22 +11,47 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ChuckEvent extends ChuckObject {
     private final List<ChuckShred> waitingShreds = new ArrayList<>();
     private final ReentrantLock eventLock = new ReentrantLock();
+    private long timeoutSamples = -1;
     
     public ChuckEvent() {
         super(ChuckType.EVENT);
+    }
+
+    /** Set a timeout for the NEXT wait on this event. */
+    public void timeout(ChuckDuration duration) {
+        this.timeoutSamples = Math.round(duration.samples());
     }
 
     /**
      * Called when a shred waits on this event.
      */
     public void waitOn(ChuckShred shred, ChuckVM vm) {
+        long t = this.timeoutSamples;
+        this.timeoutSamples = -1; // Reset after one wait
+        waitOn(shred, vm, t);
+    }
+
+    /**
+     * Called when a shred waits on this event with a timeout (in samples).
+     * timeoutSamples <= 0 means no timeout (infinite wait).
+     */
+    public void waitOn(ChuckShred shred, ChuckVM vm, long timeoutSamples) {
         eventLock.lock();
         try {
             waitingShreds.add(shred);
         } finally {
             eventLock.unlock();
         }
-        // Suspend the shred AFTER releasing the event lock
+
+        shred.setEventWaitingOn(this);
+
+        if (timeoutSamples > 0) {
+            // Schedule a timeout task in the VM
+            long wakeTime = vm.getCurrentTime() + timeoutSamples;
+            vm.scheduleTimeout(shred, this, wakeTime);
+        }
+
+        // Suspend the shred AFTER releasing the event lock and scheduling timeout
         shred.suspendOnEvent();
     }
 
