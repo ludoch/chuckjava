@@ -117,6 +117,13 @@ jobs:
       - name: List artifacts
         run: find dist/ -type f | sort
 
+      # IDE bundles for Linux and Windows are app-image directories — zip them up
+      - name: Zip Linux IDE bundle
+        run: cd dist/chuck-ide-linux && zip -r ../../chuck-ide-linux.zip chuck-ide/
+
+      - name: Zip Windows IDE bundle
+        run: cd dist/chuck-ide-windows && zip -r ../../chuck-ide-windows.zip chuck-ide/
+
       - name: Attach artifacts to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -124,3 +131,6 @@ jobs:
             dist/chuck-linux/chuck
             dist/chuck-mac/chuck
             dist/chuck-windows/chuck.exe
+            chuck-ide-linux.zip
+            chuck-ide-windows.zip
+            dist/chuck-ide-mac/chuck-ide-1.0.0.dmg
