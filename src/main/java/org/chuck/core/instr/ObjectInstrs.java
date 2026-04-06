@@ -92,10 +92,15 @@ public class ObjectInstrs {
             }
 
             if (obj instanceof ChuckEvent ce) {
-                if (mName.equals("timeout") && a == 1 && args[0] instanceof ChuckDuration cd) {
-                    ce.timeout(cd);
-                    s.reg.pushObject(ce);
-                    return;
+                switch (mName) {
+                    case "timeout" -> {
+                        if (a == 1 && args[0] instanceof ChuckDuration cd) ce.timeout(cd);
+                        s.reg.pushObject(ce); return;
+                    }
+                    case "signal" -> { ce.signal(vm); s.reg.pushObject(ce); return; }
+                    case "broadcast" -> { ce.broadcast(vm); s.reg.pushObject(ce); return; }
+                    case "can_wait" -> { s.reg.push(ce.can_wait() ? 1L : 0L); return; }
+                    case "wait" -> { ce.waitOn(s, vm); s.reg.pushObject(ce); return; }
                 }
             }
 

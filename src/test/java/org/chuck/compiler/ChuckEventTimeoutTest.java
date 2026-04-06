@@ -28,21 +28,41 @@ public class ChuckEventTimeoutTest {
     @Test
     public void testEventTimeoutTriggered() throws InterruptedException {
         // Wait on event with 1s timeout. Trigger event after 50ms.
-        String code = 
+        // Two separate shreds: one waits on event, one signals after 50ms.
+        ChuckVM vm = new ChuckVM(44100);
+        List<String> output = java.util.Collections.synchronizedList(new ArrayList<>());
+        vm.addPrintListener(output::add);
+
+        // Main shred: wait on event with 1-second timeout, then print elapsed
+        vm.run(
             "global Event e; " +
-            "Machine.eval(\"50::ms => now; global Event e; e.signal();\"); " +
             "now => time start; " +
             "e.timeout(1::second); " +
             "e => now; " +
             "now - start => dur elapsed; " +
-            "<<< elapsed / 1::ms >>>;";
-        
-        List<String> out = runChuck(code, 500);
-        assertTrue(out.size() >= 1, "Output empty! Out: " + out);
-        String last = out.get(out.size() - 1).trim();
+            "<<< elapsed / 1::ms >>>;",
+            "waiter");
+
+        // Signaling shred: signal event after 50ms
+        vm.run(
+            "50::ms => now; " +
+            "global Event e; " +
+            "e.signal();",
+            "signaler");
+
+        // Advance ~100ms of simulated time (should see signal at ~50ms)
+        for (int i = 0; i < 150; i++) {
+            vm.advanceTime(1000);
+            Thread.sleep(2);
+            if (!output.isEmpty()) break;
+        }
+        Thread.sleep(20);
+
+        assertTrue(output.size() >= 1, "Output empty! Out: " + output);
+        String last = output.get(output.size() - 1).trim();
         double elapsed = Double.parseDouble(last);
         // Should be around 50ms
-        assertTrue(elapsed >= 45 && elapsed <= 65, "Expected ~50ms, got: " + elapsed + ", Out: " + out);
+        assertTrue(elapsed >= 45 && elapsed <= 65, "Expected ~50ms, got: " + elapsed + ", Out: " + output);
     }
 
     @Test
