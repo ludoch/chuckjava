@@ -78,7 +78,9 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
   - Concrete UGens: oscillators (`SinOsc`, `SawOsc`, `TriOsc`, `SqrOsc`, `PulseOsc`, `Phasor`, `BlitSaw`, `BlitSquare`), filters (`LPF`, `HPF`, `BPF`, `BRF`, `ResonZ`), effects (`Echo`, `Delay`, `Chorus`, `JCRev`, `AllPass`), envelopes (`Adsr`, `Envelope`), instruments (`Clarinet`, `Mandolin`, `Plucked`, `Rhodey`, `Wurley`, `BeeThree`, `HevyMetl`, `PercFlut`, `TubeBell`, `FMVoices`), analyzers (`ZCR`, `MFCC`, `SFM`, `Kurtosis`, `RMS`, `Centroid`, `FFT`, `IFFT`), utilities (`Gain`, `Pan2`, `Noise`, `Impulse`, `Step`, `Blackhole`, `SndBuf`, `WvOut`)
   - `ChuckAudio` — Java `SourceDataLine` audio output; calls `vm.advanceTime(bufferSize)` per buffer
 - **`org.chuck.ide`** — `ChuckIDE`: a JavaFX-based code editor with syntax highlighting (RichTextFX)
-- **`org.chuck.midi`** — `MidiIn`/`ChuckMidi` for MIDI input support
+- **`org.chuck.midi`** — `MidiIn`/`ChuckMidi`/`MidiFileIn` for MIDI input and file playback
+- **`org.chuck.core.ai`** — AI/ML library: `KNN`, `KNN2`, `SVM`, `MLP`, `HMM`, `PCA`
+- **`org.chuck.core.instr`** — Modular instruction set organized by category (`ArithmeticInstrs`, `ControlInstrs`, `TypeInstrs`, etc.)
 
 ### Recently Fixed Issues (2026-03-10)
 - `SetMemberIntByName` was missing — now created, uses reflection + `setData` fallback
@@ -247,6 +249,48 @@ The emitter's existing `default` fallthrough already pushes all args and calls `
 - Based on `ghcr.io/graalvm/native-image-community:25`
 - `docker build --output dist/linux .` → extracts `chuck` binary
 - `docker build --target full --output dist/linux .` → extracts `chuck` + IDE bundle
+
+### Major Additions (2026-04-06)
+
+#### Language Features
+- **`typeof(expr)`** — returns type name as string; `TypeInstrs.TypeofInstr` pops value, inspects Java type
+- **`instanceof(expr, TypeName)`** — returns 1/0; `TypeInstrs.InstanceofInstr` walks class hierarchy
+- **`abstract class`** / **`interface`** — `ABSTRACT`/`INTERFACE` grammar tokens; `UserClassDescriptor.isAbstract/isInterface` flags; `ChuckFactory` throws on instantiation attempt
+- **`loop` statement** — infinite loop (`loop { ... }`); only `break` exits; `LOOP` lexer token + grammar rule + emitter
+- **`@construct`** — already parsed via `REFERENCE_TAG ID` in `functionName`; emitter handles at class compile time
+- **`@destruct`** — called on shred cleanup for `UserObject`s registered via `ChuckShred.registerDestructible()`
+- **`@operator` overload** — `fun @operator+(...)` already mapped to `__op__+` in `ChuckASTVisitor.visitFunctionDef`
+- **`Machine.*` property reads** — `Machine.realtime`, `Machine.silent`, etc. without `()` now handled in `DotExp` emitter path (previously fell through to `GetFieldByName` on null)
+
+#### AI / ML Library (`org.chuck.core.ai`)
+All six classes from ChucK's `ulib_ai.cpp` implemented:
+- `KNN` — k-nearest neighbor regression; `train(float[][], float[][])`, `predict(float[], float[])`, `k`
+- `KNN2` — k-nearest neighbor classification; `train`, `predict`, `search`, `k`
+- `SVM` — linear one-vs-rest SVM (subgradient descent); `train`, `predict`, `save(string)`, `load(string)`
+- `MLP` — feedforward network with backprop SGD; `input/hidden/output(int)`, `train`, `predict`, `activation(string)`
+- `HMM` — Gaussian emission HMM with Baum-Welch EM; `train`, `generate`, `logLikelihood`
+- `PCA` — power iteration + deflation; `train`, `transform`, `explainedVariance`, `numComponents`
+All registered in `ChuckFactory`; each extends `ChuckObject` with `super(ChuckType.OBJECT)`.
+
+#### New UGens / UAnas
+- **`DelayP`** — pitch-shifting delay; two crossfading read-heads; API: `delay(samples)`, `max(samples)`, `shift(semitones)`
+- **`JetTabl`** — STK jet saturation curve `x*(0.2−x²*0.12)`, used internally by `Flute`
+- **`FilterBasic`** — abstract filter base; `freq(double)`, `Q(double)`, `set(double,double)`
+- **`FilterStk`** — STK filter base extending `FilterBasic`; adds `gain(double)`, `clear()`
+- **`BiQuadStk`** — STK-style BiQuad with direct coefficient API: `setB0/B1/B2/A1/A2`, `setCoeffs`, `clear`
+- **`LiSa6`**, **`LiSa10`** — registered via `LiSaN(6/10, sr)`
+- UAnas (all in `org.chuck.audio`): `DCT`, `IDCT`, `AutoCorr`, `XCorr`, `Chroma`, `FeatureCollector`, `Flip`, `UnFlip`
+- STK instruments: `VoicForm`, `ModalBar`, `BandedWG`, `BlowBotl`, `BlowHole`, `HnkyTonk`, `FrencHrn`, `KrstlChr`
+
+#### Stdlib & Networking
+- **`OscEvent`** — subclass of `OscIn`; registered in `ChuckFactory`; same API (`port`, `addAddress`, `recv`)
+- **`ChuckTypeObj`** — runtime `Type` introspection object: `name()`, `parent()`, `isa(string)`, `eq(Type)`; registered as `"Type"` in `ChuckFactory`
+- **`ConsoleInput`**, **`KBHit`**, **`MidiFileIn`**, **`HidOut`** — all registered in `ChuckFactory` and `reflect-config.json`
+
+#### Bug Fixes
+- Removed `EXE [N]` trace `System.out.println` from `ChuckShred.execute()`
+- `mvn package` fix: AI/ML classes were missing `super(ChuckType.OBJECT)` constructors — incremental `mvn test` masked this; clean build exposed it
+- `FilterStk.gain(double)` return type changed from `void` to `double` to match `ChuckUGen` override
 
 ### Key Design Patterns
 
