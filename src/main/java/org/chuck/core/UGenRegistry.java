@@ -90,6 +90,14 @@ import org.chuck.audio.WvIn;
 import org.chuck.audio.WvOut2;
 import org.chuck.audio.WvOutUGen;
 import org.chuck.audio.AutoCorr;
+import org.chuck.audio.BandedWG;
+import org.chuck.audio.BlowBotl;
+import org.chuck.audio.BlowHole;
+import org.chuck.audio.FrencHrn;
+import org.chuck.audio.HnkyTonk;
+import org.chuck.audio.KrstlChr;
+import org.chuck.audio.ModalBar;
+import org.chuck.audio.VoicForm;
 import org.chuck.audio.Chroma;
 import org.chuck.audio.DCT;
 import org.chuck.audio.FeatureCollector;
@@ -212,6 +220,14 @@ public class UGenRegistry {
         register("Sitar", (sr, args) -> new Sitar(sr));
         register("StifKarp", (sr, args) -> new StifKarp(sr));
         register("Shakers", (sr, args) -> new Shakers(sr));
+        register("VoicForm", (sr, args) -> new VoicForm(sr));
+        register("ModalBar", (sr, args) -> new ModalBar(sr));
+        register("BandedWG", (sr, args) -> new BandedWG(sr));
+        register("BlowBotl", (sr, args) -> new BlowBotl(sr));
+        register("BlowHole", (sr, args) -> new BlowHole(sr));
+        register("HnkyTonk", (sr, args) -> new HnkyTonk(sr));
+        register("FrencHrn", (sr, args) -> new FrencHrn(sr));
+        register("KrstlChr", (sr, args) -> new KrstlChr(sr));
 
         // --- Analysis (UAna) ---
         register("FFT", (sr, args) -> new FFT());
