@@ -2,6 +2,7 @@ package org.chuck.core.ai;
 
 import org.chuck.core.ChuckArray;
 import org.chuck.core.ChuckObject;
+import org.chuck.core.ChuckType;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,6 +12,8 @@ import java.util.List;
  * Stores (feature_vector, output_vector) pairs and predicts via weighted average of k nearest.
  */
 public class KNN extends ChuckObject {
+
+    public KNN() { super(ChuckType.OBJECT); }
 
     private int k = 1;
     private final List<double[]> trainX = new ArrayList<>();

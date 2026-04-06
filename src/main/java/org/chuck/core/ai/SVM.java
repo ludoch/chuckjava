@@ -2,6 +2,7 @@ package org.chuck.core.ai;
 
 import org.chuck.core.ChuckArray;
 import org.chuck.core.ChuckObject;
+import org.chuck.core.ChuckType;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -14,6 +15,8 @@ import java.util.List;
  * the ChucK AI examples which use small feature vectors.
  */
 public class SVM extends ChuckObject {
+
+    public SVM() { super(ChuckType.OBJECT); }
 
     // One binary classifier per class (one-vs-rest)
     private double[][] weights;   // [numClasses][numFeatures+1]  (+1 for bias)

@@ -2,6 +2,7 @@ package org.chuck.core.ai;
 
 import org.chuck.core.ChuckArray;
 import org.chuck.core.ChuckObject;
+import org.chuck.core.ChuckType;
 
 /**
  * Principal Component Analysis — batch, power-iteration eigenvector solver.
@@ -10,6 +11,8 @@ import org.chuck.core.ChuckObject;
  * explainedVariance(out[]) — fills out[] with explained variance ratios
  */
 public class PCA extends ChuckObject {
+
+    public PCA() { super(ChuckType.OBJECT); }
 
     private double[][] components; // [numComponents][inputDim]
     private double[]   mean;

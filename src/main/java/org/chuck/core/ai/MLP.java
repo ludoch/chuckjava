@@ -2,6 +2,7 @@ package org.chuck.core.ai;
 
 import org.chuck.core.ChuckArray;
 import org.chuck.core.ChuckObject;
+import org.chuck.core.ChuckType;
 
 import java.util.Random;
 
@@ -11,6 +12,8 @@ import java.util.Random;
  * Training: mini-batch SGD with backpropagation (sigmoid activation, MSE loss).
  */
 public class MLP extends ChuckObject {
+
+    public MLP() { super(ChuckType.OBJECT); }
 
     private int inputSize  = 1;
     private int hiddenSize = 8;

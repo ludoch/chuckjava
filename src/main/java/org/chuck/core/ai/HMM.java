@@ -2,6 +2,7 @@ package org.chuck.core.ai;
 
 import org.chuck.core.ChuckArray;
 import org.chuck.core.ChuckObject;
+import org.chuck.core.ChuckType;
 
 import java.util.Random;
 
@@ -15,6 +16,8 @@ import java.util.Random;
  * with Gaussian emission probabilities.
  */
 public class HMM extends ChuckObject {
+
+    public HMM() { super(ChuckType.OBJECT); }
 
     private int numStates  = 4;
     private int maxIter    = 100;
