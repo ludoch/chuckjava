@@ -34,9 +34,6 @@ public class ChuckDSL {
         ChuckVM vm = ChuckVM.CURRENT_VM.get();
         if (current != null && vm != null) {
             current.yield(Math.round(duration.samples()));
-            // RE-SCHEDULE: For Java shreds running in their own loop, 
-            // we must put them back in the priority queue after they wake up.
-            vm.schedule(current);
         }
     }
 

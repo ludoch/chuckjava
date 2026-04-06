@@ -75,7 +75,6 @@ public class ChuckVM {
     }
 
     public ChuckVM(int sampleRate, int channels) {
-        ChuckShred.resetIdCounter();
         this.sampleRate = sampleRate;
         this.numChannels = channels;
         this.dacChannels = new DacChannel[numChannels];
@@ -262,13 +261,6 @@ public class ChuckVM {
     public int spork(ChuckShred shred) {
         if (shred.getId() <= 0) {
             shred.setId(nextShredId++);
-        }
-        if (!Boolean.getBoolean("chuck.silent") && shred.getId() > 1) {
-            String displayName = shred.getName();
-            if (displayName != null && displayName.contains(java.io.File.separator)) {
-                displayName = displayName.substring(displayName.lastIndexOf(java.io.File.separator) + 1);
-            }
-            print("[chuck]: (VM) sporking incoming shred: " + shred.getId() + " (" + displayName + ")...\n");
         }
         activeShreds.put(shred.getId(), shred);
         schedule(shred);
