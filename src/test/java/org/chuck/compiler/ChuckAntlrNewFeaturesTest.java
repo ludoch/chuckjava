@@ -59,6 +59,38 @@ public class ChuckAntlrNewFeaturesTest {
     }
 
     // -------------------------------------------------------------------------
+    // auto type inference
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testAutoInt() throws InterruptedException {
+        List<String> out = runChuck("42 => auto x; <<< x >>>;", 10);
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).contains("42"), "Expected 42, got: " + out.get(0));
+    }
+
+    @Test
+    public void testAutoFloat() throws InterruptedException {
+        List<String> out = runChuck("3.14 => auto y; <<< y >>>;", 10);
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).contains("3.14"), "Expected 3.14, got: " + out.get(0));
+    }
+
+    @Test
+    public void testAutoString() throws InterruptedException {
+        List<String> out = runChuck("\"hello\" => auto s; <<< s >>>;", 10);
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).contains("hello"), "Expected hello, got: " + out.get(0));
+    }
+
+    @Test
+    public void testAutoObject() throws InterruptedException {
+        List<String> out = runChuck("new SinOsc @=> auto z; 440 => z.freq; <<< z.freq()$int >>>;", 10);
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).contains("440"), "Expected 440, got: " + out.get(0));
+    }
+
+    // -------------------------------------------------------------------------
     // Ternary operator  ?:
     // -------------------------------------------------------------------------
 
@@ -323,6 +355,53 @@ public class ChuckAntlrNewFeaturesTest {
             ChuckASTVisitor visitor = new ChuckASTVisitor();
             visitor.visit(parser.program());
         }, "ANTLR should parse BlitSaw code without errors");
+    }
+
+    // -------------------------------------------------------------------------
+    // static member variables
+    // -------------------------------------------------------------------------
+
+    @Test
+    public void testStaticIntLiteral() throws InterruptedException {
+        String src =
+            "class Foo { 42 => static int S; }\n" +
+            "<<< Foo.S >>>;";
+        List<String> out = runChuck(src, 10);
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).contains("42"), "Expected 42, got: " + out.get(0));
+    }
+
+    @Test
+    public void testStaticFloatLiteral() throws InterruptedException {
+        String src =
+            "class Bar { 3.14 => static float F; }\n" +
+            "<<< Bar.F >>>;";
+        List<String> out = runChuck(src, 10);
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).contains("3.14"), "Expected 3.14, got: " + out.get(0));
+    }
+
+    @Test
+    public void testStaticUGenInit() throws InterruptedException {
+        // Test that static UGen is instantiated (non-null) and methods work
+        String src =
+            "class Baz { static SinOsc OSC; }\n" +
+            "440 => Baz.OSC.freq;\n" +
+            "<<< Baz.OSC.freq()$int >>>;";
+        List<String> out = runChuck(src, 10);
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).contains("440"), "Expected 440, got: " + out.get(0));
+    }
+
+    @Test
+    public void testStaticDurInit() throws InterruptedException {
+        // 3::second stored as dur (samples)
+        String src =
+            "class D { 3::second => static dur T; }\n" +
+            "<<< (D.T / second)$int >>>;";
+        List<String> out = runChuck(src, 10);
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).contains("3"), "Expected 3, got: " + out.get(0));
     }
 
     @Test

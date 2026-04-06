@@ -56,6 +56,10 @@ public class MiscInstrs {
         public RegisterClass(String n, UserClassDescriptor desc) { name = n; d = desc; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             vm.registerUserClass(name, d);
+            // Run static initializer once after the class is registered
+            if (d.staticInitCode() != null && d.staticInitCode().getNumInstructions() > 0) {
+                vm.executeSynchronous(d.staticInitCode(), s);
+            }
         }
     }
 

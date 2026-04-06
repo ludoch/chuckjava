@@ -1368,6 +1368,79 @@ public class ChuckEmitter {
                 currentClass = prevClass;
                 currentClassFields = prevFields;
                 ChuckCode finalPreCtorCode = preCtorCodeLocal.getNumInstructions() > 0 ? preCtorCodeLocal : null;
+
+                // Compile static initializers for complex (non-literal) static fields
+                ChuckCode staticInitCodeLocal = new ChuckCode("__staticInit__" + s.name());
+                String savedClass = currentClass;
+                currentClass = s.name();
+                for (ChuckAST.Stmt bodyStmt : flattenedBody) {
+                    boolean isComplexStaticInit = false;
+                    String staticFieldName = null;
+                    if (bodyStmt instanceof ChuckAST.ExpStmt es2
+                            && es2.exp() instanceof ChuckAST.BinaryExp bexp2
+                            && (bexp2.op() == ChuckAST.Operator.CHUCK || bexp2.op() == ChuckAST.Operator.AT_CHUCK)
+                            && bexp2.rhs() instanceof ChuckAST.DeclExp rDecl2
+                            && rDecl2.isStatic()) {
+                        staticFieldName = rDecl2.name();
+                        // Only complex (non-pure-literal int/float) initializers need runtime code
+                        boolean isSimpleLit = (bexp2.lhs() instanceof ChuckAST.IntExp
+                                && rDecl2.type().equals("int"))
+                                || (bexp2.lhs() instanceof ChuckAST.FloatExp
+                                && rDecl2.type().equals("float"))
+                                || (bexp2.lhs() instanceof ChuckAST.IntExp
+                                && rDecl2.type().equals("float"));
+                        isComplexStaticInit = !isSimpleLit;
+                    } else if (bodyStmt instanceof ChuckAST.DeclStmt ds && ds.isStatic()) {
+                        staticFieldName = ds.name();
+                        // UGen/object types need runtime instantiation; arrays need runtime init
+                        boolean isNonPrimStatic = isObjectType(ds.type()) || !ds.arraySizes().isEmpty();
+                        isComplexStaticInit = ds.callArgs() != null || isNonPrimStatic;
+                    } else if (bodyStmt instanceof ChuckAST.ExpStmt es3
+                            && es3.exp() instanceof ChuckAST.DeclExp rDecl3
+                            && rDecl3.isStatic()) {
+                        staticFieldName = rDecl3.name();
+                        boolean isNonPrimStatic3 = isObjectType(rDecl3.type()) || !rDecl3.arraySizes().isEmpty();
+                        isComplexStaticInit = rDecl3.callArgs() != null || isNonPrimStatic3;
+                    }
+                    if (isComplexStaticInit && staticFieldName != null) {
+                        String fName = staticFieldName;
+                        if (bodyStmt instanceof ChuckAST.ExpStmt es2
+                                && es2.exp() instanceof ChuckAST.BinaryExp bexp2
+                                && bexp2.rhs() instanceof ChuckAST.DeclExp rDecl2) {
+                            // e.g. 3::second => static dur S_DUR
+                            emitExpression(bexp2.lhs(), staticInitCodeLocal);
+                            staticInitCodeLocal.addInstruction(new FieldInstrs.SetStatic(s.name(), fName));
+                            staticInitCodeLocal.addInstruction(new StackInstrs.Pop()); // clean up
+                        } else if (bodyStmt instanceof ChuckAST.DeclStmt ds) {
+                            // e.g. static SinOsc S_SINOSC(440) — instantiate and store
+                            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(ds.type(), ds.name(),
+                                    ds.arraySizes(), ds.callArgs(), ds.isReference(), false, // not static in temp scope
+                                    false, ds.isConst(), ds.line(), ds.column());
+                            localScopes.push(new java.util.HashMap<>());
+                            localTypeScopes.push(new java.util.HashMap<>());
+                            emitExpression(declExp, staticInitCodeLocal);
+                            localScopes.pop();
+                            localTypeScopes.pop();
+                            staticInitCodeLocal.addInstruction(new FieldInstrs.SetStatic(s.name(), fName));
+                            staticInitCodeLocal.addInstruction(new StackInstrs.Pop()); // clean up
+                        } else if (bodyStmt instanceof ChuckAST.ExpStmt es3
+                                && es3.exp() instanceof ChuckAST.DeclExp rDecl3) {
+                            ChuckAST.DeclExp rDecl3m = new ChuckAST.DeclExp(rDecl3.type(), rDecl3.name(),
+                                    rDecl3.arraySizes(), rDecl3.callArgs(), rDecl3.isReference(), false,
+                                    false, rDecl3.isConst(), rDecl3.line(), rDecl3.column());
+                            localScopes.push(new java.util.HashMap<>());
+                            localTypeScopes.push(new java.util.HashMap<>());
+                            emitExpression(rDecl3m, staticInitCodeLocal);
+                            localScopes.pop();
+                            localTypeScopes.pop();
+                            staticInitCodeLocal.addInstruction(new FieldInstrs.SetStatic(s.name(), fName));
+                            staticInitCodeLocal.addInstruction(new StackInstrs.Pop()); // clean up
+                        }
+                    }
+                }
+                currentClass = savedClass;
+                ChuckCode finalStaticInitCode = staticInitCodeLocal.getNumInstructions() > 0 ? staticInitCodeLocal : null;
+
                 UserClassDescriptor descriptor = new UserClassDescriptor(
                         s.name(),
                         s.parentName(),
@@ -1380,7 +1453,8 @@ public class ChuckEmitter {
                         staticObjects,
                         finalPreCtorCode,
                         s.isAbstract(),
-                        s.isInterface());
+                        s.isInterface(),
+                        finalStaticInitCode);
 
                 // Add static methods to the main methods map too, for resolution on instances
                 methodCodes.putAll(staticMethodCodes);
@@ -1808,10 +1882,19 @@ public class ChuckEmitter {
                                 + ": error: cannot '=>' from/to a multi-variable declaration");
                     }
                     if (e.rhs() instanceof ChuckAST.DeclExp rDecl) {
-                        emitExpression(rDecl, code);
+                        // Resolve 'auto' type from the LHS expression
+                        ChuckAST.DeclExp resolvedDecl = rDecl;
+                        if ("auto".equals(rDecl.type())) {
+                            String inferredType = getExprType(e.lhs());
+                            if (inferredType == null) inferredType = "int";
+                            resolvedDecl = new ChuckAST.DeclExp(inferredType, rDecl.name(), rDecl.arraySizes(),
+                                    rDecl.callArgs(), rDecl.isReference(), rDecl.isStatic(), rDecl.isGlobal(),
+                                    rDecl.isConst(), rDecl.line(), rDecl.column());
+                        }
+                        emitExpression(resolvedDecl, code);
                         code.addInstruction(new StackInstrs.Pop());
                         emitExpression(e.lhs(), code);
-                        emitChuckTarget(rDecl, code);
+                        emitChuckTarget(resolvedDecl, code);
                     } else {
                         emitExpression(e.lhs(), code);
                         emitChuckTarget(e.rhs(), code);
