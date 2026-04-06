@@ -125,24 +125,29 @@ The typical ChucK AI workflow is: `Flip → FeatureCollector → KNN/MLP` for re
 
 ### 5.2 Missing Math functions — in C++ but not wired in Java
 
-| Function | Description |
-|----------|-------------|
-| `Math.sinh`, `cosh`, `tanh` | Hyperbolic trig |
-| `Math.hypot(x,y)` | Hypotenuse (numerically stable `sqrt(x²+y²)`) |
-| `Math.fmod(x,y)` | Floating-point modulo |
-| `Math.remainder(x,y)` | IEEE remainder |
-| `Math.min(a,b)`, `max(a,b)` | Scalar min/max |
-| `Math.nextpow2(n)` | Next power of 2 ≥ n |
-| `Math.ensurePow2(n)` | Alias for nextpow2 |
-| `Math.exp2(x)` | 2^x |
-| `Math.random()`, `randomf()`, `random2f(a,b)`, `randomize()` | Additional random variants |
-| `Math.gauss(mean, std)` | Gaussian random sample |
-| `Math.map(x, srcMin, srcMax, dstMin, dstMax)` | Same as `Std.scalef`; C++ exposes on Math |
-| `Math.map2(x, srcMin, srcMax, dstMin, dstMax, type)` | Mapped with curve type |
-| `Math.remap` | Alias for map2 |
-| `Math.clampi(x, lo, hi)` | Integer clamp (Java has `Std.clamp` for int but not `Math.clampi`) |
-| `Math.cossim(a[], b[])` | Cosine similarity of two float arrays |
-| `Math.ssin`, `scos`, `stan`, `ssinh`, `scosh`, `stanh`, `sexp`, `sinsqrt` | Fast scalar approximations |
+All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
+
+| Function | Description | Status |
+|----------|-------------|--------|
+| `Math.sinh`, `cosh`, `tanh` | Hyperbolic trig | ✅ Done |
+| `Math.hypot(x,y)` | Hypotenuse (numerically stable `sqrt(x²+y²)`) | ✅ Done |
+| `Math.fmod(x,y)` | Floating-point modulo | ✅ Done |
+| `Math.remainder(x,y)` | IEEE remainder | ✅ Done |
+| `Math.min(a,b)`, `max(a,b)` | Scalar min/max | ✅ Done |
+| `Math.nextpow2(n)` | Next power of 2 ≥ n | ✅ Done |
+| `Math.ensurePow2(n)` | Alias for nextpow2 | ✅ Done |
+| `Math.exp2(x)` | 2^x | ✅ Done |
+| `Math.random2f(a,b)` | Random float in [a,b] | ✅ Done |
+| `Math.random2(lo,hi)` / `random2i` | Random int in [lo,hi] | ✅ Done |
+| `Math.randomf()` | Random float in [0,1) | ✅ Done |
+| `Math.gauss(mean, std)` | Gaussian random sample | ✅ Done |
+| `Math.map(x, srcMin, srcMax, dstMin, dstMax)` | Same as `Std.scalef`; C++ exposes on Math | ✅ Done |
+| `Math.map2(x, srcMin, srcMax, dstMin, dstMax, type)` | Mapped with curve type (0=linear, 1=cosine, 2=smoothstep) | ✅ Done |
+| `Math.remap` | Alias for map2 | ✅ Done |
+| `Math.clampi(x, lo, hi)` | Integer clamp | ✅ Done |
+| `Math.clampf(x, lo, hi)` | Float clamp | ✅ Done |
+| `Math.cossim(a[], b[])` | Cosine similarity of two float arrays | ✅ Done |
+| `Math.ssin`, `scos`, `stan`, `ssinh`, `scosh`, `stanh`, `sexp`, `sinsqrt` | Fast scalar approx (delegate to std Math) | ✅ Done |
 
 ---
 

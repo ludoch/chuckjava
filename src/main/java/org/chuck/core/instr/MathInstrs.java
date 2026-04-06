@@ -199,25 +199,93 @@ public class MathInstrs {
                     }
                     s.reg.pushObject(b);
                 }
+                // ── Two-arg functions ────────────────────────────────────────
+                case "hypot" -> { double y = s.reg.popAsDouble(), x = s.reg.popAsDouble(); s.reg.push(Math.hypot(x, y)); }
+                case "fmod"  -> { double y = s.reg.popAsDouble(), x = s.reg.popAsDouble(); s.reg.push(x % y); }
+                case "remainder" -> { double y = s.reg.popAsDouble(), x = s.reg.popAsDouble(); s.reg.push(Math.IEEEremainder(x, y)); }
+                case "min"   -> { double b = s.reg.popAsDouble(), a = s.reg.popAsDouble(); s.reg.push(Math.min(a, b)); }
+                case "max"   -> { double b = s.reg.popAsDouble(), a = s.reg.popAsDouble(); s.reg.push(Math.max(a, b)); }
+                case "random2", "random2i" -> { long hi = s.reg.popLong(), lo = s.reg.popLong(); s.reg.push(Std.rand2(lo, hi)); }
+                case "random2f" -> { double hi = s.reg.popAsDouble(), lo = s.reg.popAsDouble(); s.reg.push(Std.rand2f(lo, hi)); }
+                case "randomf" -> s.reg.push(Std.rng.nextDouble());
+                case "gauss" -> { double std = s.reg.popAsDouble(), mean = s.reg.popAsDouble(); s.reg.push(mean + std * Std.rng.nextGaussian()); }
+                // ── Multi-arg functions ───────────────────────────────────────
+                case "map", "scalef" -> {
+                    double dstMax = s.reg.popAsDouble(), dstMin = s.reg.popAsDouble();
+                    double srcMax = s.reg.popAsDouble(), srcMin = s.reg.popAsDouble();
+                    double x = s.reg.popAsDouble();
+                    s.reg.push(Std.scalef(x, srcMin, srcMax, dstMin, dstMax));
+                }
+                case "map2", "remap" -> {
+                    long type  = s.reg.popLong();
+                    double dstMax = s.reg.popAsDouble(), dstMin = s.reg.popAsDouble();
+                    double srcMax = s.reg.popAsDouble(), srcMin = s.reg.popAsDouble();
+                    double x = s.reg.popAsDouble();
+                    double t = (srcMax == srcMin) ? 0.0 : (x - srcMin) / (srcMax - srcMin);
+                    t = Math.max(0.0, Math.min(1.0, t));
+                    double mapped = switch ((int) type) {
+                        case 1  -> (1.0 - Math.cos(t * Math.PI)) / 2.0; // cosine interp
+                        case 2  -> t * t * (3.0 - 2.0 * t);             // smoothstep/cubic
+                        default -> t;                                     // linear
+                    };
+                    s.reg.push(dstMin + mapped * (dstMax - dstMin));
+                }
+                case "clampi" -> { long hi = s.reg.popLong(), lo = s.reg.popLong(), x = s.reg.popLong(); s.reg.push(Std.clamp(x, lo, hi)); }
+                case "clampf" -> { double hi = s.reg.popAsDouble(), lo = s.reg.popAsDouble(), x = s.reg.popAsDouble(); s.reg.push(Std.clampf(x, lo, hi)); }
+                // ── Integer result ────────────────────────────────────────────
+                case "nextpow2", "ensurePow2" -> {
+                    long n = (long) s.reg.popAsDouble();
+                    if (n <= 1L) { s.reg.push(1L); break; }
+                    long p = 1L;
+                    while (p < n) p <<= 1;
+                    s.reg.push(p);
+                }
+                // ── Array functions ───────────────────────────────────────────
+                case "cossim" -> {
+                    Object bObj = s.reg.popObject(), aObj = s.reg.popObject();
+                    if (aObj instanceof ChuckArray aa && bObj instanceof ChuckArray bb) {
+                        double dot = 0, normA = 0, normB = 0;
+                        int len = Math.min(aa.size(), bb.size());
+                        for (int i = 0; i < len; i++) {
+                            double ai = aa.getFloat(i), bi = bb.getFloat(i);
+                            dot += ai * bi; normA += ai * ai; normB += bi * bi;
+                        }
+                        s.reg.push(normA == 0 || normB == 0 ? 0.0 : dot / (Math.sqrt(normA) * Math.sqrt(normB)));
+                    } else s.reg.push(0.0);
+                }
                 default -> {
                     double v = s.reg.popAsDouble();
                     double res = switch (fn) {
-                        case "sin" -> Math.sin(v);
-                        case "cos" -> Math.cos(v);
-                        case "tan" -> Math.tan(v);
-                        case "asin" -> Math.asin(v);
-                        case "acos" -> Math.acos(v);
-                        case "atan" -> Math.atan(v);
-                        case "sqrt" -> Math.sqrt(v);
-                        case "abs" -> Math.abs(v);
+                        case "sin"   -> Math.sin(v);
+                        case "cos"   -> Math.cos(v);
+                        case "tan"   -> Math.tan(v);
+                        case "asin"  -> Math.asin(v);
+                        case "acos"  -> Math.acos(v);
+                        case "atan"  -> Math.atan(v);
+                        case "sqrt"  -> Math.sqrt(v);
+                        case "abs"   -> Math.abs(v);
                         case "floor" -> Math.floor(v);
-                        case "ceil" -> Math.ceil(v);
-                        case "log" -> Math.log(v);
-                        case "log2" -> Math.log(v) / Math.log(2);
+                        case "ceil"  -> Math.ceil(v);
+                        case "log"   -> Math.log(v);
+                        case "log2"  -> Math.log(v) / Math.log(2);
                         case "log10" -> Math.log10(v);
-                        case "exp" -> Math.exp(v);
+                        case "exp"   -> Math.exp(v);
                         case "round" -> (double) Math.round(v);
                         case "trunc" -> (double) (long) v;
+                        // ── New single-arg functions ──────────────────────────
+                        case "sinh"  -> Math.sinh(v);
+                        case "cosh"  -> Math.cosh(v);
+                        case "tanh"  -> Math.tanh(v);
+                        case "exp2"  -> Math.pow(2.0, v);
+                        // Fast scalar approx — delegate to standard functions
+                        case "ssin"  -> Math.sin(v);
+                        case "scos"  -> Math.cos(v);
+                        case "stan"  -> Math.tan(v);
+                        case "ssinh" -> Math.sinh(v);
+                        case "scosh" -> Math.cosh(v);
+                        case "stanh" -> Math.tanh(v);
+                        case "sexp"  -> Math.exp(v);
+                        case "sinsqrt" -> Math.signum(v) * Math.sqrt(Math.abs(v));
                         default -> v;
                     };
                     s.reg.push(res);
