@@ -9,8 +9,8 @@ public class FilterStk extends FilterBasic {
 
     public FilterStk(float sampleRate) { super(sampleRate); }
 
-    public void gain(double g) { this.gain = g; }
-    public double gain()       { return gain; }
+    public double gain(double g) { this.gain = g; return g; }
+    public double gain()         { return gain; }
     public void clear()        { /* reset internal state — subclasses override */ }
 
     @Override
