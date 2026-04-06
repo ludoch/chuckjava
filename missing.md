@@ -103,8 +103,8 @@ The typical ChucK AI workflow is: `Flip → FeatureCollector → KNN/MLP` for re
 
 | Feature | C++ grammar | Java status | Notes |
 |---------|-------------|-------------|-------|
-| `typeof` | `TYPEOF unary_expression` | ❌ Not in grammar or emitter | Returns the type name as a string |
-| `instanceof` | Used in type checker | ❌ Not in grammar or emitter | Runtime type test (`x instanceof Foo`) |
+| `typeof` | `TYPEOF unary_expression` | ✅ Implemented | Returns the type name as a string |
+| `instanceof` | Used in type checker | ✅ Implemented | Runtime type test (`x instanceof Foo`) |
 | `abstract` class / method | `ABSTRACT` keyword | ❌ Not in grammar | Cannot declare abstract base classes |
 | `interface` | `INTERFACE id_list LBRACE` | ❌ Not in emitter | Grammar has the token but emitter ignores interface bodies |
 | `@construct` | Explicit constructor syntax | ❌ Not in grammar | C++ allows `fun @construct(...)` for custom constructors |
@@ -237,8 +237,8 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | `vec2` / `vec3` / `vec4` | ✅ Done |
 | `null` literal | ✅ Done |
 | `auto` type inference | ⚠️ Grammar has token; emitter does not fully resolve inferred types |
-| `typeof` operator | ❌ Missing |
-| `instanceof` operator | ❌ Missing |
+| `typeof` operator | ✅ Implemented |
+| `instanceof` operator | ✅ Implemented |
 | `abstract` classes | ❌ Missing |
 | `interface` definitions | ❌ Missing (token exists in grammar, emitter ignores body) |
 | `@construct` / `@destruct` | ❌ Missing |
@@ -253,7 +253,7 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | Item | Why it matters |
 |------|---------------|
 | `Machine.eval(string, args[])` | `eval(string)` is done; the `args[]` overload for passing arguments to the eval'd shred is missing |
-| `typeof` / `instanceof` | Type-safe polymorphism patterns common in larger programs |
+| ~~`typeof` / `instanceof`~~ | ✅ Implemented |
 | `AutoCorr`, `XCorr` UAnas | Used in pitch detection and audio fingerprinting examples |
 | `FeatureCollector` + AI/ML | The entire `examples/ai/` directory depends on these |
 | `Chroma` UAna | Used in key/chord detection examples |

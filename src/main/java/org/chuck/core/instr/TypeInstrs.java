@@ -82,4 +82,48 @@ public class TypeInstrs {
             }
         }
     }
+
+    public static class TypeofInstr implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            Object val = s.reg.isObject(0) ? s.reg.popObject() : s.reg.pop();
+            String typeName;
+            if (val instanceof UserObject uo) typeName = uo.getTypeName();
+            else if (val instanceof org.chuck.audio.ChuckUGen u) typeName = u.getClass().getSimpleName();
+            else if (val instanceof ChuckArray a) {
+                if (a.vecTag != null) typeName = a.vecTag;
+                else typeName = "array";
+            }
+            else if (val instanceof ChuckString) typeName = "string";
+            else if (val instanceof Double) typeName = "float";
+            else typeName = "int";
+            s.reg.pushObject(new ChuckString(typeName));
+        }
+    }
+
+    public static class InstanceofInstr implements ChuckInstr {
+        private final String typeName;
+        public InstanceofInstr(String typeName) { this.typeName = typeName; }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            Object val = s.reg.isObject(0) ? s.reg.popObject() : s.reg.pop();
+            boolean result;
+            if (val instanceof UserObject uo) result = typeName.equals(uo.getTypeName());
+            else if (val instanceof org.chuck.audio.ChuckUGen u) {
+                // check class name or superclass
+                Class<?> cls = u.getClass();
+                result = false;
+                while (cls != null) {
+                    if (cls.getSimpleName().equals(typeName)) { result = true; break; }
+                    cls = cls.getSuperclass();
+                }
+            }
+            else result = switch (typeName) {
+                case "int" -> val instanceof Long;
+                case "float" -> val instanceof Double;
+                case "string" -> val instanceof ChuckString;
+                case "array" -> val instanceof ChuckArray;
+                default -> false;
+            };
+            s.reg.push(result ? 1L : 0L);
+        }
+    }
 }

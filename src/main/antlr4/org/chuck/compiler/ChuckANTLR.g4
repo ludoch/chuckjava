@@ -105,7 +105,7 @@ memberName
     | INT_TYPE | FLOAT_TYPE | TIME_TYPE | DUR_TYPE | VOID_TYPE | COMPLEX_TYPE | POLAR_TYPE | STRING_TYPE | EVENT_TYPE | AUTO
     | IF | ELSE | WHILE | UNTIL | FOR | REPEAT | DO | RETURN | BREAK | CONTINUE | SWITCH | CASE | DEFAULT
     | FUN | CLASS | EXTENDS | PUBLIC | PRIVATE | STATIC | PROTECTED | GLOBAL
-    | SPORK | NOW | ME | NEW
+    | SPORK | NOW | ME | NEW | TYPEOF | INSTANCEOF
     ;
 
 // --- Expressions ---
@@ -150,6 +150,8 @@ primary
     | NEW typeName (LPAREN expressionList? RPAREN)? (arrayDimension)* # newExp
     | HASH LPAREN expression COMMA expression RPAREN       # complexLit
     | MOD LPAREN expression COMMA expression RPAREN        # polarLit
+    | TYPEOF LPAREN expression RPAREN                      # typeofExp
+    | INSTANCEOF LPAREN expression COMMA typeName RPAREN   # instanceofExp
     ;
 
 // --- Lexer Rules ---
@@ -178,7 +180,9 @@ GLOBAL  : 'global';
 SPORK   : 'spork';
 NOW     : 'now';
 ME      : 'me';
-NEW     : 'new';
+NEW        : 'new';
+TYPEOF     : 'typeof';
+INSTANCEOF : 'instanceof';
 AUTO    : 'auto';
 
 INT_TYPE     : 'int';

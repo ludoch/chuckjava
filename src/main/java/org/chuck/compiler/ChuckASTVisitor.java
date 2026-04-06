@@ -41,12 +41,15 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         List<ChuckAST.Exp> flattened = new ArrayList<>();
         for (ExpressionContext ectx : ctx.expression()) {
             Object result = visit(ectx);
-            if (result instanceof List<?> list) {
-                for (Object item : list) {
-                    if (item instanceof ChuckAST.Exp exp) flattened.add(exp);
+            switch (result) {
+                case List<?> list -> {
+                    for (Object item : list) {
+                        if (item instanceof ChuckAST.Exp exp) flattened.add(exp);
+                    }
                 }
-            } else if (result instanceof ChuckAST.Exp exp) {
-                flattened.add(exp);
+                case ChuckAST.Exp exp -> flattened.add(exp);
+                default -> {
+                }
             }
         }
         
@@ -526,6 +529,17 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     }
 
     @Override
+    public ChuckAST.Exp visitTypeofExp(ChuckANTLRParser.TypeofExpContext ctx) {
+        ChuckAST.Exp expr = (ChuckAST.Exp) visit(ctx.expression());
+        return new ChuckAST.TypeofExp(expr, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
+
+    public ChuckAST.Exp visitInstanceofExp(ChuckANTLRParser.InstanceofExpContext ctx) {
+        ChuckAST.Exp expr = (ChuckAST.Exp) visit(ctx.expression());
+        String typeName = ctx.typeName().getText();
+        return new ChuckAST.InstanceofExp(expr, typeName, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
+
     public ChuckAST.Exp visitNewExp(NewExpContext ctx) {
         String typeStr = ctx.typeName().getText();
         List<ChuckAST.Exp> arraySizes = new ArrayList<>();

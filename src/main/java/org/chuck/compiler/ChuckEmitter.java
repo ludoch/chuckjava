@@ -2640,6 +2640,14 @@ public class ChuckEmitter {
                     // other types: leave value as-is (e.g. casting to a class type is a no-op)
                 }
             }
+            case ChuckAST.TypeofExp e -> {
+                emitExpression(e.expr(), code);
+                code.addInstruction(new TypeInstrs.TypeofInstr());
+            }
+            case ChuckAST.InstanceofExp e -> {
+                emitExpression(e.expr(), code);
+                code.addInstruction(new TypeInstrs.InstanceofInstr(e.typeName()));
+            }
         }
     }
 

@@ -54,6 +54,10 @@ public sealed interface ChuckAST {
     record DeclExp(String type, String name, java.util.List<Exp> arraySizes, Exp callArgs, boolean isReference, boolean isStatic, boolean isGlobal, boolean isConst, int line, int column) implements Exp {}
     record TernaryExp(Exp condition, Exp thenExp, Exp elseExp, int line, int column) implements Exp {}
     record CastExp(Exp value, String targetType, int line, int column) implements Exp {}
+    /** typeof(expr) — returns the runtime type name of expr as a string */
+    record TypeofExp(Exp expr, int line, int column) implements Exp {}
+    /** instanceof(expr, TypeName) — returns 1 if expr is an instance of TypeName, else 0 */
+    record InstanceofExp(Exp expr, String typeName, int line, int column) implements Exp {}
 
     // --- Statement Nodes ---
 
