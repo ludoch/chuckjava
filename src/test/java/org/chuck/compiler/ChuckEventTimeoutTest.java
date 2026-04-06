@@ -2,6 +2,7 @@ package org.chuck.compiler;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,7 +15,14 @@ public class ChuckEventTimeoutTest {
     private List<String> runChuck(String code, int timeoutMs) throws InterruptedException {
         ChuckVM vm = new ChuckVM(44100);
         List<String> output = java.util.Collections.synchronizedList(new ArrayList<>());
-        vm.addPrintListener(output::add);
+        vm.addPrintListener(s -> {
+            if (!s.startsWith("[chuck]:")) {
+                String trimmed = s.trim();
+                if (!trimmed.isEmpty()) {
+                    output.add(trimmed);
+                }
+            }
+        });
         vm.run(code, "test");
         
         long start = System.currentTimeMillis();
@@ -39,8 +47,13 @@ public class ChuckEventTimeoutTest {
         
         List<String> out = runChuck(code, 500);
         assertTrue(out.size() >= 1, "Output empty! Out: " + out);
-        String last = out.get(out.size() - 1).trim();
-        double elapsed = Double.parseDouble(last);
+        String last = out.get(out.size() - 1);
+        double elapsed = 0;
+        try {
+            elapsed = Double.parseDouble(last);
+        } catch (NumberFormatException e) {
+            fail("Expected numeric elapsed time, got: '" + last + "'. Full out: " + out);
+        }
         // Should be around 50ms
         assertTrue(elapsed >= 45 && elapsed <= 65, "Expected ~50ms, got: " + elapsed + ", Out: " + out);
     }
@@ -58,8 +71,13 @@ public class ChuckEventTimeoutTest {
         
         List<String> out = runChuck(code, 500);
         assertTrue(out.size() >= 1, "Output empty! Out: " + out);
-        String last = out.get(out.size() - 1).trim();
-        double elapsed = Double.parseDouble(last);
+        String last = out.get(out.size() - 1);
+        double elapsed = 0;
+        try {
+            elapsed = Double.parseDouble(last);
+        } catch (NumberFormatException e) {
+            fail("Expected numeric elapsed time, got: '" + last + "'. Full out: " + out);
+        }
         // Should be exactly 50ms
         assertEquals(50.0, elapsed, 0.1, "Out: " + out);
     }

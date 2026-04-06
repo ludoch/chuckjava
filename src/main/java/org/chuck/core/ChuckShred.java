@@ -106,7 +106,7 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
             }
             return true;
         }
-        return true;
+        return e == eventWaitingOn;
     }
 
     public int getId() { return id; }
@@ -115,10 +115,19 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
     public long getWakeTime() { return wakeTime; }
     public void setWakeTime(long time) { this.wakeTime = time; }
     public boolean isDone() { return isDone; }
-    public void setDone(boolean done) { this.isDone = done; }
+    public void setDone(boolean done) {
+        lock.lock();
+        try {
+            this.isDone = done;
+            condition.signalAll();
+        } finally {
+            lock.unlock();
+        }
+    }
     /** ChucK-style: s.done() */
     public int done() { return isDone ? 1 : 0; }
     public boolean isWaiting() { return isWaiting; }
+
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
     public String[] getArgs() { return args; }
@@ -229,6 +238,20 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
     // The main interpreter loop for the Virtual Thread
     private long instructionCount = 0;
     private static final long MAX_INSTRUCTIONS_BEFORE_YIELD = 10000;
+
+    public void waitForResume() {
+        lock.lock();
+        try {
+            while (!isRunning && !isDone) {
+                condition.await();
+            }
+        } catch (InterruptedException e) {
+            isDone = true;
+            isRunning = false;
+        } finally {
+            lock.unlock();
+        }
+    }
 
     public void execute(ChuckVM vm) {
         lock.lock();

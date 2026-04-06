@@ -199,7 +199,10 @@ public class ChuckVM {
             ChuckShred shred = new ChuckShred(code);
             return spork(shred);
         } catch (Exception e) {
-            print("Machine.run error: " + e.getMessage() + "\n");
+            String msg = "Machine.run error: " + e.getMessage();
+            print(msg + "\n");
+            System.err.println(msg);
+            e.printStackTrace();
             return -1;
         }
     }
@@ -290,12 +293,16 @@ public class ChuckVM {
             shred.setId(nextShredId++);
         }
         activeShreds.put(shred.getId(), shred);
+        schedule(shred);
         
         Thread.ofVirtual().start(() -> {
             try {
                 ScopedValue.where(CURRENT_VM, this)
                           .where(ChuckShred.CURRENT_SHRED, shred)
-                          .run(task);
+                          .run(() -> {
+                              shred.waitForResume();
+                              task.run();
+                          });
             } finally {
                 activeShreds.remove(shred.getId());
                 shred.setDone(true);
@@ -323,6 +330,7 @@ public class ChuckVM {
         // Special internal task that wakes up at an absolute time
         ChuckShred timeoutTask = new ChuckShred(null);
         timeoutTask.setWakeTime(wakeTime);
+        timeoutTask.setName("timeout-task");
         sporkInternal(timeoutTask, () -> {
             // If the shred is still waiting for THIS event at THIS wake time, wake it.
             if (shred.isWaiting() && (shred.getEventWaitingOn() == event || shred.getEventWaitingOn() == null)) {
@@ -348,7 +356,10 @@ public class ChuckVM {
             try {
                 ScopedValue.where(CURRENT_VM, this)
                           .where(ChuckShred.CURRENT_SHRED, shred)
-                          .run(task);
+                          .run(() -> {
+                              shred.waitForResume();
+                              task.run();
+                          });
             } finally {
                 activeShreds.remove(shred.getId());
                 shred.setDone(true);

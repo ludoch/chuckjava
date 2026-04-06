@@ -97,6 +97,16 @@ public class ObjectInstrs {
                     s.reg.pushObject(ce);
                     return;
                 }
+                if (mName.equals("signal") && a == 0) {
+                    ce.signal(vm);
+                    s.reg.pushObject(ce);
+                    return;
+                }
+                if (mName.equals("broadcast") && a == 0) {
+                    ce.broadcast(vm);
+                    s.reg.pushObject(ce);
+                    return;
+                }
             }
 
             if (obj instanceof ChuckArray ca) {
