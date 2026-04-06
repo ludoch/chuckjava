@@ -87,6 +87,7 @@
 | 62 | **`Delay.compute()` always returned 0** — Redundant tick-deduplication guard inside `compute()` was always true (parent `tick()` sets `lastTickTime` before calling `compute()`). Removed the guard; `Delay` now functions correctly for echo and feedback effects. | ✅ Fixed |
 | 63 | **`Clarinet.compute()` silent** — `envelope.tick()` returned 0 because Envelope has no audio sources. Fixed by reading the ramp level via `envelope.getValue()` after advancing state with `tick()`. | ✅ Fixed |
 | 64 | **`ChuckShred` reflection in native image** — `me.running()` / `me.numArgs()` returned `null` in GraalVM native image because `CallMethod` dispatches via `Class.getMethods()` and `ChuckShred` was not registered for reflection. Added `allPublicMethods` to `reflect-config.json`. | ✅ Fixed |
+| 65 | **Math library gap-fill** — Implemented 20 missing `Math.*` functions: `sinh/cosh/tanh`, `hypot`, `fmod`, `remainder`, `min/max`, `exp2`, `nextpow2/ensurePow2`, `random2/random2f/randomf`, `gauss`, `map/map2/remap`, `clampi/clampf`, `cossim`, and 8 fast scalar approximations (`ssin` etc.). | ✅ Fixed |
 
 ### New Features
 

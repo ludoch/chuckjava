@@ -180,6 +180,24 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - **`Delay.compute()` always returned 0** — A redundant tick-deduplication guard (`if (systemTime == lastTickTime) return lastOut`) was inside `compute()`, which is called *after* `ChuckUGen.tick()` already sets `lastTickTime = systemTime`. The check was always true, so the delay buffer was never read or written. Removed the guard; `Delay` now works correctly for echo/feedback effects.
 - **`Clarinet.compute()` silent** — `breathPressure = envelope.tick(systemTime)` returned 0 because the Envelope has no audio sources (input = 0) and `compute()` returns `input * value`. Fixed by calling `envelope.tick()` to advance the ramp, then reading the actual level via `envelope.getValue()`.
 
+### Math Library Additions (2026-04-06)
+
+All functions from section 5.2 of `missing.md` are now implemented in `MathInstrs.MathFunc`:
+
+| Category | Functions |
+|----------|-----------|
+| Hyperbolic trig | `sinh(x)`, `cosh(x)`, `tanh(x)` |
+| Geometry / numeric | `hypot(x,y)`, `fmod(x,y)`, `remainder(x,y)` |
+| Scalar | `min(a,b)`, `max(a,b)`, `exp2(x)` |
+| Integer | `nextpow2(n)`, `ensurePow2(n)` — returns `long` (next power of 2 ≥ n) |
+| Random | `random2(lo,hi)`, `random2i(lo,hi)`, `random2f(lo,hi)`, `randomf()`, `gauss(mean,std)` |
+| Mapping | `map(x,srcMin,srcMax,dstMin,dstMax)` = linear; `map2`/`remap(...,type)` = linear/cosine/smoothstep |
+| Clamping | `clampi(x,lo,hi)` (int), `clampf(x,lo,hi)` (float) |
+| Array | `cossim(a[],b[])` — cosine similarity |
+| Fast scalar approx | `ssin`, `scos`, `stan`, `ssinh`, `scosh`, `stanh`, `sexp`, `sinsqrt` (delegate to std Math) |
+
+The emitter's existing `default` fallthrough already pushes all args and calls `MathFunc`; no emitter changes were needed.
+
 ### GraalVM Native Image & IDE Bundle (2026-04-05)
 
 **Native executable (`-Pnative` profile):**
