@@ -86,6 +86,8 @@ public sealed interface ChuckAST {
 
     record RepeatStmt(Exp count, Stmt body, int line, int column) implements Stmt {}
 
+    record LoopStmt(Stmt body, int line, int column) implements Stmt {}
+
     record ForEachStmt(String iterType, String iterName, Exp collection, Stmt body, int line, int column) implements Stmt {}
 
     record SwitchStmt(Exp condition, java.util.List<CaseStmt> cases, int line, int column) implements Stmt {}

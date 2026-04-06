@@ -17,8 +17,12 @@ import org.chuck.audio.BlitSquare;
 import org.chuck.audio.Brass;
 import org.chuck.audio.Centroid;
 import org.chuck.audio.Chorus;
+import org.chuck.audio.BiQuadStk;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.Clarinet;
+import org.chuck.audio.FilterBasic;
+import org.chuck.audio.FilterStk;
+import org.chuck.audio.JetTabl;
 import org.chuck.audio.Delay;
 import org.chuck.audio.DelayA;
 import org.chuck.audio.DelayL;
@@ -159,6 +163,10 @@ public class UGenRegistry {
         register("TwoPole", (sr, args) -> new TwoPole(sr));
         register("TwoZero", (sr, args) -> new TwoZero(sr));
         register("PoleZero", (sr, args) -> new PoleZero());
+        register("FilterBasic", (sr, args) -> new FilterBasic(sr));
+        register("FilterStk", (sr, args) -> new FilterStk(sr));
+        register("BiQuadStk", (sr, args) -> new BiQuadStk(sr));
+        register("JetTabl", (sr, args) -> new JetTabl());
 
         // --- Effects ---
         register("Echo", (sr, args) -> new Echo((int)(sr * 2)));

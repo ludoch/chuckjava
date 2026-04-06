@@ -26,7 +26,11 @@ Instruments (STK): `Clarinet`, `Mandolin`, `Plucked`, `Rhodey`, `Wurley`, `TubeB
 
 Tables / GenX: `Gen5`, `Gen7`, `Gen9`, `Gen10`, `Gen17`, `GenX`, `WarpTable`, `CurveTable`
 
-Buffers: `SndBuf`, `SndBuf2`, `WvIn`, `WvOut`/`WvOut2`, `WaveLoop`, `LiSa`, `LiSa2`, `LiSa4`, `LiSa8`, `LiSa16`
+Buffers: `SndBuf`, `SndBuf2`, `WvIn`, `WvOut`/`WvOut2`, `WaveLoop`, `LiSa`, `LiSa2`, `LiSa4`, `LiSa6`, `LiSa8`, `LiSa10`, `LiSa16`
+
+STK (additional): `VoicForm`, `ModalBar`, `BandedWG`, `BlowBotl`, `BlowHole`, `HnkyTonk`, `FrencHrn`, `KrstlChr`, `JetTabl`
+
+Filter bases: `FilterBasic`, `FilterStk`, `BiQuadStk`
 
 Utilities: `Gain`, `GainDB`, `Blackhole`, `Adc`
 
@@ -42,14 +46,14 @@ Utilities: `Gain`, `GainDB`, `Blackhole`, `Adc`
 | `HnkyTonk` | `ugen_stk` | ✅ Implemented — FM honky-tonk piano |
 | `FrencHrn` | `ugen_stk` | ✅ Implemented — FM French horn |
 | `KrstlChr` | `ugen_stk` | ✅ Implemented — FM crystal choir |
-| `JetTabl` | `ugen_stk` | Jet table (lookup table used by `Flute`; exposed as standalone UGen in C++) |
-| `Mesh2D` | `ugen_stk` | 2D waveguide mesh (spatial physical model) |
-| `DelayP` | `ugen_xxx` | Pitch-shifting delay (different from `DelayA`/`DelayL`) |
-| `FilterBasic` | `ugen_xxx` | Abstract base exposing `freq`, `Q`, `set` — parent of LPF/HPF/BPF/BRF |
-| `FilterStk` | `ugen_stk` | STK-compatible filter base |
-| `BiQuadStk` | `ugen_stk` | STK BiQuad (distinct from `BiQuad` — different coefficient style) |
-| `Teabox` | `ugen_stk` | Sensor input box (hardware-specific, low priority) |
-| `LiSa6`, `LiSa10` | `ugen_xxx` | 6- and 10-voice LiSa variants (Java has 2/4/8/16 only) |
+| `JetTabl` | `ugen_stk` | ✅ Implemented — jet saturation curve (used by Flute internally) |
+| `Mesh2D` | `ugen_stk` | ❌ 2D waveguide mesh — complex spatial model, not implemented |
+| `DelayP` | `ugen_xxx` | ✅ Implemented — pitch-shifting delay, `delay`/`shift(semitones)` |
+| `FilterBasic` | `ugen_xxx` | ✅ Implemented — abstract base with `freq`, `Q`, `set` API |
+| `FilterStk` | `ugen_stk` | ✅ Implemented — STK-compatible filter base with `gain`, `clear` |
+| `BiQuadStk` | `ugen_stk` | ✅ Implemented — STK BiQuad with `b0/b1/b2/a1/a2` coefficient API |
+| `Teabox` | `ugen_stk` | ❌ Hardware sensor box — platform-specific, not implemented |
+| `LiSa6`, `LiSa10` | `ugen_xxx` | ✅ Implemented — registered via `LiSaN(6/10, sr)` |
 
 ---
 
@@ -57,7 +61,7 @@ Utilities: `Gain`, `GainDB`, `Blackhole`, `Adc`
 
 ### 2.1 Present in Java
 
-`FFT`, `IFFT`, `RMS`, `Centroid`, `Flux`, `ZeroX`, `ZCR`, `MFCC`, `SFM`, `Kurtosis`, `Rolloff`
+`FFT`, `IFFT`, `RMS`, `Centroid`, `Flux`, `ZeroX`, `ZCR`, `MFCC`, `SFM`, `Kurtosis`, `Rolloff`, `DCT`, `IDCT`, `AutoCorr`, `XCorr`, `Chroma`, `FeatureCollector`, `Flip`, `UnFlip`
 
 ### 2.2 Missing UAnas — in C++ but absent in Java
 
@@ -108,9 +112,9 @@ The typical ChucK AI workflow is: `Flip → FeatureCollector → KNN/MLP` for re
 | `abstract` class / method | `ABSTRACT` keyword | ✅ Implemented — `abstract class Foo { }` prevents instantiation |
 | `interface` | `INTERFACE id_list LBRACE` | ✅ Implemented — parsed; prevents direct instantiation |
 | `@construct` | Explicit constructor syntax | ✅ Implemented — `fun @construct(...)` parsed via `REFERENCE_TAG ID` in `functionName` |
-| `@destruct` | Explicit destructor syntax | ❌ Not wired — `@destruct` is parsed but not called on object cleanup |
-| `loop` statement | `LOOP LPAREN stmt RPAREN` | ❌ Not in grammar | Explicit named infinite loop (different from `while(true)`) |
-| `@operator` overload syntax | `fun @operator+(...)` | ⚠️ Partial | Java uses `__op__+` naming convention; C++ uses `@operator+` |
+| `@destruct` | Explicit destructor syntax | ✅ Implemented — called on shred cleanup for registered UserObjects |
+| `loop` statement | `LOOP stmt` | ✅ Implemented — infinite loop, only `break` exits |
+| `@operator` overload syntax | `fun @operator+(...)` | ✅ Implemented — `@operator+` maps to `__op__+` in visitor |
 | `static` class variables | `STATIC` in class body | ⚠️ Partial | Declared but not fully initialized between instances |
 | `public` class-level access | `PUBLIC` in class body | ⚠️ Partial | Parsed but not enforced at runtime |
 | `doc` comments (`/** */`) | `@doc` annotation | ❌ Not in grammar | ChucK doc comment extraction |
@@ -199,7 +203,8 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | `KBHit` | ✅ Done | `kbhit()` / `hit()`, `getchar()`, `can_wait()` — background virtual thread queues keypresses |
 | `StringTokenizer` | ✅ Done | `set(s)`, `more()`, `next()`, `reset()` implemented |
 | `RegEx` | ✅ Done | Pattern matching via `java.util.regex` |
-| `Type` / `Function` introspection | ❌ Missing | Reflect on type names, method signatures at runtime |
+| `Type` introspection | ✅ Implemented — `ChuckTypeObj`: `name()`, `parent()`, `isa(string)`, `eq(Type)` |
+| `Function` introspection | ❌ Missing — runtime method signature reflection not implemented |
 
 ---
 
@@ -222,7 +227,7 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | Feature | Status | Notes |
 |---------|--------|-------|
 | `Event` base | ✅ Done | `signal()`, `broadcast()`, `wait()`, `can_wait()` |
-| `OscEvent` | ⚠️ Partial | OscIn fires events; standalone `OscEvent` class not exposed |
+| `OscEvent` | ✅ Implemented — subclass of OscIn, same API |
 | Conjunction `e1 && e2 => now` | ✅ Done | |
 | Disjunction `e1 \|\| e2 => now` | ✅ Done | |
 | Event timeout | ❌ Missing | C++ supports `timeout => now` on event waits |
@@ -242,7 +247,7 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | `abstract` classes | ✅ Implemented |
 | `interface` definitions | ✅ Implemented |
 | `@construct` | ✅ Implemented |
-| `@destruct` | ❌ Parsed but not called on object cleanup |
+| `@destruct` | ✅ Implemented |
 | `static` member variables (per-class, not per-instance) | ⚠️ Partial — declared but shared initialization not reliable |
 
 ---
@@ -253,7 +258,7 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 
 | Item | Why it matters |
 |------|---------------|
-| `Machine.eval(string, args[])` | `eval(string)` is done; the `args[]` overload for passing arguments to the eval'd shred is missing |
+| ~~`Machine.eval(string, args[])`~~ | ✅ Implemented |
 | ~~`typeof` / `instanceof`~~ | ✅ Implemented |
 | ~~`AutoCorr`, `XCorr` UAnas~~ | ✅ Implemented |
 | ~~`FeatureCollector` + AI/ML~~ | ✅ Implemented — KNN, KNN2, SVM, MLP, HMM, PCA |
@@ -274,19 +279,20 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | ~~`MidiFileIn`~~ | ✅ Implemented |
 | ~~`abstract` / `interface`~~ | ✅ Implemented |
 | ~~`@construct`~~ | ✅ Implemented |
-| `@destruct` | Parsed but not called — would need GC hooks |
+| ~~`@destruct`~~ | ✅ Implemented — called on shred cleanup |
 | ~~Missing Math: `gauss`, `nextpow2`, `map`, `fmod`~~ | ✅ All implemented |
 
 ### Lower — niche or debug use
 
 | Item | |
 |------|-|
-| `Mesh2D` | Spatial physical model; complex to implement |
-| ~~`DelayP`~~ | ✅ Implemented — two crossfading read-heads, `delay`, `shift` (semitones) |
-| ~~`LiSa6`, `LiSa10`~~ | ✅ Implemented — registered via `LiSaN(6/10, sr)` |
-| `Teabox` | Hardware sensor box; very platform-specific |
-| `Machine.refcount`, `sp_reg`, `sp_mem` | Debug/introspection |
-| `Machine.operatorsPush/Pop` | Namespace management for operator overloads |
-| `HidOut` | Output HID (rarely used) |
-| `Std.system()` | Shell execution (security risk; low demand) |
-| Fast math approximations (`ssin`, `scos`, etc.) | Performance hints; Java JIT handles this differently |
+| `Mesh2D` | ❌ 2D waveguide mesh — complex spatial model, not implemented |
+| ~~`DelayP`~~ | ✅ Implemented |
+| ~~`LiSa6`, `LiSa10`~~ | ✅ Implemented |
+| ~~`JetTabl`, `FilterBasic`, `FilterStk`, `BiQuadStk`~~ | ✅ Implemented |
+| `Teabox` | ❌ Hardware sensor box — platform-specific |
+| ~~`Machine.refcount`, `sp_reg`, `sp_mem`~~ | ✅ Stubs returning 0 |
+| ~~`Machine.operatorsPush/Pop`~~ | ✅ Stubs |
+| ~~`HidOut`~~ | ✅ Implemented (stub) |
+| ~~`Std.system()`~~ | ✅ Implemented |
+| ~~Fast math approximations (`ssin`, `scos`, etc.)~~ | ✅ Implemented (delegate to java.lang.Math) |

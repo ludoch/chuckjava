@@ -82,8 +82,10 @@ public class ChuckFactory {
             case "FileIO" -> new FileIO();
             case "StringTokenizer" -> new StringTokenizer();
             case "Object" -> new ChuckObject(ChuckType.OBJECT);
+            case "Type"   -> new ChuckTypeObj("void");
             case "Event" -> new ChuckEvent();
             case "OscIn" -> new OscIn(vm);
+            case "OscEvent" -> new org.chuck.network.OscEvent(vm);
             case "OscOut" -> new OscOut();
             case "OscMsg" -> new OscMsg();
             case "MidiMsg" -> new MidiMsg();

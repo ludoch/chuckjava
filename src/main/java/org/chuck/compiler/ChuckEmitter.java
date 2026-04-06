@@ -1169,6 +1169,21 @@ public class ChuckEmitter {
                     code.replaceInstruction(jump, new ControlInstrs.Jump(updateStart));
                 }
             }
+            case ChuckAST.LoopStmt s -> {
+                // Infinite loop: emit body, jump back — only break exits
+                int startPc = code.getNumInstructions();
+                continueJumps.push(new ArrayList<>());
+                breakJumps.push(new ArrayList<>());
+                emitStatement(s.body(), code);
+                code.addInstruction(new ControlInstrs.Jump(startPc));
+                int endPc = code.getNumInstructions();
+                for (int jump : breakJumps.pop()) {
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(endPc));
+                }
+                for (int jump : continueJumps.pop()) {
+                    code.replaceInstruction(jump, new ControlInstrs.Jump(startPc));
+                }
+            }
             default -> {
             }
         }

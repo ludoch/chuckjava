@@ -201,7 +201,6 @@
       </dependencies>
       <properties>
         <skipNativeTests>true</skipNativeTests>
-        <graalvm.home>C:/Users/ludo/Downloads/graalvm-jdk-25_windows-x64_bin/graalvm-jdk-25.0.2+10.1</graalvm.home>
       </properties>
     </profile>
     <profile>
@@ -234,22 +233,41 @@
             <version>3.6.3</version>
             <executions>
               <execution>
+                <id>aot-training-run</id>
+                <phase>package</phase>
+                <goals>
+                  <goal>exec</goal>
+                </goals>
+                <configuration>
+                  <skip>${skipAot}</skip>
+                  <executable>${java.home}/bin/java</executable>
+                  <arguments>
+                    <argument>--enable-preview</argument>
+                    <argument>--add-modules=jdk.incubator.vector</argument>
+                    <argument>-XX:AOTCache=${project.build.directory}/jpackage-input/chuck.aot</argument>
+                    <argument>-jar</argument>
+                    <argument>${project.build.directory}/jpackage-input/chuck-java.jar</argument>
+                    <argument>--version</argument>
+                  </arguments>
+                </configuration>
+              </execution>
+              <execution>
                 <id>jpackage-ide</id>
                 <phase>package</phase>
                 <goals>
                   <goal>exec</goal>
                 </goals>
                 <configuration>
-                  <executable>C:\Program Files\Zulu\zulu-25/bin/jpackage</executable>
+                  <executable>${java.home}/bin/jpackage</executable>
                   <arguments>
                     <argument>--type</argument>
-                    <argument>app-image</argument>
+                    <argument>${jpackage.type}</argument>
                     <argument>--name</argument>
                     <argument>chuck-ide</argument>
                     <argument>--app-version</argument>
                     <argument>1.0.0</argument>
                     <argument>--input</argument>
-                    <argument>C:\Users\ludo\a\chuckjava\target/jpackage-input</argument>
+                    <argument>${project.build.directory}/jpackage-input</argument>
                     <argument>--main-jar</argument>
                     <argument>chuck-java.jar</argument>
                     <argument>--main-class</argument>
@@ -258,16 +276,21 @@
                     <argument>--enable-preview</argument>
                     <argument>--java-options</argument>
                     <argument>--add-modules=jdk.incubator.vector</argument>
+                    <argument>--java-options</argument>
+                    <argument>-XX:AOTCache=$APPDIR/lib/app/chuck.aot</argument>
                     <argument>--dest</argument>
-                    <argument>C:\Users\ludo\a\chuckjava\target/chuck-ide-bundle</argument>
+                    <argument>${project.build.directory}/chuck-ide-bundle</argument>
                   </arguments>
-                  <mainClass>org.chuck.Main</mainClass>
                 </configuration>
               </execution>
             </executions>
           </plugin>
         </plugins>
       </build>
+      <properties>
+        <skipAot>false</skipAot>
+        <jpackage.type>app-image</jpackage.type>
+      </properties>
     </profile>
   </profiles>
   <dependencies>

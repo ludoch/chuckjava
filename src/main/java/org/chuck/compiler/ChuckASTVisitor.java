@@ -154,6 +154,12 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     }
 
     @Override
+    public ChuckAST.Stmt visitLoopStatement(ChuckANTLRParser.LoopStatementContext ctx) {
+        return new ChuckAST.LoopStmt((ChuckAST.Stmt) visit(ctx.statement()),
+            ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
+
+    @Override
     public ChuckAST.Stmt visitReturnStatement(ReturnStatementContext ctx) {
         ChuckAST.Exp exp = ctx.expression() != null ? (ChuckAST.Exp) visit(ctx.expression()) : null;
         return new ChuckAST.ReturnStmt(exp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());

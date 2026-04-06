@@ -37,6 +37,9 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     /** Closeable resources (e.g. OscIn sockets) to close when shred exits. */
     private final java.util.List<AutoCloseable> ownedCloseables = new java.util.ArrayList<>();
     public void registerCloseable(AutoCloseable c) { ownedCloseables.add(c); }
+    /** UserObjects created by this shred that have a @destruct method. */
+    private final java.util.List<UserObject> destructibles = new java.util.ArrayList<>();
+    public void registerDestructible(UserObject uo) { if (uo.methods.containsKey("@destruct:0")) destructibles.add(uo); }
     
     // Execution state
     private ChuckCode code;
@@ -332,6 +335,18 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
             try { c.close(); } catch (Exception ignored) {}
         }
         ownedCloseables.clear();
+        // Call @destruct on any registered objects
+        for (UserObject uo : destructibles) {
+            ChuckCode dtor = uo.methods.get("@destruct:0");
+            if (dtor != null) {
+                try {
+                    ChuckShred dtorShred = new ChuckShred(dtor);
+                    dtorShred.thisStack.push(uo);
+                    dtorShred.execute(null);
+                } catch (Exception ignored) {}
+            }
+        }
+        destructibles.clear();
     }
 
     @Override

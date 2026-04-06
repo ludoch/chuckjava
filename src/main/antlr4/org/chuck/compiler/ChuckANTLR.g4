@@ -19,6 +19,7 @@ statement
     | forStatement                                         # forStmt
     | repeatStatement                                      # repeatStmt
     | doStatement                                          # doStmt
+    | loopStatement                                        # loopStmt
     | returnStatement                                      # returnStmt
     | printStatement                                       # printStmt
     | blockStatement                                       # blockStmt
@@ -37,6 +38,7 @@ forStatement
     | FOR LPAREN (type|AUTO) REFERENCE_TAG? ID (arrayDimension)* COLON expression RPAREN statement
     ;
 repeatStatement: REPEAT LPAREN expression RPAREN statement ;
+loopStatement: LOOP statement ;
 doStatement: DO statement (WHILE|UNTIL) LPAREN expression RPAREN SEMI ;
 returnStatement: RETURN expression? SEMI ;
 printStatement: LTRIPLE expressionList? RTRIPLE SEMI ;
@@ -105,7 +107,7 @@ memberName
     : ID
     | INT_TYPE | FLOAT_TYPE | TIME_TYPE | DUR_TYPE | VOID_TYPE | COMPLEX_TYPE | POLAR_TYPE | STRING_TYPE | EVENT_TYPE | AUTO
     | IF | ELSE | WHILE | UNTIL | FOR | REPEAT | DO | RETURN | BREAK | CONTINUE | SWITCH | CASE | DEFAULT
-    | FUN | CLASS | EXTENDS | PUBLIC | PRIVATE | STATIC | PROTECTED | GLOBAL | ABSTRACT | INTERFACE
+    | FUN | CLASS | EXTENDS | PUBLIC | PRIVATE | STATIC | PROTECTED | GLOBAL | ABSTRACT | INTERFACE | LOOP
     | SPORK | NOW | ME | NEW | TYPEOF | INSTANCEOF
     ;
 
@@ -185,6 +187,7 @@ NEW        : 'new';
 TYPEOF     : 'typeof';
 INSTANCEOF : 'instanceof';
 AUTO     : 'auto';
+LOOP     : 'loop';
 ABSTRACT : 'abstract';
 INTERFACE: 'interface';
 
