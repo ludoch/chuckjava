@@ -90,6 +90,7 @@ public class ChuckVM {
         setGlobalObject("dac", multiChannelDac);
         setGlobalObject("blackhole", blackhole);
         setGlobalObject("adc", adc);
+        setGlobalObject("Machine", this);
         initIO(System.out, System.err);
     }
 
@@ -313,6 +314,49 @@ public class ChuckVM {
         } finally {
             shredulerLock.unlock();
         }
+    }
+
+    /**
+     * Schedules a timeout task to wake a shred if an event doesn't trigger.
+     */
+    public void scheduleTimeout(ChuckShred shred, ChuckEvent event, long wakeTime) {
+        // Special internal task that wakes up at an absolute time
+        ChuckShred timeoutTask = new ChuckShred(null);
+        timeoutTask.setWakeTime(wakeTime);
+        sporkInternal(timeoutTask, () -> {
+            // If the shred is still waiting for THIS event at THIS wake time, wake it.
+            if (shred.isWaiting() && (shred.getEventWaitingOn() == event || shred.getEventWaitingOn() == null)) {
+                event.removeWaitingShred(shred);
+                shred.setEventWaitingOn(null);
+                shred.setWakeTime(now.get());
+                shred.resume(this);
+                if (!shred.isDone() && !shred.isWaiting()) {
+                    this.schedule(shred);
+                }
+            }
+        });
+    }
+
+    private int sporkInternal(ChuckShred shred, Runnable task) {
+        if (shred.getId() <= 0) {
+            shred.setId(nextShredId++);
+        }
+        activeShreds.put(shred.getId(), shred);
+        schedule(shred);
+        
+        Thread.ofVirtual().start(() -> {
+            try {
+                ScopedValue.where(CURRENT_VM, this)
+                          .where(ChuckShred.CURRENT_SHRED, shred)
+                          .run(task);
+            } finally {
+                activeShreds.remove(shred.getId());
+                shred.setDone(true);
+                shred.broadcast(this);
+            }
+        });
+        
+        return shred.getId();
     }
 
     public void executeSynchronous(ChuckCode code, ChuckShred shred) {

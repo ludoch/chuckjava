@@ -84,6 +84,7 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
     }
     
     private ChuckEvent eventWaitingOn = null;
+    public ChuckEvent getEventWaitingOn() { return eventWaitingOn; }
     private final Set<ChuckEvent> conjunctionTriggered = new java.util.HashSet<>();
 
     public void setEventWaitingOn(ChuckEvent e) {

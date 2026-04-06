@@ -6,6 +6,7 @@ import java.util.Map;
 import org.chuck.core.ChuckArray;
 import org.chuck.core.ChuckCode;
 import org.chuck.core.ChuckDuration;
+import org.chuck.core.ChuckEvent;
 import org.chuck.core.ChuckFactory;
 import org.chuck.core.ChuckInstr;
 import org.chuck.core.ChuckObject;
@@ -83,8 +84,19 @@ public class ObjectInstrs {
                 className = a.vecTag != null ? a.vecTag : "array";
             } else if (obj instanceof ChuckString) {
                 className = "string";
-            } else if (obj instanceof ChuckShred) {
+            }
+            if (obj instanceof ChuckShred) {
                 className = "Shred";
+            } else if (obj instanceof ChuckEvent) {
+                className = "Event";
+            }
+
+            if (obj instanceof ChuckEvent ce) {
+                if (mName.equals("timeout") && a == 1 && args[0] instanceof ChuckDuration cd) {
+                    ce.timeout(cd);
+                    s.reg.pushObject(ce);
+                    return;
+                }
             }
 
             if (obj instanceof ChuckArray ca) {

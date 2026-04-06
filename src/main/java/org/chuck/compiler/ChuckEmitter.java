@@ -203,6 +203,7 @@ public class ChuckEmitter {
         this.globalVarTypes.put("blackhole", "UGen");
         this.globalVarTypes.put("chout", "IO");
         this.globalVarTypes.put("cherr", "IO");
+        this.globalVarTypes.put("Event", "Event");
         this.globalVarTypes.put("me", "Shred");
         this.globalVarTypes.put("Machine", "Machine");
         
