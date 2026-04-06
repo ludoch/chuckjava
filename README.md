@@ -108,16 +108,37 @@
 
 #### 📦 Distribution Targets
 
-Two standalone Windows distributions are now buildable from Maven:
+Six pre-built distributions are produced automatically by CI and attached to every [GitHub Release](../../releases):
 
-| Target | Maven command | Output | Size | Use case |
-|--------|--------------|--------|------|----------|
-| **Native CLI** | `mvn -Pnative package -DskipTests` | `target/chuck.exe` | ~49 MB | Scripting, CI, headless |
-| **IDE Bundle** | `mvn -Pide-bundle package -DskipTests` | `target/chuck-ide-bundle/chuck-ide/chuck-ide.exe` | ~154 MB | Desktop, double-click IDE |
+| File | Platform | Use case |
+|------|----------|----------|
+| `chuck` (Linux) | Linux x64 | Scripting, CI, headless |
+| `chuck` (macOS) | macOS x64/ARM | Scripting, CI, headless |
+| `chuck.exe` | Windows x64 | Scripting, CI, headless |
+| `chuck-ide-linux.zip` | Linux x64 | Desktop IDE (unzip → `bin/chuck-ide`) |
+| `chuck-ide-windows.zip` | Windows x64 | Desktop IDE (unzip → `chuck-ide.exe`) |
+| `chuck-ide-1.0.0.dmg` | macOS | Desktop IDE (mount → drag to Applications) |
 
-**Native CLI** (`-Pnative`) is built with GraalVM native-image (requires `JAVA_HOME` pointing at GraalVM JDK 25 installation). JavaFX is excluded; `--gui` prints a helpful error. 108 of 130 unit tests are verified to pass natively (`mvn -Pnative -DskipNativeTests=false test`). The 22 excluded tests use `ChuckDSL.load()` → `javax.tools.JavaCompiler`, which is unavailable in native images.
+All downloads are self-contained — no Java installation required.
 
-**IDE Bundle** (`-Pide-bundle`) uses `jpackage --type app-image` to embed a full JRE alongside the fat JAR. The bundled `chuck-ide.exe` runs with no external Java installation needed.
+They can also be built locally on any platform:
+
+| Target | Maven command | Output |
+|--------|--------------|--------|
+| **Native CLI** | `mvn -Pnative package -DskipTests` | `target/chuck` / `target/chuck.exe` |
+| **IDE Bundle** | `mvn -Pide-bundle package -DskipTests` | `target/chuck-ide-bundle/chuck-ide/` |
+| **Linux via Docker** | `docker build --output dist/linux .` | `dist/linux/chuck` |
+
+**Native CLI** (`-Pnative`) is built with GraalVM native-image (requires `JAVA_HOME` pointing at GraalVM JDK 25). JavaFX is excluded. 108 of 130 unit tests pass natively (`mvn -Pnative -DskipNativeTests=false test`).
+
+**IDE Bundle** (`-Pide-bundle`) uses `jpackage --type app-image` to embed a full JRE alongside the fat JAR. Includes a JEP 483 AOT cache (`chuck.aot`) for faster startup — pre-warms JavaFX and ANTLR initialization.
+
+#### Publishing a Release
+
+```bash
+# Tag and publish (triggers CI → builds all 6 artifacts → attaches to release page)
+gh release create v1.0.0 --title "ChucK-Java v1.0.0" --notes "Release notes here"
+```
 
 ---
 
