@@ -85,6 +85,12 @@ public class ChuckFactory {
             case "OscMsg" -> new OscMsg();
             case "MidiMsg" -> new MidiMsg();
             case "HidMsg" -> new HidMsg();
+            case "KNN" -> new org.chuck.core.ai.KNN();
+            case "KNN2" -> new org.chuck.core.ai.KNN2();
+            case "SVM" -> new org.chuck.core.ai.SVM();
+            case "MLP" -> new org.chuck.core.ai.MLP();
+            case "HMM" -> new org.chuck.core.ai.HMM();
+            case "PCA" -> new org.chuck.core.ai.PCA();
             default -> null;
         };
     }

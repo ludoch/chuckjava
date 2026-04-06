@@ -87,7 +87,7 @@ public class TypeInstrs {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             Object val = s.reg.isObject(0) ? s.reg.popObject() : s.reg.pop();
             String typeName;
-            if (val instanceof UserObject uo) typeName = uo.getTypeName();
+            if (val instanceof UserObject uo) typeName = uo.className;
             else if (val instanceof org.chuck.audio.ChuckUGen u) typeName = u.getClass().getSimpleName();
             else if (val instanceof ChuckArray a) {
                 if (a.vecTag != null) typeName = a.vecTag;
@@ -106,7 +106,7 @@ public class TypeInstrs {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             Object val = s.reg.isObject(0) ? s.reg.popObject() : s.reg.pop();
             boolean result;
-            if (val instanceof UserObject uo) result = typeName.equals(uo.getTypeName());
+            if (val instanceof UserObject uo) result = typeName.equals(uo.className);
             else if (val instanceof org.chuck.audio.ChuckUGen u) {
                 // check class name or superclass
                 Class<?> cls = u.getClass();

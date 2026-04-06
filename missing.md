@@ -34,14 +34,14 @@ Utilities: `Gain`, `GainDB`, `Blackhole`, `Adc`
 
 | UGen | C++ File | Description |
 |------|----------|-------------|
-| `VoicForm` | `ugen_stk` | Formant voice synthesizer (4-formant singing voice, different from FMVoices) |
-| `ModalBar` | `ugen_stk` | Modal-resonance bar physical model (xylophone, vibraphone, etc.) |
-| `BandedWG` | `ugen_stk` | Banded waveguide (bowed bar, tibetan bowl, etc.) |
-| `BlowBotl` | `ugen_stk` | Blown bottle physical model |
-| `BlowHole` | `ugen_stk` | Clarinet with tonehole and register vent |
-| `HnkyTonk` | `ugen_stk` | FM honky-tonk piano |
-| `FrencHrn` | `ugen_stk` | FM French horn |
-| `KrstlChr` | `ugen_stk` | FM crystal choir |
+| `VoicForm` | `ugen_stk` | ✅ Implemented — Formant voice synthesizer (4-formant singing voice) |
+| `ModalBar` | `ugen_stk` | ✅ Implemented — Modal-resonance bar physical model |
+| `BandedWG` | `ugen_stk` | ✅ Implemented — Banded waveguide (bowed bar, tibetan bowl) |
+| `BlowBotl` | `ugen_stk` | ✅ Implemented — Blown bottle physical model |
+| `BlowHole` | `ugen_stk` | ✅ Implemented — Clarinet with tonehole and register vent |
+| `HnkyTonk` | `ugen_stk` | ✅ Implemented — FM honky-tonk piano |
+| `FrencHrn` | `ugen_stk` | ✅ Implemented — FM French horn |
+| `KrstlChr` | `ugen_stk` | ✅ Implemented — FM crystal choir |
 | `JetTabl` | `ugen_stk` | Jet table (lookup table used by `Flute`; exposed as standalone UGen in C++) |
 | `Mesh2D` | `ugen_stk` | 2D waveguide mesh (spatial physical model) |
 | `DelayP` | `ugen_xxx` | Pitch-shifting delay (different from `DelayA`/`DelayL`) |
@@ -63,14 +63,14 @@ Utilities: `Gain`, `GainDB`, `Blackhole`, `Adc`
 
 | UAna | Description |
 |------|-------------|
-| `DCT` | Discrete Cosine Transform (forward) — useful for audio compression / feature extraction |
-| `IDCT` | Inverse DCT |
-| `AutoCorr` | Autocorrelation of input buffer — pitch detection, periodicity analysis |
-| `XCorr` | Cross-correlation between two UAna streams |
-| `Chroma` | 12-bin pitch-class profile (chroma features) — key detection |
-| `FeatureCollector` | Aggregates outputs from multiple UAnas into a single feature vector (used with AI/ML) |
-| `Flip` | Copies audio buffer into UAna blob without analysis — enables custom analysis |
-| `UnFlip` | Inverse of Flip: copies UAna blob back to audio buffer |
+| `DCT` | ✅ Implemented — Discrete Cosine Transform (forward) |
+| `IDCT` | ✅ Implemented — Inverse DCT |
+| `AutoCorr` | ✅ Implemented — Autocorrelation of input buffer |
+| `XCorr` | ✅ Implemented — Cross-correlation between two UAna streams |
+| `Chroma` | ✅ Implemented — 12-bin pitch-class profile |
+| `FeatureCollector` | ✅ Implemented — Aggregates outputs from multiple UAnas |
+| `Flip` | ✅ Implemented — Copies audio buffer into UAna blob |
+| `UnFlip` | ✅ Implemented — Copies UAna blob back to audio buffer |
 
 `FeatureCollector` is particularly important because it bridges the UAna graph to the AI/ML classes (`KNN`, `MLP`, etc.).
 
@@ -78,16 +78,16 @@ Utilities: `Gain`, `GainDB`, `Blackhole`, `Adc`
 
 ## 3. AI / ML Library (`ulib_ai.cpp`)
 
-Completely absent in Java. All five classes need implementation:
+All six classes implemented in `org.chuck.core.ai`:
 
-| Class | Description | Key Methods |
-|-------|-------------|-------------|
-| `KNN` | K-Nearest Neighbor (regression) | `train(float[][], float[][])`, `predict(float[], float[])` |
-| `KNN2` | K-Nearest Neighbor (classification) | `train(float[][], int[])`, `predict(float[], int[])`, `search(float[])` |
-| `SVM` | Support Vector Machine | `train(float[][], int[])`, `predict(float[])`, `save(string)`, `load(string)` |
-| `HMM` | Hidden Markov Model | `train(float[][])`, `generate(float[])`, `viterbi(float[][], int[])`, `forward(float[][])` |
-| `MLP` | Multi-Layer Perceptron | `input/hidden/output(int)`, `train(float[][], float[][])`, `predict(float[])`, activation functions |
-| `PCA` | Principal Component Analysis | `train(float[][])`, `transform(float[], float[])`, `explainedVariance(float[])` |
+| Class | Description | Status |
+|-------|-------------|--------|
+| `KNN` | K-Nearest Neighbor (regression) | ✅ Implemented — `train`, `predict`, `k` |
+| `KNN2` | K-Nearest Neighbor (classification) | ✅ Implemented — `train`, `predict`, `search`, `k` |
+| `SVM` | Support Vector Machine (linear, one-vs-rest) | ✅ Implemented — `train`, `predict`, `save`, `load` |
+| `HMM` | Hidden Markov Model (Baum-Welch EM) | ✅ Implemented — `train`, `generate`, `logLikelihood` |
+| `MLP` | Multi-Layer Perceptron (backprop SGD) | ✅ Implemented — `input/hidden/output`, `train`, `predict`, `activation` |
+| `PCA` | Principal Component Analysis (power iteration) | ✅ Implemented — `train`, `transform`, `explainedVariance`, `numComponents` |
 
 The typical ChucK AI workflow is: `Flip → FeatureCollector → KNN/MLP` for real-time machine learning on audio.
 
@@ -254,23 +254,23 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 |------|---------------|
 | `Machine.eval(string, args[])` | `eval(string)` is done; the `args[]` overload for passing arguments to the eval'd shred is missing |
 | ~~`typeof` / `instanceof`~~ | ✅ Implemented |
-| `AutoCorr`, `XCorr` UAnas | Used in pitch detection and audio fingerprinting examples |
-| `FeatureCollector` + AI/ML | The entire `examples/ai/` directory depends on these |
-| `Chroma` UAna | Used in key/chord detection examples |
+| ~~`AutoCorr`, `XCorr` UAnas~~ | ✅ Implemented |
+| ~~`FeatureCollector` + AI/ML~~ | ✅ Implemented — KNN, KNN2, SVM, MLP, HMM, PCA |
+| ~~`Chroma` UAna~~ | ✅ Implemented |
 | `ConsoleInput` / `KBHit` | ✅ Done — interactive terminal programs now supported |
 | Missing Math: `min`, `max`, `tanh`, `sinh`, `cosh` | ✅ Done — all Math section 5.2 functions implemented |
-| `DCT` / `IDCT` | Used in MFCC-adjacent analysis and compression examples |
+| ~~`DCT` / `IDCT`~~ | ✅ Implemented |
 
 ### Medium — affects completeness but workarounds exist
 
 | Item | Why it matters |
 |------|---------------|
-| `VoicForm` | Formant synthesis — distinct from FM-based FMVoices |
-| `ModalBar` | Modal synthesis for pitched percussion |
-| `BandedWG`, `BlowBotl`, `BlowHole` | STK physical models in `examples/stk/` |
-| `HnkyTonk`, `FrencHrn`, `KrstlChr` | FM instrument variants |
-| `Flip` / `UnFlip` UAnas | Needed for custom UAna pipeline construction |
-| `MidiFileIn` | MIDI file playback |
+| ~~`VoicForm`~~ | ✅ Implemented |
+| ~~`ModalBar`~~ | ✅ Implemented |
+| ~~`BandedWG`, `BlowBotl`, `BlowHole`~~ | ✅ Implemented |
+| ~~`HnkyTonk`, `FrencHrn`, `KrstlChr`~~ | ✅ Implemented |
+| ~~`Flip` / `UnFlip` UAnas~~ | ✅ Implemented |
+| ~~`MidiFileIn`~~ | ✅ Implemented |
 | `abstract` / `interface` | Class hierarchy patterns |
 | `@construct` / `@destruct` | Explicit lifecycle management |
 | Missing Math: `gauss`, `nextpow2`, `map`, `fmod` | Common in synthesis algorithms |
