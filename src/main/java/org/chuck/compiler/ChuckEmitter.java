@@ -2101,6 +2101,20 @@ public class ChuckEmitter {
                         code.addInstruction(new FieldInstrs.GetBuiltinStatic("org.chuck.core.Std", e.member()));
                         return;
                     }
+                    if (id.name().equals("Machine")) {
+                        // Property-style read: Machine.realtime, Machine.silent, Machine.intsize, etc.
+                        switch (e.member()) {
+                            case "realtime"  -> code.addInstruction(new PushInstrs.PushInt(0));
+                            case "silent"    -> code.addInstruction(new PushInstrs.PushInt(1));
+                            case "intsize"   -> code.addInstruction(new PushInstrs.PushInt(64));
+                            case "version"   -> code.addInstruction(new org.chuck.core.instr.MachineCall("version", 0));
+                            case "platform", "os" -> code.addInstruction(new org.chuck.core.instr.MachineCall("platform", 0));
+                            case "loglevel"  -> code.addInstruction(new org.chuck.core.instr.MachineCall("loglevel", 0));
+                            case "timeofday" -> code.addInstruction(new org.chuck.core.instr.MachineCall("timeofday", 0));
+                            default          -> code.addInstruction(new org.chuck.core.instr.MachineCall(e.member(), 0));
+                        }
+                        return;
+                    }
                     if (id.name().equals("RegEx")) {
                         code.addInstruction(new FieldInstrs.GetBuiltinStatic("org.chuck.core.RegEx", e.member()));
                         return;
