@@ -89,6 +89,14 @@ import org.chuck.audio.Wurley;
 import org.chuck.audio.WvIn;
 import org.chuck.audio.WvOut2;
 import org.chuck.audio.WvOutUGen;
+import org.chuck.audio.AutoCorr;
+import org.chuck.audio.Chroma;
+import org.chuck.audio.DCT;
+import org.chuck.audio.FeatureCollector;
+import org.chuck.audio.Flip;
+import org.chuck.audio.IDCT;
+import org.chuck.audio.UnFlip;
+import org.chuck.audio.XCorr;
 import org.chuck.audio.ZCR;
 
 import org.chuck.audio.CNoise;
@@ -213,7 +221,15 @@ public class UGenRegistry {
         register("Rolloff", (sr, args) -> new Rolloff());
         register("Centroid", (sr, args) -> new Centroid());
         register("ZCR", (sr, args) -> new ZCR());
-        
+        register("DCT", (sr, args) -> new DCT());
+        register("IDCT", (sr, args) -> new IDCT());
+        register("AutoCorr", (sr, args) -> new AutoCorr());
+        register("XCorr", (sr, args) -> new XCorr());
+        register("Chroma", (sr, args) -> new Chroma(sr));
+        register("Flip", (sr, args) -> new Flip());
+        register("UnFlip", (sr, args) -> new UnFlip());
+        register("FeatureCollector", (sr, args) -> new FeatureCollector());
+
         // --- Tools ---
         register("Gain", (sr, args) -> new Gain());
         register("GainDB", (sr, args) -> args.length > 0 && args[0] instanceof Number n ? new GainDB(n.doubleValue()) : new GainDB());
