@@ -61,6 +61,12 @@ public class Hid extends ChuckEvent {
         queue.addLast(msg);
     }
 
+    public void dispatch(HidMsg msg, ChuckVM vm) {
+        if (msg.deviceType != null && !msg.deviceType.equals(this.deviceType)) return;
+        pushMsg(msg);
+        broadcast(vm);
+    }
+
     public synchronized boolean recv(HidMsg out) {
         HidMsg next = queue.pollFirst();
         if (next != null) {

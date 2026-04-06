@@ -10,8 +10,22 @@ public class ObjectInstrs {
     public static class NewObject implements ChuckInstr {
         String type; public NewObject(String t) { type = t; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            s.reg.pushObject(new UserObject(type, null, null, false));
+            ChuckObject obj = ChuckFactory.instantiateType(type, 0, null, vm.getSampleRate(), vm, s, null);
+            s.reg.pushObject(obj);
         }
+    }
+
+    public static void runPreCtors(ChuckVM vm, ChuckShred s, String type, UserObject uo) {
+            UserClassDescriptor desc = vm.getUserClass(type);
+            if (desc == null) return;
+            if (desc.parentName() != null) {
+                runPreCtors(vm, s, desc.parentName(), uo);
+            }
+            if (desc.preCtorCode() != null) {
+                s.thisStack.push(uo);
+                vm.executeSynchronous(desc.preCtorCode(), s);
+                s.thisStack.pop();
+            }
     }
 
     public static class CallMethod implements ChuckInstr {
@@ -50,36 +64,113 @@ public class ObjectInstrs {
                 throw new RuntimeException("NullPointerException: cannot call method '" + mName + "' on null object");
             }
 
-            UserObject uo = (obj instanceof UserObject) ? (UserObject) obj : null;
-            if (uo != null) {
+            String className = null;
+            UserObject uo = null;
+            if (obj instanceof UserObject) {
+                uo = (UserObject) obj;
+                className = uo.className;
+            } else if (obj instanceof ChuckArray a) {
+                className = a.vecTag != null ? a.vecTag : "array";
+            } else if (obj instanceof ChuckString) {
+                className = "string";
+            } else if (obj instanceof ChuckShred) {
+                className = "Shred";
+            }
+
+            if (obj instanceof ChuckArray ca) {
+                switch (mName) {
+                    case "size" -> { s.reg.push((long)ca.size()); return; }
+                    case "cap", "capacity" -> { s.reg.push((long)ca.cap()); return; }
+                    case "clear" -> { ca.clear(); s.reg.pushObject(ca); return; }
+                    case "erase" -> {
+                        if (a == 1) ca.erase(((Number)args[0]).intValue());
+                        else if (a == 2) ca.erase(((Number)args[0]).intValue(), ((Number)args[1]).intValue());
+                        s.reg.pushObject(ca);
+                        return;
+                    }
+                    case "popFront" -> { ca.popFront(); s.reg.pushObject(ca); return; }
+                    case "popBack" -> { ca.popBack(); s.reg.pushObject(ca); return; }
+                }
+            }
+
+            if (className != null) {
+                // Explicit dispatch for ChuckString (already handled array above)
+                if (obj instanceof ChuckString cs) {
+                    switch (mName) {
+                        case "length" -> { s.reg.push(cs.length()); return; }
+                        case "charAt" -> { s.reg.push(cs.charAt(((Number)args[0]).longValue())); return; }
+                        case "setCharAt" -> { cs.setCharAt(((Number)args[0]).longValue(), ((Number)args[1]).longValue()); s.reg.pushObject(cs); return; }
+                        case "substring" -> {
+                            if (a == 1) s.reg.pushObject(cs.substring(((Number)args[0]).longValue()));
+                            else s.reg.pushObject(cs.substring(((Number)args[0]).longValue(), ((Number)args[1]).longValue()));
+                            return;
+                        }
+                        case "insert" -> { s.reg.pushObject(cs.insert(((Number)args[0]).longValue(), args[1])); return; }
+                        case "erase" -> { s.reg.pushObject(cs.erase(((Number)args[0]).longValue(), ((Number)args[1]).longValue())); return; }
+                        case "replace" -> {
+                            if (a == 2 && (args[0] instanceof Long || args[0] instanceof Double)) {
+                                s.reg.pushObject(cs.replace(((Number)args[0]).longValue(), args[1]));
+                            } else if (a == 2) {
+                                s.reg.pushObject(cs.replace(args[0], args[1]));
+                            } else if (a == 3) {
+                                s.reg.pushObject(cs.replace(((Number)args[0]).longValue(), ((Number)args[1]).longValue(), args[2]));
+                            }
+                            return;
+                        }
+                        case "find" -> {
+                            if (a == 1) s.reg.push(cs.find(args[0]));
+                            else s.reg.push(cs.find(args[0], ((Number)args[1]).longValue()));
+                            return;
+                        }
+                        case "rfind" -> {
+                            if (a == 1) s.reg.push(cs.rfind(args[0]));
+                            else s.reg.push(cs.rfind(args[0], ((Number)args[1]).longValue()));
+                            return;
+                        }
+                        case "lower" -> { s.reg.pushObject(cs.lower()); return; }
+                        case "upper" -> { s.reg.pushObject(cs.upper()); return; }
+                        case "trim" -> { s.reg.pushObject(cs.trim()); return; }
+                        case "ltrim" -> { s.reg.pushObject(cs.ltrim()); return; }
+                        case "rtrim" -> { s.reg.pushObject(cs.rtrim()); return; }
+                        case "set" -> { s.reg.pushObject(cs.set(args[0])); return; }
+                    }
+                }
+
                 String key = (fullKey != null) ? fullKey : (mName + ":" + a);
                 String fallbackKey = mName + ":" + a;
                 ChuckCode target = null;
-                String t = uo.className;
+                boolean isStatic = false;
+                String t = className;
                 for (int depth = 0; depth < 16 && t != null; depth++) {
                     UserClassDescriptor desc = vm.getUserClass(t);
                     if (desc == null) break;
-                    if (desc.methods().containsKey(key)) { target = desc.methods().get(key); break; }
-                    if (desc.staticMethods().containsKey(key)) { target = desc.staticMethods().get(key); break; }
-                    if (desc.methods().containsKey(fallbackKey)) { target = desc.methods().get(fallbackKey); break; }
-                    if (desc.staticMethods().containsKey(fallbackKey)) { target = desc.staticMethods().get(fallbackKey); break; }
+                    if (desc.methods().containsKey(key)) { target = desc.methods().get(key); isStatic = false; break; }
+                    if (desc.staticMethods().containsKey(key)) { target = desc.staticMethods().get(key); isStatic = true; break; }
+                    if (desc.methods().containsKey(fallbackKey)) { target = desc.methods().get(fallbackKey); isStatic = false; break; }
+                    if (desc.staticMethods().containsKey(fallbackKey)) { target = desc.staticMethods().get(fallbackKey); isStatic = true; break; }
                     t = desc.parentName();
                 }
                 if (target != null) {
+                    // 1. Save return frame
                     s.mem.pushObject(s.getCode());
-                    s.mem.push((long) s.getPc());
+                    s.mem.push((long) (s.getPc() + 1));
                     s.mem.push((long) s.getFramePointer());
                     s.mem.push((long) s.reg.getSp());
-                    s.setFramePointer(s.mem.getSp());
+                    
+                    // 2. Push arguments BACK to reg stack for MoveArgs to handle
                     for (int i = 0; i < a; i++) {
                         Object arg = args[i];
-                        if (arg instanceof ChuckObject co) s.mem.pushObject(co);
-                        else if (isD[i]) s.mem.push((Double) arg);
-                        else s.mem.push((Long) arg);
+                        if (arg instanceof ChuckObject co) s.reg.pushObject(co);
+                        else if (isD[i]) s.reg.push((Double) arg);
+                        else s.reg.push((Long) arg);
                     }
-                    s.thisStack.push(uo);
+
+                    if (!isStatic) s.thisStack.push(uo);
+                    else s.thisStack.push(null);
+
                     s.setCode(target);
-                    s.setPc(-1);
+                    s.setPc(0);
+                    s.setFramePointer(s.mem.getSp());
                     return;
                 }
             }
@@ -117,6 +208,8 @@ public class ObjectInstrs {
                             else { valid = false; break; }
                         } else if (pts[i].isInstance(val)) {
                             coe[i] = val; score += 2;
+                        } else if (pts[i] == Object.class) {
+                            coe[i] = val; score += 1;
                         } else {
                             valid = false; break;
                         }
@@ -315,23 +408,26 @@ public class ObjectInstrs {
             }
             int fp = s.getFramePointer();
             if (r) { s.mem.setRef(fp + o, null); s.reg.pushObject(null); return; }
-            Object obj;
+            Object obj = null;
             if (ar) {
                 int sz = ((Number) args[0]).intValue();
                 if (sz < 0) {
-                    obj = switch (t) {
+                    ChuckArray ca = switch (t) {
                         case "vec2" -> new ChuckArray(ChuckType.ARRAY, 2);
                         case "vec3" -> new ChuckArray(ChuckType.ARRAY, 3);
                         case "vec4" -> new ChuckArray(ChuckType.ARRAY, 4);
                         case "complex", "polar" -> new ChuckArray(ChuckType.ARRAY, 2);
                         default -> null;
                     };
+                    if (ca != null) ca.vecTag = t;
+                    obj = ca;
                 } else if (a > 1) {
                     long[] dims = new long[a];
                     for (int di = 0; di < a; di++) dims[di] = ((Number) args[di]).longValue();
                     obj = ChuckFactory.buildMultiDimArray(dims, 0, t, vm, s, rm);
                 } else {
                     ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
+                    arr.elementTypeName = t;
                     for (int i = 0; i < sz; i++) {
                         ChuckObject elem = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
                         if (elem != null) {
@@ -341,7 +437,9 @@ public class ObjectInstrs {
                     }
                     obj = arr;
                 }
-            } else obj = ChuckFactory.instantiateType(t, a, args, vm.getSampleRate(), vm, s, rm);
+            } else if (!t.equals("int") && !t.equals("float") && !t.equals("string") && !t.equals("dur") && !t.equals("time")) {
+                obj = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+            }
 
             if (obj instanceof ChuckObject co) {
                 s.mem.setRef(fp + o, co);
@@ -360,7 +458,6 @@ public class ObjectInstrs {
             if (fp + o >= s.mem.getSp()) s.mem.setSp(fp + o + 1);
         }
     }
-
     public static class InstantiateSetAndPushGlobal implements ChuckInstr {
         String t, n; int a; boolean r, ar; Map<String, UserClassDescriptor> rm;
         public InstantiateSetAndPushGlobal(String type, String name, int arg, boolean ref, boolean arr, Map<String, UserClassDescriptor> m) {
@@ -385,23 +482,26 @@ public class ObjectInstrs {
                     return;
                 }
             }
-            Object obj;
+            Object obj = null;
             if (ar) {
                 int sz = ((Number) args[0]).intValue();
                 if (sz < 0) {
-                    obj = switch (t) {
+                    ChuckArray ca = switch (t) {
                         case "vec2" -> new ChuckArray(ChuckType.ARRAY, 2);
                         case "vec3" -> new ChuckArray(ChuckType.ARRAY, 3);
                         case "vec4" -> new ChuckArray(ChuckType.ARRAY, 4);
                         case "complex", "polar" -> new ChuckArray(ChuckType.ARRAY, 2);
                         default -> null;
                     };
+                    if (ca != null) ca.vecTag = t;
+                    obj = ca;
                 } else if (a > 1) {
                     long[] dims = new long[a];
                     for (int di = 0; di < a; di++) dims[di] = ((Number) args[di]).longValue();
                     obj = ChuckFactory.buildMultiDimArray(dims, 0, t, vm, s, rm);
                 } else {
                     ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
+                    arr.elementTypeName = t;
                     for (int i = 0; i < sz; i++) {
                         ChuckObject elem = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
                         if (elem != null) {
@@ -411,7 +511,9 @@ public class ObjectInstrs {
                     }
                     obj = arr;
                 }
-            } else obj = ChuckFactory.instantiateType(t, a, args, vm.getSampleRate(), vm, s, rm);
+            } else if (!t.equals("int") && !t.equals("float") && !t.equals("string") && !t.equals("dur") && !t.equals("time")) {
+                obj = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+            }
 
             if (obj instanceof ChuckObject co) {
                 vm.setGlobalObject(n, co);
@@ -420,11 +522,19 @@ public class ObjectInstrs {
                 s.reg.pushObject(co);
             } else {
                 if (t.equals("float")) { 
-                    vm.setGlobalFloat(n, 0.0); 
-                    s.reg.push(0.0); 
+                    if (vm.isGlobalDouble(n)) {
+                        s.reg.push(Double.longBitsToDouble(vm.getGlobalInt(n)));
+                    } else {
+                        vm.setGlobalFloat(n, 0.0); 
+                        s.reg.push(0.0);
+                    }
                 } else if (t.equals("int")) { 
-                    vm.setGlobalInt(n, 0L); 
-                    s.reg.push(0L);
+                    if (vm.isGlobalInt(n)) {
+                        s.reg.push(vm.getGlobalInt(n));
+                    } else {
+                        vm.setGlobalInt(n, 0L); 
+                        s.reg.push(0L);
+                    }
                 } else {
                     vm.setGlobalObject(n, null);
                     s.reg.pushObject(null);
@@ -497,6 +607,84 @@ public class ObjectInstrs {
                     }
                 } else s.reg.push(0L);
             } catch (Exception e) { s.reg.push(0L); }
+        }
+    }
+
+    public static class InstantiateSetAndPushField implements ChuckInstr {
+        String t, n; int a; boolean r, ar; Map<String, UserClassDescriptor> rm;
+        public InstantiateSetAndPushField(String type, String name, int arg, boolean ref, boolean arr, Map<String, UserClassDescriptor> m) {
+            t = type; n = name; a = arg; r = ref; ar = arr; rm = m;
+        }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            Object thisObj = s.reg.popObject();
+            if (!(thisObj instanceof UserObject uo_this)) {
+                s.reg.pushObject(null);
+                return;
+            }
+
+            Object[] args = new Object[a];
+            boolean[] isD = new boolean[a];
+            for (int i = a - 1; i >= 0; i--) {
+                if (s.reg.getSp() > 0) {
+                    isD[i] = s.reg.isDouble(0);
+                    if (s.reg.isObject(0)) args[i] = s.reg.popObject();
+                    else if (isD[i]) args[i] = s.reg.popAsDouble();
+                    else args[i] = s.reg.popAsLong();
+                }
+            }
+            
+            
+            if (r) { uo_this.setObjectField(n, null); s.reg.pushObject(null); return; }
+            
+            Object obj = null;
+            if (ar) {
+                if (a > 0 && args[0] != null) {
+                    int sz = ((Number) args[0]).intValue();
+                    if (sz < 0) {
+                        ChuckArray ca = switch (t) {
+                            case "vec2" -> new ChuckArray(ChuckType.ARRAY, 2);
+                            case "vec3" -> new ChuckArray(ChuckType.ARRAY, 3);
+                            case "vec4" -> new ChuckArray(ChuckType.ARRAY, 4);
+                            case "complex", "polar" -> new ChuckArray(ChuckType.ARRAY, 2);
+                            default -> null;
+                        };
+                        if (ca != null) ca.vecTag = t;
+                        obj = ca;
+                    } else if (a > 1) {
+                        long[] dims = new long[a];
+                        for (int di = 0; di < a; di++) dims[di] = ((Number) args[di]).longValue();
+                        obj = ChuckFactory.buildMultiDimArray(dims, 0, t, vm, s, rm);
+                    } else {
+                        ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
+                        for (int i = 0; i < sz; i++) {
+                            ChuckObject elem = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+                            if (elem != null) {
+                                arr.setObject(i, elem);
+                                if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
+                            }
+                        }
+                        obj = arr;
+                    }
+                }
+            } else {
+                obj = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+            }
+            
+            if (obj instanceof ChuckObject co) {
+                uo_this.setObjectField(n, co);
+                if (co instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
+                s.reg.pushObject(co);
+            } else {
+                if (t.equals("float")) { 
+                    uo_this.setFloatField(n, 0.0); s.reg.push(Double.doubleToRawLongBits(0.0)); 
+                }
+                else if (t.equals("int")) { 
+                    uo_this.setPrimitiveField(n, 0L); s.reg.push(0L); 
+                }
+                else { 
+                    uo_this.setObjectField(n, null); s.reg.pushObject(null); 
+                }
+            }
         }
     }
 }

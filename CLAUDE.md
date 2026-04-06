@@ -117,6 +117,19 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - **Test Normalization**: Enhanced `ChucKIntegrationTest` to handle minor precision differences and multiple polar output formats (pi-multiples vs radians).
 - **Console Verbosity**: Removed sample-rate debug prints from `DacChannel` that caused massive log files.
 
+### Recently Fixed Issues (2026-04-04)
+- **Forward References**: Implemented multi-pass emission in `ChuckEmitter` to support calling functions and classes before they are defined in the source.
+- **Variable Shadowing**: Corrected variable resolution order to strictly follow Local > Class/Inherited > Global hierarchy, ensuring correct shadowing semantics.
+- **Nested Classes**: Implemented recursive class registration and emission, supporting experimental nested class definitions.
+- **Auto-Instantiation**: Objects declared as fields (e.g. `SinOsc s;` inside a class) are now automatically instantiated in the pre-constructor, matching ChucK behavior.
+- **Machine.add Path Resolution**: Fixed `Machine.add` to resolve relative paths relative to the calling script's directory instead of the current working directory.
+- **Std.range**: Implemented full `Std.range()` suite (stop, start/stop, start/stop/step) with automatic step sign adjustment.
+- **Mutable Strings**: Implemented `ChuckString.replace`, `insert`, `erase`, `set` methods and ensured strings are copied on assignment (`=>`).
+- **Calling Convention**: Simplified `CallFunc`/`CallMethod` to push return info and jump, leaving argument moving to the standard `MoveArgs` instruction.
+- **Field Access**: Fixed `SetFieldByName` and `GetFieldByName` to correctly handle built-in vector/complex/polar fields and fallback to UGen `setData` for test mocks.
+- **VM Stability**: Optimized the interpreter loop with a safety yield threshold (10,000 instructions) to prevent infinite tight loops from hanging the VM.
+- **Test Infrastructure**: Enhanced integration tests to automatically abort hanging shreds and cap captured output to 10KB.
+
 ### Key Design Patterns
 
 **Time model:** `ChuckVM.advanceTime(n)` advances the logical clock sample-by-sample. Each sample, the shreduler wakes any `ChuckShred` whose `wakeTime <= now`, then ticks the entire UGen graph. Shreds yield by calling `shred.yield(samples)`, which suspends their Virtual Thread until the VM advances to their wake time.

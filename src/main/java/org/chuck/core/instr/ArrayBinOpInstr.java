@@ -24,7 +24,7 @@ public abstract class ArrayBinOpInstr implements ChuckInstr {
         
         // Result size usually matches lhs size (element-wise or specialized)
         ChuckArray result = new ChuckArray(ChuckType.ARRAY, lhs.size());
-        result.vecTag = vecTag;
+        result.vecTag = (vecTag != null) ? vecTag : lhs.vecTag;
         
         compute(lhs, rhs, result);
         

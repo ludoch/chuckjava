@@ -11,13 +11,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 /**
  * Represents a concurrent execution context in ChucK.
  */
-public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
+public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
     /** The ScopedValue holding the current shred for this thread. */
     public static final ScopedValue<ChuckShred> CURRENT_SHRED = ScopedValue.newInstance();
     
     private static final AtomicInteger ID_GENERATOR = new AtomicInteger(1);
     
-    private final int id;
+    private int id;
     private long wakeTime = 0;
     public volatile boolean isDone = false;
     private boolean isRunning = false;
@@ -62,7 +62,6 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     private ChuckShred parentShred = null;
 
     public ChuckShred(ChuckCode code) {
-        super(new ChuckType("Shred", ChuckType.OBJECT, 0, 0));
         this.id = ID_GENERATOR.getAndIncrement();
         this.code = code;
     }
@@ -107,10 +106,12 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     }
 
     public int getId() { return id; }
+    public void setId(int id) { this.id = id; }
     public static void resetIdCounter() { ID_GENERATOR.set(1); }
     public long getWakeTime() { return wakeTime; }
     public void setWakeTime(long time) { this.wakeTime = time; }
     public boolean isDone() { return isDone; }
+    public void setDone(boolean done) { this.isDone = done; }
     /** ChucK-style: s.done() */
     public int done() { return isDone ? 1 : 0; }
     public boolean isWaiting() { return isWaiting; }
@@ -139,7 +140,8 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
         if (code == null || code.getName() == null) return "./";
         java.io.File f = new java.io.File(code.getName());
         java.io.File parent = f.getParentFile();
-        for (int i = 0; i < n && parent != null; i++) {
+        int levels = Math.abs(n);
+        for (int i = 0; i < levels && parent != null; i++) {
             parent = parent.getParentFile();
         }
         if (parent != null) {
@@ -165,7 +167,7 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     }
     
     // Called by VM to resume this shred
-    void resume(ChuckVM vm) {
+    public void resume(ChuckVM vm) {
         lock.lock();
         try {
             isRunning = true;
@@ -175,7 +177,8 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
                 condition.await();
             }
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            isDone = true;
+            isRunning = false;
         } finally {
             lock.unlock();
         }
@@ -193,7 +196,8 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
                 condition.await();
             }
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            isDone = true;
+            isRunning = false;
         } finally {
             lock.unlock();
         }
@@ -211,7 +215,8 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
                 condition.await();
             }
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            isDone = true;
+            isRunning = false;
         } finally {
             lock.unlock();
         }
@@ -219,12 +224,12 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
     
     // The main interpreter loop for the Virtual Thread
     private long instructionCount = 0;
-    private static final long MAX_INSTRUCTIONS_BEFORE_YIELD = 1000000;
+    private static final long MAX_INSTRUCTIONS_BEFORE_YIELD = 10000;
 
     public void execute(ChuckVM vm) {
         lock.lock();
         try {
-            while (!isDone && code != null && pc < code.getNumInstructions()) {
+            while (!isDone && code != null) {
                 while (!isRunning && !isDone) {
                     condition.await();
                 }
@@ -235,18 +240,26 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
                     ChuckInstr instr = code.getInstruction(pc);
                     if (instr == null) break;
 
+                    // Safety check: prevent infinite tight loops from hanging the VM
+                    if (++instructionCount > MAX_INSTRUCTIONS_BEFORE_YIELD) {
+                        instructionCount = 0;
+                        this.yield(0); // Force yield to allow other shreds/audio to run
+                        break; 
+                    }
+
                     // Execute instruction
+                    int oldPc = pc;
+                    ChuckCode oldCode = code;
                     try {
-                        System.out.println("EXE [" + pc + "] " + instr.getClass().getSimpleName() + " stack=" + reg.getSp());
                         instr.execute(vm, this);
                     } catch (RuntimeException e) {
-                        e.printStackTrace(); // Print to stderr for debugging
-                        int line = code.getLineNumber(pc);
+                        int line = (code != null) ? code.getLineNumber(pc) : -1;
+                        String name = (code != null) ? code.getName() : "unknown";
                         String rawMsg = e.getMessage();
                         if (rawMsg == null) rawMsg = e.getClass().getSimpleName();
                         String type = rawMsg.contains(":") ? rawMsg.split(":")[0] : rawMsg;
                         String msg = String.format("[chuck]:(EXCEPTION) %s: on line[%d] in shred[id=%d:%s]",
-                                type, line, id, code.getName());
+                                type, line, id, name);
                         if (rawMsg.contains("index[")) {
                             msg += " " + rawMsg.substring(rawMsg.indexOf("index["));
                         }
@@ -256,19 +269,26 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
                         return;
                     }
 
-                    // Advance PC
-                    pc++;
-
-                    // Safety check: prevent infinite tight loops from hanging the VM
-                    if (++instructionCount > MAX_INSTRUCTIONS_BEFORE_YIELD) {
-                        instructionCount = 0;
-                        this.yield(0); // Force yield to allow other shreds/audio to run
-                        break; 
+                    // Only increment PC if it wasn't changed by the instruction (e.g. Jump, Call)
+                    if (code == oldCode && pc == oldPc) {
+                        pc++;
+                    }
+                }
+                
+                // If we finished the current code (e.g. a method) but not the shred
+                if (isRunning && !isDone && pc >= code.getNumInstructions()) {
+                    if (framePointer >= 4) {
+                        // Fall off end of method - simulate return
+                        new org.chuck.core.instr.ControlInstrs.ReturnMethod().execute(vm, this);
+                    } else {
+                        isDone = true;
+                        isRunning = false;
                     }
                 }
             }
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
+            isDone = true;
+            isRunning = false;
         } finally {
             isDone = true;
             isRunning = false;
@@ -297,20 +317,37 @@ public class ChuckShred extends ChuckObject implements Comparable<ChuckShred> {
         this.framePointer = mem.getSp();
         this.code = tickCode;
         this.pc = 0;
+
+        int stopSp = mem.getSp();
         
-        while (code != null && pc >= 0 && pc < code.getNumInstructions()) {
+        while (!isDone && isRunning) {
+            if (pc < 0 || pc >= code.getNumInstructions()) {
+                if (this.framePointer > stopSp) {
+                    new org.chuck.core.instr.ControlInstrs.ReturnMethod().execute(vm, this);
+                    continue;
+                } else {
+                    break;
+                }
+            }
+
             ChuckInstr instr = code.getInstruction(pc);
             if (instr == null) break;
+            int p = pc;
+            ChuckCode c = code;
             instr.execute(vm, this);
-            pc++;
+            if (pc == p && code == c) {
+                pc++;
+            }
+            
+            if (mem.getSp() < stopSp) break;
         }
-        
+
         this.code = oldCode;
         this.pc = oldPc;
         this.framePointer = oldFp;
         this.mem.setSp(oldMemSp);
     }
-    
+
     public void cleanup() {
         isRunning = false;
         isDone = true;

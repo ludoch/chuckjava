@@ -55,7 +55,11 @@ public class ArrayInstrs {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             Object rhs = s.reg.pop();
             Object lhs = s.reg.popObject();
-            if (lhs instanceof ChuckArray a) a.append(rhs);
+            if (lhs instanceof ChuckArray a) {
+                a.append(rhs);
+            } else if (lhs instanceof ChuckIO io) {
+                io.write(rhs);
+            }
             s.reg.pushObject(lhs);
         }
     }

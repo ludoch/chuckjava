@@ -15,10 +15,23 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     @Override
     public List<ChuckAST.Stmt> visitProgram(ProgramContext ctx) {
         return ctx.children.stream()
-                .filter(c -> c instanceof StatementContext || c instanceof FunctionDefContext || c instanceof ClassDefinitionContext)
+                .filter(c -> c instanceof DirectiveContext || c instanceof StatementContext || c instanceof FunctionDefContext || c instanceof ClassDefinitionContext)
                 .map(c -> (ChuckAST.Stmt) visit(c))
                 .filter(s -> s != null)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public ChuckAST.Stmt visitDirective(DirectiveContext ctx) {
+        if (ctx.IMPORT() != null) {
+            String path = ctx.STRING().getText();
+            // Remove quotes
+            if (path.startsWith("\"") && path.endsWith("\"")) {
+                path = path.substring(1, path.length() - 1);
+            }
+            return new ChuckAST.ImportStmt(path, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        }
+        return null;
     }
 
     // --- Statements ---
@@ -175,7 +188,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
     @Override
     public Object visitDeclExp(DeclExpContext ctx) {
-        String typeStr = ctx.type().getText();
+        StringBuilder typeBase = new StringBuilder(ctx.type().getText());
         List<ChuckAST.Exp> decls = new ArrayList<>();
         
         boolean isGlobal = ctx.accessModifier() != null && ctx.accessModifier().GLOBAL() != null;
@@ -191,8 +204,10 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         }
 
         for (VariableDeclContext v : ctx.variableDecl()) {
+            StringBuilder fullType = new StringBuilder(typeBase);
             List<ChuckAST.Exp> arraySizes = new ArrayList<>();
             for (ChuckANTLRParser.ArrayDimensionContext ad : v.arrayDimension()) {
+                fullType.append("[]");
                 if (ad.expression() != null) {
                     arraySizes.add((ChuckAST.Exp) visit(ad.expression()));
                 } else {
@@ -211,7 +226,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
             // vec/complex/polar are value types stored as ChuckArrays — instantiate, don't treat as null reference
             
-            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(typeStr, v.ID().getText(), arraySizes, null, isRef, isStatic, isGlobal, isConst,
+            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(fullType.toString(), v.ID().getText(), arraySizes, null, isRef, isStatic, isGlobal, isConst,
                     v.getStart().getLine(), v.getStart().getCharPositionInLine());            
             
             if (v.CHUCK_OP() != null) {
@@ -307,36 +322,46 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
     @Override
     public ChuckAST.Exp visitCompareOp(CompareOpContext ctx) {
-        ChuckAST.Operator op = switch (ctx.getChild(1).getText()) {
-            case "<" -> ChuckAST.Operator.LT;
-            case ">" -> ChuckAST.Operator.GT;
-            case "<=" -> ChuckAST.Operator.LE;
-            case ">=" -> ChuckAST.Operator.GE;
-            case "==" -> ChuckAST.Operator.EQ;
-            case "!=" -> ChuckAST.Operator.NEQ;
-            default -> ChuckAST.Operator.NONE;
-        };
+        ChuckAST.Operator op = ChuckAST.Operator.NONE;
+        for (int i = 0; i < ctx.getChildCount(); i++) {
+            String text = ctx.getChild(i).getText();
+            op = switch (text) {
+                case "<" -> ChuckAST.Operator.LT;
+                case ">" -> ChuckAST.Operator.GT;
+                case "<=" -> ChuckAST.Operator.LE;
+                case ">=" -> ChuckAST.Operator.GE;
+                case "==" -> ChuckAST.Operator.EQ;
+                case "!=" -> ChuckAST.Operator.NEQ;
+                default -> ChuckAST.Operator.NONE;
+            };
+            if (op != ChuckAST.Operator.NONE) break;
+        }
         return new ChuckAST.BinaryExp((ChuckAST.Exp) visit(ctx.expression(0)), op, (ChuckAST.Exp) visit(ctx.expression(1)),
             ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     @Override
     public ChuckAST.Exp visitBinaryOp(BinaryOpContext ctx) {
-        ChuckAST.Operator op = switch (ctx.getChild(1).getText()) {
-            case "+" -> ChuckAST.Operator.PLUS;
-            case "-" -> ChuckAST.Operator.MINUS;
-            case "*" -> ChuckAST.Operator.TIMES;
-            case "/" -> ChuckAST.Operator.DIVIDE;
-            case "%" -> ChuckAST.Operator.PERCENT;
-            case "&&" -> ChuckAST.Operator.AND;
-            case "||" -> ChuckAST.Operator.OR;
-            case "<<" -> ChuckAST.Operator.SHIFT_LEFT;
-            case ">>" -> ChuckAST.Operator.SHIFT_RIGHT;
-            case "&" -> ChuckAST.Operator.S_AND;
-            case "|" -> ChuckAST.Operator.S_OR;
-            case "^" -> ChuckAST.Operator.NONE;
-            default -> ChuckAST.Operator.NONE;
-        };
+        ChuckAST.Operator op = ChuckAST.Operator.NONE;
+        for (int i = 0; i < ctx.getChildCount(); i++) {
+            String text = ctx.getChild(i).getText();
+            op = switch (text) {
+                case "+" -> ChuckAST.Operator.PLUS;
+                case "-" -> ChuckAST.Operator.MINUS;
+                case "*" -> ChuckAST.Operator.TIMES;
+                case "/" -> ChuckAST.Operator.DIVIDE;
+                case "%" -> ChuckAST.Operator.PERCENT;
+                case "&&" -> ChuckAST.Operator.AND;
+                case "||" -> ChuckAST.Operator.OR;
+                case "<<" -> ChuckAST.Operator.SHIFT_LEFT;
+                case ">>" -> ChuckAST.Operator.SHIFT_RIGHT;
+                case "&" -> ChuckAST.Operator.S_AND;
+                case "|" -> ChuckAST.Operator.S_OR;
+                case "^" -> ChuckAST.Operator.NONE;
+                default -> ChuckAST.Operator.NONE;
+            };
+            if (op != ChuckAST.Operator.NONE) break;
+        }
         return new ChuckAST.BinaryExp((ChuckAST.Exp) visit(ctx.expression(0)), op, (ChuckAST.Exp) visit(ctx.expression(1)),
             ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
@@ -372,7 +397,9 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         } catch (NumberFormatException e) { val = 0; }
         return new ChuckAST.IntExp(val, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); 
     }
-    @Override public ChuckAST.Exp visitFloatLit(FloatLitContext ctx) { return new ChuckAST.FloatExp(Double.parseDouble(ctx.getText()), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); }
+    @Override public ChuckAST.Exp visitFloatLit(FloatLitContext ctx) { 
+        return new ChuckAST.FloatExp(Double.parseDouble(ctx.getText()), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()); 
+    }
     @Override public ChuckAST.Exp visitStringLit(StringLitContext ctx) { 
         String s = ctx.getText();
         if (s.length() < 2) return new ChuckAST.StringExp("", ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
@@ -484,7 +511,17 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         }
 
         boolean isPublic = ctx.PUBLIC() != null || (ctx.accessModifier() != null && ctx.accessModifier().PUBLIC() != null);
+        
+        // Find STATIC keyword in any of the possible locations in the prefix
         boolean isStatic = ctx.STATIC() != null;
+        if (!isStatic && ctx.getText().startsWith("static")) isStatic = true;
+        if (!isStatic && ctx.accessModifier() != null && ctx.accessModifier().getText().equals("static")) isStatic = true; // should not happen per grammar but safe
+        
+        // Check for static after access modifier: e.g. "public static fun"
+        if (!isStatic) {
+            String prefix = ctx.getChild(0).getText();
+            if (prefix.contains("static")) isStatic = true;
+        }
 
         if (name.startsWith("@operator") || name.startsWith("operator")) {
             String opSym = name.startsWith("@operator") ? name.substring("@operator".length()).trim() : name.substring("operator".length()).trim();
@@ -500,7 +537,13 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         List<String> argNames = new ArrayList<>();
         if (ctx.formalParameters() != null) {
             for (FormalParameterContext p : ctx.formalParameters().formalParameter()) {
-                argTypes.add(p.type().getText());
+                StringBuilder type = new StringBuilder(p.type().getText());
+                if (p.arrayDimension() != null) {
+                    for (int i = 0; i < p.arrayDimension().size(); i++) {
+                        type.append("[]");
+                    }
+                }
+                argTypes.add(type.toString());
                 argNames.add(p.ID().getText());
             }
         }

@@ -18,7 +18,20 @@ public class ChuckFactory {
 
     public static ChuckObject instantiateType(String t, int argc, Object[] args, float sr, ChuckVM vm, ChuckShred s, Map<String, UserClassDescriptor> rm) {
         if (t == null) return null;
+        if (t.endsWith("[]")) {
+            String elemType = t.substring(0, t.length() - 2);
+            int size = (argc > 0 && args != null && args.length > 0) ? (int) args[0] : 0;
+            ChuckArray arr = new ChuckArray(elemType, size);
+            return arr;
+        }
+        t = t.replaceAll("\\[\\]", "");
         
+        if (t.equals("complex")) return new ChuckArray("complex", 2);
+        if (t.equals("polar")) return new ChuckArray("polar", 2);
+        if (t.equals("vec2")) return new ChuckArray("vec2", 2);
+        if (t.equals("vec3")) return new ChuckArray("vec3", 3);
+        if (t.equals("vec4")) return new ChuckArray("vec4", 4);
+
         UserClassDescriptor d = (rm != null && rm.containsKey(t)) ? rm.get(t) : (vm != null ? vm.getUserClass(t) : null);
         if (d != null) {
             UserObject uo = new UserObject(t, d.fields(), d.methods(), extendsEvent(t, rm, vm));
@@ -37,13 +50,15 @@ public class ChuckFactory {
                     if (desc == null) continue;
                     if (desc.preCtorCode() != null) {
                         s.thisStack.push(uo);
-                        s.executeSynchronous(vm, desc.preCtorCode());
+                        vm.executeSynchronous(desc.preCtorCode(), s);
                         s.thisStack.pop();
+                    } else {
                     }
                     ChuckCode ctorCode = desc.methods().get(cls + ":0");
                     if (ctorCode != null) {
                         s.thisStack.push(uo);
-                        s.executeSynchronous(vm, ctorCode);
+                        vm.executeSynchronous(ctorCode, s);
+                        s.thisStack.pop();
                     }
                 }
             }
@@ -58,11 +73,11 @@ public class ChuckFactory {
 
         return switch (t) {
             case "string" -> new ChuckString("");
-            case "vec2" -> { ChuckArray v = new ChuckArray(ChuckType.ARRAY, 2); v.vecTag = "vec2"; yield v; }
-            case "vec3" -> { ChuckArray v = new ChuckArray(ChuckType.ARRAY, 3); v.vecTag = "vec3"; yield v; }
-            case "vec4" -> { ChuckArray v = new ChuckArray(ChuckType.ARRAY, 4); v.vecTag = "vec4"; yield v; }
-            case "complex" -> { ChuckArray v = new ChuckArray(ChuckType.ARRAY, 2); v.vecTag = "complex"; yield v; }
-            case "polar" -> { ChuckArray v = new ChuckArray(ChuckType.ARRAY, 2); v.vecTag = "polar"; yield v; }
+            case "vec2" -> new ChuckArray("vec2", 2);
+            case "vec3" -> new ChuckArray("vec3", 3);
+            case "vec4" -> new ChuckArray("vec4", 4);
+            case "complex" -> new ChuckArray("complex", 2);
+            case "polar" -> new ChuckArray("polar", 2);
             case "MidiIn" -> new org.chuck.midi.MidiIn(vm);
             case "MidiOut" -> new MidiOut();
             case "Hid" -> new org.chuck.hid.Hid();

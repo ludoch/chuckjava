@@ -77,8 +77,17 @@ public class ChucKIntegrationTest {
         
         final StringBuilder output = new StringBuilder();
         vm.addPrintListener(text -> {
-            if (output.length() < 100000) output.append(text);
+            if (output.length() < 10000) output.append(text);
         });
+
+        // Also redirect chout and cherr specifically for capturing
+        java.io.PrintStream capturePs = new java.io.PrintStream(new java.io.OutputStream() {
+            @Override public void write(int b) { if (output.length() < 10000) output.append((char) b); }
+            @Override public void write(byte[] b, int off, int len) { 
+                if (output.length() < 10000) output.append(new String(b, off, Math.min(len, 10000 - output.length()))); 
+            }
+        });
+        vm.initIO(capturePs, capturePs);
 
         // Capture stdout and stderr
         java.io.PrintStream oldOut = System.out;
@@ -89,26 +98,45 @@ public class ChucKIntegrationTest {
         System.setErr(ps);
 
         try {
+            boolean expectTags = false;
+            if (Files.exists(txtFilePre)) {
+                String expected = Files.readString(txtFilePre);
+                expectTags = expected.contains(":(");
+            }
+            if (expectTags) System.setProperty("chuck.print.tags", "true");
+            else System.clearProperty("chuck.print.tags");
+
             @SuppressWarnings("unused")
             int shredId = vm.run(source, ckFile.toString());
 
             // Advance time until finished or timeout
             int maxSeconds = 3; // Allow up to 3 simulated seconds
             int samplesPerStep = 44100 / 10; // 100ms
-            for (int i = 0; i < maxSeconds * 10 && vm.getActiveShredCount() > 0; i++) {
+            boolean finished = false;
+            for (int i = 0; i < maxSeconds * 10; i++) {
+                if (vm.getActiveShredCount() == 0) {
+                    finished = true;
+                    break;
+                }
                 vm.advanceTime(samplesPerStep);
                 Thread.sleep(1);
             }
+            if (!finished) {
+                vm.removeShred(shredId);
+            }
+            // Give a little extra time for the last output to be collected
+            Thread.sleep(50);
         } finally {
             System.setOut(oldOut);
             System.setErr(oldErr);
+            System.clearProperty("chuck.print.tags");
         }
 
         String result = output.toString();
-        String normalizedResult = normalizeOutput(result);
 
         Path txtFile = ckFile.resolveSibling(ckFile.getFileName().toString().replace(".ck", ".txt"));
         boolean useExpected = false;
+        String normalizedResult = "";
         String normalizedExpected = "";
         if (Files.exists(txtFile)) {
             FileTime modBefore = txtModTimeBefore.get(txtFile.toAbsolutePath().toString());
@@ -116,9 +144,13 @@ public class ChucKIntegrationTest {
             boolean fileWrittenByTest = modBefore == null || !modAfter.equals(modBefore);
             if (!fileWrittenByTest) {
                 String expected = Files.readString(txtFile);
-                normalizedExpected = normalizeOutput(expected);
+                boolean expectTags = expected.contains(":(");
+                normalizedResult = normalizeOutput(result, expectTags);
+                normalizedExpected = normalizeOutput(expected, expectTags);
                 useExpected = true;
             }
+        } else {
+            normalizedResult = normalizeOutput(result, false);
         }
 
         if (useExpected) {
@@ -135,12 +167,16 @@ public class ChucKIntegrationTest {
         }
     }
 
-    private String normalizeOutput(String out) {
+    private String normalizeOutput(String out, boolean preserveTags) {
         if (out == null) return "";
-        String normalized = out.replaceAll(" :\\(\\w+\\)", "") // Strip :(int), :(float), etc.
-                .replaceAll("\"" , "")           // Strip quotes
+        String normalized = out;
+        if (!preserveTags) {
+            normalized = normalized.replaceAll(" :\\(\\w+\\)", ""); // Strip :(int), :(float), etc.
+        }
+        normalized = normalized.replaceAll("\"" , "")           // Strip quotes
                 .replace("\r\n", "\n")
-                .replaceAll("\\[chuck\\]: \\(VM\\) sporking incoming shred: \\d+", "[chuck]: (VM) sporking incoming shred: N")
+                .replaceAll("\\[shred \\d+\\]: ", "") // Strip [shred 1]: prefix from console output
+                .replaceAll("\\[chuck\\]: \\(VM\\) sporking incoming shred:.*?\\.\\.\\. ?", "")
                 .replaceAll("[ \t]+\n", "\n")
                 .stripTrailing();
         

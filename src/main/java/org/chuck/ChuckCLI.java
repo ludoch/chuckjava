@@ -155,7 +155,7 @@ public class ChuckCLI {
 
     private void startVM() {
         try {
-            if (verbose > 0) {
+            if (verbose > 0 && !Boolean.getBoolean("chuck.print.tags")) {
                 System.out.println("🎸 ChucK-Java (JDK 25) - " + (silent ? "Silent Mode" : "Real-time Audio"));
             }
 

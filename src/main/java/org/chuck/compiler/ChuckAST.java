@@ -57,6 +57,7 @@ public sealed interface ChuckAST {
 
     // --- Statement Nodes ---
 
+    record ImportStmt(String path, int line, int column) implements Stmt {}
     record ExpStmt(Exp exp, int line, int column) implements Stmt {}
     
     record IfStmt(Exp condition, Stmt thenBranch, Stmt elseBranch, int line, int column) implements Stmt {}
@@ -93,6 +94,4 @@ public sealed interface ChuckAST {
     record ContinueStmt(int line, int column) implements Stmt {}
 
     record PrintStmt(java.util.List<Exp> expressions, int line, int column) implements Stmt {}
-
-    record ImportStmt(String path, int line, int column) implements Stmt {}
 }

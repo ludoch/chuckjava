@@ -237,15 +237,15 @@ LBRACE       : '{';
 RBRACE       : '}';
 LBRACK       : '[';
 RBRACK       : ']';
+FLOAT : [0-9]+ '.' [0-9]+ | [0-9]+ '.' | '.' [0-9]+ ;
+INT : '0x' [0-9a-fA-F]+ | [0-9]+ ;
+STRING : '"' ( ESC | ~["\\] )* '"' ;
+CHAR_LIT : '\'' ( ESC | ~['\\] ) '\'' ;
+ID : [a-zA-Z_] [a-zA-Z0-9_]* ;
+
 DOT          : '.';
 LTRIPLE      : '<<<';
 RTRIPLE      : '>>>';
-
-ID : [a-zA-Z_] [a-zA-Z0-9_]* ;
-INT : '0x' [0-9a-fA-F]+ | [0-9]+ ;
-FLOAT : [0-9]* '.' [0-9]+ | [0-9]+ '.' [0-9]* ;
-STRING : '"' ( ESC | ~["\\] )* '"' ;
-CHAR_LIT : '\'' ( ESC | ~['\\] ) '\'' ;
 
 fragment ESC : '\\' . ;
 

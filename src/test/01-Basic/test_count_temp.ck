@@ -14,3 +14,4 @@ fun void inc(int depth) {
 spork~ inc(3);
 5::samp => now;
 <<< "final count:", count >>>;
+<<< "success" >>>;

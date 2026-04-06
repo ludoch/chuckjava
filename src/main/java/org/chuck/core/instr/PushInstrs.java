@@ -4,8 +4,9 @@ import org.chuck.core.*;
 
 public class PushInstrs {
     public static class PushInt implements ChuckInstr {
-        long v; public PushInt(long val) { v = val; }
-        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.push(v); }
+        long val; public PushInt(long v) { val = v; }
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.push(val); }
+        @Override public String toString() { return "PushInt(" + val + ")"; }
     }
 
     public static class PushFloat implements ChuckInstr {

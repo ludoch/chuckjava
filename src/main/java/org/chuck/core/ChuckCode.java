@@ -24,6 +24,13 @@ public class ChuckCode {
         return name;
     }
 
+    public void dump(java.io.PrintStream out) {
+        for (int i = 0; i < instructions.size(); i++) {
+            ChuckInstr instr = instructions.get(i);
+            out.println("  [" + i + "] " + (instr != null ? instr.toString() : "null") + " (line " + getLineNumber(i) + ")");
+        }
+    }
+
     public void addInstruction(ChuckInstr instr) {
         instructions.add(instr);
         lineNumbers.add(activeLineNumber);

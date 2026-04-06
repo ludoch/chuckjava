@@ -4,6 +4,7 @@ package org.chuck.hid;
  * Represents a message from an HID device (keyboard, mouse, etc.).
  */
 public class HidMsg extends org.chuck.core.ChuckObject {
+    public String deviceType; // "keyboard", "mouse", etc.
     public int type;      // 1: Key Down, 2: Key Up, 3: Mouse Move, etc.
     public int which;     // Key code or button index
     public float x;       // Mouse X or axis value

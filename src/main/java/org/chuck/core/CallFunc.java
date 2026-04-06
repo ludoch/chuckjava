@@ -16,33 +16,17 @@ public class CallFunc implements ChuckInstr {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred shred) {
-        // 1. Move arguments from reg stack to mem stack first
-        long[] prims = new long[argCount];
-        boolean[] isD = new boolean[argCount];
-        Object[] objs = new Object[argCount];
-        for (int i = argCount - 1; i >= 0; i--) {
-            isD[i] = shred.reg.isDouble(0);
-            if (shred.reg.isObject(0)) objs[i] = shred.reg.popObject();
-            else if (isD[i]) prims[i] = Double.doubleToRawLongBits(shred.reg.popDouble());
-            else prims[i] = shred.reg.popLong();
-        }
-
-        // 2. Save return state
+        // 1. Save return state
         shred.mem.pushObject(shred.getCode());
-        shred.mem.push(shred.getPc());
-        shred.mem.push(shred.getFramePointer());
-        shred.mem.push(shred.reg.getSp()); // reg sp before return value is pushed
+        shred.mem.push((long) (shred.getPc() + 1));
+        shred.mem.push((long) shred.getFramePointer());
+        shred.mem.push((long) (shred.reg.getSp() - argCount));
 
-        // 3. Set new FP and push args to it
+        // 2. Set new FP
         shred.setFramePointer(shred.mem.getSp());
-        for (int i = 0; i < argCount; i++) {
-            if (objs[i] != null) shred.mem.pushObject(objs[i]);
-            else if (isD[i]) shred.mem.push(Double.longBitsToDouble(prims[i]));
-            else shred.mem.push(prims[i]);
-        }
 
-        // 4. Jump
+        // 3. Jump
         shred.setCode(targetCode);
-        shred.setPc(-1);
+        shred.setPc(0);
     }
 }

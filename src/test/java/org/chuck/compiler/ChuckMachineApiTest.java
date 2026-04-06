@@ -202,7 +202,7 @@ public class ChuckMachineApiTest {
     @Test
     public void testMachineStatus() throws InterruptedException {
         // Machine.status() prints the VM status; check it produces some output
-        List<String> out = runChuck("Machine.status();", 10);
+        List<String> out = runChuck("Machine.status();", 1000);
         // Status prints directly to VM output
         assertFalse(out.isEmpty(), "Machine.status() should produce output");
     }

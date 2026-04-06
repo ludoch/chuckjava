@@ -54,7 +54,9 @@ public class MiscInstrs {
     public static class RegisterClass implements ChuckInstr {
         String name; UserClassDescriptor d;
         public RegisterClass(String n, UserClassDescriptor desc) { name = n; d = desc; }
-        @Override public void execute(ChuckVM vm, ChuckShred s) { vm.registerUserClass(name, d); }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            vm.registerUserClass(name, d);
+        }
     }
 
     public static class CreateEventConjunction implements ChuckInstr {

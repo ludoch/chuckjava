@@ -19,7 +19,8 @@ public class StackInstrs {
 
     public static class PushThis implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            s.reg.pushObject(s.thisStack.isEmpty() ? null : s.thisStack.peek());
+            Object obj = s.thisStack.isEmpty() ? null : s.thisStack.peek();
+            s.reg.pushObject(obj);
         }
     }
 

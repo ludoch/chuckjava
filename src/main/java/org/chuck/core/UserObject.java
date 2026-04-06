@@ -43,6 +43,12 @@ public class UserObject extends ChuGen {
             }
             if (isFloat) floatFields.add(f[1]);
             primitiveFields.put(f[1], initVal);
+            
+            // Auto-instantiate object fields if they are known user classes
+            if (!isFloat && !"int".equals(f[0]) && !"string".equals(f[0]) && !"dur".equals(f[0]) && !"time".equals(f[0]) && !"void".equals(f[0])) {
+                // We'll let the VM handle instantiation later if needed, but for now we mark it
+                // Actually, the Emitter should probably emit an instruction to instantiate it.
+            }
         }
     }
 

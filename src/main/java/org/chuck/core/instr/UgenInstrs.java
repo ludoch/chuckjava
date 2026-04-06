@@ -32,4 +32,11 @@ public class UgenInstrs {
             else s.reg.push(0.0);
         }
     }
+
+    public static class NewUGen implements ChuckInstr {
+        String type; public NewUGen(String t) { type = t; }
+        @Override public void execute(ChuckVM vm, ChuckShred s) {
+            s.reg.pushObject(org.chuck.core.ChuckFactory.instantiateType(type, 0, null, vm.getSampleRate(), vm, s, null));
+        }
+    }
 }

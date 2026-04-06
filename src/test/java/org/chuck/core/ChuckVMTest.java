@@ -192,6 +192,7 @@ public class ChuckVMTest {
 
         // Args are in mem stack at fp+0, fp+1 with the new calling convention.
         ChuckCode funcCode = new ChuckCode("AddFunction");
+        funcCode.addInstruction(new org.chuck.core.instr.VarInstrs.MoveArgs(2));
         funcCode.addInstruction((vm2, shred) -> {
             int fp = shred.getFramePointer();
             long a = shred.mem.getData(fp);

@@ -4,100 +4,120 @@ import org.chuck.audio.Adc;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.Blackhole;
 import org.chuck.chugin.ChuginLoader;
+import org.chuck.compiler.ChuckANTLRLexer;
+import org.chuck.compiler.ChuckANTLRParser;
+import org.chuck.compiler.ChuckAST;
+import org.chuck.compiler.ChuckASTVisitor;
+import org.chuck.compiler.ChuckEmitter;
+import org.antlr.v4.runtime.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.PriorityQueue;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.Set;
-import java.util.HashSet;
-import java.util.concurrent.ConcurrentHashMap;
-import java.nio.file.Files;
-import java.nio.file.Paths;
+import org.chuck.audio.DacChannel;
+import org.chuck.audio.MultiChannelDac;
+import org.chuck.hid.Hid;
+import org.chuck.hid.HidMsg;
 
 /**
- * The Virtual Machine is responsible for managing timing, shreds,
- * and sample-accurate execution.
+ * The ChucK Virtual Machine.
+ * Manages shreds, timing, and global state.
  */
 public class ChuckVM {
-    /** The ScopedValue holding the active VM for the current scope. */
+    /** The current VM instance for the current thread (ScopedValue). */
     public static final ScopedValue<ChuckVM> CURRENT_VM = ScopedValue.newInstance();
+
+    // Current logical time in samples
+    private final AtomicLong now = new AtomicLong(0);
     
-    // Global logical time in samples
-    private final AtomicLong currentTime = new AtomicLong(0);
-    
-    // Shared Emitter to preserve class registry and metadata across shreds
-    private final org.chuck.compiler.ChuckEmitter emitter;
-    
-    // Shreduler queue: orders shreds by wake-up time
+    // Shred management
     private final PriorityQueue<ChuckShred> shreduler = new PriorityQueue<>();
     private final Map<Integer, ChuckShred> activeShreds = new ConcurrentHashMap<>();
-    private final ReentrantLock schedulerLock = new ReentrantLock();
+    private final ReentrantLock shredulerLock = new ReentrantLock();
+    private final Condition shredulerCondition = shredulerLock.newCondition();
+    private int nextShredId = 1;
     
     // Audio configuration
     private final int sampleRate;
     
     // Global variables
     private final Map<String, Long> globalInts = new ConcurrentHashMap<>();
+    private final Map<String, Boolean> globalIsInt = new ConcurrentHashMap<>();
     private final Map<String, Boolean> globalIsDouble = new ConcurrentHashMap<>();
     private final Map<String, Boolean> globalIsObject = new ConcurrentHashMap<>();
     private final Map<String, Object> globalObjects = new ConcurrentHashMap<>();
     private final Map<String, UserClassDescriptor> userClassRegistry = new ConcurrentHashMap<>();
-    private final Map<String, ChuckCode> importedFunctions = new ConcurrentHashMap<>();
 
-    public void registerUserClass(String name, UserClassDescriptor descriptor) {
-        userClassRegistry.put(name, descriptor);
-    }
-
-    public UserClassDescriptor getUserClass(String name) {
-        return userClassRegistry.get(name);
-    }
-
-    // Multi-channel output (dac)
-    private final int numChannels = 2;
-    private final ChuckUGen[] dacChannels = new ChuckUGen[numChannels];
-    private final org.chuck.audio.MultiChannelDac multiChannelDac;
-    public final ChuckObject dac;
-    public final Blackhole blackhole;
+    // Multi-channel support
+    private final int numChannels;
+    private final DacChannel[] dacChannels;
+    private final MultiChannelDac multiChannelDac;
+    
+    // Special globals
+    public final MultiChannelDac dac;
     public final Adc adc;
+    public final Blackhole blackhole;
+
+    // Listeners for printed output
+    private final List<java.util.function.Consumer<String>> printListeners = new ArrayList<>();
+
+    // HID management
+    private final List<Hid> registeredHids = new ArrayList<>();
 
     public ChuckVM(int sampleRate) {
-        this.sampleRate = sampleRate;
-        this.emitter = new org.chuck.compiler.ChuckEmitter(userClassRegistry, importedFunctions);
-        ChuginLoader.loadChugins("chugins");
-
-        // Initialize dac channels as virtual summing nodes
-        for (int i = 0; i < numChannels; i++) {
-            dacChannels[i] = new org.chuck.audio.DacChannel(i);
-        }
-
-        this.dac = new ChuckObject(new ChuckType("dac", ChuckType.OBJECT, 0, 0));
-        setGlobalObject("dac", dac);
-
-        this.blackhole = new Blackhole();
-        setGlobalObject("blackhole", blackhole);
-
-        this.adc = new Adc();
-        setGlobalObject("adc", adc);
-
-        this.multiChannelDac = new org.chuck.audio.MultiChannelDac(dacChannels);
-
-        setGlobalObject("chout", new ChuckIO(System.out, this));
-        setGlobalObject("cherr", new ChuckIO(System.err, this));
-        setGlobalObject("IO", new ChuckIO(System.out, this));
+        this(sampleRate, 2);
     }
 
-    public ChuckUGen getDacChannel(int channel) {
+    public ChuckVM(int sampleRate, int channels) {
+        ChuckShred.resetIdCounter();
+        this.sampleRate = sampleRate;
+        this.numChannels = channels;
+        this.dacChannels = new DacChannel[numChannels];
+        for (int i = 0; i < numChannels; i++) {
+            dacChannels[i] = new DacChannel(i);
+        }
+        this.multiChannelDac = new MultiChannelDac(dacChannels);
+        this.dac = multiChannelDac;
+        this.adc = new Adc();
+        this.blackhole = new Blackhole();
+        
+        // Initialize special globals
+        setGlobalObject("dac", multiChannelDac);
+        setGlobalObject("blackhole", blackhole);
+        setGlobalObject("adc", adc);
+        initIO(System.out, System.err);
+    }
+
+    public void initIO(java.io.PrintStream out, java.io.PrintStream err) {
+        setGlobalObject("chout", new ChuckIO(out, this));
+        setGlobalObject("cherr", new ChuckIO(err, this));
+        setGlobalObject("IO", new ChuckIO(out, this));
+    }
+
+    public int getSampleRate() { return sampleRate; }
+    public long getCurrentTime() { return now.get(); }
+    
+    public void addPrintListener(java.util.function.Consumer<String> listener) {
+        synchronized(printListeners) { printListeners.add(listener); }
+    }
+    
+    public void print(String text) {
+        synchronized(printListeners) {
+            if (printListeners.isEmpty()) System.out.print(text);
+            else printListeners.forEach(l -> l.accept(text));
+        }
+    }
+
+    public MultiChannelDac getMultiChannelDac() { return multiChannelDac; }
+    public DacChannel getDacChannel(int channel) {
         return dacChannels[channel % numChannels];
     }
-
-    public ChuckUGen getMultiChannelDac() {
-        return multiChannelDac;
-    }
-
     public float getChannelLastOut(int channel) {
         return dacChannels[channel % numChannels].getLastOut();
     }
@@ -106,8 +126,9 @@ public class ChuckVM {
         return numChannels;
     }
 
-    public void setGlobalInt(String name, long value) {
-        globalInts.put(name, value);
+    public void setGlobalInt(String name, long val) {
+        globalInts.put(name, val);
+        globalIsInt.put(name, true);
         globalIsDouble.put(name, false);
         globalIsObject.put(name, false);
     }
@@ -115,11 +136,20 @@ public class ChuckVM {
     public void setGlobalFloat(String name, double value) {
         globalInts.put(name, Double.doubleToRawLongBits(value));
         globalIsDouble.put(name, true);
+        globalIsInt.put(name, false);
         globalIsObject.put(name, false);
     }
 
     public long getGlobalInt(String name) {
         return globalInts.getOrDefault(name, 0L);
+    }
+
+    public double getGlobalFloat(String name) {
+        return Double.longBitsToDouble(getGlobalInt(name));
+    }
+
+    public boolean isGlobalInt(String name) {
+        return globalIsInt.getOrDefault(name, false);
     }
 
     public boolean isGlobalDouble(String name) {
@@ -132,6 +162,8 @@ public class ChuckVM {
 
     public void setGlobalObject(String name, Object obj) {
         globalIsObject.put(name, true);
+        globalIsInt.put(name, false);
+        globalIsDouble.put(name, false);
         if (obj == null) {
             globalObjects.remove(name);
         } else {
@@ -143,451 +175,272 @@ public class ChuckVM {
         return globalObjects.get(name);
     }
 
-    public Map<String, String> getGlobalTypes() {
-        Map<String, String> types = new HashMap<>();
-        for (String name : globalIsObject.keySet()) {
-            if (globalIsObject.get(name)) {
-                Object o = globalObjects.get(name);
-                if (o instanceof ChuckObject co) types.put(name, co.getType().getName());
-                else types.put(name, "Object");
-            } else if (globalIsDouble.getOrDefault(name, false)) {
-                types.put(name, "float");
-            } else {
-                types.put(name, "int");
-            }
+    public UserClassDescriptor getUserClass(String name) {
+        return userClassRegistry.get(name);
+    }
+
+    public void registerUserClass(String name, UserClassDescriptor desc) {
+        userClassRegistry.put(name, desc);
+    }
+
+    public int run(String source, String name) {
+        try {
+            CharStream input = CharStreams.fromString(source);
+            ChuckANTLRLexer lexer = new ChuckANTLRLexer(input);
+            CommonTokenStream tokens = new CommonTokenStream(lexer);
+            ChuckANTLRParser parser = new ChuckANTLRParser(tokens);
+            
+            ChuckASTVisitor visitor = new ChuckASTVisitor();
+            @SuppressWarnings("unchecked")
+            List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
+            
+            ChuckEmitter emitter = new ChuckEmitter(userClassRegistry);
+            ChuckCode code = emitter.emit(ast, name);
+            ChuckShred shred = new ChuckShred(code);
+            return spork(shred);
+        } catch (Exception e) {
+            print("Machine.run error: " + e.getMessage() + "\n");
+            return -1;
         }
-        return types;
     }
-    
-    // Printing support
-    public interface PrintListener {
-        void onPrint(String text);
+
+    public int add(String filename) {
+        return add(filename, null);
     }
-    private final List<PrintListener> printListeners = new ArrayList<>();
-    
-    // HID support
-    private final List<org.chuck.hid.Hid> openHidDevices = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+    public int add(String filename, ChuckShred caller) {
+        try {
+            // ChucK supports passing arguments to added shreds via colons: "file.ck:arg1:arg2"
+            String baseFilename = filename;
+            String[] parts = filename.split(":");
+            if (parts.length > 1 && (parts[0].endsWith(".ck") || parts[0].endsWith(".disabled"))) {
+                baseFilename = parts[0];
+            }
+
+            java.nio.file.Path path = java.nio.file.Paths.get(baseFilename);
+            if (!path.isAbsolute() && caller != null) {
+                String callerPath = caller.getCode().getName();
+                if (callerPath != null && !callerPath.equals("eval")) {
+                    java.nio.file.Path callerDir = java.nio.file.Paths.get(callerPath).getParent();
+                    if (callerDir != null) {
+                        path = callerDir.resolve(baseFilename);
+                    }
+                }
+            }
+            String source = java.nio.file.Files.readString(path);
+            int id = run(source, path.toString());
+            
+            // Pass arguments if any
+            if (id > 0 && parts.length > 1 && baseFilename.equals(parts[0])) {
+                ChuckShred ns = activeShreds.get(id);
+                if (ns != null) {
+                    String[] shredArgs = new String[parts.length - 1];
+                    System.arraycopy(parts, 1, shredArgs, 0, parts.length - 1);
+                    ns.setArgs(shredArgs);
+                }
+            }
+            return id;
+        } catch (IOException e) {
+            print("Error adding file: " + filename + "\n");
+            return -1;
+        }
+    }
+
+    public int eval(String code) {
+        return run(code, "eval");
+    }
+
+    public int replace(int id, String filename) {
+        return replace(id, filename, null);
+    }
+
+    public int replace(int id, String filename, ChuckShred caller) {
+        removeShred(id);
+        return add(filename, caller);
+    }
+
+    public int spork(ChuckShred shred) {
+        if (shred.getId() <= 0) {
+            shred.setId(nextShredId++);
+        }
+        if (!Boolean.getBoolean("chuck.silent") && shred.getId() > 1) {
+            String displayName = shred.getName();
+            if (displayName != null && displayName.contains(java.io.File.separator)) {
+                displayName = displayName.substring(displayName.lastIndexOf(java.io.File.separator) + 1);
+            }
+            print("[chuck]: (VM) sporking incoming shred: " + shred.getId() + " (" + displayName + ")...\n");
+        }
+        activeShreds.put(shred.getId(), shred);
+        schedule(shred);
+        
+        // Start shred execution in a Virtual Thread
+        Thread.ofVirtual().start(() -> {
+            try {
+                // Ensure we are inside the ScopedValue context
+                ScopedValue.where(CURRENT_VM, this)
+                          .where(ChuckShred.CURRENT_SHRED, shred)
+                          .run(() -> shred.execute(this));
+            } finally {
+                activeShreds.remove(shred.getId());
+                shred.setDone(true);
+                // Wake up any shreds waiting on this shred (if it's an Event)
+                shred.broadcast(this);
+            }
+        });
+        
+        return shred.getId();
+    }
+
+    public int spork(Runnable task) {
+        ChuckShred shred = new ChuckShred(null); // No ChucK code
+        if (shred.getId() <= 0) {
+            shred.setId(nextShredId++);
+        }
+        activeShreds.put(shred.getId(), shred);
+        
+        Thread.ofVirtual().start(() -> {
+            try {
+                ScopedValue.where(CURRENT_VM, this)
+                          .where(ChuckShred.CURRENT_SHRED, shred)
+                          .run(task);
+            } finally {
+                activeShreds.remove(shred.getId());
+                shred.setDone(true);
+                shred.broadcast(this);
+            }
+        });
+        
+        return shred.getId();
+    }
+
+    public void schedule(ChuckShred shred) {
+        shredulerLock.lock();
+        try {
+            shreduler.add(shred);
+            shredulerCondition.signalAll();
+        } finally {
+            shredulerLock.unlock();
+        }
+    }
+
+    public void executeSynchronous(ChuckCode code, ChuckShred shred) {
+        if (code != null) {
+            shred.executeSynchronous(this, code);
+        }
+    }
+
+    public void advanceTime(long samples) {
+        long targetTime = now.get() + samples;
+        while (now.get() < targetTime) {
+            long currentTime = now.get();
+
+            // 1. Collect all shreds ready to run at this time
+            java.util.List<ChuckShred> ready = new java.util.ArrayList<>();
+            shredulerLock.lock();
+            try {
+                while (!shreduler.isEmpty() && shreduler.peek().getWakeTime() <= currentTime) {
+                    ready.add(shreduler.poll());
+                }
+            } finally {
+                shredulerLock.unlock();
+            }
+
+            // 2. Run them once
+            for (ChuckShred nextShred : ready) {
+                nextShred.resume(this);
+                if (!nextShred.isDone() && !nextShred.isWaiting()) {
+                    schedule(nextShred);
+                }
+            }
+
+            // 3. Roots are the DAC channels
+            for (DacChannel chan : dacChannels) {
+                chan.tick(currentTime);
+            }
+            
+            now.incrementAndGet();
+        }
+    }
 
     public int getActiveShredCount() {
         return activeShreds.size();
+    }
+
+    public int getNumShreds() { return activeShreds.size(); }
+
+    public int[] getActiveShredIds() {
+        Set<Integer> ids = activeShreds.keySet();
+        int[] result = new int[ids.size()];
+        int i = 0;
+        for (Integer id : ids) result[i++] = id;
+        return result;
     }
 
     public boolean shredExists(int id) {
         return activeShreds.containsKey(id);
     }
 
-    public void registerHid(org.chuck.hid.Hid hid) {
-        openHidDevices.add(hid);
-    }
-
-    public void dispatchHidMsg(org.chuck.hid.HidMsg msg) {
-        String type = msg.type == 3 || msg.type == 4 ? "mouse" : "keyboard";
-        for (org.chuck.hid.Hid hid : openHidDevices) {
-            if (hid.getDeviceType().equals(type)) {
-                hid.pushMsg(msg);
-                hid.broadcast(this);
-            }
-        }
-    }
-
-    public void addPrintListener(PrintListener listener) {
-        printListeners.add(listener);
-    }
-
-    public void print(String text) {
-        if (text == null) return;
-        for (PrintListener listener : printListeners) {
-            listener.onPrint(text);
-        }
-    }
-
-    public long getCurrentTime() {
-        return currentTime.get();
-    }
-    
-    public int getSampleRate() {
-        return sampleRate;
-    }
-
-    /**
-     * Schedules a shred to wake up based on its wakeTime.
-     */
-    public void schedule(ChuckShred shred) {
-        schedulerLock.lock();
-        try {
-            shreduler.offer(shred);
-        } finally {
-            schedulerLock.unlock();
-        }
-    }
-
-    /**
-     * Spawns a new Java-based shred from a Runnable.
-     */
-    public int spork(Runnable task) {
-        ChuckShred shred = new ChuckShred(null); // No bytecode for Java shreds
-        schedulerLock.lock();
-        try {
-            shred.setWakeTime(currentTime.get());
-            shreduler.offer(shred);
-            activeShreds.put(shred.getId(), shred);
-        } finally {
-            schedulerLock.unlock();
-        }
-
-        Thread.ofVirtual().name("JavaShred-" + shred.getId()).start(() -> {
-            ScopedValue.where(ChuckVM.CURRENT_VM, this)
-                       .where(ChuckShred.CURRENT_SHRED, shred)
-                       .run(() -> {
-                try {
-                    // Java shreds are expected to block using ChuckDSL.advance()
-                    task.run();
-                } catch (Throwable t) {
-                    t.printStackTrace();
-                } finally {
-                    shred.isDone = true;
-                    shred.cleanup();
-                    activeShreds.remove(shred.getId());
-                }
-            });
-        });
-        return shred.getId();
-    }
-
-    /**
-     * Spawns a new shred and starts its Virtual Thread.
-     */
-    public int spork(ChuckShred shred) {
-        schedulerLock.lock();
-        boolean doLog;
-        try {
-            doLog = !activeShreds.isEmpty();
-            long wt = currentTime.get();
-            shred.setWakeTime(wt);
-            shreduler.offer(shred);
-            activeShreds.put(shred.getId(), shred);
-        } finally {
-            schedulerLock.unlock();
-        }
-        if (doLog) {
-            ChuckCode c = shred.getCode();
-            String fname = "shred";
-            if (c != null && c.getName() != null) {
-                String n = c.getName().replace('\\', '/');
-                int slash = n.lastIndexOf('/');
-                fname = slash >= 0 ? n.substring(slash + 1) : n;
-            }
-            print("[chuck]: (VM) sporking incoming shred: " + shred.getId() + " (" + fname + ")...\n");
-        }
-        
-        Thread.ofVirtual().name("Shred-" + shred.getId()).start(() -> {
-            ScopedValue.where(ChuckVM.CURRENT_VM, this)
-                       .where(ChuckShred.CURRENT_SHRED, shred)
-                       .run(() -> {
-                try {
-                    shred.execute(this);
-                } catch (Throwable t) {
-                    System.err.println("Error in shred " + shred.getId() + ": " + t.getMessage());
-                    t.printStackTrace();
-                } finally {
-                    shred.cleanup();
-                    activeShreds.remove(shred.getId());
-                }
-            });
-        });
-        return shred.getId();
-    }
-
-    public int add(String pathWithArgs) {
-        try {
-            // Support "path/to/file.ck:arg0:arg1" format (ChucK Machine.add convention)
-            String filePath = pathWithArgs;
-            String[] shredArgs = new String[0];
-            int colonIdx = pathWithArgs.indexOf(':');
-            if (colonIdx >= 0) {
-                filePath = pathWithArgs.substring(0, colonIdx);
-                String argStr = pathWithArgs.substring(colonIdx + 1);
-                shredArgs = argStr.isEmpty() ? new String[0] : argStr.split(":");
-            }
-
-            if (filePath.endsWith(".java")) {
-                Runnable task = ChuckDSL.load(java.nio.file.Paths.get(filePath));
-                int id = spork(task);
-                ChuckShred shred = getShred(id);
-                if (shred != null && shredArgs.length > 0) shred.setArgs(shredArgs);
-                return id;
-            }
-
-            String source = java.nio.file.Files.readString(java.nio.file.Paths.get(filePath));
-            int shredId = run(source, filePath);
-            if (shredId > 0 && shredArgs.length > 0) {
-                ChuckShred shred = getShred(shredId);
-                if (shred != null) shred.setArgs(shredArgs);
-            }
-            return shredId;
-        } catch (Exception e) {
-            print("Machine.add error: " + e.getMessage());
-            return 0;
-        }
-    }
-
-    /**
-     * Compiles and executes a ChucK source string.
-     * @param source The ChucK source code
-     * @param name A label for this shred (e.g. filename)
-     * @return The shred ID
-     */
-    public int run(String source, String name) {
-        try {
-            List<org.chuck.compiler.ChuckAST.Stmt> ast = parseSource(source);
-
-            // Resolve an absolute path for the file so imports can be resolved relatively
-            String absName;
-            try {
-                absName = Paths.get(name).toAbsolutePath().normalize().toString();
-            } catch (Exception ex) {
-                absName = name;
-            }
-
-            // Process @import directives before emitting
-            Map<String, ChuckCode> fileImportedFunctions = new HashMap<>();
-            Set<String> compiledFiles = new HashSet<>();
-            LinkedHashSet<String> importStack = new LinkedHashSet<>();
-            processImports(ast, absName, importStack, compiledFiles, fileImportedFunctions);
-            importedFunctions.putAll(fileImportedFunctions);
-
-            ChuckCode code = emitter.emit(ast, name, getGlobalTypes());
-            ChuckShred shred = new ChuckShred(code);
-            return spork(shred);
-        } catch (Exception e) {
-            print("Machine.run error: " + e.getMessage());
-            return 0;
-        }
-    }
-
-    private List<org.chuck.compiler.ChuckAST.Stmt> parseSource(String source) {
-        org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
-        org.chuck.compiler.ChuckANTLRLexer lexer = new org.chuck.compiler.ChuckANTLRLexer(input);
-        org.antlr.v4.runtime.CommonTokenStream tokens = new org.antlr.v4.runtime.CommonTokenStream(lexer);
-        org.chuck.compiler.ChuckANTLRParser parser = new org.chuck.compiler.ChuckANTLRParser(tokens);
-        org.chuck.compiler.ChuckASTVisitor visitor = new org.chuck.compiler.ChuckASTVisitor();
-        @SuppressWarnings("unchecked")
-        List<org.chuck.compiler.ChuckAST.Stmt> result = (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
-        return result;
-    }
-
-    private String resolveImportPath(String currentFilePath, String importPath) {
-        java.nio.file.Path base = Paths.get(currentFilePath).getParent();
-        if (base == null) base = Paths.get(".");
-        java.nio.file.Path resolved = base.resolve(importPath).normalize();
-        String str = resolved.toString();
-        // Try as-is, then with .ck extension
-        if (Files.exists(Paths.get(str))) return str;
-        if (!str.endsWith(".ck")) {
-            String withExt = str + ".ck";
-            if (Files.exists(Paths.get(withExt))) return withExt;
-            return withExt; // return even if not found (will error in caller)
-        }
-        return str;
-    }
-
-    private void processImports(
-            List<org.chuck.compiler.ChuckAST.Stmt> ast,
-            String filePath,
-            LinkedHashSet<String> importStack,
-            Set<String> compiledFiles,
-            Map<String, ChuckCode> importedFunctions) throws Exception {
-
-        importStack.add(filePath);
-        for (org.chuck.compiler.ChuckAST.Stmt stmt : ast) {
-            if (stmt instanceof org.chuck.compiler.ChuckAST.ImportStmt imp) {
-                String importPath = resolveImportPath(filePath, imp.path());
-
-                // Check file exists
-                if (!Files.exists(Paths.get(importPath))) {
-                    String shortName = Paths.get(imp.path()).getFileName().toString();
-                    if (!shortName.endsWith(".ck")) shortName += ".ck";
-                    throw new RuntimeException(Paths.get(filePath).getFileName() + ":"
-                            + imp.line() + ":" + imp.column()
-                            + ": error: no such file: '" + imp.path() + "'\n"
-                            + "[" + imp.line() + "] @import \"" + imp.path() + "\"\n"
-                            + "            ^");
-                }
-
-                // Check cycle
-                if (importStack.contains(importPath)) {
-                    String cyclic = Paths.get(importPath).getFileName().toString();
-                    StringBuilder msg = new StringBuilder("[chuck]: @import error -- cycle detected:\n");
-                    msg.append("[chuck]:  |- '").append(cyclic).append("' is imported from...\n");
-                    // Walk the stack backwards to build the chain
-                    List<String> chain = new ArrayList<>(importStack);
-                    for (int i = chain.size() - 1; i >= 0; i--) {
-                        String chainFile = Paths.get(chain.get(i)).getFileName().toString();
-                        if (i == 0) {
-                            msg.append("[chuck]:  |- '").append(chainFile).append("':[line ").append(imp.line()).append("] (this is the originating file)");
-                        } else {
-                            msg.append("[chuck]:  |- '").append(chainFile).append("':[line ").append(imp.line()).append("], which is imported from...\n");
-                        }
-                    }
-                    throw new RuntimeException(msg.toString());
-                }
-
-                // Skip if already compiled (diamond dependency deduplication)
-                if (compiledFiles.contains(importPath)) continue;
-
-                // Read and parse the imported file
-                String importSource = Files.readString(Paths.get(importPath));
-                List<org.chuck.compiler.ChuckAST.Stmt> importAst = parseSource(importSource);
-
-                // Recursively process its imports first
-                processImports(importAst, importPath, importStack, compiledFiles, importedFunctions);
-
-                // Compile to extract class definitions and public operator functions
-                org.chuck.compiler.ChuckEmitter importEmitter =
-                        new org.chuck.compiler.ChuckEmitter(userClassRegistry, importedFunctions);
-                importEmitter.emit(importAst, importPath);
-
-                // Merge class definitions into VM registry
-                importEmitter.getUserClassRegistry().forEach((k, v) -> {
-                    if (!userClassRegistry.containsKey(k)) userClassRegistry.put(k, v);
-                });
-
-                // Collect public operator functions for the importing file
-                importedFunctions.putAll(importEmitter.getPublicFunctions());
-
-                compiledFiles.add(importPath);
-            }
-        }
-        importStack.remove(filePath);
-    }
-
     public ChuckShred getShred(int id) {
         return activeShreds.get(id);
     }
-    
-    public int getNumShreds() {
-        return activeShreds.size();
-    }
-    
-    public int[] getActiveShredIds() {
-        return activeShreds.keySet().stream().mapToInt(Integer::intValue).toArray();
+
+    public List<ChuckShred> getAllShreds() {
+        return new ArrayList<>(activeShreds.values());
     }
 
     public void removeShred(int id) {
-        ChuckShred shred = activeShreds.get(id);
-        if (shred != null) {
-            shred.abort();
-            activeShreds.remove(id);
-        }
+        ChuckShred s = activeShreds.get(id);
+        if (s != null) s.setDone(true);
     }
 
-    public int replace(int id, String path) {
-        removeShred(id);
-        return add(path);
+    public void resetShredId() {
+        nextShredId = 1;
     }
 
-    public void status() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("\n[chuck]: (VM) status (").append(activeShreds.size()).append(" shreds active):\n");
-        sb.append("  | id | name       | wakeTime | args |\n");
-        sb.append("  |----|------------|----------|------|\n");
-        for (ChuckShred s : activeShreds.values()) {
-            String n = s.getName();
-            if (n == null || n.isEmpty()) n = "eval";
-            else {
-                n = n.replace('\\', '/');
-                int slash = n.lastIndexOf('/');
-                if (slash >= 0) n = n.substring(slash + 1);
-            }
-            if (n.length() > 10) n = n.substring(0, 10);
-            
-            sb.append(String.format("  | %2d | %-10s | %8d | %s |\n", 
-                s.getId(), n, s.getWakeTime(), String.join(":", s.getArgs())));
-        }
-        print(sb.toString());
+    public void gc() {
+        System.gc();
     }
 
-    public int eval(String source) {
-        return run(source, "eval");
-    }
-
-    // Machine API
-    private static final String VERSION = "1.5.4.0 (java)";
-    private int logLevel = 1;
-
-    public void resetShredId() { ChuckShred.resetIdCounter(); }
-    public void gc() { System.gc(); }
-    public String getVersion() { return VERSION; }
-    public String getPlatform() { return System.getProperty("os.name", "unknown"); }
-    public int getLogLevel() { return logLevel; }
-    public void setLogLevel(int level) { logLevel = level; }
-    public double getTimeOfDay() { return System.currentTimeMillis() / 1000.0; }
+    public String getVersion() { return "1.0.0 (Java)"; }
+    public String getPlatform() { return System.getProperty("os.name"); }
 
     public void clear() {
-        activeShreds.values().forEach(ChuckShred::abort);
+        activeShreds.values().forEach(s -> s.setDone(true));
         activeShreds.clear();
-        schedulerLock.lock();
+        shredulerLock.lock();
         try {
             shreduler.clear();
         } finally {
-            schedulerLock.unlock();
-        }
-        globalObjects.clear();
-        globalInts.clear();
-        // Disconnect all UGens from the audio graph so sound stops immediately
-        for (int i = 0; i < numChannels; i++) dacChannels[i].clearSources();
-        blackhole.clearSources();
-
-        // Re-register defaults
-        globalObjects.put("dac", dac);
-        globalObjects.put("blackhole", blackhole);
-        globalObjects.put("adc", adc);
-    }
-    
-    /**
-     * Advance logical time by computing audio samples and waking shreds.
-     */
-    public void advanceTime(int samplesToCompute) {
-        // Run any shreds scheduled for the current time before advancing
-        runShredsAt(currentTime.get());
-
-        for (int s = 0; s < samplesToCompute; s++) {
-            long now = currentTime.incrementAndGet();
-            runShredsAt(now);
-            
-            // DRIVE THE UGEN GRAPH: Pull samples through the dac channels
-            for (int i = 0; i < numChannels; i++) {
-                dacChannels[i].tick(now);
-            }
-            // Also tick blackhole
-            blackhole.tick(now);
+            shredulerLock.unlock();
         }
     }
 
-    private void runShredsAt(long now) {
-        int loopGuard = 0;
-        while (true) {
-            ChuckShred nextShred = null;
-            
-            schedulerLock.lock();
-            try {
-                if (!shreduler.isEmpty() && shreduler.peek().getWakeTime() <= now) {
-                    nextShred = shreduler.poll();
-                }
-            } finally {
-                schedulerLock.unlock();
-            }
+    public double getTimeOfDay() {
+        return System.currentTimeMillis() / 1000.0;
+    }
 
-            if (nextShred == null) break;
-            if (++loopGuard > 10000) {
-                break;
-            }
+    public void registerHid(Hid hid) {
+        registeredHids.add(hid);
+    }
 
-            nextShred.resume(this);
-            
-            if (!nextShred.isDone() && !nextShred.isWaiting()) {
-                schedule(nextShred);
-            }
+    public void dispatchHidMsg(HidMsg msg) {
+        for (Hid hid : registeredHids) {
+            hid.dispatch(msg, this);
         }
     }
+
+    public String status() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("--- ChucK VM Status ---\n");
+        sb.append("Time: ").append(now.get()).append("\n");
+        sb.append("Active Shreds: ").append(activeShreds.size()).append("\n");
+        for (ChuckShred s : activeShreds.values()) {
+            sb.append("  [").append(s.getId()).append("] ").append(s.getCode().getName()).append("\n");
+        }
+        return sb.toString();
+    }
+
+    private int logLevel = 0;
+    public void setLogLevel(int level) { this.logLevel = level; }
+    public int getLogLevel() { return logLevel; }
 }

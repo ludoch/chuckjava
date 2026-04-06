@@ -27,7 +27,7 @@ public class MachineCall implements ChuckInstr {
         switch (method) {
             case "add" -> {
                 String path = args.length > 0 ? String.valueOf(args[0]) : "";
-                s.reg.push((long) vm.add(path));
+                s.reg.push((long) vm.add(path, s));
             }
             case "remove" -> {
                 if (args.length > 0 && args[0] != null) {
@@ -42,14 +42,14 @@ public class MachineCall implements ChuckInstr {
                 if (args.length > 1 && args[0] != null) {
                     long id = ((Number) args[0]).longValue();
                     String path = String.valueOf(args[1]);
-                    s.reg.push((long) vm.replace((int) id, path));
+                    s.reg.push((long) vm.replace((int) id, path, s));
                 } else {
                     s.reg.push(0L);
                 }
             }
             case "status" -> {
-                vm.status();
-                s.reg.push(0L);
+                vm.print(vm.status());
+                s.reg.push(1L);
             }
             case "clear", "removeAll" -> {
                 vm.clear();

@@ -110,29 +110,6 @@ public class Std {
         System.setProperty(key, value);
     }
 
-    /** ChucK 1.5.1.1+: Std.range(n) -> [0, 1, ..., n-1] */
-    public static ChuckArray range(long n) {
-        int sz = (int) Math.max(0, n);
-        ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
-        for (int i = 0; i < sz; i++) arr.setInt(i, i);
-        return arr;
-    }
-
-    public static ChuckArray range(long start, long end) {
-        int sz = (int) Math.max(0, end - start);
-        ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
-        for (int i = 0; i < sz; i++) arr.setInt(i, start + i);
-        return arr;
-    }
-
-    public static ChuckArray range(long start, long end, long step) {
-        if (step == 0) return new ChuckArray(ChuckType.ARRAY, 0);
-        int sz = (int) Math.max(0, (end - start) / step);
-        ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
-        for (int i = 0; i < sz; i++) arr.setInt(i, start + i * step);
-        return arr;
-    }
-
     /** Convert int to string. */
     public static String itoa(long i) {
         return Long.toString(i);
@@ -164,5 +141,34 @@ public class Std {
     /** Absolute value of an integer. */
     public static long abs(long v) {
         return Math.abs(v);
+    }
+
+    /** ChucK 1.5.1.1+: Std.range(n) -> [0, 1, ..., n-1] */
+    public static ChuckArray range(long stop) {
+        return range(0, stop, 1);
+    }
+
+    public static ChuckArray range(long start, long stop) {
+        return range(start, stop, 1);
+    }
+
+    public static ChuckArray range(long start, long stop, long step) {
+        ChuckArray arr = new ChuckArray(ChuckType.ARRAY, 0);
+        if (step == 0) return arr;
+        
+        // ChucK's Std.range automatically adjusts step sign to match direction if needed
+        if (start < stop && step < 0) step = -step;
+        if (start > stop && step > 0) step = -step;
+
+        if (step > 0) {
+            for (long i = start; i < stop; i += step) {
+                arr.appendInt(i);
+            }
+        } else {
+            for (long i = start; i > stop; i += step) {
+                arr.appendInt(i);
+            }
+        }
+        return arr;
     }
 }

@@ -21,6 +21,7 @@ public class ChuckArray extends ChuckObject {
     
     // Vector tag (e.g. "vec3", "complex", "polar") for formatting
     public String vecTag = null;
+    public String elementTypeName = null;
 
     public ChuckArray(ChuckType type) {
         super(type);
@@ -36,12 +37,37 @@ public class ChuckArray extends ChuckObject {
         }
     }
 
+    public ChuckArray(String elementTypeName, int size) {
+        super(ChuckType.ARRAY);
+        this.elementTypeName = elementTypeName;
+        this.vecTag = (elementTypeName != null && (elementTypeName.startsWith("vec") || elementTypeName.equals("complex") || elementTypeName.equals("polar"))) ? elementTypeName : null;
+        if (size > 0) ensureCapacity(size - 1);
+    }
+
+    public ChuckArray(String tag, double[] vals) {
+        super(ChuckType.ARRAY);
+        this.vecTag = tag;
+        this.elementTypeName = tag;
+        for (double v : vals) {
+            floatData.add(v);
+            intData.add(0L);
+            objectData.add(null);
+            types.add((byte)1);
+        }
+    }
+
     private void ensureCapacity(int index) {
         while (types.size() <= index) {
             intData.add(0L);
             floatData.add(0.0);
-            objectData.add(null);
-            types.add((byte)0);
+            if (elementTypeName != null && (elementTypeName.equals("complex") || elementTypeName.equals("polar"))) {
+                objectData.add(new ChuckArray(elementTypeName, new double[]{0, 0}));
+                types.add((byte)2);
+            } else {
+                objectData.add(null);
+                byte t = (byte) ("float".equals(elementTypeName) ? 1 : 0);
+                types.add(t);
+            }
         }
     }
 
@@ -202,6 +228,10 @@ public class ChuckArray extends ChuckObject {
         return types.size();
     }
 
+    public int cap() {
+        return types.size();
+    }
+
     public int resolveIndex(long idx) {
         int i = (int) idx;
         if (i < 0) i = types.size() + i;
@@ -220,7 +250,41 @@ public class ChuckArray extends ChuckObject {
     }
 
     public void erase(int index) {
-        popOut(index);
+        if (index < 0) index = types.size() + index;
+        if (index >= 0 && index < types.size()) {
+            popOut(index);
+        }
+    }
+
+    public void erase(int begin, int end) {
+        if (begin < 0) begin = 0;
+        if (end > types.size()) end = types.size();
+        if (begin >= end) return;
+        
+        for (int i = 0; i < end - begin; i++) {
+            popOut(begin);
+        }
+    }
+
+    public void appendInt(long val) {
+        intData.add(val);
+        floatData.add(0.0);
+        objectData.add(null);
+        types.add((byte) 0);
+    }
+
+    public void appendFloat(double val) {
+        intData.add(0L);
+        floatData.add(val);
+        objectData.add(null);
+        types.add((byte) 1);
+    }
+
+    public void appendObject(Object val) {
+        intData.add(0L);
+        floatData.add(0.0);
+        objectData.add(val);
+        types.add((byte) 2);
     }
 
     // Associative access
@@ -230,6 +294,11 @@ public class ChuckArray extends ChuckObject {
     /** Remove first element. */
     public void popFront() {
         if (size() > 0) popOut(0);
+    }
+
+    /** Remove last element. */
+    public void popBack() {
+        if (size() > 0) popOut(size() - 1);
     }
 
     public void clear() {
@@ -254,6 +323,7 @@ public class ChuckArray extends ChuckObject {
 
     // append (<<) support
     public ChuckArray append(long val) {
+        if ("float".equals(elementTypeName)) return append((double) val);
         int idx = types.size();
         ensureCapacity(idx);
         intData.set(idx, val);
@@ -262,6 +332,7 @@ public class ChuckArray extends ChuckObject {
     }
 
     public ChuckArray append(double val) {
+        if ("int".equals(elementTypeName)) return append((long) val);
         int idx = types.size();
         ensureCapacity(idx);
         floatData.set(idx, val);
@@ -270,6 +341,10 @@ public class ChuckArray extends ChuckObject {
     }
 
     public ChuckArray append(Object val) {
+        System.err.println("  ChuckArray.append: val=" + val + " elemType=" + elementTypeName);
+        if ("float".equals(elementTypeName)) {
+            if (val instanceof Number n) return append(n.doubleValue());
+        }
         if (val instanceof Long l) return append(l.longValue());
         if (val instanceof Double d) return append(d.doubleValue());
         if (val instanceof Integer i) return append((long)i);
