@@ -11,10 +11,20 @@ public class ChuckCode {
     private final List<Integer> lineNumbers = new ArrayList<>();
     private String name;
     private int activeLineNumber = -1;
+    private int numArgs = 0;
+    private String returnType = "void";
 
     public ChuckCode(String name) {
         this.name = name;
     }
+
+    public void setSignature(int numArgs, String returnType) {
+        this.numArgs = numArgs;
+        this.returnType = returnType;
+    }
+
+    public int getNumArgs() { return numArgs; }
+    public String getReturnType() { return returnType; }
 
     public void setActiveLineNumber(int line) {
         this.activeLineNumber = line;

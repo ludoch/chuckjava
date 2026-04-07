@@ -87,16 +87,26 @@ public class TypeInstrs {
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             Object val = s.reg.isObject(0) ? s.reg.popObject() : s.reg.pop();
             String typeName;
-            if (val instanceof UserObject uo) typeName = uo.className;
-            else if (val instanceof org.chuck.audio.ChuckUGen u) typeName = u.getClass().getSimpleName();
-            else if (val instanceof ChuckArray a) {
+            String parentName = null;
+            if (val instanceof UserObject uo) {
+                typeName = uo.className;
+                UserClassDescriptor desc = vm.getUserClass(typeName);
+                if (desc != null) parentName = desc.parentName();
+            } else if (val instanceof org.chuck.audio.ChuckUGen u) {
+                typeName = u.getClass().getSimpleName();
+                Class<?> parentClass = u.getClass().getSuperclass();
+                if (parentClass != null) parentName = parentClass.getSimpleName();
+            } else if (val instanceof ChuckArray a) {
                 if (a.vecTag != null) typeName = a.vecTag;
                 else typeName = "array";
+            } else if (val instanceof ChuckString) {
+                typeName = "string";
+            } else if (val instanceof Double) {
+                typeName = "float";
+            } else {
+                typeName = "int";
             }
-            else if (val instanceof ChuckString) typeName = "string";
-            else if (val instanceof Double) typeName = "float";
-            else typeName = "int";
-            s.reg.pushObject(new ChuckString(typeName));
+            s.reg.pushObject(new org.chuck.core.ChuckTypeObj(typeName, parentName, vm));
         }
     }
 

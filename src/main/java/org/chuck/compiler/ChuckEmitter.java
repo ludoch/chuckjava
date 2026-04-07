@@ -126,7 +126,7 @@ public class ChuckEmitter {
 
     // Core non-UGen data types
     private static final java.util.Set<String> CORE_DATA_TYPES = java.util.Set.of(
-            "int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar", "Object", "Array", "Type", "auto",
+            "int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar", "Object", "Array", "Type", "Function", "auto",
             "MidiMsg", "HidMsg", "OscMsg", "FileIO", "IO", "SerialIO", "OscIn", "OscOut", "OscBundle", "MidiIn", "MidiOut", "Hid", "StringTokenizer", "RegEx", "Reflect"
     );
 
@@ -139,14 +139,19 @@ public class ChuckEmitter {
         if (type.endsWith("[]")) return true;
         if (userClassRegistry.containsKey(type)) return true;
         if (isKnownUGenType(type)) return true;
-        java.util.Set<String> objects = java.util.Set.of("complex", "polar", "vec2", "vec3", "vec4", "string", "Object", "Event");
+        java.util.Set<String> objects = java.util.Set.of("complex", "polar", "vec2", "vec3", "vec4", "string", "Object", "Event", "Type", "Function");
         return objects.contains(type);
     }
 
     private boolean isKnownType(String type) {
         if (type == null) return false;
         String baseType = type.replaceAll("\\[\\]", "");
-        return isKnownUGenType(baseType) || CORE_DATA_TYPES.contains(baseType) || userClassRegistry.containsKey(baseType);
+        boolean known = isKnownUGenType(baseType) || CORE_DATA_TYPES.contains(baseType) || userClassRegistry.containsKey(baseType);
+        if (!known && type.contains("Function")) {
+            System.err.println("isKnownType failed for: '" + type + "', baseType: '" + baseType + "'");
+            System.err.println("CORE_DATA_TYPES contains Function? " + CORE_DATA_TYPES.contains("Function"));
+        }
+        return known;
     }
 
     private String getMethodKey(String name, List<String> argTypes) {
@@ -357,6 +362,20 @@ public class ChuckEmitter {
             }
             case ChuckAST.DeclExp e ->
                 e.type();
+            case ChuckAST.TypeofExp _ ->
+                "Type";
+            case ChuckAST.ArrayAccessExp e -> {
+                String base = getExprType(e.base());
+                if (base != null) {
+                    for (int i = 0; i < e.indices().size(); i++) {
+                        if (base.endsWith("[]")) {
+                            base = base.substring(0, base.length() - 2);
+                        }
+                    }
+                    yield base;
+                }
+                yield null;
+            }
             case ChuckAST.BinaryExp bin -> {
                 String lhsType = getExprType(bin.lhs());
                 if (lhsType == null) {
@@ -612,7 +631,9 @@ public class ChuckEmitter {
 
             String key = getMethodKey(name, s.argTypes());
             if (!functions.containsKey(key)) {
-                functions.put(key, new ChuckCode(s.name()));
+                ChuckCode c = new ChuckCode(s.name());
+                c.setSignature(s.argTypes().size(), s.returnType() != null ? s.returnType() : "void");
+                functions.put(key, c);
             }
             if (s.returnType() != null && !s.returnType().equals("void")) {
                 functionReturnTypes.put(key, s.returnType());
@@ -1058,6 +1079,8 @@ public class ChuckEmitter {
                 currentFuncHasReturn = false;
                 inStaticFuncContext = s.isStatic();
 
+                funcCode.setSignature(s.argNames().size(), currentFuncReturnType);
+
                 int savedLocalCount = localCount;
                 boolean savedInPreCtor = inPreCtor;
                 
@@ -1269,6 +1292,7 @@ public class ChuckEmitter {
                     definedMethods.add(methodKey);
 
                     ChuckCode stub = new ChuckCode(methodName);
+                    stub.setSignature(m.argNames().size(), m.returnType() != null ? m.returnType() : "void");
                     methodCodeMap.put(m, stub);
                     if (m.isStatic()) {
                         staticMethodCodes.put(methodKey, stub);

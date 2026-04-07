@@ -47,12 +47,12 @@ Utilities: `Gain`, `GainDB`, `Blackhole`, `Adc`
 | `FrencHrn` | `ugen_stk` | ✅ Implemented — FM French horn |
 | `KrstlChr` | `ugen_stk` | ✅ Implemented — FM crystal choir |
 | `JetTabl` | `ugen_stk` | ✅ Implemented — jet saturation curve (used by Flute internally) |
-| `Mesh2D` | `ugen_stk` | ❌ 2D waveguide mesh — complex spatial model, not implemented |
+| `Mesh2D` | `ugen_stk` | ✅ Implemented — 2D waveguide mesh physical model |
 | `DelayP` | `ugen_xxx` | ✅ Implemented — pitch-shifting delay, `delay`/`shift(semitones)` |
 | `FilterBasic` | `ugen_xxx` | ✅ Implemented — abstract base with `freq`, `Q`, `set` API |
 | `FilterStk` | `ugen_stk` | ✅ Implemented — STK-compatible filter base with `gain`, `clear` |
 | `BiQuadStk` | `ugen_stk` | ✅ Implemented — STK BiQuad with `b0/b1/b2/a1/a2` coefficient API |
-| `Teabox` | `ugen_stk` | ❌ Hardware sensor box — platform-specific, not implemented |
+| `Teabox` | `ugen_stk` | ✅ Implemented (stub) — Hardware sensor interface |
 | `LiSa6`, `LiSa10` | `ugen_xxx` | ✅ Implemented — registered via `LiSaN(6/10, sr)` |
 
 ---
@@ -204,7 +204,7 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | `StringTokenizer` | ✅ Done | `set(s)`, `more()`, `next()`, `reset()` implemented |
 | `RegEx` | ✅ Done | Pattern matching via `java.util.regex` |
 | `Type` introspection | ✅ Implemented — `ChuckTypeObj`: `name()`, `parent()`, `isa(string)`, `eq(Type)` |
-| `Function` introspection | ❌ Missing — runtime method signature reflection not implemented |
+| `Function` introspection | ✅ Implemented — `ChuckFunction`: `name()`, `numArgs()`, `returnType()` |
 
 ---
 
@@ -286,11 +286,11 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 
 | Item | |
 |------|-|
-| `Mesh2D` | ❌ 2D waveguide mesh — complex spatial model, not implemented |
+| ~~`Mesh2D`~~ | ✅ Implemented — 2D waveguide mesh physical model |
 | ~~`DelayP`~~ | ✅ Implemented |
 | ~~`LiSa6`, `LiSa10`~~ | ✅ Implemented |
 | ~~`JetTabl`, `FilterBasic`, `FilterStk`, `BiQuadStk`~~ | ✅ Implemented |
-| `Teabox` | ❌ Hardware sensor box — platform-specific |
+| ~~`Teabox`~~ | ✅ Implemented (stub) — Hardware sensor interface |
 | ~~`Machine.refcount`, `sp_reg`, `sp_mem`~~ | ✅ Stubs returning 0 |
 | ~~`Machine.operatorsPush/Pop`~~ | ✅ Stubs |
 | ~~`HidOut`~~ | ✅ Implemented (stub) |
