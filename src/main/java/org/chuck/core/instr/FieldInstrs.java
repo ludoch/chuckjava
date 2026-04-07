@@ -133,7 +133,10 @@ public class FieldInstrs {
         String cName, fName; public GetStatic(String c, String f) { cName = c; fName = f; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
             UserClassDescriptor d = vm.getUserClass(cName);
-            if (d == null) { s.reg.pushObject(null); return; }
+            if (d == null) { 
+                s.reg.pushObject(null); 
+                return; 
+            }
             Object val = null;
             if (d.staticObjects().containsKey(fName)) {
                 val = d.staticObjects().get(fName);
@@ -149,21 +152,21 @@ public class FieldInstrs {
     }
 
     public static class SetStatic implements ChuckInstr {
-        String cName, fName; public SetStatic(String c, String f) { cName = c; fName = f; }
+        String n; String fName; public SetStatic(String c, String f) { n = c; fName = f; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
-            UserClassDescriptor d = vm.getUserClass(cName);
-            if (d == null) throw new RuntimeException("Static field set: class '" + cName + "' not found");
+            UserClassDescriptor d = vm.getUserClass(n);
+            if (d == null) throw new RuntimeException("Static field set: class '" + n + "' not found");
             if (s.reg.isObject(0)) {
-                Object o = s.reg.peekObject(0);
+                Object o = s.reg.popObject();
                 d.staticObjects().put(fName, o);
                 if (o instanceof ChuckUGen u) s.registerUGen(u);
                 if (o instanceof AutoCloseable ac) s.registerCloseable(ac);
             } else if (s.reg.isDouble(0)) {
-                double dv = s.reg.peekAsDouble(0);
+                double dv = s.reg.popAsDouble();
                 d.staticInts().put(fName, Double.doubleToRawLongBits(dv));
                 d.staticIsDouble().put(fName, true);
             } else {
-                long lv = s.reg.peekLong(0);
+                long lv = s.reg.popLong();
                 d.staticInts().put(fName, lv);
                 d.staticIsDouble().put(fName, false);
             }

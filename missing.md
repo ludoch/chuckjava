@@ -248,7 +248,7 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | `interface` definitions | ✅ Implemented |
 | `@construct` | ✅ Implemented |
 | `@destruct` | ✅ Implemented |
-| `static` member variables (per-class, not per-instance) | ⚠️ Partial — declared but shared initialization not reliable |
+| `static` member variables (per-class, not per-instance) | ✅ Done — shared between instances and shreds; initialization persists correctly |
 
 ---
 

@@ -212,6 +212,11 @@ public class ChuckEmitter {
         this.globalVarTypes.put("Event", "Event");
         this.globalVarTypes.put("me", "Shred");
         this.globalVarTypes.put("Machine", "Machine");
+
+        // Add all user classes from registry as known global types
+        for (String className : userClassRegistry.keySet()) {
+            this.globalVarTypes.put(className, className);
+        }
         
         // Register built-in types as known classes for field resolution
         if (!userClassRegistry.containsKey("Std")) {
@@ -594,19 +599,56 @@ public class ChuckEmitter {
     }
 
     private void registerClassNames(ChuckAST.Stmt stmt) {
-        if (stmt instanceof ChuckAST.ImportStmt s) {
-            List<ChuckAST.Stmt> imported = parseImport(s.path());
-            for (ChuckAST.Stmt i : imported) registerClassNames(i);
-        } else if (stmt instanceof ChuckAST.ClassDefStmt s) {
-            if (!userClassRegistry.containsKey(s.name())) {
-                userClassRegistry.put(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, s.isAbstract(), s.isInterface()));
+        if (stmt == null) return;
+        switch (stmt) {
+            case ChuckAST.ImportStmt s -> {
+                List<ChuckAST.Stmt> imported = parseImport(s.path());
+                for (ChuckAST.Stmt i : imported) registerClassNames(i);
             }
-            for (ChuckAST.Stmt inner : s.body()) {
-                registerClassNames(inner);
+            case ChuckAST.ClassDefStmt s -> {
+                userClassRegistry.putIfAbsent(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, s.isAbstract(), s.isInterface()));
+                UserClassDescriptor desc = userClassRegistry.get(s.name());
+                registerStaticFieldsRecursive(s.body(), desc);
+                for (ChuckAST.Stmt inner : s.body()) registerClassNames(inner);
             }
-        } else if (stmt instanceof ChuckAST.BlockStmt b) {
-            for (ChuckAST.Stmt inner : b.statements()) {
-                registerClassNames(inner);
+            case ChuckAST.BlockStmt b -> {
+                for (ChuckAST.Stmt inner : b.statements()) registerClassNames(inner);
+            }
+            default -> {}
+        }
+    }
+
+    private void registerStaticFieldsRecursive(List<ChuckAST.Stmt> body, UserClassDescriptor desc) {
+        for (ChuckAST.Stmt inner : body) {
+            registerStaticFieldFromStmt(inner, desc);
+            if (inner instanceof ChuckAST.BlockStmt b) {
+                registerStaticFieldsRecursive(b.statements(), desc);
+            }
+        }
+    }
+
+    private void registerStaticFieldFromStmt(ChuckAST.Stmt inner, UserClassDescriptor desc) {
+        String staticName = null;
+        String type = null;
+        if (inner instanceof ChuckAST.DeclStmt ds && ds.isStatic()) {
+            staticName = ds.name(); type = ds.type();
+        } else if (inner instanceof ChuckAST.ExpStmt es) {
+            if (es.exp() instanceof ChuckAST.DeclExp de && de.isStatic()) {
+                staticName = de.name(); type = de.type();
+            } else if (es.exp() instanceof ChuckAST.BinaryExp be 
+                    && (be.op() == ChuckAST.Operator.CHUCK || be.op() == ChuckAST.Operator.AT_CHUCK)
+                    && be.rhs() instanceof ChuckAST.DeclExp de && de.isStatic()) {
+                staticName = de.name(); type = de.type();
+            }
+        }
+        if (staticName != null) {
+            if (type.equals("float")) {
+                desc.staticIsDouble().put(staticName, true);
+                desc.staticInts().putIfAbsent(staticName, 0L);
+            } else if (type.equals("int")) {
+                desc.staticInts().putIfAbsent(staticName, 0L);
+            } else {
+                desc.staticObjects().putIfAbsent(staticName, null);
             }
         }
     }
@@ -693,7 +735,7 @@ public class ChuckEmitter {
         if (!hasContent) {
             throw new RuntimeException(programName + ":1:1: syntax error\n(empty file)");
         }
-        // Pass 0: Register all class names so they are known as types
+        // Pass 0: Register all class names and static field names so they are known as types
         for (ChuckAST.Stmt stmt : statements) {
             registerClassNames(stmt);
         }
@@ -1143,9 +1185,10 @@ public class ChuckEmitter {
                 java.util.Set<String> fieldNames = new java.util.LinkedHashSet<>();
                 List<ChuckAST.FuncDefStmt> methods = new ArrayList<>();
 
-                Map<String, Long> staticInts = new HashMap<>();
-                Map<String, Boolean> staticIsDouble = new HashMap<>();
-                Map<String, Object> staticObjects = new HashMap<>();
+                UserClassDescriptor existing = userClassRegistry.get(s.name());
+                Map<String, Long> staticInts = existing != null ? existing.staticInts() : new java.util.concurrent.ConcurrentHashMap<>();
+                Map<String, Boolean> staticIsDouble = existing != null ? existing.staticIsDouble() : new java.util.concurrent.ConcurrentHashMap<>();
+                Map<String, Object> staticObjects = existing != null ? existing.staticObjects() : new java.util.concurrent.ConcurrentHashMap<>();
 
                 // Pre-check: static vars cannot be declared inside nested blocks within a class body
                 for (ChuckAST.Stmt bodyItem : s.body()) {
@@ -1161,27 +1204,6 @@ public class ChuckEmitter {
                         case ChuckAST.DeclStmt f -> {
                             if (f.isStatic()) {
                                 staticFieldDefs.add(new String[]{f.type(), f.name()});
-                                boolean isArray = !f.arraySizes().isEmpty();
-                                if (!isArray && f.type().equals("int")) {
-                                    staticInts.put(f.name(), 0L);
-                                } else if (!isArray && f.type().equals("float")) {
-                                    staticInts.put(f.name(), Double.doubleToRawLongBits(0.0));
-                                    staticIsDouble.put(f.name(), true);
-                                } else if (f.type().equals("vec2")) {
-                                    staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 2));
-                                } else if (f.type().equals("vec3")) {
-                                    staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 3));
-                                } else if (f.type().equals("vec4")) {
-                                    staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 4));
-                                } else if (f.type().equals("complex") || f.type().equals("polar")) {
-                                    ChuckArray arr = new ChuckArray(ChuckType.ARRAY, 2);
-                                    arr.vecTag = f.type();
-                                    staticObjects.put(f.name(), arr);
-                                } else if (isArray) {
-                                    staticObjects.put(f.name(), new ChuckArray(ChuckType.ARRAY, 0));
-                                } else {
-                                    staticObjects.put(f.name(), null);
-                                }
                             } else {
                                 fieldDefs.add(new String[]{f.type(), f.name()});
                                 fieldNames.add(f.name());
@@ -1195,18 +1217,6 @@ public class ChuckEmitter {
                                 && bexp.rhs() instanceof ChuckAST.DeclExp rDecl -> {
                             if (rDecl.isStatic()) {
                                 staticFieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
-                                boolean isArray = !rDecl.arraySizes().isEmpty();
-                                if (!isArray && rDecl.type().equals("int")) {
-                                    long initVal = bexp.lhs() instanceof ChuckAST.IntExp iv ? iv.value() : 0L;
-                                    staticInts.put(rDecl.name(), initVal);
-                                } else if (!isArray && rDecl.type().equals("float")) {
-                                    double initVal = bexp.lhs() instanceof ChuckAST.FloatExp fv ? fv.value()
-                                            : bexp.lhs() instanceof ChuckAST.IntExp iv ? (double) iv.value() : 0.0;
-                                    staticInts.put(rDecl.name(), Double.doubleToRawLongBits(initVal));
-                                    staticIsDouble.put(rDecl.name(), true);
-                                } else {
-                                    staticObjects.put(rDecl.name(), null);
-                                }
                             } else {
                                 // e.g. `5 => int n;` — field declaration with literal initializer
                                 String initStr = null;
@@ -1228,15 +1238,6 @@ public class ChuckEmitter {
                             // Standalone declaration like 'static int a[];'
                             if (rDecl.isStatic()) {
                                 staticFieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
-                                boolean isArray = !rDecl.arraySizes().isEmpty();
-                                if (!isArray && rDecl.type().equals("int")) {
-                                    staticInts.put(rDecl.name(), 0L);
-                                } else if (!isArray && rDecl.type().equals("float")) {
-                                    staticInts.put(rDecl.name(), Double.doubleToRawLongBits(0.0));
-                                    staticIsDouble.put(rDecl.name(), true);
-                                } else {
-                                    staticObjects.put(rDecl.name(), null);
-                                }
                             } else {
                                 fieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
                                 fieldNames.add(rDecl.name());
@@ -1395,12 +1396,12 @@ public class ChuckEmitter {
                 currentClassFields = prevFields;
                 ChuckCode finalPreCtorCode = preCtorCodeLocal.getNumInstructions() > 0 ? preCtorCodeLocal : null;
 
-                // Compile static initializers for complex (non-literal) static fields
+                // Compile static initializers for ALL static fields
                 ChuckCode staticInitCodeLocal = new ChuckCode("__staticInit__" + s.name());
                 String savedClass = currentClass;
                 currentClass = s.name();
                 for (ChuckAST.Stmt bodyStmt : flattenedBody) {
-                    boolean isComplexStaticInit = false;
+                    boolean isStaticInit = false;
                     String staticFieldName = null;
                     if (bodyStmt instanceof ChuckAST.ExpStmt es2
                             && es2.exp() instanceof ChuckAST.BinaryExp bexp2
@@ -1408,39 +1409,29 @@ public class ChuckEmitter {
                             && bexp2.rhs() instanceof ChuckAST.DeclExp rDecl2
                             && rDecl2.isStatic()) {
                         staticFieldName = rDecl2.name();
-                        // Only complex (non-pure-literal int/float) initializers need runtime code
-                        boolean isSimpleLit = (bexp2.lhs() instanceof ChuckAST.IntExp
-                                && rDecl2.type().equals("int"))
-                                || (bexp2.lhs() instanceof ChuckAST.FloatExp
-                                && rDecl2.type().equals("float"))
-                                || (bexp2.lhs() instanceof ChuckAST.IntExp
-                                && rDecl2.type().equals("float"));
-                        isComplexStaticInit = !isSimpleLit;
+                        isStaticInit = true;
                     } else if (bodyStmt instanceof ChuckAST.DeclStmt ds && ds.isStatic()) {
                         staticFieldName = ds.name();
-                        // UGen/object types need runtime instantiation; arrays need runtime init
-                        boolean isNonPrimStatic = isObjectType(ds.type()) || !ds.arraySizes().isEmpty();
-                        isComplexStaticInit = ds.callArgs() != null || isNonPrimStatic;
+                        isStaticInit = true;
                     } else if (bodyStmt instanceof ChuckAST.ExpStmt es3
                             && es3.exp() instanceof ChuckAST.DeclExp rDecl3
                             && rDecl3.isStatic()) {
                         staticFieldName = rDecl3.name();
-                        boolean isNonPrimStatic3 = isObjectType(rDecl3.type()) || !rDecl3.arraySizes().isEmpty();
-                        isComplexStaticInit = rDecl3.callArgs() != null || isNonPrimStatic3;
+                        isStaticInit = true;
                     }
-                    if (isComplexStaticInit && staticFieldName != null) {
+                    if (isStaticInit && staticFieldName != null) {
                         String fName = staticFieldName;
                         if (bodyStmt instanceof ChuckAST.ExpStmt es2
                                 && es2.exp() instanceof ChuckAST.BinaryExp bexp2
                                 && bexp2.rhs() instanceof ChuckAST.DeclExp rDecl2) {
-                            // e.g. 3::second => static dur S_DUR
+                            // e.g. 1 => static int S;
                             emitExpression(bexp2.lhs(), staticInitCodeLocal);
                             staticInitCodeLocal.addInstruction(new FieldInstrs.SetStatic(s.name(), fName));
                             staticInitCodeLocal.addInstruction(new StackInstrs.Pop()); // clean up
                         } else if (bodyStmt instanceof ChuckAST.DeclStmt ds) {
-                            // e.g. static SinOsc S_SINOSC(440) — instantiate and store
+                            // e.g. static int S; or static SinOsc S;
                             ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(ds.type(), ds.name(),
-                                    ds.arraySizes(), ds.callArgs(), ds.isReference(), false, // not static in temp scope
+                                    ds.arraySizes(), ds.callArgs(), ds.isReference(), false,
                                     false, ds.isConst(), ds.line(), ds.column());
                             localScopes.push(new java.util.HashMap<>());
                             localTypeScopes.push(new java.util.HashMap<>());
@@ -1484,6 +1475,7 @@ public class ChuckEmitter {
 
                 // Add static methods to the main methods map too, for resolution on instances
                 methodCodes.putAll(staticMethodCodes);
+                
                 userClassRegistry.put(s.name(), descriptor);
                 if (code != null) {
                     code.addInstruction(new MiscInstrs.RegisterClass(s.name(), descriptor));
@@ -1690,6 +1682,16 @@ public class ChuckEmitter {
     private String getBaseType(String type) {
         if (type == null) return null;
         return type.replaceAll("\\[\\]", "");
+    }
+
+    private String resolveClassName(ChuckAST.Exp exp) {
+        if (exp == null) return null;
+        if (exp instanceof ChuckAST.IdExp id) {
+            String name = id.name();
+            if (userClassRegistry.containsKey(name)) return name;
+            if (CORE_DATA_TYPES.contains(name) || isKnownUGenType(name)) return name;
+        }
+        return null;
     }
 
     private void emitExpression(ChuckAST.Exp exp, ChuckCode code) {
@@ -2095,8 +2097,25 @@ public class ChuckEmitter {
                             return;
                         }
                     }
-                    // Primitive postfix: push old value, push current value again, add/sub 1, store back, pop new value
-                    // Old value remains on stack as the expression result
+                    // Primitive postfix: push old value, push current value again, add/sub 1, store back
+                    if (e.rhs() instanceof ChuckAST.DotExp dot) {
+                        String potentialClassName = resolveClassName(dot.base());
+                        if (potentialClassName != null) {
+                            UserClassDescriptor classDesc = userClassRegistry.get(potentialClassName);
+                            if (classDesc != null && (classDesc.staticInts().containsKey(dot.member()) || classDesc.staticObjects().containsKey(dot.member()))) {
+                                code.addInstruction(new FieldInstrs.GetStatic(potentialClassName, dot.member())); // push old
+                                code.addInstruction(new FieldInstrs.GetStatic(potentialClassName, dot.member())); // push again for arithmetic
+                                code.addInstruction(new PushInstrs.PushInt(1));
+                                if (isPostfixPlus) {
+                                    code.addInstruction(new ArithmeticInstrs.AddAny());
+                                } else {
+                                    code.addInstruction(new ArithmeticInstrs.MinusAny());
+                                }
+                                code.addInstruction(new FieldInstrs.SetStatic(potentialClassName, dot.member()));
+                                return;
+                            }
+                        }
+                    }
                     emitExpression(e.rhs(), code);  // push old value (for return)
                     emitExpression(e.rhs(), code);  // push current value again (for arithmetic)
                     emitExpression(e.lhs(), code);  // push 1
@@ -2105,8 +2124,7 @@ public class ChuckEmitter {
                     } else {
                         code.addInstruction(new ArithmeticInstrs.MinusAny());
                     }
-                    emitChuckTarget(e.rhs(), code); // store new value, pushes new value back
-                    code.addInstruction(new StackInstrs.Pop());  // discard new value, old value remains
+                    emitChuckTarget(e.rhs(), code); // store new value, emitChuckTarget already pops for primitives
                 } else if (e.op() == ChuckAST.Operator.WRITE_IO || (e.op() == ChuckAST.Operator.LE && isIOType(getExprType(e.lhs())))) {
                     emitExpression(e.lhs(), code);
                     emitExpression(e.rhs(), code);
@@ -2573,11 +2591,17 @@ public class ChuckEmitter {
                     return;
                 }
                 // Handle static field access: ClassName.staticField
-                if (e.base() instanceof ChuckAST.IdExp(String potentialClassName, _, _)) {
+                String potentialClassName = resolveClassName(e.base());
+                if (potentialClassName != null) {
+                    boolean inRegistry = userClassRegistry.containsKey(potentialClassName);
                     UserClassDescriptor classDesc = userClassRegistry.get(potentialClassName);
-                    if (classDesc != null && (classDesc.staticInts().containsKey(e.member()) || classDesc.staticObjects().containsKey(e.member()))) {
-                        code.addInstruction(new FieldInstrs.GetStatic(potentialClassName, e.member()));
-                        return;
+                    if (classDesc != null) {
+                        boolean hasSInt = classDesc.staticInts().containsKey(e.member());
+                        boolean hasSObj = classDesc.staticObjects().containsKey(e.member());
+                        if (hasSInt || hasSObj) {
+                            code.addInstruction(new FieldInstrs.GetStatic(potentialClassName, e.member()));
+                            return;
+                        }
                     }
                 }
                 if (e.base() instanceof ChuckAST.IdExp id && id.name().equals("IO")) {
@@ -3138,13 +3162,12 @@ public class ChuckEmitter {
             }
             case ChuckAST.DotExp e -> {
                 // Handle static field target: ClassName.staticField
-                if (e.base() instanceof ChuckAST.IdExp(String potentialClassName, int line, int column)) {
-                    if (userClassRegistry.containsKey(potentialClassName)) {
-                        UserClassDescriptor classDesc = userClassRegistry.get(potentialClassName);
-                        if (classDesc != null && (classDesc.staticInts().containsKey(e.member()) || classDesc.staticObjects().containsKey(e.member()))) {
-                            code.addInstruction(new FieldInstrs.SetStatic(potentialClassName, e.member()));
-                            return;
-                        }
+                String potentialClassName = resolveClassName(e.base());
+                if (potentialClassName != null) {
+                    UserClassDescriptor classDesc = userClassRegistry.get(potentialClassName);
+                    if (classDesc != null && (classDesc.staticInts().containsKey(e.member()) || classDesc.staticObjects().containsKey(e.member()))) {
+                        code.addInstruction(new FieldInstrs.SetStatic(potentialClassName, e.member()));
+                        return;
                     }
                 }
                 if (e.base() instanceof ChuckAST.IdExp baseId && baseId.name().equals("Std") && e.member().equals("mtof")) {

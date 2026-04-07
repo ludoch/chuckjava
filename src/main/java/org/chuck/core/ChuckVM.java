@@ -53,6 +53,7 @@ public class ChuckVM {
     private final Map<String, Boolean> globalIsObject = new ConcurrentHashMap<>();
     private final Map<String, Object> globalObjects = new ConcurrentHashMap<>();
     private final Map<String, UserClassDescriptor> userClassRegistry = new ConcurrentHashMap<>();
+    private final Set<String> staticInitializedClasses = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     // Multi-channel support
     private final int numChannels;
@@ -183,7 +184,25 @@ public class ChuckVM {
         return userClassRegistry.get(name);
     }
 
+    public boolean isStaticInitialized(String name) {
+        return staticInitializedClasses.contains(name);
+    }
+
+    public void setStaticInitialized(String name) {
+        staticInitializedClasses.add(name);
+    }
+
     public void registerUserClass(String name, UserClassDescriptor desc) {
+        UserClassDescriptor existing = userClassRegistry.get(name);
+        if (existing != null) {
+            // Keep the OLD static state, but accept the NEW method definitions and descriptor.
+            // We want to update the methods/code but NOT reset the static variables.
+            // Since UserClassDescriptor is a record, we must use the new one's maps
+            // but fill them with existing data if present.
+            desc.staticInts().putAll(existing.staticInts());
+            desc.staticIsDouble().putAll(existing.staticIsDouble());
+            desc.staticObjects().putAll(existing.staticObjects());
+        }
         userClassRegistry.put(name, desc);
     }
 
@@ -197,7 +216,7 @@ public class ChuckVM {
             ChuckASTVisitor visitor = new ChuckASTVisitor();
             @SuppressWarnings("unchecked")
             List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
-            
+
             ChuckEmitter emitter = new ChuckEmitter(userClassRegistry);
             ChuckCode code = emitter.emit(ast, name);
             ChuckShred shred = new ChuckShred(code);
@@ -235,6 +254,8 @@ public class ChuckVM {
                 }
             }
             String source = java.nio.file.Files.readString(path);
+            
+            ChuckEmitter emitter = new ChuckEmitter(userClassRegistry);
             int id = run(source, path.toString());
             
             // Pass arguments if any

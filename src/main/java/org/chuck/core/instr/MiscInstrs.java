@@ -55,9 +55,11 @@ public class MiscInstrs {
         String name; UserClassDescriptor d;
         public RegisterClass(String n, UserClassDescriptor desc) { name = n; d = desc; }
         @Override public void execute(ChuckVM vm, ChuckShred s) {
+            boolean initialized = vm.isStaticInitialized(name);
             vm.registerUserClass(name, d);
-            // Run static initializer once after the class is registered
-            if (d.staticInitCode() != null && d.staticInitCode().getNumInstructions() > 0) {
+            // Run static initializer once after the class is registered for the first time in the VM
+            if (!initialized && d.staticInitCode() != null && d.staticInitCode().getNumInstructions() > 0) {
+                vm.setStaticInitialized(name);
                 vm.executeSynchronous(d.staticInitCode(), s);
             }
         }
