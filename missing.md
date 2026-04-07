@@ -230,7 +230,7 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | `OscEvent` | ✅ Implemented — subclass of OscIn, same API |
 | Conjunction `e1 && e2 => now` | ✅ Done | |
 | Disjunction `e1 \|\| e2 => now` | ✅ Done | |
-| Event timeout | ❌ Missing | C++ supports `timeout => now` on event waits |
+| Event timeout | ✅ Done | `e.timeout(dur) => now;` |
 
 ---
 

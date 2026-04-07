@@ -48,6 +48,7 @@ import org.chuck.audio.LiSa2;
 import org.chuck.audio.LiSaN;
 import org.chuck.audio.Lpf;
 import org.chuck.audio.Mandolin;
+import org.chuck.audio.Mesh2D;
 import org.chuck.audio.Mix16;
 import org.chuck.audio.Mix2;
 import org.chuck.audio.Mix4;
@@ -85,6 +86,7 @@ import org.chuck.audio.SndBuf2;
 import org.chuck.audio.SqrOsc;
 import org.chuck.audio.Step;
 import org.chuck.audio.StifKarp;
+import org.chuck.audio.Teabox;
 import org.chuck.audio.TriOsc;
 import org.chuck.audio.TubeBell;
 import org.chuck.audio.TwoPole;
@@ -240,6 +242,8 @@ public class UGenRegistry {
         register("HnkyTonk", (sr, args) -> new HnkyTonk(sr));
         register("FrencHrn", (sr, args) -> new FrencHrn(sr));
         register("KrstlChr", (sr, args) -> new KrstlChr(sr));
+        register("Mesh2D", (sr, args) -> new Mesh2D());
+        register("Teabox", (sr, args) -> new Teabox(sr));
 
         // --- Analysis (UAna) ---
         register("FFT", (sr, args) -> new FFT());
