@@ -394,6 +394,16 @@ public class ChuckAntlrNewFeaturesTest {
     }
 
     @Test
+    public void testStaticStringCtor() throws InterruptedException {
+        String src =
+            "class Foo { static string S(\"hello\"); }\n" +
+            "<<< Foo.S >>>;";
+        List<String> out = runChuck(src, 10);
+        assertEquals(1, out.size());
+        assertTrue(out.get(0).contains("hello"), "Expected hello, got: " + out.get(0));
+    }
+
+    @Test
     public void testStaticDurInit() throws InterruptedException {
         // 3::second stored as dur (samples)
         String src =

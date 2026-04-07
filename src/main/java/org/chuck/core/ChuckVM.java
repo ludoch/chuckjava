@@ -70,6 +70,10 @@ public class ChuckVM {
     // HID management
     private final List<Hid> registeredHids = new ArrayList<>();
 
+    // Pending event timeouts: fired when VM clock >= wakeTime
+    private record TimeoutEntry(ChuckShred waitingShred, ChuckEvent event, long wakeTime) {}
+    private final java.util.List<TimeoutEntry> pendingTimeouts = new java.util.concurrent.CopyOnWriteArrayList<>();
+
     public ChuckVM(int sampleRate) {
         this(sampleRate, 2);
     }
@@ -324,50 +328,31 @@ public class ChuckVM {
     }
 
     /**
-     * Schedules a timeout task to wake a shred if an event doesn't trigger.
+     * Schedules a timeout to wake a shred if the event hasn't triggered by wakeTime.
+     * Fired directly from advanceTime (no extra thread).
      */
     public void scheduleTimeout(ChuckShred shred, ChuckEvent event, long wakeTime) {
-        // Special internal task that wakes up at an absolute time
-        ChuckShred timeoutTask = new ChuckShred(null);
-        timeoutTask.setWakeTime(wakeTime);
-        timeoutTask.setName("timeout-task");
-        sporkInternal(timeoutTask, () -> {
-            // If the shred is still waiting for THIS event at THIS wake time, wake it.
-            if (shred.isWaiting() && (shred.getEventWaitingOn() == event || shred.getEventWaitingOn() == null)) {
-                event.removeWaitingShred(shred);
-                shred.setEventWaitingOn(null);
-                shred.setWakeTime(now.get());
-                shred.resume(this);
-                if (!shred.isDone() && !shred.isWaiting()) {
-                    this.schedule(shred);
-                }
-            }
-        });
+        pendingTimeouts.add(new TimeoutEntry(shred, event, wakeTime));
     }
 
-    private int sporkInternal(ChuckShred shred, Runnable task) {
-        if (shred.getId() <= 0) {
-            shred.setId(nextShredId++);
-        }
-        activeShreds.put(shred.getId(), shred);
-        schedule(shred);
-        
-        Thread.ofVirtual().start(() -> {
-            try {
-                ScopedValue.where(CURRENT_VM, this)
-                          .where(ChuckShred.CURRENT_SHRED, shred)
-                          .run(() -> {
-                              shred.waitForResume();
-                              task.run();
-                          });
-            } finally {
-                activeShreds.remove(shred.getId());
-                shred.setDone(true);
-                shred.broadcast(this);
+    /** Check and fire any pending timeouts whose wakeTime <= current VM time. */
+    private void fireTimeouts(long currentTime) {
+        pendingTimeouts.removeIf(t -> {
+            if (currentTime < t.wakeTime()) return false;
+            // Only fire if the shred is still waiting on THIS event
+            if (t.waitingShred().isWaiting()
+                    && (t.waitingShred().getEventWaitingOn() == t.event()
+                        || t.waitingShred().getEventWaitingOn() == null)) {
+                t.event().removeWaitingShred(t.waitingShred());
+                t.waitingShred().setEventWaitingOn(null);
+                t.waitingShred().setWakeTime(currentTime);
+                t.waitingShred().resume(this);
+                if (!t.waitingShred().isDone() && !t.waitingShred().isWaiting()) {
+                    schedule(t.waitingShred());
+                }
             }
+            return true;
         });
-        
-        return shred.getId();
     }
 
     public void executeSynchronous(ChuckCode code, ChuckShred shred) {
@@ -380,6 +365,9 @@ public class ChuckVM {
         long targetTime = now.get() + samples;
         while (now.get() < targetTime) {
             long currentTime = now.get();
+
+            // 0. Check timeouts
+            fireTimeouts(currentTime);
 
             // 1. Run all shreds scheduled for this time (allow 0-yield chaining)
             int safety = 0;

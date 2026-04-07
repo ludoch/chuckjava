@@ -92,10 +92,15 @@ public class ObjectInstrs {
             }
 
             if (obj instanceof ChuckEvent ce) {
-                if (mName.equals("timeout") && a == 1 && args[0] instanceof ChuckDuration cd) {
-                    ce.timeout(cd);
-                    s.reg.pushObject(ce);
-                    return;
+                switch (mName) {
+                    case "timeout" -> {
+                        if (a == 1 && args[0] instanceof ChuckDuration cd) ce.timeout(cd);
+                        s.reg.pushObject(ce); return;
+                    }
+                    case "signal" -> { ce.signal(vm); s.reg.pushObject(ce); return; }
+                    case "broadcast" -> { ce.broadcast(vm); s.reg.pushObject(ce); return; }
+                    case "can_wait" -> { s.reg.push(ce.can_wait() ? 1L : 0L); return; }
+                    case "wait" -> { ce.waitOn(s, vm); s.reg.pushObject(ce); return; }
                 }
                 if (mName.equals("signal") && a == 0) {
                     ce.signal(vm);
@@ -211,7 +216,18 @@ public class ObjectInstrs {
                 java.lang.reflect.Method bestMethod = null;
                 Object[] bestArgs = null;
                 int bestScore = -1;
-                for (java.lang.reflect.Method m : obj.getClass().getMethods()) {
+                // In GraalVM native image, unregistered subclasses return empty from getMethods().
+                // Walk up the hierarchy until we find a registered class (e.g. ChuckUGen).
+                // Method.invoke() still does virtual dispatch on the actual instance.
+                java.lang.reflect.Method[] reflMethods = obj.getClass().getMethods();
+                if (reflMethods.length == 0) {
+                    Class<?> parent = obj.getClass().getSuperclass();
+                    while (parent != null && reflMethods.length == 0) {
+                        reflMethods = parent.getMethods();
+                        parent = parent.getSuperclass();
+                    }
+                }
+                for (java.lang.reflect.Method m : reflMethods) {
                     if (!m.getName().equals(mName) || m.getParameterCount() != a) continue;
                     Class<?>[] pts = m.getParameterTypes();
                     Object[] coe = new Object[a];
@@ -469,8 +485,17 @@ public class ObjectInstrs {
                     }
                     obj = arr;
                 }
-            } else if (!t.equals("int") && !t.equals("float") && !t.equals("string") && !t.equals("dur") && !t.equals("time")) {
-                obj = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+            } else if (t.equals("string")) {
+                String initVal = "";
+                if (a > 0 && args[0] instanceof ChuckString cs) initVal = cs.toString();
+                else if (a > 0 && args[0] instanceof String sv) initVal = sv;
+                obj = new ChuckString(initVal);
+            } else if (!t.equals("int") && !t.equals("float") && !t.equals("dur") && !t.equals("time")) {
+                obj = ChuckFactory.instantiateType(t, a, args, vm.getSampleRate(), vm, s, rm);
+                if (a > 0 && obj instanceof org.chuck.audio.ChuckUGen ugen && args[0] instanceof Number n2) {
+                    try { ugen.getClass().getMethod("freq", double.class).invoke(ugen, n2.doubleValue()); }
+                    catch (Exception ignored) { try { ugen.setData(0, n2.longValue()); } catch (Exception ignored2) {} }
+                }
             }
 
             if (obj instanceof ChuckObject co) {
@@ -543,8 +568,19 @@ public class ObjectInstrs {
                     }
                     obj = arr;
                 }
-            } else if (!t.equals("int") && !t.equals("float") && !t.equals("string") && !t.equals("dur") && !t.equals("time")) {
-                obj = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+            } else if (t.equals("string")) {
+                // string ctor arg: string s("hello") initializes the value
+                String initVal = "";
+                if (a > 0 && args[0] instanceof ChuckString cs) initVal = cs.toString();
+                else if (a > 0 && args[0] instanceof String sv) initVal = sv;
+                obj = new ChuckString(initVal);
+            } else if (!t.equals("int") && !t.equals("float") && !t.equals("dur") && !t.equals("time")) {
+                obj = ChuckFactory.instantiateType(t, a, args, vm.getSampleRate(), vm, s, rm);
+                // Apply single numeric ctor arg to UGen (e.g. SinOsc s(440) sets freq=440)
+                if (a > 0 && obj instanceof org.chuck.audio.ChuckUGen ugen && args[0] instanceof Number n2) {
+                    try { ugen.getClass().getMethod("freq", double.class).invoke(ugen, n2.doubleValue()); }
+                    catch (Exception ignored) { try { ugen.setData(0, n2.longValue()); } catch (Exception ignored2) {} }
+                }
             }
 
             if (obj instanceof ChuckObject co) {
@@ -698,10 +734,19 @@ public class ObjectInstrs {
                         obj = arr;
                     }
                 }
+            } else if (t.equals("string")) {
+                String initVal = "";
+                if (a > 0 && args[0] instanceof ChuckString cs) initVal = cs.toString();
+                else if (a > 0 && args[0] instanceof String sv) initVal = sv;
+                obj = new ChuckString(initVal);
             } else {
-                obj = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+                obj = ChuckFactory.instantiateType(t, a, args, vm.getSampleRate(), vm, s, rm);
+                if (a > 0 && obj instanceof org.chuck.audio.ChuckUGen ugen && args[0] instanceof Number n2) {
+                    try { ugen.getClass().getMethod("freq", double.class).invoke(ugen, n2.doubleValue()); }
+                    catch (Exception ignored) { try { ugen.setData(0, n2.longValue()); } catch (Exception ignored2) {} }
+                }
             }
-            
+
             if (obj instanceof ChuckObject co) {
                 uo_this.setObjectField(n, co);
                 if (co instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);

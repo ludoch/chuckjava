@@ -233,9 +233,15 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             if (ctx.variableDecl(0).REFERENCE_TAG() != null) isRef = true;
             if (v.LPAREN() != null) isRef = false; // Constructor call always overrides ref
 
-            // vec/complex/polar are value types stored as ChuckArrays — instantiate, don't treat as null reference
-            
-            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(fullType.toString(), v.ID().getText(), arraySizes, null, isRef, isStatic, isGlobal, isConst,
+            // Capture constructor args from variableDecl's LPAREN expressionList RPAREN
+            // e.g. 'SinOsc s(440)' or 'string s("hello")'
+            ChuckAST.Exp ctorArgs = null;
+            if (v.LPAREN() != null && v.expressionList() != null) {
+                List<ChuckAST.Exp> argList = (List<ChuckAST.Exp>) visit(v.expressionList());
+                ctorArgs = new ChuckAST.CallExp(null, argList, v.getStart().getLine(), v.getStart().getCharPositionInLine());
+            }
+
+            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(fullType.toString(), v.ID().getText(), arraySizes, ctorArgs, isRef, isStatic, isGlobal, isConst,
                     v.getStart().getLine(), v.getStart().getCharPositionInLine());            
             
             if (v.CHUCK_OP() != null) {
