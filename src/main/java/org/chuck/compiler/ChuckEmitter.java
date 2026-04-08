@@ -494,6 +494,13 @@ public class ChuckEmitter {
                 if (baseType.equals("complex") || baseType.equals("polar") || baseType.startsWith("vec")) {
                     yield "float";
                 }
+                
+                if (isKnownUGenType(baseType) || isSubclassOfUGen(baseType)) {
+                    if (Set.of("freq", "gain", "pan", "width", "phase", "sharpness", "resonance", "cutoff", "noteOn", "noteOff", "keyOn", "keyOff").contains(dot.member())) {
+                        yield "float";
+                    }
+                }
+
                 // Handle member access or method call type
                 UserClassDescriptor desc = userClassRegistry.get(baseType);
                 if (desc != null) {
@@ -510,6 +517,24 @@ public class ChuckEmitter {
                 yield null;
             }
             case ChuckAST.CallExp call -> {
+                String mName = null;
+                String bType = null;
+                if (call.base() instanceof ChuckAST.IdExp id) {
+                    mName = id.name();
+                } else if (call.base() instanceof ChuckAST.DotExp dot) {
+                    mName = dot.member();
+                    bType = getExprType(dot.base());
+                    if (bType == null && dot.base() instanceof ChuckAST.IdExp bid && userClassRegistry.containsKey(bid.name())) {
+                        bType = bid.name();
+                    }
+                }
+                
+                if (mName != null && (bType == null || isKnownUGenType(bType) || isSubclassOfUGen(bType))) {
+                    if (Set.of("freq", "gain", "pan", "width", "phase", "sharpness", "resonance", "cutoff", "noteOn", "noteOff", "keyOn", "keyOff").contains(mName)) {
+                        yield "float";
+                    }
+                }
+
                 if (call.base() instanceof ChuckAST.IdExp id) {
                     List<String> argTypes = call.args().stream().map(this::getExprType).toList();
                     String key = getMethodKey(id.name(), argTypes);
@@ -524,10 +549,7 @@ public class ChuckEmitter {
                     // Standard library functions
                     if (id.name().equals("print") || id.name().equals("chout") || id.name().equals("cherr")) yield "void";
                 } else if (call.base() instanceof ChuckAST.DotExp dot) {
-                    String baseType = getExprType(dot.base());
-                    if (baseType == null && dot.base() instanceof ChuckAST.IdExp id && userClassRegistry.containsKey(id.name())) {
-                        baseType = id.name();
-                    }
+                    String baseType = bType;
                     if (baseType != null) {
                         List<String> argTypes = call.args().stream().map(this::getExprType).toList();
                         String key = resolveMethodKey(baseType, dot.member(), argTypes);
@@ -752,6 +774,13 @@ public class ChuckEmitter {
 
         // Pass 3: Emit top-level statements and register classes
         localCount = 0;
+        localScopes.clear();
+        localTypeScopes.clear();
+        localScopes.push(new HashMap<>());
+        localTypeScopes.push(new HashMap<>());
+        constants.clear();
+        emptyArrayVars.clear();
+
         ChuckCode code = new ChuckCode(programName);
         code.addInstruction(new VarInstrs.MoveArgs(0));
 
@@ -1778,8 +1807,10 @@ public class ChuckEmitter {
                 int argCount = 0;
                 boolean isUserClass = userClassRegistry.containsKey(e.type());
                 boolean forceGlobal = e.isGlobal();
+                boolean useGlobal = forceGlobal || (localScopes.size() <= 1 && currentClass == null);
+                
                 // Compile-time check: detect global type conflicts
-                if (forceGlobal) {
+                if (useGlobal) {
                     String prevType = globalVarTypes.get(e.name());
                     if (prevType != null && !prevType.equals(e.type()) && !prevType.equals("int") && !prevType.equals("float") && !prevType.equals("string")) {
                         throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column()
@@ -1791,28 +1822,32 @@ public class ChuckEmitter {
 
                 boolean isBuiltinPseudoClass = Set.of("string", "vec2", "vec3", "vec4", "complex", "polar").contains(e.type());
                 if (isUserClass && !isBuiltinPseudoClass && e.callArgs() instanceof ChuckAST.CallExp call) {
+                    argCount = call.args().size();
                     if (inPreCtor) {
                         code.addInstruction(new StackInstrs.PushThis());
-                        code.addInstruction(new ObjectInstrs.InstantiateSetAndPushField(getBaseType(e.type()), e.name(), 0, e.isReference(), false, userClassRegistry));
+                        code.addInstruction(new ObjectInstrs.InstantiateSetAndPushField(getBaseType(e.type()), e.name(), argCount, e.isReference(), false, userClassRegistry));
                     } else {
-                        boolean useGlobal = forceGlobal || localScopes.size() <= 1;
-                        Integer localOffset = useGlobal ? null : getLocalOffset(e.name());
+                        boolean isField = currentClass != null && (currentClassFields.contains(e.name()) || hasInstanceField(currentClass, e.name()));
+                        Integer localOffset = (forceGlobal || useGlobal || isField) ? null : getLocalOffset(e.name());
                         if (localOffset != null) {
-                            code.addInstruction(new ObjectInstrs.InstantiateSetAndPushLocal(e.type(), localOffset, 0, e.isReference(), false, userClassRegistry));
-                        } else if (!forceGlobal && !useGlobal && !localScopes.isEmpty()) {
+                            code.addInstruction(new ObjectInstrs.InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), false, userClassRegistry));
+                        } else if (!forceGlobal && !useGlobal && !isField && !localScopes.isEmpty()) {
                             Map<String, Integer> scope = localScopes.peek();
                             localOffset = localCount++;
                             scope.put(e.name(), localOffset);
-                            code.addInstruction(new ObjectInstrs.InstantiateSetAndPushLocal(e.type(), localOffset, 0, e.isReference(), false, userClassRegistry));
+                            code.addInstruction(new ObjectInstrs.InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), false, userClassRegistry));
+                        } else if (isField) {
+                            code.addInstruction(new StackInstrs.PushThis());
+                            code.addInstruction(new ObjectInstrs.InstantiateSetAndPushField(getBaseType(e.type()), e.name(), argCount, e.isReference(), false, userClassRegistry));
                         } else {
-                            code.addInstruction(new ObjectInstrs.InstantiateSetAndPushGlobal(getBaseType(e.type()), e.name(), 0, e.isReference(), false, userClassRegistry));
+                            code.addInstruction(new ObjectInstrs.InstantiateSetAndPushGlobal(getBaseType(e.type()), e.name(), argCount, e.isReference(), false, userClassRegistry));
                         }
                     }
                     code.addInstruction(new StackInstrs.Dup());
                     for (ChuckAST.Exp arg : call.args()) {
                         emitExpression(arg, code);
                     }
-                    code.addInstruction(new ObjectInstrs.CallMethod(e.type(), call.args().size()));
+                    code.addInstruction(new ObjectInstrs.CallMethod(e.type(), argCount));
                 } else {
                     if (e.callArgs() instanceof ChuckAST.CallExp call) {
                         for (ChuckAST.Exp arg : call.args()) {
@@ -1830,20 +1865,23 @@ public class ChuckEmitter {
                     boolean isObject = isObjectType(e.type());
 
                     boolean isArrayDecl = !e.arraySizes().isEmpty();
-                    boolean useGlobal = forceGlobal || localScopes.size() <= 1;
 
                     if (inPreCtor) {
                         code.addInstruction(new StackInstrs.PushThis());
                         code.addInstruction(new ObjectInstrs.InstantiateSetAndPushField(getBaseType(e.type()), e.name(), argCount, e.isReference(), isArrayDecl, userClassRegistry));
                     } else {
-                        Integer localOffset = (forceGlobal || useGlobal) ? null : getLocalOffset(e.name());
+                        boolean isField = currentClass != null && (currentClassFields.contains(e.name()) || hasInstanceField(currentClass, e.name()));
+                        Integer localOffset = (forceGlobal || useGlobal || isField) ? null : getLocalOffset(e.name());
                         if (localOffset != null) {
                             code.addInstruction(new ObjectInstrs.InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), isArrayDecl, userClassRegistry));
-                        } else if (!forceGlobal && !useGlobal && !localScopes.isEmpty()) {
+                        } else if (!forceGlobal && !useGlobal && !isField && !localScopes.isEmpty()) {
                             Map<String, Integer> scope = localScopes.peek();
                             localOffset = localCount++;
                             scope.put(e.name(), localOffset);
                             code.addInstruction(new ObjectInstrs.InstantiateSetAndPushLocal(e.type(), localOffset, argCount, e.isReference(), isArrayDecl, userClassRegistry));
+                        } else if (isField) {
+                            code.addInstruction(new StackInstrs.PushThis());
+                            code.addInstruction(new ObjectInstrs.InstantiateSetAndPushField(getBaseType(e.type()), e.name(), argCount, e.isReference(), isArrayDecl, userClassRegistry));
                         } else {
                             code.addInstruction(new ObjectInstrs.InstantiateSetAndPushGlobal(getBaseType(e.type()), e.name(), argCount, e.isReference(), isArrayDecl, userClassRegistry));
                         }
@@ -1926,13 +1964,18 @@ public class ChuckEmitter {
                                     rDecl.callArgs(), rDecl.isReference(), rDecl.isStatic(), rDecl.isGlobal(),
                                     rDecl.isConst(), rDecl.access(), rDecl.line(), rDecl.column());
                         }
-                        emitExpression(resolvedDecl, code);
-                        code.addInstruction(new StackInstrs.Pop());
+                        
+                        // Pass e.op() to emitChuckTarget
+                        boolean resolvedUseGlobal = resolvedDecl.isGlobal() || (localScopes.size() <= 1 && currentClass == null);
+                        if (!resolvedUseGlobal) {
+                            emitExpression(resolvedDecl, code);
+                            code.addInstruction(new StackInstrs.Pop());
+                        }
                         emitExpression(e.lhs(), code);
-                        emitChuckTarget(resolvedDecl, code);
+                        emitChuckTarget(resolvedDecl, code, e.op());
                     } else {
                         emitExpression(e.lhs(), code);
-                        emitChuckTarget(e.rhs(), code);
+                        emitChuckTarget(e.rhs(), code, e.op());
                     }
                 } else if (e.op() == ChuckAST.Operator.UNCHUCK) {
                     emitExpression(e.lhs(), code);
@@ -2546,10 +2589,12 @@ public class ChuckEmitter {
                             + ": error: keyword 'super' cannot be used inside static functions");
                 }
                 
-                if (localOffset != null) {
-                    code.addInstruction(new VarInstrs.LoadLocal(localOffset));
-                } else if (currentClass != null && hasInstanceField(currentClass, e.name())) {
+                boolean isField = currentClass != null && (currentClassFields.contains(e.name()) || hasInstanceField(currentClass, e.name()));
+                if (isField) {
+                    code.addInstruction(new StackInstrs.PushThis());
                     code.addInstruction(new FieldInstrs.GetUserField(e.name()));
+                } else if (localOffset != null) {
+                    code.addInstruction(new VarInstrs.LoadLocal(localOffset));
                 } else if (currentClass != null && hasStaticField(currentClass, e.name())) {
                     code.addInstruction(new FieldInstrs.GetStatic(currentClass, e.name()));
                 } else if (varType != null) {
@@ -2752,10 +2797,20 @@ public class ChuckEmitter {
                 }
                 emitExpression(e.base(), code);
                 String baseType = getExprType(e.base());
-                if (baseType != null && userClassRegistry.containsKey(baseType)) {
-                    checkAccess(baseType, e.member(), false, e.line(), e.column());
+                if (baseType != null) {
+                    if (userClassRegistry.containsKey(baseType)) {
+                        checkAccess(baseType, e.member(), false, e.line(), e.column());
+                    }
+                    
+                    boolean isUGenMember = isKnownUGenType(baseType) || isSubclassOfUGen(baseType);
+                    if (isUGenMember) {
+                        code.addInstruction(new ObjectInstrs.CallMethod(e.member(), 0));
+                    } else {
+                        code.addInstruction(new FieldInstrs.GetFieldByName(e.member()));
+                    }
+                } else {
+                    code.addInstruction(new FieldInstrs.GetFieldByName(e.member()));
                 }
-                code.addInstruction(new FieldInstrs.GetFieldByName(e.member()));
             }
             case ChuckAST.ArrayLitExp e -> {
                 for (ChuckAST.Exp el : e.elements()) {
@@ -3121,6 +3176,10 @@ public class ChuckEmitter {
     }
 
     private void emitChuckTarget(Object target, ChuckCode code) {
+        emitChuckTarget(target, code, ChuckAST.Operator.CHUCK);
+    }
+
+    private void emitChuckTarget(Object target, ChuckCode code, ChuckAST.Operator op) {
         if (target instanceof List<?> list) {
             if (list.size() > 1) {
                 // Find first element to get line/column
@@ -3130,7 +3189,7 @@ public class ChuckEmitter {
                 }
                 throw new RuntimeException(currentFile + ":" + line + ":" + col + ": error: cannot '=>' from/to a multi-variable declaration");
             }
-            if (!list.isEmpty()) emitChuckTarget(list.get(0), code);
+            if (!list.isEmpty()) emitChuckTarget(list.get(0), code, op);
             return;
         }
         
@@ -3217,7 +3276,7 @@ public class ChuckEmitter {
                     if (baseType != null && userClassRegistry.containsKey(baseType)) {
                         checkAccess(baseType, e.member(), false, e.line(), e.column());
                     }
-                    code.addInstruction(new FieldInstrs.SetFieldByName(e.member()));
+                    code.addInstruction(new SetMemberIntByName(e.member()));
                 }
             }
             case ChuckAST.ArrayAccessExp e -> {
@@ -3232,7 +3291,7 @@ public class ChuckEmitter {
             case ChuckAST.DeclExp e -> {
                 if (inPreCtor) {
                     code.addInstruction(new StackInstrs.PushThis());
-                    code.addInstruction(new FieldInstrs.SetFieldByName(e.name()));
+                    code.addInstruction(new SetMemberIntByName(e.name()));
                     return;
                 }
                 String type = e.type();

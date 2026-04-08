@@ -532,7 +532,7 @@ public class ObjectInstrs {
                 }
             }
             if (r) { vm.setGlobalObject(n, null); s.reg.pushObject(null); return; }
-            if (vm.isGlobalObject(n)) {
+            if (vm.isGlobalObject(n) && !n.startsWith("@new_")) {
                 Object existing = vm.getGlobalObject(n);
                 if (existing != null) {
                     s.reg.pushObject(existing);

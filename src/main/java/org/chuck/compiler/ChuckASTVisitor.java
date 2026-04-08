@@ -65,22 +65,12 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             }
         }
         
-        List<ChuckAST.Stmt> stmts = new ArrayList<>();
-        for (ChuckAST.Exp exp : flattened) {
-            if (exp instanceof ChuckAST.DeclExp de) {
-                stmts.add(new ChuckAST.DeclStmt(de.type(), de.name(), de.arraySizes(), de.callArgs(), de.isReference(), de.isStatic(), de.isGlobal(), de.isConst(), de.access(), de.line(), de.column()));
-            } else if (exp instanceof ChuckAST.BinaryExp be && be.lhs() instanceof ChuckAST.DeclExp de) {
-                // Handle cases like `1 => int x;`
-                stmts.add(new ChuckAST.DeclStmt(de.type(), de.name(), de.arraySizes(), de.callArgs(), de.isReference(), de.isStatic(), de.isGlobal(), de.isConst(), de.access(), de.line(), de.column()));
-                stmts.add(new ChuckAST.ExpStmt(be, be.line(), be.column()));
-            } else {
-                stmts.add(new ChuckAST.ExpStmt(exp, exp.line(), exp.column()));
-            }
-        }
-
-        if (stmts.size() == 1) {
-            return stmts.get(0);
+        if (flattened.size() == 1) {
+            return new ChuckAST.ExpStmt(flattened.get(0), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
         } else {
+            List<ChuckAST.Stmt> stmts = flattened.stream()
+                    .map(e -> new ChuckAST.ExpStmt(e, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()))
+                    .collect(Collectors.toList());
             return new ChuckAST.BlockStmt(stmts, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
         }
     }

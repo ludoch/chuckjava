@@ -14,6 +14,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.PriorityQueue;
 import java.util.Map;
 import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
@@ -131,6 +134,20 @@ public class ChuckVM {
         return numChannels;
     }
 
+    public Map<String, String> getGlobalTypeMap() {
+        Map<String, String> types = new HashMap<>();
+        for (String n : globalIsInt.keySet()) if (globalIsInt.get(n)) types.put(n, "int");
+        for (String n : globalIsDouble.keySet()) if (globalIsDouble.get(n)) types.put(n, "float");
+        for (String n : globalIsObject.keySet()) {
+            if (globalIsObject.get(n)) {
+                Object obj = globalObjects.get(n);
+                if (obj instanceof ChuckObject co) types.put(n, co.getType().getName());
+                else if (obj != null) types.put(n, obj.getClass().getSimpleName());
+            }
+        }
+        return types;
+    }
+
     public void setGlobalInt(String name, long val) {
         globalInts.put(name, val);
         globalIsInt.put(name, true);
@@ -218,7 +235,7 @@ public class ChuckVM {
             List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
 
             ChuckEmitter emitter = new ChuckEmitter(userClassRegistry);
-            ChuckCode code = emitter.emit(ast, name);
+            ChuckCode code = emitter.emit(ast, name, getGlobalTypeMap());
             ChuckShred shred = new ChuckShred(code);
             return spork(shred);
         } catch (Exception e) {

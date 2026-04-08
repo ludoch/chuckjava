@@ -3,6 +3,7 @@ package org.chuck.core;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.chuck.audio.ChuckUGen;
 import org.chuck.chugin.ChuginLoader;
@@ -20,6 +21,8 @@ public class ChuckFactory {
 
     public static ChuckObject instantiateType(String t, int argc, Object[] args, float sr, ChuckVM vm, ChuckShred s, Map<String, UserClassDescriptor> rm) {
         if (t == null) return null;
+        if (t.equals("int") || t.equals("float") || t.equals("dur") || t.equals("time") || t.equals("void") || t.equals("auto")) return null;
+
         if (t.endsWith("[]")) {
             String elemType = t.substring(0, t.length() - 2);
             int size = (argc > 0 && args != null && args.length > 0) ? (int) args[0] : 0;
@@ -76,7 +79,7 @@ public class ChuckFactory {
         ChuckObject chugin = ChuginLoader.instantiateChugin(t, sr, vm);
         if (chugin != null) return chugin;
 
-        return switch (t) {
+        ChuckObject res = switch (t) {
             case "string" -> new ChuckString("");
             case "vec2" -> new ChuckArray("vec2", 2);
             case "vec3" -> new ChuckArray("vec3", 3);
@@ -113,6 +116,8 @@ public class ChuckFactory {
             case "PCA" -> new org.chuck.core.ai.PCA();
             default -> null;
         };
+        
+        return res;
     }
 
     private static boolean extendsEvent(String t, Map<String, UserClassDescriptor> rm, ChuckVM vm) {
