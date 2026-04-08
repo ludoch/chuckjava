@@ -220,35 +220,35 @@ public class ChuckEmitter {
         
         // Register built-in types as known classes for field resolution
         if (!userClassRegistry.containsKey("Std")) {
-            userClassRegistry.put("Std", new UserClassDescriptor("Std", "Object", new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>()));
+            userClassRegistry.put("Std", new UserClassDescriptor("Std", "Object", new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
         }
         if (!userClassRegistry.containsKey("string")) {
-            userClassRegistry.put("string", new UserClassDescriptor("string", "Object", new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>()));
+            userClassRegistry.put("string", new UserClassDescriptor("string", "Object", new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
         }
         if (!userClassRegistry.containsKey("vec2")) {
             List<String[]> fields = new ArrayList<>();
             fields.add(new String[]{"float", "x"}); fields.add(new String[]{"float", "y"});
-            userClassRegistry.put("vec2", new UserClassDescriptor("vec2", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>()));
+            userClassRegistry.put("vec2", new UserClassDescriptor("vec2", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
         }
         if (!userClassRegistry.containsKey("vec3")) {
             List<String[]> fields = new ArrayList<>();
             fields.add(new String[]{"float", "x"}); fields.add(new String[]{"float", "y"}); fields.add(new String[]{"float", "z"});
-            userClassRegistry.put("vec3", new UserClassDescriptor("vec3", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>()));
+            userClassRegistry.put("vec3", new UserClassDescriptor("vec3", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
         }
         if (!userClassRegistry.containsKey("vec4")) {
             List<String[]> fields = new ArrayList<>();
             fields.add(new String[]{"float", "x"}); fields.add(new String[]{"float", "y"}); fields.add(new String[]{"float", "z"}); fields.add(new String[]{"float", "w"});
-            userClassRegistry.put("vec4", new UserClassDescriptor("vec4", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>()));
+            userClassRegistry.put("vec4", new UserClassDescriptor("vec4", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
         }
         if (!userClassRegistry.containsKey("complex")) {
             List<String[]> fields = new ArrayList<>();
             fields.add(new String[]{"float", "re"}); fields.add(new String[]{"float", "im"});
-            userClassRegistry.put("complex", new UserClassDescriptor("complex", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>()));
+            userClassRegistry.put("complex", new UserClassDescriptor("complex", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
         }
         if (!userClassRegistry.containsKey("polar")) {
             List<String[]> fields = new ArrayList<>();
             fields.add(new String[]{"float", "mag"}); fields.add(new String[]{"float", "phase"});
-            userClassRegistry.put("polar", new UserClassDescriptor("polar", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>()));
+            userClassRegistry.put("polar", new UserClassDescriptor("polar", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
         }
 
         if (existing != null) this.globalVarTypes.putAll(existing);
@@ -606,7 +606,7 @@ public class ChuckEmitter {
                 for (ChuckAST.Stmt i : imported) registerClassNames(i);
             }
             case ChuckAST.ClassDefStmt s -> {
-                userClassRegistry.putIfAbsent(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, s.isAbstract(), s.isInterface()));
+                userClassRegistry.putIfAbsent(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, s.isAbstract(), s.isInterface(), null, new HashMap<>(), new HashMap<>(), s.access()));
                 UserClassDescriptor desc = userClassRegistry.get(s.name());
                 registerStaticFieldsRecursive(s.body(), desc);
                 for (ChuckAST.Stmt inner : s.body()) registerClassNames(inner);
@@ -1189,6 +1189,8 @@ public class ChuckEmitter {
                 Map<String, Long> staticInts = existing != null ? existing.staticInts() : new java.util.concurrent.ConcurrentHashMap<>();
                 Map<String, Boolean> staticIsDouble = existing != null ? existing.staticIsDouble() : new java.util.concurrent.ConcurrentHashMap<>();
                 Map<String, Object> staticObjects = existing != null ? existing.staticObjects() : new java.util.concurrent.ConcurrentHashMap<>();
+                Map<String, ChuckAST.AccessModifier> fieldAccess = existing != null ? existing.fieldAccess() : new HashMap<>();
+                Map<String, ChuckAST.AccessModifier> methodAccess = existing != null ? existing.methodAccess() : new HashMap<>();
 
                 // Pre-check: static vars cannot be declared inside nested blocks within a class body
                 for (ChuckAST.Stmt bodyItem : s.body()) {
@@ -1204,8 +1206,10 @@ public class ChuckEmitter {
                         case ChuckAST.DeclStmt f -> {
                             if (f.isStatic()) {
                                 staticFieldDefs.add(new String[]{f.type(), f.name()});
+                                fieldAccess.put(f.name(), f.access());
                             } else {
                                 fieldDefs.add(new String[]{f.type(), f.name()});
+                                fieldAccess.put(f.name(), f.access());
                                 fieldNames.add(f.name());
                             }
                         }
@@ -1217,6 +1221,7 @@ public class ChuckEmitter {
                                 && bexp.rhs() instanceof ChuckAST.DeclExp rDecl -> {
                             if (rDecl.isStatic()) {
                                 staticFieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
+                                fieldAccess.put(rDecl.name(), rDecl.access());
                             } else {
                                 // e.g. `5 => int n;` — field declaration with literal initializer
                                 String initStr = null;
@@ -1228,8 +1233,10 @@ public class ChuckEmitter {
                                 }
                                 if (initStr != null) {
                                     fieldDefs.add(new String[]{rDecl.type(), rDecl.name(), initStr});
+                                    fieldAccess.put(rDecl.name(), rDecl.access());
                                 } else {
                                     fieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
+                                fieldAccess.put(rDecl.name(), rDecl.access());
                                 }
                                 fieldNames.add(rDecl.name());
                             }
@@ -1238,8 +1245,10 @@ public class ChuckEmitter {
                             // Standalone declaration like 'static int a[];'
                             if (rDecl.isStatic()) {
                                 staticFieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
+                                fieldAccess.put(rDecl.name(), rDecl.access());
                             } else {
                                 fieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
+                                fieldAccess.put(rDecl.name(), rDecl.access());
                                 fieldNames.add(rDecl.name());
                             }
                         }
@@ -1258,7 +1267,7 @@ public class ChuckEmitter {
                 // methodCodes/staticMethodCodes are mutable maps; stubs added in pass 1 below become visible here.
                 userClassRegistry.put(s.name(), new UserClassDescriptor(
                         s.name(), s.parentName(), fieldDefs, staticFieldDefs, methodCodes, staticMethodCodes,
-                        staticInts, staticIsDouble, staticObjects, null, s.isAbstract(), s.isInterface()));
+                        staticInts, staticIsDouble, staticObjects, null, s.isAbstract(), s.isInterface(), null, fieldAccess, methodAccess, s.access()));
 
                 // Track methods defined so far to detect duplicates
                 java.util.Set<String> definedMethods = new java.util.HashSet<>();
@@ -1301,6 +1310,7 @@ public class ChuckEmitter {
                     } else {
                         methodCodes.put(methodKey, stub);
                     }
+                    methodAccess.put(methodKey, m.access());
                 }
 
                 // Always compile pre-constructor body into a dedicated ChuckCode.
@@ -1430,9 +1440,7 @@ public class ChuckEmitter {
                             staticInitCodeLocal.addInstruction(new StackInstrs.Pop()); // clean up
                         } else if (bodyStmt instanceof ChuckAST.DeclStmt ds) {
                             // e.g. static int S; or static SinOsc S;
-                            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(ds.type(), ds.name(),
-                                    ds.arraySizes(), ds.callArgs(), ds.isReference(), false,
-                                    false, ds.isConst(), ds.line(), ds.column());
+                            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(ds.type(), ds.name(), ds.arraySizes(), ds.callArgs(), ds.isReference(), false, false, ds.isConst(), ChuckAST.AccessModifier.PUBLIC, ds.line(), ds.column());
                             localScopes.push(new java.util.HashMap<>());
                             localTypeScopes.push(new java.util.HashMap<>());
                             emitExpression(declExp, staticInitCodeLocal);
@@ -1442,9 +1450,7 @@ public class ChuckEmitter {
                             staticInitCodeLocal.addInstruction(new StackInstrs.Pop()); // clean up
                         } else if (bodyStmt instanceof ChuckAST.ExpStmt es3
                                 && es3.exp() instanceof ChuckAST.DeclExp rDecl3) {
-                            ChuckAST.DeclExp rDecl3m = new ChuckAST.DeclExp(rDecl3.type(), rDecl3.name(),
-                                    rDecl3.arraySizes(), rDecl3.callArgs(), rDecl3.isReference(), false,
-                                    false, rDecl3.isConst(), rDecl3.line(), rDecl3.column());
+                            ChuckAST.DeclExp rDecl3m = new ChuckAST.DeclExp(rDecl3.type(), rDecl3.name(), rDecl3.arraySizes(), rDecl3.callArgs(), rDecl3.isReference(), false, false, rDecl3.isConst(), ChuckAST.AccessModifier.PUBLIC, rDecl3.line(), rDecl3.column());
                             localScopes.push(new java.util.HashMap<>());
                             localTypeScopes.push(new java.util.HashMap<>());
                             emitExpression(rDecl3m, staticInitCodeLocal);
@@ -1471,7 +1477,10 @@ public class ChuckEmitter {
                         finalPreCtorCode,
                         s.isAbstract(),
                         s.isInterface(),
-                        finalStaticInitCode);
+                        finalStaticInitCode,
+                        fieldAccess,
+                        methodAccess,
+                        s.access());
 
                 // Add static methods to the main methods map too, for resolution on instances
                 methodCodes.putAll(staticMethodCodes);
@@ -1645,6 +1654,7 @@ public class ChuckEmitter {
     }
 
     private boolean hasInstanceField(String className, String fieldName) {
+        if (className == null) return false;
         UserClassDescriptor desc = userClassRegistry.get(className);
         while (desc != null) {
             for (String[] field : desc.fields()) {
@@ -1914,7 +1924,7 @@ public class ChuckEmitter {
                             if (inferredType == null) inferredType = "int";
                             resolvedDecl = new ChuckAST.DeclExp(inferredType, rDecl.name(), rDecl.arraySizes(),
                                     rDecl.callArgs(), rDecl.isReference(), rDecl.isStatic(), rDecl.isGlobal(),
-                                    rDecl.isConst(), rDecl.line(), rDecl.column());
+                                    rDecl.isConst(), rDecl.access(), rDecl.line(), rDecl.column());
                         }
                         emitExpression(resolvedDecl, code);
                         code.addInstruction(new StackInstrs.Pop());
@@ -2599,6 +2609,7 @@ public class ChuckEmitter {
                         boolean hasSInt = classDesc.staticInts().containsKey(e.member());
                         boolean hasSObj = classDesc.staticObjects().containsKey(e.member());
                         if (hasSInt || hasSObj) {
+                            checkAccess(potentialClassName, e.member(), false, e.line(), e.column());
                             code.addInstruction(new FieldInstrs.GetStatic(potentialClassName, e.member()));
                             return;
                         }
@@ -2740,6 +2751,10 @@ public class ChuckEmitter {
                     }
                 }
                 emitExpression(e.base(), code);
+                String baseType = getExprType(e.base());
+                if (baseType != null && userClassRegistry.containsKey(baseType)) {
+                    checkAccess(baseType, e.member(), false, e.line(), e.column());
+                }
                 code.addInstruction(new FieldInstrs.GetFieldByName(e.member()));
             }
             case ChuckAST.ArrayLitExp e -> {
@@ -2910,6 +2925,8 @@ public class ChuckEmitter {
                             }
                             
                             if (target != null) {
+                                String finalKey = (target.getName().equals(dot.member())) ? fullKey : dot.member() + ":" + argc;
+                                checkAccess(baseType, finalKey, true, e.line(), e.column());
                                 for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
                                 code.addInstruction(new CallFunc(target, argc));
                                 return;
@@ -2920,6 +2937,9 @@ public class ChuckEmitter {
                         emitExpression(dot.base(), code);
                         for (ChuckAST.Exp arg : e.args()) emitExpression(arg, code);
                         String fullKey = resolveMethodKey(baseType, dot.member(), argTypes);
+                        if (userClassRegistry.containsKey(baseType)) {
+                            checkAccess(baseType, fullKey, true, e.line(), e.column());
+                        }
                         code.addInstruction(new ObjectInstrs.CallMethod(dot.member(), argc, fullKey));
                         return;
                     }
@@ -3153,7 +3173,7 @@ public class ChuckEmitter {
                     Integer localOffset = getLocalOffset(e.name());
                     if (localOffset != null) {
                         code.addInstruction(new VarInstrs.StoreLocal(localOffset));
-                    } else if (currentClassFields.contains(e.name())) {
+                    } else if (currentClass != null && (currentClassFields.contains(e.name()) || hasInstanceField(currentClass, e.name()))) {
                         code.addInstruction(new FieldInstrs.SetUserField(e.name()));
                     } else {
                         code.addInstruction(new VarInstrs.SetGlobalObjectOrInt(e.name()));
@@ -3166,6 +3186,7 @@ public class ChuckEmitter {
                 if (potentialClassName != null) {
                     UserClassDescriptor classDesc = userClassRegistry.get(potentialClassName);
                     if (classDesc != null && (classDesc.staticInts().containsKey(e.member()) || classDesc.staticObjects().containsKey(e.member()))) {
+                        checkAccess(potentialClassName, e.member(), false, e.line(), e.column());
                         code.addInstruction(new FieldInstrs.SetStatic(potentialClassName, e.member()));
                         return;
                     }
@@ -3192,6 +3213,10 @@ public class ChuckEmitter {
                 } else {
                     // Vector or Object field write: val => v.x / v.y / obj.member
                     emitExpression(e.base(), code);
+                    String baseType = getExprType(e.base());
+                    if (baseType != null && userClassRegistry.containsKey(baseType)) {
+                        checkAccess(baseType, e.member(), false, e.line(), e.column());
+                    }
                     code.addInstruction(new FieldInstrs.SetFieldByName(e.member()));
                 }
             }
@@ -3288,6 +3313,39 @@ public class ChuckEmitter {
                 code.addInstruction(new VarInstrs.StoreLocalOrGlobal(lid.name(), getLocalOffset(lid.name())));
             }
         }
+    }
+
+    
+    private void checkAccess(String className, String memberName, boolean isMethod, int line, int col) {
+        UserClassDescriptor desc = userClassRegistry.get(className);
+        if (desc == null) return;
+
+        org.chuck.compiler.ChuckAST.AccessModifier access = isMethod ? desc.methodAccess().get(memberName) : desc.fieldAccess().get(memberName);
+        if (access == null) access = org.chuck.compiler.ChuckAST.AccessModifier.PUBLIC;
+
+        if (access == org.chuck.compiler.ChuckAST.AccessModifier.PUBLIC) return;
+
+        if (access == org.chuck.compiler.ChuckAST.AccessModifier.PRIVATE) {
+            if (currentClass == null || !currentClass.equals(className)) {
+                throw new RuntimeException(currentFile + ":" + line + ":" + col
+                        + ": error: cannot access private " + (isMethod ? "method" : "field") + " '" + memberName + "' of class '" + className + "'");
+            }
+        }
+
+        if (access == org.chuck.compiler.ChuckAST.AccessModifier.PROTECTED) {
+            if (currentClass == null || !isSubclassOf(currentClass, className)) {
+                throw new RuntimeException(currentFile + ":" + line + ":" + col
+                        + ": error: cannot access protected " + (isMethod ? "method" : "field") + " '" + memberName + "' of class '" + className + "'");
+            }
+        }
+    }
+
+    private boolean isSubclassOf(String child, String parent) {
+        if (child == null) return false;
+        if (child.equals(parent)) return true;
+        UserClassDescriptor desc = userClassRegistry.get(child);
+        if (desc == null) return false;
+        return isSubclassOf(desc.parentName(), parent);
     }
 
     private Integer getLocalOffset(String name) {

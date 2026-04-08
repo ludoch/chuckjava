@@ -10,6 +10,15 @@ public sealed interface ChuckAST {
     int column();
 
     /**
+     * Access modifiers in the ChucK language.
+     */
+    enum AccessModifier {
+        PUBLIC,
+        PRIVATE,
+        PROTECTED
+    }
+
+    /**
      * Operators in the ChucK language.
      */
     enum Operator {
@@ -51,7 +60,7 @@ public sealed interface ChuckAST {
     record PolarLit(Exp mag, Exp phase, int line, int column) implements Exp {}
     record ArrayAccessExp(Exp base, java.util.List<Exp> indices, int line, int column) implements Exp {}
     record SporkExp(CallExp call, int line, int column) implements Exp {}
-    record DeclExp(String type, String name, java.util.List<Exp> arraySizes, Exp callArgs, boolean isReference, boolean isStatic, boolean isGlobal, boolean isConst, int line, int column) implements Exp {}
+    record DeclExp(String type, String name, java.util.List<Exp> arraySizes, Exp callArgs, boolean isReference, boolean isStatic, boolean isGlobal, boolean isConst, AccessModifier access, int line, int column) implements Exp {}
     record TernaryExp(Exp condition, Exp thenExp, Exp elseExp, int line, int column) implements Exp {}
     record CastExp(Exp value, String targetType, int line, int column) implements Exp {}
     /** typeof(expr) — returns the runtime type name of expr as a string */
@@ -79,11 +88,11 @@ public sealed interface ChuckAST {
     record BlockStmt(java.util.List<Stmt> statements, int line, int column) implements Stmt {}
     
     // Declaration statement: int i; or float f[10];
-    record DeclStmt(String type, String name, java.util.List<Exp> arraySizes, Exp callArgs, boolean isReference, boolean isStatic, boolean isGlobal, boolean isConst, int line, int column) implements Stmt {}
+    record DeclStmt(String type, String name, java.util.List<Exp> arraySizes, Exp callArgs, boolean isReference, boolean isStatic, boolean isGlobal, boolean isConst, AccessModifier access, int line, int column) implements Stmt {}
     
-    record FuncDefStmt(String returnType, String name, java.util.List<String> argTypes, java.util.List<String> argNames, Stmt body, boolean isStatic, int line, int column) implements Stmt {}
+    record FuncDefStmt(String returnType, String name, java.util.List<String> argTypes, java.util.List<String> argNames, Stmt body, boolean isStatic, AccessModifier access, int line, int column) implements Stmt {}
 
-    record ClassDefStmt(String name, String parentName, java.util.List<Stmt> body, boolean isAbstract, boolean isInterface, int line, int column) implements Stmt {}
+    record ClassDefStmt(String name, String parentName, java.util.List<Stmt> body, boolean isAbstract, boolean isInterface, AccessModifier access, int line, int column) implements Stmt {}
 
     record RepeatStmt(Exp count, Stmt body, int line, int column) implements Stmt {}
 
