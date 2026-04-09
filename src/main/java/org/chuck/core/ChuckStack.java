@@ -127,10 +127,33 @@ public Object popObject() {
 
     public void dup() {
         if (sp <= 0) throw new RuntimeException("ChucK stack underflow on Dup");
-        int src = sp - 1;
-        if (isObject[src]) pushObject(objects[src]);
-        else if (isDouble[src]) push(Double.longBitsToDouble(primitives[src]));
-        else push(primitives[src]);
+        copySlot(sp - 1, sp);
+        sp++;
+    }
+
+    public void dup2() {
+        if (sp < 2) throw new RuntimeException("ChucK stack underflow on Dup2");
+        copySlot(sp - 2, sp);
+        copySlot(sp - 1, sp + 1);
+        sp += 2;
+    }
+
+    public void rot() {
+        if (sp < 3) throw new RuntimeException("ChucK stack underflow on Rot");
+        // [a, b, c] -> [b, c, a] where c is top
+        int i1 = sp - 1, i2 = sp - 2, i3 = sp - 3;
+        long p3 = primitives[i3]; boolean d3 = isDouble[i3]; boolean o3 = isObject[i3]; Object obj3 = objects[i3];
+        copySlot(i2, i3);
+        copySlot(i1, i2);
+        primitives[i1] = p3; isDouble[i1] = d3; isObject[i1] = o3; objects[i1] = obj3;
+    }
+
+    private void copySlot(int from, int to) {
+        if (to >= primitives.length) throw new RuntimeException("ChucK stack overflow");
+        primitives[to] = primitives[from];
+        isDouble[to] = isDouble[from];
+        isObject[to] = isObject[from];
+        objects[to] = objects[from];
     }
 
     public void swap() {

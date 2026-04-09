@@ -4,6 +4,7 @@ import org.chuck.compiler.ChuckANTLRParser.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.antlr.v4.runtime.tree.TerminalNode;
 
 /**
  * Maps ANTLR4 Parse Tree to ChuckAST.
@@ -12,17 +13,43 @@ import java.util.stream.Collectors;
 @SuppressWarnings("unchecked")
 public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
+    private String lastDocComment = null;
+
+    private String cleanDoc(String text) {
+        if (text == null) return null;
+        if (text.startsWith("/**") && text.endsWith("*/")) {
+            return text.substring(3, text.length() - 2).trim();
+        }
+        return text;
+    }
+
+    private void captureDoc(org.antlr.v4.runtime.ParserRuleContext ctx) {
+        List<TerminalNode> tokens = ctx.getTokens(ChuckANTLRParser.DOC_COMMENT);
+        if (tokens != null && !tokens.isEmpty()) {
+            lastDocComment = cleanDoc(tokens.get(0).getText());
+        }
+    }
+
     @Override
     public List<ChuckAST.Stmt> visitProgram(ProgramContext ctx) {
-        return ctx.children.stream()
-                .filter(c -> c instanceof DirectiveContext || c instanceof StatementContext || c instanceof FunctionDefContext || c instanceof ClassDefinitionContext)
-                .map(c -> (ChuckAST.Stmt) visit(c))
-                .filter(s -> s != null)
-                .collect(Collectors.toList());
+        List<ChuckAST.Stmt> stmts = new ArrayList<>();
+        for (org.antlr.v4.runtime.tree.ParseTree c : ctx.children) {
+            if (c instanceof TerminalNode tn && tn.getSymbol().getType() == ChuckANTLRParser.DOC_COMMENT) {
+                lastDocComment = cleanDoc(tn.getText());
+            } else {
+                Object res = visit(c);
+                if (res instanceof ChuckAST.Stmt s) stmts.add(s);
+                else if (res instanceof List<?> list) {
+                    for (Object item : list) if (item instanceof ChuckAST.Stmt s) stmts.add(s);
+                }
+            }
+        }
+        return stmts;
     }
 
     @Override
     public ChuckAST.Stmt visitDirective(DirectiveContext ctx) {
+        captureDoc(ctx);
         if (ctx.IMPORT() != null) {
             String path = ctx.STRING().getText();
             // Remove quotes
@@ -53,6 +80,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
     @Override 
     public ChuckAST.Stmt visitExpressionStmt(ExpressionStmtContext ctx) { 
+        captureDoc(ctx);
         List<ChuckAST.Exp> flattened = new ArrayList<>();
         for (ExpressionContext ectx : ctx.expression()) {
             Object result = visit(ectx);
@@ -65,14 +93,22 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             }
         }
         
-        if (flattened.size() == 1) {
-            return new ChuckAST.ExpStmt(flattened.get(0), ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-        } else {
-            List<ChuckAST.Stmt> stmts = flattened.stream()
-                    .map(e -> new ChuckAST.ExpStmt(e, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()))
-                    .collect(Collectors.toList());
-            return new ChuckAST.BlockStmt(stmts, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        List<ChuckAST.Stmt> stmts = new ArrayList<>();
+        for (ChuckAST.Exp exp : flattened) {
+            if (exp instanceof ChuckAST.DeclExp de) {
+                stmts.add(new ChuckAST.DeclStmt(de.type(), de.name(), de.arraySizes(), de.callArgs(), de.isReference(), de.isStatic(), de.isGlobal(), de.isConst(), de.access(), de.doc(), de.line(), de.column()));
+            } else if (exp instanceof ChuckAST.BinaryExp be && be.lhs() instanceof ChuckAST.DeclExp de && (be.op() == ChuckAST.Operator.CHUCK || be.op() == ChuckAST.Operator.AT_CHUCK)) {
+                // Handle cases like `SinOsc s => dac;`
+                stmts.add(new ChuckAST.DeclStmt(de.type(), de.name(), de.arraySizes(), de.callArgs(), de.isReference(), de.isStatic(), de.isGlobal(), de.isConst(), de.access(), de.doc(), de.line(), de.column()));
+                ChuckAST.IdExp id = new ChuckAST.IdExp(de.name(), de.line(), de.column());
+                stmts.add(new ChuckAST.ExpStmt(new ChuckAST.BinaryExp(id, be.op(), be.rhs(), be.line(), be.column()), be.line(), be.column()));
+            } else {
+                stmts.add(new ChuckAST.ExpStmt(exp, exp.line(), exp.column()));
+            }
         }
+
+        if (stmts.size() == 1) return stmts.get(0);
+        return new ChuckAST.BlockStmt(stmts, false, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     // --- Statement Implementations ---
@@ -85,9 +121,13 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             ChuckAST.Exp match = cctx.expression() != null ? (ChuckAST.Exp) visit(cctx.expression()) : null;
             boolean isDefault = cctx.DEFAULT() != null;
             List<ChuckAST.Stmt> body = new ArrayList<>();
-            for (StatementContext sctx : cctx.statement()) {
-                ChuckAST.Stmt s = (ChuckAST.Stmt) visit(sctx);
-                if (s != null) body.add(s);
+            for (org.antlr.v4.runtime.tree.ParseTree child : cctx.children) {
+                if (child instanceof TerminalNode tn && tn.getSymbol().getType() == ChuckANTLRParser.DOC_COMMENT) {
+                    lastDocComment = cleanDoc(tn.getText());
+                } else if (child instanceof StatementContext sctx) {
+                    ChuckAST.Stmt s = (ChuckAST.Stmt) visit(sctx);
+                    if (s != null) body.add(s);
+                }
             }
             cases.add(new ChuckAST.CaseStmt(match, isDefault, body, cctx.getStart().getLine(), cctx.getStart().getCharPositionInLine()));
         }
@@ -96,6 +136,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
     @Override
     public ChuckAST.Stmt visitIfStatement(IfStatementContext ctx) {
+        captureDoc(ctx);
         ChuckAST.Exp cond = (ChuckAST.Exp) visit(ctx.expression());
         ChuckAST.Stmt thenBranch = (ChuckAST.Stmt) visit(ctx.statement(0));
         ChuckAST.Stmt elseBranch = ctx.statement().size() > 1 ? (ChuckAST.Stmt) visit(ctx.statement(1)) : null;
@@ -105,18 +146,21 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
     @Override
     public ChuckAST.Stmt visitWhileStatement(WhileStatementContext ctx) {
+        captureDoc(ctx);
         return new ChuckAST.WhileStmt((ChuckAST.Exp) visit(ctx.expression()), (ChuckAST.Stmt) visit(ctx.statement()),
             ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     @Override
     public ChuckAST.Stmt visitUntilStatement(UntilStatementContext ctx) {
+        captureDoc(ctx);
         return new ChuckAST.UntilStmt((ChuckAST.Exp) visit(ctx.expression()), (ChuckAST.Stmt) visit(ctx.statement()),
             ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     @Override
     public ChuckAST.Stmt visitDoStatement(DoStatementContext ctx) {
+        captureDoc(ctx);
         boolean isUntil = ctx.UNTIL() != null;
         return new ChuckAST.DoStmt((ChuckAST.Stmt) visit(ctx.statement()), (ChuckAST.Exp) visit(ctx.expression()),
             isUntil, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
@@ -128,6 +172,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
     @Override
     public ChuckAST.Stmt visitForStatement(ForStatementContext ctx) {
+        captureDoc(ctx);
         if (ctx.COLON() != null) {
             String type = ctx.type() != null ? ctx.type().getText() : (ctx.AUTO() != null ? "auto" : "Object");
             String name = ctx.ID().getText();
@@ -140,11 +185,16 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         ChuckAST.Exp update = null;
 
         int childIdx = 2; // skip FOR LPAREN
+        while (childIdx < ctx.getChildCount() && ctx.getChild(childIdx) instanceof TerminalNode tn && tn.getSymbol().getType() == ChuckANTLRParser.DOC_COMMENT) {
+            lastDocComment = cleanDoc(tn.getText());
+            childIdx++;
+        }
+
         if (ctx.getChild(childIdx) instanceof ExpressionContext) {
             Object res = visit(ctx.getChild(childIdx));
             ChuckAST.Exp exp = (res instanceof List<?> list) ? (ChuckAST.Exp) list.get(0) : (ChuckAST.Exp) res;
             if (exp instanceof ChuckAST.DeclExp de) {
-                init = new ChuckAST.DeclStmt(de.type(), de.name(), de.arraySizes(), de.callArgs(), de.isReference(), de.isStatic(), de.isGlobal(), de.isConst(), de.access(), de.line(), de.column());
+                init = new ChuckAST.DeclStmt(de.type(), de.name(), de.arraySizes(), de.callArgs(), de.isReference(), de.isStatic(), de.isGlobal(), de.isConst(), de.access(), de.doc(), de.line(), de.column());
             } else {
                 init = new ChuckAST.ExpStmt(exp, exp.line(), exp.column());
             }
@@ -170,6 +220,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
     @Override
     public ChuckAST.Stmt visitRepeatStatement(RepeatStatementContext ctx) {
+        captureDoc(ctx);
         return new ChuckAST.RepeatStmt((ChuckAST.Exp) visit(ctx.expression()), (ChuckAST.Stmt) visit(ctx.statement()),
             ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
@@ -194,17 +245,33 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
     @Override
     public ChuckAST.Stmt visitBlockStatement(BlockStatementContext ctx) {
-        List<ChuckAST.Stmt> stmts = ctx.statement().stream()
-                .map(s -> (ChuckAST.Stmt) visit(s))
-                .filter(s -> s != null)
-                .collect(Collectors.toList());
-        return new ChuckAST.BlockStmt(stmts, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        List<ChuckAST.Stmt> stmts = new ArrayList<>();
+        for (org.antlr.v4.runtime.tree.ParseTree child : ctx.children) {
+            if (child instanceof TerminalNode tn && tn.getSymbol().getType() == ChuckANTLRParser.DOC_COMMENT) {
+                lastDocComment = cleanDoc(tn.getText());
+            } else if (child instanceof StatementContext sctx) {
+                ChuckAST.Stmt s = (ChuckAST.Stmt) visit(sctx);
+                if (s != null) stmts.add(s);
+            }
+        }
+        return new ChuckAST.BlockStmt(stmts, true, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     // --- Expressions ---
 
+    private ChuckAST.AccessModifier getAccessModifier(AccessModifierContext ctx) {
+        if (ctx == null) return ChuckAST.AccessModifier.PUBLIC;
+        if (ctx.PRIVATE() != null) return ChuckAST.AccessModifier.PRIVATE;
+        if (ctx.PROTECTED() != null) return ChuckAST.AccessModifier.PROTECTED;
+        return ChuckAST.AccessModifier.PUBLIC;
+    }
+
     @Override
     public Object visitDeclExp(DeclExpContext ctx) {
+        captureDoc(ctx);
+        String currentDoc = lastDocComment;
+        lastDocComment = null; // consume it
+
         StringBuilder typeBase = new StringBuilder(ctx.type().getText());
         List<ChuckAST.Exp> decls = new ArrayList<>();
         
@@ -244,7 +311,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
                 ctorArgs = new ChuckAST.CallExp(null, argList, v.getStart().getLine(), v.getStart().getCharPositionInLine());
             }
 
-            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(fullType.toString(), v.ID().getText(), arraySizes, ctorArgs, isRef, isStatic, isGlobal, isConst, access,
+            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(fullType.toString(), v.ID().getText(), arraySizes, ctorArgs, isRef, isStatic, isGlobal, isConst, access, currentDoc,
                     v.getStart().getLine(), v.getStart().getCharPositionInLine());            
             
             if (v.CHUCK_OP() != null) {
@@ -310,9 +377,12 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         Object left = visit(ctx.expression(0));
         Object right = visit(ctx.expression(1));
         
-        ChuckAST.Exp lExp = (left instanceof List<?> list) ? (ChuckAST.Exp) list.get(0) : (ChuckAST.Exp) left;
-        ChuckAST.Exp rExp = (right instanceof List<?> list) ? (ChuckAST.Exp) list.get(0) : (ChuckAST.Exp) right;
+        ChuckAST.Exp lExp = (left instanceof List<?> list && !list.isEmpty()) ? (ChuckAST.Exp) list.get(0) : (left instanceof ChuckAST.Exp e ? e : null);
+        ChuckAST.Exp rExp = (right instanceof List<?> list && !list.isEmpty()) ? (ChuckAST.Exp) list.get(0) : (right instanceof ChuckAST.Exp e ? e : null);
         
+        if (lExp == null) throw new RuntimeException(ctx.getStart().getLine() + ":" + ctx.getStart().getCharPositionInLine() + ": error: left operand of '=>' is null (" + ctx.expression(0).getText() + ")");
+        if (rExp == null) throw new RuntimeException(ctx.getStart().getLine() + ":" + ctx.getStart().getCharPositionInLine() + ": error: right operand of '=>' is null (" + ctx.expression(1).getText() + ")");
+
         return new ChuckAST.BinaryExp(lExp, op, rExp, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
@@ -470,6 +540,12 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     }
 
     @Override
+    public ChuckAST.Exp visitVectorLitExp(VectorLitExpContext ctx) {
+        List<ChuckAST.Exp> elements = ctx.expressionList() != null ? (List<ChuckAST.Exp>) visit(ctx.expressionList()) : new ArrayList<>();
+        return new ChuckAST.VectorLitExp(elements, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
+
+    @Override
     public List<ChuckAST.Exp> visitExpressionList(ExpressionListContext ctx) {
         return ctx.expression().stream().map(e -> {
             Object res = visit(e);
@@ -486,17 +562,50 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
                 ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
-    // --- Definitions ---
+    @Override
+    public ChuckAST.Exp visitTypeofExp(ChuckANTLRParser.TypeofExpContext ctx) {
+        ChuckAST.Exp expr = (ChuckAST.Exp) visit(ctx.expression());
+        return new ChuckAST.TypeofExp(expr, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
 
-    private ChuckAST.AccessModifier getAccessModifier(AccessModifierContext ctx) {
-        if (ctx == null) return ChuckAST.AccessModifier.PUBLIC;
-        if (ctx.PRIVATE() != null) return ChuckAST.AccessModifier.PRIVATE;
-        if (ctx.PROTECTED() != null) return ChuckAST.AccessModifier.PROTECTED;
-        return ChuckAST.AccessModifier.PUBLIC;
+    @Override
+    public ChuckAST.Exp visitInstanceofExp(ChuckANTLRParser.InstanceofExpContext ctx) {
+        ChuckAST.Exp expr = (ChuckAST.Exp) visit(ctx.expression());
+        String typeName = ctx.typeName().getText();
+        return new ChuckAST.InstanceofExp(expr, typeName, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+    }
+
+    @Override
+    public ChuckAST.Exp visitNewExp(NewExpContext ctx) {
+        String typeStr = ctx.typeName().getText();
+        List<ChuckAST.Exp> arraySizes = new ArrayList<>();
+        boolean isArray = ctx.arrayDimension() != null && !ctx.arrayDimension().isEmpty();
+        
+        for (ChuckANTLRParser.ArrayDimensionContext ad : ctx.arrayDimension()) {
+            if (ad.expression() != null) {
+                arraySizes.add((ChuckAST.Exp) visit(ad.expression()));
+            } else {
+                arraySizes.add(new ChuckAST.IntExp(-1, ad.getStart().getLine(), ad.getStart().getCharPositionInLine()));
+            }
+        }
+        List<ChuckAST.Exp> argList = ctx.expressionList() != null ? (List<ChuckAST.Exp>) visit(ctx.expressionList()) : null;
+        ChuckAST.Exp callArgs = null;
+        if (argList != null) {
+            callArgs = new ChuckAST.ArrayLitExp(argList, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        }
+        
+        String namePrefix = isArray ? "@new_array_" : "@new_";
+        return new ChuckAST.DeclExp(typeStr, namePrefix + ctx.getStart().getLine() + "_" + ctx.getStart().getCharPositionInLine(), 
+                arraySizes, callArgs, false, false, false, false, ChuckAST.AccessModifier.PUBLIC, null,
+                ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     @Override
     public ChuckAST.Stmt visitFunctionDef(FunctionDefContext ctx) {
+        captureDoc(ctx);
+        String currentDoc = lastDocComment;
+        lastDocComment = null; // consume
+
         String retType = ctx.type() != null ? ctx.type().getText() : "void";
         String name = "";
         if (ctx.functionName() != null) {
@@ -538,11 +647,15 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
                 argNames.add(p.ID().getText());
             }
         }
-        return new ChuckAST.FuncDefStmt(retType, name, argTypes, argNames, (ChuckAST.Stmt) visit(ctx.statement()), isStatic, access, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return new ChuckAST.FuncDefStmt(retType, name, argTypes, argNames, (ChuckAST.Stmt) visit(ctx.statement()), isStatic, access, currentDoc, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 
     @Override
     public ChuckAST.Stmt visitClassDefinition(ClassDefinitionContext ctx) {
+        captureDoc(ctx);
+        String currentDoc = lastDocComment;
+        lastDocComment = null; // consume
+
         String name = ctx.ID().getText();
         String parentName = ctx.EXTENDS() != null ? ctx.typeName().getText() : null;
         boolean isAbstract = ctx.ABSTRACT() != null
@@ -550,55 +663,18 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         boolean isInterface = ctx.INTERFACE() != null;
         ChuckAST.AccessModifier access = getAccessModifier(ctx.accessModifier());
         
-        List<ChuckAST.Stmt> body = ctx.children.stream()
-            .filter(c -> c instanceof StatementContext || c instanceof FunctionDefContext || c instanceof ClassDefinitionContext)
-            .map(c -> (ChuckAST.Stmt) visit(c))
-            .filter(s -> s != null)
-            .collect(Collectors.toList());
-        return new ChuckAST.ClassDefStmt(name, parentName, body, isAbstract, isInterface, access, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-    }
-
-    @Override
-    public ChuckAST.Exp visitVectorLitExp(ChuckANTLRParser.VectorLitExpContext ctx) {
-        List<ChuckAST.Exp> elements = ctx.expressionList() != null ? (List<ChuckAST.Exp>) visit(ctx.expressionList()) : new ArrayList<>();
-        return new ChuckAST.VectorLitExp(elements, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-    }
-
-    @Override
-    public ChuckAST.Exp visitTypeofExp(ChuckANTLRParser.TypeofExpContext ctx) {
-        ChuckAST.Exp expr = (ChuckAST.Exp) visit(ctx.expression());
-        return new ChuckAST.TypeofExp(expr, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-    }
-
-    @Override
-    public ChuckAST.Exp visitInstanceofExp(ChuckANTLRParser.InstanceofExpContext ctx) {
-        ChuckAST.Exp expr = (ChuckAST.Exp) visit(ctx.expression());
-        String typeName = ctx.typeName().getText();
-        return new ChuckAST.InstanceofExp(expr, typeName, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-    }
-
-    @Override
-    public ChuckAST.Exp visitNewExp(NewExpContext ctx) {
-        String typeStr = ctx.typeName().getText();
-        List<ChuckAST.Exp> arraySizes = new ArrayList<>();
-        boolean isArray = ctx.arrayDimension() != null && !ctx.arrayDimension().isEmpty();
-        
-        for (ChuckANTLRParser.ArrayDimensionContext ad : ctx.arrayDimension()) {
-            if (ad.expression() != null) {
-                arraySizes.add((ChuckAST.Exp) visit(ad.expression()));
-            } else {
-                arraySizes.add(new ChuckAST.IntExp(-1, ad.getStart().getLine(), ad.getStart().getCharPositionInLine()));
+        List<ChuckAST.Stmt> body = new ArrayList<>();
+        for (org.antlr.v4.runtime.tree.ParseTree child : ctx.children) {
+            if (child instanceof TerminalNode tn && tn.getSymbol().getType() == ChuckANTLRParser.DOC_COMMENT) {
+                lastDocComment = cleanDoc(tn.getText());
+            } else if (child instanceof StatementContext || child instanceof FunctionDefContext || child instanceof ClassDefinitionContext || child instanceof DirectiveContext) {
+                Object res = visit(child);
+                if (res instanceof ChuckAST.Stmt s) body.add(s);
+                else if (res instanceof List<?> list) {
+                    for (Object item : list) if (item instanceof ChuckAST.Stmt s) body.add(s);
+                }
             }
         }
-        List<ChuckAST.Exp> argList = ctx.expressionList() != null ? (List<ChuckAST.Exp>) visit(ctx.expressionList()) : null;
-        ChuckAST.Exp callArgs = null;
-        if (argList != null) {
-            callArgs = new ChuckAST.ArrayLitExp(argList, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
-        }
-        
-        String namePrefix = isArray ? "@new_array_" : "@new_";
-        return new ChuckAST.DeclExp(typeStr, namePrefix + ctx.getStart().getLine() + "_" + ctx.getStart().getCharPositionInLine(), 
-                arraySizes, callArgs, false, false, false, false, ChuckAST.AccessModifier.PUBLIC,
-                ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        return new ChuckAST.ClassDefStmt(name, parentName, body, isAbstract, isInterface, access, currentDoc, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
 }

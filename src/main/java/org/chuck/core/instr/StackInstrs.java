@@ -13,6 +13,14 @@ public class StackInstrs {
         @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.dup(); }
     }
 
+    public static class Dup2 implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.dup2(); }
+    }
+
+    public static class Rot implements ChuckInstr {
+        @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.rot(); }
+    }
+
     public static class Swap implements ChuckInstr {
         @Override public void execute(ChuckVM vm, ChuckShred s) { s.reg.swap(); }
     }

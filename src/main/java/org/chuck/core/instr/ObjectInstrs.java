@@ -456,6 +456,19 @@ public class ObjectInstrs {
             }
             int fp = s.getFramePointer();
             if (r) { s.mem.setRef(fp + o, null); s.reg.pushObject(null); return; }
+            
+            // Check for existing object at this local offset?
+            // Usually local variables are not re-instantiated if they are in the same shred run.
+            // But ChucK variables are typically initialized once per scope entry.
+            // For now, we assume if it's already an object, we use it.
+            if (s.mem.isObjectAt(fp + o)) {
+                Object existing = s.mem.getRef(fp + o);
+                if (existing != null) {
+                    s.reg.pushObject(existing);
+                    return;
+                }
+            }
+
             Object obj = null;
             if (ar) {
                 int sz = ((Number) args[0]).intValue();
@@ -750,6 +763,7 @@ public class ObjectInstrs {
             if (obj instanceof ChuckObject co) {
                 uo_this.setObjectField(n, co);
                 if (co instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
+                if (co instanceof AutoCloseable ac) s.registerCloseable(ac);
                 s.reg.pushObject(co);
             } else {
                 if (t.equals("float")) { 

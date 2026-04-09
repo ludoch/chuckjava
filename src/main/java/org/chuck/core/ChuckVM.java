@@ -23,6 +23,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
 import org.chuck.audio.DacChannel;
 import org.chuck.audio.MultiChannelDac;
 import org.chuck.hid.Hid;
@@ -55,6 +56,8 @@ public class ChuckVM {
     private final Map<String, Boolean> globalIsDouble = new ConcurrentHashMap<>();
     private final Map<String, Boolean> globalIsObject = new ConcurrentHashMap<>();
     private final Map<String, Object> globalObjects = new ConcurrentHashMap<>();
+    private final Map<String, String> globalDocs = new ConcurrentHashMap<>();
+    private final Map<String, String> globalFunctionDocs = new ConcurrentHashMap<>();
     private final Map<String, UserClassDescriptor> userClassRegistry = new ConcurrentHashMap<>();
     private final Set<String> staticInitializedClasses = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
@@ -134,20 +137,6 @@ public class ChuckVM {
         return numChannels;
     }
 
-    public Map<String, String> getGlobalTypeMap() {
-        Map<String, String> types = new HashMap<>();
-        for (String n : globalIsInt.keySet()) if (globalIsInt.get(n)) types.put(n, "int");
-        for (String n : globalIsDouble.keySet()) if (globalIsDouble.get(n)) types.put(n, "float");
-        for (String n : globalIsObject.keySet()) {
-            if (globalIsObject.get(n)) {
-                Object obj = globalObjects.get(n);
-                if (obj instanceof ChuckObject co) types.put(n, co.getType().getName());
-                else if (obj != null) types.put(n, obj.getClass().getSimpleName());
-            }
-        }
-        return types;
-    }
-
     public void setGlobalInt(String name, long val) {
         globalInts.put(name, val);
         globalIsInt.put(name, true);
@@ -197,6 +186,28 @@ public class ChuckVM {
         return globalObjects.get(name);
     }
 
+    public void setGlobalDoc(String name, String doc) {
+        if (doc == null) globalDocs.remove(name);
+        else globalDocs.put(name, doc);
+    }
+
+    public String getGlobalDoc(String name) {
+        return globalDocs.get(name);
+    }
+
+    public void setGlobalFunctionDoc(String key, String doc) {
+        if (doc == null) globalFunctionDocs.remove(key);
+        else globalFunctionDocs.put(key, doc);
+    }
+
+    public String getGlobalFunctionDoc(String key) {
+        return globalFunctionDocs.get(key);
+    }
+
+    public Set<String> getGlobalFunctionDocKeys() {
+        return globalFunctionDocs.keySet();
+    }
+
     public UserClassDescriptor getUserClass(String name) {
         return userClassRegistry.get(name);
     }
@@ -223,6 +234,27 @@ public class ChuckVM {
         userClassRegistry.put(name, desc);
     }
 
+    public Map<String, String> getGlobalTypeMap() {
+        Map<String, String> types = new HashMap<>();
+        for (String n : globalIsInt.keySet()) if (globalIsInt.get(n)) types.put(n, "int");
+        for (String n : globalIsDouble.keySet()) if (globalIsDouble.get(n)) types.put(n, "float");
+        for (String n : globalIsObject.keySet()) {
+            if (globalIsObject.get(n)) {
+                Object obj = globalObjects.get(n);
+                if (obj instanceof ChuckArray ca && ca.vecTag != null) {
+                    types.put(n, ca.vecTag);
+                } else if (obj instanceof UserObject uo) {
+                    types.put(n, uo.className);
+                } else if (obj instanceof ChuckObject co) {
+                    types.put(n, co.getType().getName());
+                } else if (obj != null) {
+                    types.put(n, obj.getClass().getSimpleName());
+                }
+            }
+        }
+        return types;
+    }
+
     public int run(String source, String name) {
         try {
             CharStream input = CharStreams.fromString(source);
@@ -235,8 +267,13 @@ public class ChuckVM {
             List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
 
             ChuckEmitter emitter = new ChuckEmitter(userClassRegistry);
-            ChuckCode code = emitter.emit(ast, name, getGlobalTypeMap());
-            ChuckShred shred = new ChuckShred(code);
+            ChuckEmitter.EmitResult result = emitter.emitWithDocs(ast, name, getGlobalTypeMap());
+            
+            // Register docs
+            result.globalDocs().forEach(this::setGlobalDoc);
+            result.functionDocs().forEach(this::setGlobalFunctionDoc);
+
+            ChuckShred shred = new ChuckShred(result.code());
             return spork(shred);
         } catch (Exception e) {
             String msg = "Machine.run error: " + e.getMessage();
@@ -272,7 +309,6 @@ public class ChuckVM {
             }
             String source = java.nio.file.Files.readString(path);
             
-            ChuckEmitter emitter = new ChuckEmitter(userClassRegistry);
             int id = run(source, path.toString());
             
             // Pass arguments if any
@@ -321,6 +357,7 @@ public class ChuckVM {
             } finally {
                 activeShreds.remove(shred.getId());
                 shred.setDone(true);
+                shred.cleanup();
                 // Wake up any shreds waiting on this shred (if it's an Event)
                 shred.broadcast(this);
             }
@@ -348,6 +385,7 @@ public class ChuckVM {
             } finally {
                 activeShreds.remove(shred.getId());
                 shred.setDone(true);
+                shred.cleanup();
                 shred.broadcast(this);
             }
         });

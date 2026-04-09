@@ -63,7 +63,7 @@ public class ChuckObject {
     /**
      * Gets data at index and treats it as a double.
      */
-    protected double getDataAsDouble(int index) {
+    public double getDataAsDouble(int index) {
         if (index >= data.length) return 0.0;
         long raw = data[index];
         if (isDouble[index]) return Double.longBitsToDouble(raw);

@@ -74,7 +74,10 @@ public class ChuckFactory {
         }
 
         ChuckUGen ugen = UGenRegistry.instantiate(t, sr, args);
-        if (ugen != null) return ugen;
+        if (ugen != null) {
+            // System.err.println("ChuckFactory: instantiated UGen " + t);
+            return ugen;
+        }
 
         ChuckObject chugin = ChuginLoader.instantiateChugin(t, sr, vm);
         if (chugin != null) return chugin;
@@ -116,7 +119,6 @@ public class ChuckFactory {
             case "PCA" -> new org.chuck.core.ai.PCA();
             default -> null;
         };
-        
         return res;
     }
 

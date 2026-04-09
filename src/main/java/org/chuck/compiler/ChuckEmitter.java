@@ -220,35 +220,35 @@ public class ChuckEmitter {
         
         // Register built-in types as known classes for field resolution
         if (!userClassRegistry.containsKey("Std")) {
-            userClassRegistry.put("Std", new UserClassDescriptor("Std", "Object", new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
+            userClassRegistry.put("Std", new UserClassDescriptor("Std", "Object", new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>()));
         }
         if (!userClassRegistry.containsKey("string")) {
-            userClassRegistry.put("string", new UserClassDescriptor("string", "Object", new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
+            userClassRegistry.put("string", new UserClassDescriptor("string", "Object", new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>()));
         }
         if (!userClassRegistry.containsKey("vec2")) {
             List<String[]> fields = new ArrayList<>();
             fields.add(new String[]{"float", "x"}); fields.add(new String[]{"float", "y"});
-            userClassRegistry.put("vec2", new UserClassDescriptor("vec2", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
+            userClassRegistry.put("vec2", new UserClassDescriptor("vec2", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>()));
         }
         if (!userClassRegistry.containsKey("vec3")) {
             List<String[]> fields = new ArrayList<>();
             fields.add(new String[]{"float", "x"}); fields.add(new String[]{"float", "y"}); fields.add(new String[]{"float", "z"});
-            userClassRegistry.put("vec3", new UserClassDescriptor("vec3", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
+            userClassRegistry.put("vec3", new UserClassDescriptor("vec3", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>()));
         }
         if (!userClassRegistry.containsKey("vec4")) {
             List<String[]> fields = new ArrayList<>();
             fields.add(new String[]{"float", "x"}); fields.add(new String[]{"float", "y"}); fields.add(new String[]{"float", "z"}); fields.add(new String[]{"float", "w"});
-            userClassRegistry.put("vec4", new UserClassDescriptor("vec4", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
+            userClassRegistry.put("vec4", new UserClassDescriptor("vec4", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>()));
         }
         if (!userClassRegistry.containsKey("complex")) {
             List<String[]> fields = new ArrayList<>();
             fields.add(new String[]{"float", "re"}); fields.add(new String[]{"float", "im"});
-            userClassRegistry.put("complex", new UserClassDescriptor("complex", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
+            userClassRegistry.put("complex", new UserClassDescriptor("complex", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>()));
         }
         if (!userClassRegistry.containsKey("polar")) {
             List<String[]> fields = new ArrayList<>();
             fields.add(new String[]{"float", "mag"}); fields.add(new String[]{"float", "phase"});
-            userClassRegistry.put("polar", new UserClassDescriptor("polar", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, false, false, null, new HashMap<>(), new HashMap<>(), ChuckAST.AccessModifier.PUBLIC));
+            userClassRegistry.put("polar", new UserClassDescriptor("polar", "Object", fields, new ArrayList<>(), new HashMap<>(), new HashMap<>()));
         }
 
         if (existing != null) this.globalVarTypes.putAll(existing);
@@ -628,7 +628,7 @@ public class ChuckEmitter {
                 for (ChuckAST.Stmt i : imported) registerClassNames(i);
             }
             case ChuckAST.ClassDefStmt s -> {
-                userClassRegistry.putIfAbsent(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, s.isAbstract(), s.isInterface(), null, new HashMap<>(), new HashMap<>(), s.access()));
+                userClassRegistry.putIfAbsent(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, s.isAbstract(), s.isInterface(), null, new HashMap<>(), new HashMap<>(), s.access(), s.doc(), new HashMap<>()));
                 UserClassDescriptor desc = userClassRegistry.get(s.name());
                 registerStaticFieldsRecursive(s.body(), desc);
                 for (ChuckAST.Stmt inner : s.body()) registerClassNames(inner);
@@ -736,14 +736,11 @@ public class ChuckEmitter {
         }
     }
 
-    public ChuckCode emit(List<ChuckAST.Stmt> statements, String programName) {
-        return emit(statements, programName, null);
-    }
+    public record EmitResult(ChuckCode code, Map<String, String> globalVarTypes, Map<String, String> globalDocs, Map<String, String> functionDocs) {}
 
-    public ChuckCode emit(List<ChuckAST.Stmt> statements, String programName, Map<String, String> existingGlobals) {
+    public EmitResult emitWithDocs(List<ChuckAST.Stmt> statements, String programName, Map<String, String> existingGlobals) {
         localScopes.clear();
         localTypeScopes.clear();
-        // Push a top-level local scope so script variables are shred-local
         localScopes.push(new HashMap<>());
         localTypeScopes.push(new HashMap<>());
         localCount = 0;
@@ -751,28 +748,24 @@ public class ChuckEmitter {
         globalVarTypes.clear();
         initGlobalTypes(existingGlobals);
         currentFile = programName;
-        // Empty/comment-only programs are errors in ChucK
+        
         boolean hasContent = statements.stream().anyMatch(s
                 -> !(s instanceof ChuckAST.BlockStmt bs && bs.statements().isEmpty()));
         if (!hasContent) {
             throw new RuntimeException(programName + ":1:1: syntax error\n(empty file)");
         }
-        // Pass 0: Register all class names and static field names so they are known as types
+
+        for (ChuckAST.Stmt stmt : statements) registerClassNames(stmt);
+
+        Map<String, String> functionDocs = new HashMap<>();
         for (ChuckAST.Stmt stmt : statements) {
-            registerClassNames(stmt);
+            registerSignaturesWithDocs(stmt, functions, functionReturnTypes, functionDocs);
         }
 
-        // Pass 1: Collect all global function signatures
-        for (ChuckAST.Stmt stmt : statements) {
-            registerSignatures(stmt, functions, functionReturnTypes);
-        }
-
-        // Pass 2: Populate function and class bodies
         for (ChuckAST.Stmt stmt : statements) {
             emitBodies(stmt);
         }
 
-        // Pass 3: Emit top-level statements and register classes
         localCount = 0;
         localScopes.clear();
         localTypeScopes.clear();
@@ -784,17 +777,62 @@ public class ChuckEmitter {
         ChuckCode code = new ChuckCode(programName);
         code.addInstruction(new VarInstrs.MoveArgs(0));
 
-        // First, register classes so they are available for static access in the script
         for (ChuckAST.Stmt stmt : statements) {
             registerClassesToCode(stmt, code);
         }
 
+        Map<String, String> globalDocsMap = new HashMap<>();
         for (ChuckAST.Stmt stmt : statements) {
             if (!(stmt instanceof ChuckAST.FuncDefStmt) && !(stmt instanceof ChuckAST.ImportStmt) && !(stmt instanceof ChuckAST.ClassDefStmt)) {
-                emitStatement(stmt, code);
+                emitStatementWithDocs(stmt, code, globalDocsMap);
             }
         }
-        return code;
+        return new EmitResult(code, new HashMap<>(globalVarTypes), globalDocsMap, functionDocs);
+    }
+
+    private void registerSignaturesWithDocs(ChuckAST.Stmt stmt, Map<String, ChuckCode> functions, Map<String, String> functionReturnTypes, Map<String, String> functionDocs) {
+        if (stmt instanceof ChuckAST.ImportStmt s) {
+            List<ChuckAST.Stmt> imported = getParsedImport(s.path());
+            for (ChuckAST.Stmt i : imported) registerSignaturesWithDocs(i, functions, functionReturnTypes, functionDocs);
+        } else if (stmt instanceof ChuckAST.FuncDefStmt s) {
+            String name = s.name();
+            String key = getMethodKey(name, s.argTypes());
+            if (!functions.containsKey(key)) {
+                ChuckCode c = new ChuckCode(s.name());
+                c.setSignature(s.argTypes().size(), s.returnType() != null ? s.returnType() : "void");
+                functions.put(key, c);
+            }
+            if (s.returnType() != null && !s.returnType().equals("void")) {
+                functionReturnTypes.put(key, s.returnType());
+            }
+            if (s.doc() != null) {
+                functionDocs.put(key, s.doc());
+            }
+        } else if (stmt instanceof ChuckAST.BlockStmt b) {
+            for (ChuckAST.Stmt inner : b.statements()) {
+                registerSignaturesWithDocs(inner, functions, functionReturnTypes, functionDocs);
+            }
+        }
+    }
+
+    private void emitStatementWithDocs(ChuckAST.Stmt stmt, ChuckCode code, Map<String, String> globalDocs) {
+        if (stmt instanceof ChuckAST.DeclStmt ds && ds.doc() != null && localScopes.size() == 1) {
+            globalDocs.put(ds.name(), ds.doc());
+        } else if (stmt instanceof ChuckAST.ExpStmt es && es.exp() instanceof ChuckAST.BinaryExp be && be.rhs() instanceof ChuckAST.DeclExp de && de.doc() != null && localScopes.size() == 1) {
+             globalDocs.put(de.name(), de.doc());
+        } else if (stmt instanceof ChuckAST.BlockStmt b && !b.isScoped()) {
+            for (ChuckAST.Stmt inner : b.statements()) emitStatementWithDocs(inner, code, globalDocs);
+            return;
+        }
+        emitStatement(stmt, code);
+    }
+
+    public ChuckCode emit(List<ChuckAST.Stmt> statements, String programName) {
+        return emit(statements, programName, null);
+    }
+
+    public ChuckCode emit(List<ChuckAST.Stmt> statements, String programName, Map<String, String> existingGlobals) {
+        return emitWithDocs(statements, programName, existingGlobals).code();
     }
 
     private void emitStatement(ChuckAST.Stmt stmt, ChuckCode code) {
@@ -994,15 +1032,19 @@ public class ChuckEmitter {
                 localCount = oldLocalCount;
             }
             case ChuckAST.BlockStmt s -> {
-                localScopes.push(new HashMap<>());
-                localTypeScopes.push(new HashMap<>());
+                if (s.isScoped()) {
+                    localScopes.push(new HashMap<>());
+                    localTypeScopes.push(new HashMap<>());
+                }
                 int oldLocalCount = localCount;
                 for (ChuckAST.Stmt inner : s.statements()) {
                     emitStatement(inner, code);
                 }
-                localScopes.pop();
-                localTypeScopes.pop();
-                localCount = oldLocalCount;
+                if (s.isScoped()) {
+                    localScopes.pop();
+                    localTypeScopes.pop();
+                    localCount = oldLocalCount;
+                }
             }
             case ChuckAST.ImportStmt _ -> {
                 // already processed by VM before emit — skip
@@ -1287,6 +1329,7 @@ public class ChuckEmitter {
                 }
                 Map<String, ChuckCode> methodCodes = new HashMap<>();
                 Map<String, ChuckCode> staticMethodCodes = new HashMap<>();
+                Map<String, String> methodDocs = new HashMap<>();
                 String prevClass = currentClass;
                 java.util.Set<String> prevFields = currentClassFields;
                 currentClass = s.name();
@@ -1296,7 +1339,7 @@ public class ChuckEmitter {
                 // methodCodes/staticMethodCodes are mutable maps; stubs added in pass 1 below become visible here.
                 userClassRegistry.put(s.name(), new UserClassDescriptor(
                         s.name(), s.parentName(), fieldDefs, staticFieldDefs, methodCodes, staticMethodCodes,
-                        staticInts, staticIsDouble, staticObjects, null, s.isAbstract(), s.isInterface(), null, fieldAccess, methodAccess, s.access()));
+                        staticInts, staticIsDouble, staticObjects, null, s.isAbstract(), s.isInterface(), null, fieldAccess, methodAccess, s.access(), s.doc(), methodDocs));
 
                 // Track methods defined so far to detect duplicates
                 java.util.Set<String> definedMethods = new java.util.HashSet<>();
@@ -1340,6 +1383,9 @@ public class ChuckEmitter {
                         methodCodes.put(methodKey, stub);
                     }
                     methodAccess.put(methodKey, m.access());
+                    if (m.doc() != null) {
+                        methodDocs.put(methodKey, m.doc());
+                    }
                 }
 
                 // Always compile pre-constructor body into a dedicated ChuckCode.
@@ -1385,7 +1431,7 @@ public class ChuckEmitter {
                 // Update descriptor with compiled pre-constructor
                 userClassRegistry.put(s.name(), new UserClassDescriptor(
                         s.name(), s.parentName(), fieldDefs, staticFieldDefs, methodCodes, staticMethodCodes,
-                        staticInts, staticIsDouble, staticObjects, preCtorCodeLocal));
+                        staticInts, staticIsDouble, staticObjects, preCtorCodeLocal, s.isAbstract(), s.isInterface(), null, fieldAccess, methodAccess, s.access(), s.doc(), methodDocs));
 
                 // Pass 2: compile method bodies (all stubs already registered above)
                 for (Map.Entry<ChuckAST.FuncDefStmt, ChuckCode> entry : methodCodeMap.entrySet()) {
@@ -1469,7 +1515,7 @@ public class ChuckEmitter {
                             staticInitCodeLocal.addInstruction(new StackInstrs.Pop()); // clean up
                         } else if (bodyStmt instanceof ChuckAST.DeclStmt ds) {
                             // e.g. static int S; or static SinOsc S;
-                            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(ds.type(), ds.name(), ds.arraySizes(), ds.callArgs(), ds.isReference(), false, false, ds.isConst(), ChuckAST.AccessModifier.PUBLIC, ds.line(), ds.column());
+                            ChuckAST.DeclExp declExp = new ChuckAST.DeclExp(ds.type(), ds.name(), ds.arraySizes(), ds.callArgs(), ds.isReference(), false, false, ds.isConst(), ChuckAST.AccessModifier.PUBLIC, null, ds.line(), ds.column());
                             localScopes.push(new java.util.HashMap<>());
                             localTypeScopes.push(new java.util.HashMap<>());
                             emitExpression(declExp, staticInitCodeLocal);
@@ -1479,7 +1525,7 @@ public class ChuckEmitter {
                             staticInitCodeLocal.addInstruction(new StackInstrs.Pop()); // clean up
                         } else if (bodyStmt instanceof ChuckAST.ExpStmt es3
                                 && es3.exp() instanceof ChuckAST.DeclExp rDecl3) {
-                            ChuckAST.DeclExp rDecl3m = new ChuckAST.DeclExp(rDecl3.type(), rDecl3.name(), rDecl3.arraySizes(), rDecl3.callArgs(), rDecl3.isReference(), false, false, rDecl3.isConst(), ChuckAST.AccessModifier.PUBLIC, rDecl3.line(), rDecl3.column());
+                            ChuckAST.DeclExp rDecl3m = new ChuckAST.DeclExp(rDecl3.type(), rDecl3.name(), rDecl3.arraySizes(), rDecl3.callArgs(), rDecl3.isReference(), false, false, rDecl3.isConst(), ChuckAST.AccessModifier.PUBLIC, null, rDecl3.line(), rDecl3.column());
                             localScopes.push(new java.util.HashMap<>());
                             localTypeScopes.push(new java.util.HashMap<>());
                             emitExpression(rDecl3m, staticInitCodeLocal);
@@ -1509,7 +1555,9 @@ public class ChuckEmitter {
                         finalStaticInitCode,
                         fieldAccess,
                         methodAccess,
-                        s.access());
+                        s.access(),
+                        s.doc(),
+                        methodDocs);
 
                 // Add static methods to the main methods map too, for resolution on instances
                 methodCodes.putAll(staticMethodCodes);
@@ -1962,7 +2010,7 @@ public class ChuckEmitter {
                             if (inferredType == null) inferredType = "int";
                             resolvedDecl = new ChuckAST.DeclExp(inferredType, rDecl.name(), rDecl.arraySizes(),
                                     rDecl.callArgs(), rDecl.isReference(), rDecl.isStatic(), rDecl.isGlobal(),
-                                    rDecl.isConst(), rDecl.access(), rDecl.line(), rDecl.column());
+                                    rDecl.isConst(), rDecl.access(), rDecl.doc(), rDecl.line(), rDecl.column());
                         }
                         
                         // Pass e.op() to emitChuckTarget
@@ -1992,7 +2040,7 @@ public class ChuckEmitter {
                                 + lhsType + "' and '" + rhsName + "'");
                     }
                     emitExpression(e.lhs(), code);
-                    emitChuckTarget(e.rhs(), code);
+                    emitChuckTarget(e.rhs(), code, e.op());
                 } else if (e.op() == ChuckAST.Operator.APPEND) {
                     emitExpression(e.lhs(), code);
                     emitExpression(e.rhs(), code);
@@ -2118,7 +2166,7 @@ public class ChuckEmitter {
                             }
                         }
                     }
-                    emitChuckTarget(e.rhs(), code);
+                    emitChuckTarget(e.rhs(), code, e.op());
                 } else if (e.op() == ChuckAST.Operator.POSTFIX_PLUS_PLUS || e.op() == ChuckAST.Operator.POSTFIX_MINUS_MINUS) {
                     // Postfix ++ / -- : dispatch to user-class operator, or return old value for primitives
                     if (e.rhs() instanceof ChuckAST.DeclExp) {
@@ -2177,7 +2225,7 @@ public class ChuckEmitter {
                     } else {
                         code.addInstruction(new ArithmeticInstrs.MinusAny());
                     }
-                    emitChuckTarget(e.rhs(), code); // store new value, emitChuckTarget already pops for primitives
+                    emitChuckTarget(e.rhs(), code, e.op()); // store new value, emitChuckTarget already pops for primitives
                 } else if (e.op() == ChuckAST.Operator.WRITE_IO || (e.op() == ChuckAST.Operator.LE && isIOType(getExprType(e.lhs())))) {
                     emitExpression(e.lhs(), code);
                     emitExpression(e.rhs(), code);
@@ -3175,10 +3223,6 @@ public class ChuckEmitter {
         }
     }
 
-    private void emitChuckTarget(Object target, ChuckCode code) {
-        emitChuckTarget(target, code, ChuckAST.Operator.CHUCK);
-    }
-
     private void emitChuckTarget(Object target, ChuckCode code, ChuckAST.Operator op) {
         if (target instanceof List<?> list) {
             if (list.size() > 1) {
@@ -3223,12 +3267,12 @@ public class ChuckEmitter {
                     return;
                 }
 
-                if (isUGen) {
-                    // If target is a UGen variable, we do a ChuckTo connection
+                if (isUGen && op == ChuckAST.Operator.CHUCK) {
+                    // => Connection
                     emitExpression(exp, code);
                     code.addInstruction(new org.chuck.core.ChuckTo());
                 } else {
-                    // Otherwise it's a value assignment
+                    // @=> Assignment (or => value assignment for non-UGens)
                     Integer localOffset = getLocalOffset(e.name());
                     if (localOffset != null) {
                         code.addInstruction(new VarInstrs.StoreLocal(localOffset));
@@ -3315,11 +3359,15 @@ public class ChuckEmitter {
                     emitExpression(e, code); // Pushes new object 'target'
                     // Stack is now: [..., source, target]
 
-                    if (isUGen) {
+                    if (isUGen && op == ChuckAST.Operator.CHUCK) {
                         code.addInstruction(new org.chuck.core.ChuckTo());
                     } else {
                         code.addInstruction(new StackInstrs.Pop());
-                        // Now save the target object to its variable
+                        // Now save the source object to its variable (overwriting the newly created one)
+                        // Wait! If it was source => Mesh2D m;
+                        // ChucK creates a Mesh2D m, THEN connects source to it.
+                        // BUT if it was source @=> Mesh2D m;
+                        // ChucK should probably just set m = source.
                         Integer localOffset = getLocalOffset(e.name());
                         if (localOffset != null) {
                             code.addInstruction(new VarInstrs.StoreLocal(localOffset));
@@ -3334,8 +3382,8 @@ public class ChuckEmitter {
                     // In a chain: source => target1 => target2
                     // When called with target = (target1 => target2)
                     // We should first process target1, then target2.
-                    emitChuckTarget(e.lhs(), code);
-                    emitChuckTarget(e.rhs(), code);
+                    emitChuckTarget(e.lhs(), code, e.op());
+                    emitChuckTarget(e.rhs(), code, e.op());
                 } else {
                     emitExpression(exp, code);
                 }

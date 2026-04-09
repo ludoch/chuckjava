@@ -4,11 +4,12 @@ grammar ChuckANTLR;
  * ChucK ANTLR4 Grammar - Cleaned up for non-combined usage
  */
 
-program : (directive | statement | functionDef | classDefinition)* EOF ;
+program : (directive | statement | functionDef | classDefinition | DOC_COMMENT)* EOF ;
 
 directive
     : REFERENCE_TAG IMPORT STRING                        // @import "file.ck"
     | REFERENCE_TAG ID STRING?                             // @doc "...", @global, etc.
+    | DOC_COMMENT
     ;
 
 // --- Statements ---
@@ -23,28 +24,28 @@ statement
     | returnStatement                                      # returnStmt
     | printStatement                                       # printStmt
     | blockStatement                                       # blockStmt
-    | expression (COMMA expression)* SEMI                  # expressionStmt
+    | DOC_COMMENT? expression (COMMA expression)* SEMI     # expressionStmt
     | switchStatement                                      # switchStmt
     | BREAK SEMI                                           # breakStmt
     | CONTINUE SEMI                                        # continueStmt
     | SEMI                                                 # emptyStmt
     ;
 
-ifStatement: IF LPAREN expression RPAREN statement (ELSE statement)? ;
-whileStatement: WHILE LPAREN expression RPAREN statement ;
-untilStatement: UNTIL LPAREN expression RPAREN statement ;
+ifStatement: DOC_COMMENT? IF LPAREN expression RPAREN statement (ELSE statement)? ;
+whileStatement: DOC_COMMENT? WHILE LPAREN expression RPAREN statement ;
+untilStatement: DOC_COMMENT? UNTIL LPAREN expression RPAREN statement ;
 forStatement
-    : FOR LPAREN (expression? SEMI) (expression? SEMI) expression? RPAREN statement
-    | FOR LPAREN (type|AUTO) REFERENCE_TAG? ID (arrayDimension)* COLON expression RPAREN statement
+    : DOC_COMMENT? FOR LPAREN (expression? SEMI) (expression? SEMI) expression? RPAREN statement
+    | DOC_COMMENT? FOR LPAREN (type|AUTO) REFERENCE_TAG? ID (arrayDimension)* COLON expression RPAREN statement
     ;
-repeatStatement: REPEAT LPAREN expression RPAREN statement ;
-loopStatement: LOOP statement ;
-doStatement: DO statement (WHILE|UNTIL) LPAREN expression RPAREN SEMI ;
+repeatStatement: DOC_COMMENT? REPEAT LPAREN expression RPAREN statement ;
+loopStatement: DOC_COMMENT? LOOP statement ;
+doStatement: DOC_COMMENT? DO statement (WHILE|UNTIL) LPAREN expression RPAREN SEMI ;
 returnStatement: RETURN expression? SEMI ;
 printStatement: LTRIPLE expressionList? RTRIPLE SEMI ;
-blockStatement: LBRACE (statement)* RBRACE ;
+blockStatement: LBRACE (statement | DOC_COMMENT)* RBRACE ;
 switchStatement: SWITCH LPAREN expression RPAREN LBRACE switchCase* RBRACE ;
-switchCase: (CASE expression COLON | DEFAULT COLON) statement* ;
+switchCase: (CASE expression COLON | DEFAULT COLON) (statement | DOC_COMMENT)* ;
 
 variableDecl
     : REFERENCE_TAG? ID (LPAREN expressionList? RPAREN)? (arrayDimension)* (CHUCK_OP expression)?
@@ -64,7 +65,7 @@ expressionList
 
 // --- Definitions ---
 functionDef
-    : (accessModifier? (STATIC? FUN | FUN STATIC?) | PUBLIC) type? (functionName LPAREN formalParameters? RPAREN | REFERENCE_TAG? OPERATOR LPAREN formalParameters? RPAREN postfixOpToken) statement
+    : DOC_COMMENT? (accessModifier? (STATIC? FUN | FUN STATIC?) | PUBLIC) type? (functionName LPAREN formalParameters? RPAREN | REFERENCE_TAG? OPERATOR LPAREN formalParameters? RPAREN postfixOpToken) statement
     ;
 
 postfixOpToken : PLUS_PLUS | MINUS_MINUS ;
@@ -90,8 +91,8 @@ formalParameter
     ;
 
 classDefinition
-    : accessModifier? ABSTRACT? CLASS ID (EXTENDS typeName)? LBRACE (directive | statement | functionDef | classDefinition)* RBRACE
-    | accessModifier? INTERFACE ID (EXTENDS typeName)? LBRACE (functionDef | classDefinition)* RBRACE
+    : DOC_COMMENT? accessModifier? ABSTRACT? CLASS ID (EXTENDS typeName)? LBRACE (directive | statement | functionDef | classDefinition | DOC_COMMENT)* RBRACE
+    | DOC_COMMENT? accessModifier? INTERFACE ID (EXTENDS typeName)? LBRACE (functionDef | classDefinition | DOC_COMMENT)* RBRACE
     ;
 
 type
@@ -114,7 +115,7 @@ memberName
 // --- Expressions ---
 expression
     : primary                                              # primaryExp
-    | accessModifier? STATIC? CONST? type variableDecl (COMMA variableDecl)* # declExp
+    | DOC_COMMENT? accessModifier? STATIC? CONST? type variableDecl (COMMA variableDecl)* # declExp
     | prefixOp expression                                   # unaryOp
     | expression CAST type                                 # castExp
     | expression COLON_COLON expression                   # durationOp
@@ -261,4 +262,6 @@ fragment ESC : '\\' . ;
 
 WS : [ \t\r\n]+ -> skip ;
 COMMENT : '//' ~[\r\n]* -> skip ;
-MULTILINE_COMMENT : '/*' .*? '*/' -> skip ;
+DOC_COMMENT : '/**' .*? '*/' ;
+MULTILINE_COMMENT : '/*' ~[*] .*? '*/' -> skip ;
+
