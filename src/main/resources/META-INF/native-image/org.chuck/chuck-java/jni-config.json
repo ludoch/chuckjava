@@ -1,0 +1,11 @@
+[
+  {
+    "name": "com.fazecast.jSerialComm.SerialPort",
+    "allDeclaredFields": true,
+    "allPublicFields": true,
+    "allDeclaredMethods": true,
+    "allPublicMethods": true,
+    "allDeclaredConstructors": true,
+    "allPublicConstructors": true
+  }
+]

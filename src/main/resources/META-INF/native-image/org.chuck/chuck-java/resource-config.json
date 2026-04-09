@@ -2,7 +2,10 @@
   "resources": {
     "includes": [
       { "pattern": "examples/.*\\.ck" },
-      { "pattern": "META-INF/native-image/.*" }
+      { "pattern": "META-INF/native-image/.*" },
+      { "pattern": ".*\\.dylib" },
+      { "pattern": ".*\\.so" },
+      { "pattern": ".*\\.dll" }
     ]
   }
 }
