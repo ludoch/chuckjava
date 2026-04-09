@@ -93,6 +93,9 @@
 | 68 | **`KBHit`** — New class: `kbhit()`, `getchar()`. Background virtual thread queues keypresses non-blocking. | ✅ Fixed |
 | 69 | **`MidiFileIn`** — New class: reads Standard MIDI files, merges/sorts all tracks, exposes `read(MidiMsg)`, `more()`, `rewind()`, `numTracks()`, `resolution()`. | ✅ Fixed |
 | 70 | **`HidOut`** — New stub class: API-complete, `open()` returns 0 (native USB HID output unavailable in JVM without extra libraries). | ✅ Fixed |
+| 71 | **Access Control Enforcement** — Implemented runtime enforcement of `public`, `private`, and `protected` modifiers for class fields and methods. | ✅ Fixed |
+| 72 | **Doc Comment Extraction** — Added support for `/** ... */` comments; extracted and linked to classes, methods, and globals. | ✅ Fixed |
+| 73 | **Real Hardware `SerialIO`** — Replaced the serial stub with a full implementation using `jSerialComm`; supports port listing, baud rates, and asynchronous data events. | ✅ Fixed |
 
 ### New Features
 
@@ -103,6 +106,11 @@
 - **Phase Support**: `UAnaBlob` and `Complex` now calculate and store phase data (`pvals`).
 - **Chained Analysis**: `upchuck()` now recursively triggers analysis through the UGen graph.
 - **Real-time Monitoring**: Use `--verbose:2` to see real-time RMS levels in the console.
+
+#### 🔍 Introspection & Documentation
+- **Reflection Docs**: Use `Reflect.doc(obj)` to retrieve class or method documentation strings at runtime.
+- **Global Documentation**: Support for `Reflect.docGlobal(name)` and `Reflect.docFunc(name)` to introspect global variables and functions.
+- **Log Level Stack Traces**: Non-fatal errors and interpreter exceptions now gate full stack traces behind `--verbose:2` to keep logs clean by default.
 
 #### 🎨 IDE Enhancements (JavaFX)
 - **CLI Loading**: Pass `.ck` files as arguments to `run.sh` to open them directly in editor tabs.

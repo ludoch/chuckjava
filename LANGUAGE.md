@@ -52,6 +52,7 @@ Complete reference for the ChucK-Java implementation — operators, types, built
 | `Object` | Base object type |
 | `UGen` | Base unit generator |
 | `Event` | Synchronization event |
+| `SerialIO` | Hardware serial communication |
 
 ### Type Declarations
 
@@ -63,6 +64,23 @@ int arr[10];            // declare int array of size 10
 float mat[4][4];        // declare 2D float array
 SinOsc s;               // declare UGen instance
 auto x = 5;             // type inferred from right-hand side
+
+// Access Modifiers (default is public)
+public int a;           // visible everywhere
+private int b;          // visible only within the class
+protected int c;        // visible within class and subclasses
+```
+
+### Doc Comments
+
+Capture documentation using `/** ... */` syntax before declarations:
+
+```chuck
+/** My specialized Oscillator */
+class MyOsc extends SinOsc {
+    /** The fundamental frequency */
+    float myFreq;
+}
 ```
 
 ### Type Casting
@@ -536,6 +554,19 @@ me.sourceDir()      // alias for dir()
 me.path()           // string: full absolute path to this shred's source file
 me.source()         // alias for path()
 me.sourcePath()     // alias for path()
+```
+
+### Reflect
+
+```chuck
+Reflect.id(Shred)        // int: shred ID
+Reflect.name(Shred)      // string: shred name
+Reflect.done(Shred)      // int: 1 if finished
+Reflect.type(Object)     // string: type name
+Reflect.doc(Object)      // string: class doc comment
+Reflect.doc(Object, s)   // string: method doc comment for member 's'
+Reflect.docGlobal(s)     // string: doc comment for global variable 's'
+Reflect.docFunc(s)       // string: doc comment for global function 's'
 ```
 
 ### IO / chout / cherr
@@ -1235,6 +1266,24 @@ while (hid.recv(msg)) {
 
 ---
 
+## SerialIO
+
+Real hardware serial port communication using the `jSerialComm` library.
+
+```chuck
+SerialIO.list() @=> string ports[];   // list available port names
+SerialIO serial;
+serial.open(0, 9600, 1) => int ok;    // open port 0 at 9600 baud
+serial.write(42);                     // send a byte
+serial => now;                        // wait for incoming data
+serial.recv() => int val;             // read a byte (-1 if none)
+serial.close();                       // release port
+```
+
+Ports are automatically closed when the shred exits.
+
+---
+
 ## CLI Flags
 
 Run via `mvn exec:java -Dexec.args="[flags] [files]"` or `./run.sh [flags] [files]`.
@@ -1244,7 +1293,7 @@ Run via `mvn exec:java -Dexec.args="[flags] [files]"` or `./run.sh [flags] [file
 | `--halt` / `-h` | Exit once all shreds finish (default in headless mode) |
 | `--loop` / `-l` | Keep running after shreds finish; starts OSC Machine Server on port 8888 |
 | `--silent` / `-s` | Disable audio output (headless, no sound device opened) |
-| `--verbose:N` | Log level (0=quiet, 1=normal, 2=RMS monitoring) |
+| `--verbose:N` | Log level (0=quiet, 1=normal, 2=RMS monitoring + full stack traces) |
 | `--syntax` | Syntax-check files only, do not execute |
 | `--dump` | Print compiled bytecode (virtual instructions) to console |
 | `--srate:N` | Set sample rate (default: 44100) |

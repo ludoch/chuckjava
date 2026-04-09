@@ -115,9 +115,9 @@ The typical ChucK AI workflow is: `Flip → FeatureCollector → KNN/MLP` for re
 | `@destruct` | Explicit destructor syntax | ✅ Implemented — called on shred cleanup for registered UserObjects |
 | `loop` statement | `LOOP stmt` | ✅ Implemented — infinite loop, only `break` exits |
 | `@operator` overload syntax | `fun @operator+(...)` | ✅ Implemented — `@operator+` maps to `__op__+` in visitor |
-| `static` class variables | `STATIC` in class body | ⚠️ Partial | Declared but not fully initialized between instances |
-| `public` class-level access | `PUBLIC` in class body | ⚠️ Partial | Parsed but not enforced at runtime |
-| `doc` comments (`/** */`) | `@doc` annotation | ❌ Not in grammar | ChucK doc comment extraction |
+| `static` class variables | `STATIC` in class body | ✅ Implemented | Shared between instances and shreds; initialization persists |
+| `public` class-level access | `PUBLIC` in class body | ✅ Implemented | Runtime enforcement added |
+| `doc` comments (`/** */`) | `@doc` annotation | ✅ Implemented | Extracted and introspectable via Reflect.doc* |
 
 ---
 
@@ -216,7 +216,7 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | `MidiIn` / `MidiOut` / `MidiMsg` | ✅ Done |
 | `OscIn` / `OscOut` / `OscMsg` / `OscBundle` | ✅ Done |
 | `Hid` / `HidMsg` | ✅ Done |
-| `SerialIO` | ⚠️ Stub (functional for basic use; no hardware serial port) |
+| `SerialIO` | ✅ Done |
 | `MidiFileIn` | ✅ Done — `open(string)`, `read(MidiMsg)`, `more()`, `rewind()`, `close()`, `size()`, `numTracks()`, `resolution()` |
 | `HidOut` | ✅ Done (stub) — `open(num)`, `send(HidMsg)`, `close()`, `name()`, `num()` — always returns 0 (native HID output requires platform libs) |
 
