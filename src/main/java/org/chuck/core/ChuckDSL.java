@@ -111,7 +111,10 @@ public class ChuckDSL {
                 }
             } catch (IllegalAccessException | IllegalArgumentException | InstantiationException | NoSuchMethodException | InvocationTargetException e) {
                 System.err.println("Runtime error in Java Shred: " + className);
-                e.printStackTrace();
+                ChuckVM vm = ChuckVM.CURRENT_VM.get();
+                if (vm != null && vm.getLogLevel() >= 2) {
+                    e.printStackTrace();
+                }
             }
         };
     }

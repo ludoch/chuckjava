@@ -291,7 +291,9 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
                             msg += " " + rawMsg.substring(rawMsg.indexOf("index["));
                         }
                         vm.print(msg + "\n");
-                        e.printStackTrace();
+                        if (vm.getLogLevel() >= 2) {
+                            e.printStackTrace();
+                        }
                         isDone = true;
                         isRunning = false;
                         return;

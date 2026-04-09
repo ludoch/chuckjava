@@ -54,7 +54,9 @@ public class JavaMachine {
             System.out.println("✅ Sporked Java Shred: " + id);
         } catch (Exception e) {
             System.err.println("❌ Failed to load " + path.getFileName());
-            e.printStackTrace();
+            if (host.getVM().getLogLevel() >= 2) {
+                e.printStackTrace();
+            }
         }
     }
 

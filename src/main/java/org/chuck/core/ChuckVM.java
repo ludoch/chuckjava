@@ -277,9 +277,13 @@ public class ChuckVM {
             return spork(shred);
         } catch (Exception e) {
             String msg = "Machine.run error: " + e.getMessage();
-            print(msg + "\n");
-            System.err.println(msg);
-            e.printStackTrace();
+            if (logLevel >= 1) {
+                print(msg + "\n");
+                System.err.println(msg);
+            }
+            if (logLevel >= 2) {
+                e.printStackTrace();
+            }
             return -1;
         }
     }

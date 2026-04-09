@@ -52,7 +52,9 @@ public class ChuckMachineServer {
                     }
                     Thread.sleep(10);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    if (vm.getLogLevel() >= 2) {
+                        e.printStackTrace();
+                    }
                 }
             }
         });
