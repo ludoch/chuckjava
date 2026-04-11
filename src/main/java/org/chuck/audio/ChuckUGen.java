@@ -11,7 +11,9 @@ import java.util.List;
 public abstract class ChuckUGen extends ChuckObject {
     protected final List<ChuckUGen> sources = new CopyOnWriteArrayList<>();
     protected final List<ChuckUGen> targets = new CopyOnWriteArrayList<>();
+    @SuppressWarnings("unused") // Used via introspection in ChucK scripts
     protected float lastOut = 0.0f;
+    @SuppressWarnings("unused") // Used via introspection in ChucK scripts
     protected float gain = 1.0f;
     protected long lastTickTime = -1;
     protected boolean isTicking = false;

@@ -6,9 +6,13 @@ import org.chuck.core.ChuckType;
  * Base class for simple oscillator unit generators.
  */
 public abstract class Osc extends ChuckUGen {
+    @SuppressWarnings("unused") // Used via introspection in ChucK scripts
     protected double freq = 220.0;
+    @SuppressWarnings("unused") // Used via introspection in ChucK scripts
     protected double phase = 0.0;
+    @SuppressWarnings("unused") // Used via introspection in ChucK scripts
     protected double width = 0.5;
+    @SuppressWarnings("unused") // Used via introspection in ChucK scripts
     protected int sync = 0; // 0: sync freq, 1: sync phase, 2: FM
     protected final float sampleRate;
 

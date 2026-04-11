@@ -26,6 +26,7 @@ public class Adsr extends ChuckUGen {
     }
     
     private State state = State.DONE_ENUM;
+    @SuppressWarnings("unused") // Used via introspection in ChucK scripts
     private float currentLevel = 0.0f;
     private final float sampleRate;
     
