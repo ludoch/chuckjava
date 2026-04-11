@@ -365,6 +365,43 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
         }
         if (isDone) break;
 
+        // JIT trigger and execution
+        if (code != null) {
+          org.chuck.compiler.JitExecutable jit = code.getJitExecutable();
+          if (jit != null) {
+            try {
+              int oldP = pc;
+              ChuckCode oldC = code;
+              jit.execute(vm, this);
+              if (isDone || !isRunning) break;
+              // If JIT finished a block but didn't change PC, increment it
+              if (code == oldC && pc == oldP) {
+                pc++;
+              }
+              continue; // Next instruction or loop check
+            } catch (Throwable t) {
+              vm.print("[shred]: JIT error: " + t.getMessage() + "\n");
+            }
+          }
+
+          if (code.incrementHotness() == 1000) {
+            final ChuckCode targetCode = code;
+            Thread.ofVirtual()
+                .start(
+                    () -> {
+                      try {
+                        Class<?> clz =
+                            org.chuck.compiler.JitCompiler.compile(
+                                targetCode, "Jit_" + targetCode.hashCode());
+                        targetCode.setJitExecutable(
+                            (org.chuck.compiler.JitExecutable)
+                                clz.getDeclaredConstructor().newInstance());
+                      } catch (Exception ignored) {
+                      }
+                    });
+          }
+        }
+
         // Interpreter Loop
         while (!isDone && isRunning && code != null && pc < code.getNumInstructions()) {
           MethodHandle handle = code.getHandle(pc);

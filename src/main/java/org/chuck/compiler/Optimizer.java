@@ -26,6 +26,7 @@ public class Optimizer {
         ChuckInstr i1 = instrs.get(i);
         ChuckInstr i2 = (i + 1 < instrs.size()) ? instrs.get(i + 1) : null;
         ChuckInstr i3 = (i + 2 < instrs.size()) ? instrs.get(i + 2) : null;
+        ChuckInstr i4 = (i + 3 < instrs.size()) ? instrs.get(i + 3) : null;
 
         // 1a. Remove [Dup, Pop]
         if (i1 instanceof StackInstrs.Dup && i2 instanceof StackInstrs.Pop) {
@@ -101,7 +102,6 @@ public class Optimizer {
 
         // 1d. IncLocal Optimization: [LoadLocalInt(o), PushInt(d), AddInt, StoreLocalInt(o)] ->
         // [IncLocalInt(o, d)]
-        ChuckInstr i4 = (i + 3 < instrs.size()) ? instrs.get(i + 3) : null;
         if (i1 instanceof VarInstrs.LoadLocalInt l
             && i2 instanceof PushInstrs.PushInt p
             && i3 instanceof ArithmeticInstrs.AddInt
@@ -109,6 +109,29 @@ public class Optimizer {
           if (l.getOffset() == s.getOffset()) {
             next.add(new VarInstrs.IncLocalInt(l.getOffset(), p.getVal()));
             i += 3;
+            changed = true;
+            continue;
+          }
+        }
+
+        // 1e. Redundant Load Pruning: [StoreLocalInt(o), LoadLocalInt(o)] -> [StoreLocalInt(o)]
+        if (i1 instanceof VarInstrs.StoreLocalInt s && i2 instanceof VarInstrs.LoadLocalInt l) {
+          if (s.getOffset() == l.getOffset()) {
+            next.add(s);
+            i += 1;
+            changed = true;
+            continue;
+          }
+        }
+
+        // 1f. Store-Pop-Load Pruning: [StoreLocalInt(o), Pop, LoadLocalInt(o)] ->
+        // [StoreLocalInt(o)]
+        if (i1 instanceof VarInstrs.StoreLocalInt s
+            && i2 instanceof StackInstrs.Pop
+            && i3 instanceof VarInstrs.LoadLocalInt l) {
+          if (s.getOffset() == l.getOffset()) {
+            next.add(s);
+            i += 2;
             changed = true;
             continue;
           }

@@ -95,4 +95,21 @@ public class OptimizerTest {
     assertEquals(5, inc.getOffset());
     assertEquals(1, inc.getDelta());
   }
+
+  @Test
+  public void testStorePopLoadOptimization() {
+    ChuckCode code = new ChuckCode("test");
+    code.addInstruction(new VarInstrs.StoreLocalInt(5));
+    code.addInstruction(new StackInstrs.Pop());
+    code.addInstruction(new VarInstrs.LoadLocalInt(5));
+
+    assertEquals(3, code.getNumInstructions());
+
+    Optimizer.optimize(code);
+
+    // Should combine into just StoreLocalInt(5)
+    assertEquals(1, code.getNumInstructions());
+    assertTrue(code.getInstruction(0) instanceof VarInstrs.StoreLocalInt);
+    assertEquals(5, ((VarInstrs.StoreLocalInt) code.getInstruction(0)).getOffset());
+  }
 }

@@ -15,9 +15,24 @@ public class ChuckCode {
   private int numArgs = 0;
   private int stackSize = 0;
   private String returnType = "void";
+  private final java.util.concurrent.atomic.AtomicInteger hotness =
+      new java.util.concurrent.atomic.AtomicInteger(0);
+  private org.chuck.compiler.JitExecutable jitExecutable = null;
 
   public ChuckCode(String name) {
     this.name = name;
+  }
+
+  public int incrementHotness() {
+    return hotness.incrementAndGet();
+  }
+
+  public void setJitExecutable(org.chuck.compiler.JitExecutable exec) {
+    this.jitExecutable = exec;
+  }
+
+  public org.chuck.compiler.JitExecutable getJitExecutable() {
+    return jitExecutable;
   }
 
   public void setStackSize(int s) {
