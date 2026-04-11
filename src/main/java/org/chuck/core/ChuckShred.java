@@ -58,7 +58,7 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
 
   // Execution state
   private ChuckCode code;
-  private int pc = 0;
+  public int pc = 0;
   private int framePointer = 0; // Index in mem stack where current frame starts
 
   public ChuckCode getCode() {

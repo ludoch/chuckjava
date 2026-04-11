@@ -81,10 +81,10 @@ public class JitCompiler implements Opcodes {
     for (int i = 0; i < instrs.size(); i++) {
       mv.visitLabel(labels[i]);
 
-      // shred.setPc(i)
+      // shred.pc = i
       mv.visitVarInsn(ALOAD, 2);
       mv.visitLdcInsn(i);
-      mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckShred", "setPc", "(I)V", false);
+      mv.visitFieldInsn(PUTFIELD, "org/chuck/core/ChuckShred", "pc", "I");
 
       ChuckInstr instr = instrs.get(i);
       if (instr == null) continue;
@@ -96,6 +96,57 @@ public class JitCompiler implements Opcodes {
             GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
         mv.visitLdcInsn(p.getVal());
         mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(J)V", false);
+      } else if (instr instanceof ArithmeticInstrs.AddInt) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitInsn(DUP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popLong", "()J", false);
+        mv.visitInsn(SWAP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popLong", "()J", false);
+        mv.visitInsn(LADD);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(J)V", false);
+      } else if (instr instanceof ArithmeticInstrs.AddFloat) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitInsn(DUP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popDouble", "()D", false);
+        mv.visitInsn(SWAP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popDouble", "()D", false);
+        mv.visitInsn(DADD);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(D)V", false);
+      } else if (instr instanceof VarInstrs.LoadLocalInt p) {
+        mv.visitVarInsn(ALOAD, 2); // shred
+        mv.visitInsn(DUP);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;"); // stack
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "mem", "Lorg/chuck/core/ChuckStack;"); // mem
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitMethodInsn(
+            INVOKEVIRTUAL, "org/chuck/core/ChuckShred", "getFramePointer", "()I", false);
+        mv.visitLdcInsn(p.getOffset());
+        mv.visitInsn(IADD);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "getData", "(I)J", false);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(J)V", false);
+      } else if (instr instanceof VarInstrs.StoreLocalInt p) {
+        mv.visitVarInsn(ALOAD, 2); // shred
+        mv.visitInsn(DUP);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "mem", "Lorg/chuck/core/ChuckStack;"); // mem
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitMethodInsn(
+            INVOKEVIRTUAL, "org/chuck/core/ChuckShred", "getFramePointer", "()I", false);
+        mv.visitLdcInsn(p.getOffset());
+        mv.visitInsn(IADD);
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitLdcInsn(0);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "peekLong", "(I)J", false);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "setData", "(IJ)V", false);
       } else {
         // Generic call: instr.execute(vm, shred)
         mv.visitVarInsn(ALOAD, 3); // initialCode
@@ -129,7 +180,7 @@ public class JitCompiler implements Opcodes {
 
       // 3. PC changed? (Jump/Call)
       mv.visitVarInsn(ALOAD, 2);
-      mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckShred", "getPc", "()I", false);
+      mv.visitFieldInsn(GETFIELD, "org/chuck/core/ChuckShred", "pc", "I");
       mv.visitLdcInsn(i);
       mv.visitJumpInsn(IF_ICMPNE, labels[instrs.size()]);
 
@@ -148,7 +199,7 @@ public class JitCompiler implements Opcodes {
       // Advance PC for the next iteration.
       mv.visitVarInsn(ALOAD, 2);
       mv.visitLdcInsn(i + 1);
-      mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckShred", "setPc", "(I)V", false);
+      mv.visitFieldInsn(PUTFIELD, "org/chuck/core/ChuckShred", "pc", "I");
     }
 
     mv.visitLabel(labels[instrs.size()]);
