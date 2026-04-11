@@ -258,6 +258,34 @@ public class TypeInferenceEngine {
 
             if (baseType.equals("Std") && dot.member().equals("range")) yield "int[]";
 
+            if (baseType.equals("Machine")) {
+              switch (dot.member()) {
+                case "shreds" -> {
+                  yield "int[]";
+                }
+                case "numShreds",
+                    "shredExists",
+                    "id",
+                    "add",
+                    "remove",
+                    "replace",
+                    "eval",
+                    "status",
+                    "clear",
+                    "removeAll",
+                    "resetID",
+                    "gc" -> {
+                  yield "int";
+                }
+                case "version", "platform", "os" -> {
+                  yield "string";
+                }
+                case "loglevel" -> {
+                  yield "void";
+                }
+              }
+            }
+
             if (baseType.endsWith("[]")) {
               if (dot.member().equals("size")
                   || dot.member().equals("cap")

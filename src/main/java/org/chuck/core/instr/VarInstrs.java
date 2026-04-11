@@ -225,4 +225,112 @@ public class VarInstrs {
       }
     }
   }
+
+  public static class LoadLocalInt implements ChuckInstr {
+    int offset;
+
+    public LoadLocalInt(int o) {
+      offset = o;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push(s.mem.getData(s.getFramePointer() + offset));
+    }
+  }
+
+  public static class LoadLocalFloat implements ChuckInstr {
+    int offset;
+
+    public LoadLocalFloat(int o) {
+      offset = o;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push(Double.longBitsToDouble(s.mem.getData(s.getFramePointer() + offset)));
+    }
+  }
+
+  public static class StoreLocalInt implements ChuckInstr {
+    int offset;
+
+    public StoreLocalInt(int o) {
+      offset = o;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      int idx = s.getFramePointer() + offset;
+      s.mem.setData(idx, s.reg.peekLong(0));
+      if (idx >= s.mem.getSp()) s.mem.setSp(idx + 1);
+    }
+  }
+
+  public static class StoreLocalFloat implements ChuckInstr {
+    int offset;
+
+    public StoreLocalFloat(int o) {
+      offset = o;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      int idx = s.getFramePointer() + offset;
+      s.mem.setData(idx, s.reg.peekAsDouble(0));
+      if (idx >= s.mem.getSp()) s.mem.setSp(idx + 1);
+    }
+  }
+
+  public static class GetGlobalInt implements ChuckInstr {
+    String name;
+
+    public GetGlobalInt(String n) {
+      name = n;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push(vm.getGlobalInt(name));
+    }
+  }
+
+  public static class GetGlobalFloat implements ChuckInstr {
+    String name;
+
+    public GetGlobalFloat(String n) {
+      name = n;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push(vm.getGlobalFloat(name));
+    }
+  }
+
+  public static class SetGlobalInt implements ChuckInstr {
+    String name;
+
+    public SetGlobalInt(String n) {
+      name = n;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      vm.setGlobalInt(name, s.reg.peekLong(0));
+    }
+  }
+
+  public static class SetGlobalFloat implements ChuckInstr {
+    String name;
+
+    public SetGlobalFloat(String n) {
+      name = n;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      vm.setGlobalFloat(name, s.reg.peekAsDouble(0));
+    }
+  }
 }

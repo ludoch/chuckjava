@@ -842,16 +842,41 @@ public class ExpressionEmitter {
             if (e.rhs() instanceof ChuckAST.IdExp rid && ugenGlobals.contains(rid.name()))
               throw error(e, "cannot perform arithmetic on UGen '" + rid.name() + "'");
           }
+          String lhsType = parent.getExprType(e.lhs());
+          String rhsType = parent.getExprType(e.rhs());
+          boolean isInt = "int".equals(lhsType) && "int".equals(rhsType);
+          boolean isFloat =
+              ("float".equals(lhsType) || "int".equals(lhsType))
+                  && ("float".equals(rhsType) || "int".equals(rhsType))
+                  && !isInt;
+
           if (e.op() != ChuckAST.Operator.AND && e.op() != ChuckAST.Operator.OR) {
             this.emitExpression(e.lhs(), code);
             this.emitExpression(e.rhs(), code);
           }
           switch (e.op()) {
-            case PLUS -> code.addInstruction(new ArithmeticInstrs.AddAny());
-            case MINUS -> code.addInstruction(new ArithmeticInstrs.MinusAny());
-            case TIMES -> code.addInstruction(new ArithmeticInstrs.TimesAny());
-            case DIVIDE -> code.addInstruction(new ArithmeticInstrs.DivideAny());
+            case PLUS -> {
+              if (isInt) code.addInstruction(new ArithmeticInstrs.AddInt());
+              else if (isFloat) code.addInstruction(new ArithmeticInstrs.AddFloat());
+              else code.addInstruction(new ArithmeticInstrs.AddAny());
+            }
+            case MINUS -> {
+              if (isInt) code.addInstruction(new ArithmeticInstrs.MinusInt());
+              else if (isFloat) code.addInstruction(new ArithmeticInstrs.MinusFloat());
+              else code.addInstruction(new ArithmeticInstrs.MinusAny());
+            }
+            case TIMES -> {
+              if (isInt) code.addInstruction(new ArithmeticInstrs.TimesInt());
+              else if (isFloat) code.addInstruction(new ArithmeticInstrs.TimesFloat());
+              else code.addInstruction(new ArithmeticInstrs.TimesAny());
+            }
+            case DIVIDE -> {
+              if (isInt) code.addInstruction(new ArithmeticInstrs.DivideInt());
+              else if (isFloat) code.addInstruction(new ArithmeticInstrs.DivideFloat());
+              else code.addInstruction(new ArithmeticInstrs.DivideAny());
+            }
             case PERCENT -> code.addInstruction(new ArithmeticInstrs.ModuloAny());
+
             case S_OR -> code.addInstruction(new ArithmeticInstrs.BitwiseOrAny());
             case S_AND -> code.addInstruction(new ArithmeticInstrs.BitwiseAndAny());
             case LT -> code.addInstruction(new LogicInstrs.LessThanAny());
@@ -922,12 +947,20 @@ public class ExpressionEmitter {
         if (isField) {
           code.addInstruction(new StackInstrs.PushThis());
           code.addInstruction(new FieldInstrs.GetUserField(e.name()));
-        } else if (localOffset != null) code.addInstruction(new VarInstrs.LoadLocal(localOffset));
-        else if (parent.getCurrentClass() != null
-            && parent.hasStaticField(parent.getCurrentClass(), e.name()))
+        } else if (localOffset != null) {
+          if ("int".equals(varType)) code.addInstruction(new VarInstrs.LoadLocalInt(localOffset));
+          else if ("float".equals(varType))
+            code.addInstruction(new VarInstrs.LoadLocalFloat(localOffset));
+          else code.addInstruction(new VarInstrs.LoadLocal(localOffset));
+        } else if (parent.getCurrentClass() != null
+            && parent.hasStaticField(parent.getCurrentClass(), e.name())) {
           code.addInstruction(new FieldInstrs.GetStatic(parent.getCurrentClass(), e.name()));
-        else if (varType != null) code.addInstruction(new VarInstrs.GetGlobalObjectOrInt(e.name()));
-        else if (e.name().equals("null")) code.addInstruction(new PushInstrs.PushNull());
+        } else if (varType != null) {
+          if ("int".equals(varType)) code.addInstruction(new VarInstrs.GetGlobalInt(e.name()));
+          else if ("float".equals(varType))
+            code.addInstruction(new VarInstrs.GetGlobalFloat(e.name()));
+          else code.addInstruction(new VarInstrs.GetGlobalObjectOrInt(e.name()));
+        } else if (e.name().equals("null")) code.addInstruction(new PushInstrs.PushNull());
         else if (e.name().equals("true")) code.addInstruction(new PushInstrs.PushInt(1));
         else if (e.name().equals("false")) code.addInstruction(new PushInstrs.PushInt(0));
         else if (e.name().equals("now")) code.addInstruction(new PushInstrs.PushNow());

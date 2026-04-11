@@ -231,4 +231,64 @@ public class ArithmeticInstrs {
       s.reg.push(l | r);
     }
   }
+
+  public static class AddInt implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push(s.reg.popLong() + s.reg.popLong());
+    }
+  }
+
+  public static class AddFloat implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push(s.reg.popDouble() + s.reg.popDouble());
+    }
+  }
+
+  public static class MinusInt implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long r = s.reg.popLong(), l = s.reg.popLong();
+      s.reg.push(l - r);
+    }
+  }
+
+  public static class MinusFloat implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      double r = s.reg.popDouble(), l = s.reg.popDouble();
+      s.reg.push(l - r);
+    }
+  }
+
+  public static class TimesInt implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push(s.reg.popLong() * s.reg.popLong());
+    }
+  }
+
+  public static class TimesFloat implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push(s.reg.popDouble() * s.reg.popDouble());
+    }
+  }
+
+  public static class DivideInt implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long r = s.reg.popLong(), l = s.reg.popLong();
+      s.reg.push(r == 0 ? 0 : l / r);
+    }
+  }
+
+  public static class DivideFloat implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      double r = s.reg.popDouble(), l = s.reg.popDouble();
+      s.reg.push(r == 0 ? 0.0 : l / r);
+    }
+  }
 }

@@ -941,13 +941,19 @@ public class ChuckEmitter {
           // @=> Assignment (or => value assignment for non-UGens)
           Integer localOffset = getLocalOffset(e.name());
           if (localOffset != null) {
-            code.addInstruction(new VarInstrs.StoreLocal(localOffset));
+            if ("int".equals(type)) code.addInstruction(new VarInstrs.StoreLocalInt(localOffset));
+            else if ("float".equals(type))
+              code.addInstruction(new VarInstrs.StoreLocalFloat(localOffset));
+            else code.addInstruction(new VarInstrs.StoreLocal(localOffset));
           } else if (currentClass != null
               && (currentClassFields.contains(e.name())
                   || hasInstanceField(currentClass, e.name()))) {
             code.addInstruction(new FieldInstrs.SetUserField(e.name()));
           } else {
-            code.addInstruction(new VarInstrs.SetGlobalObjectOrInt(e.name()));
+            if ("int".equals(type)) code.addInstruction(new VarInstrs.SetGlobalInt(e.name()));
+            else if ("float".equals(type))
+              code.addInstruction(new VarInstrs.SetGlobalFloat(e.name()));
+            else code.addInstruction(new VarInstrs.SetGlobalObjectOrInt(e.name()));
           }
         }
       }

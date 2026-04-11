@@ -73,21 +73,12 @@ public class ChuckLanguage {
 
   public static boolean isObjectType(String type) {
     if (type == null) return false;
-    if (type.endsWith("[]")) return true;
+    if (type.contains("[]")) return true;
     if (CORE_UGENS.contains(type)) return true;
-    Set<String> objectTypes =
-        Set.of(
-            "complex",
-            "polar",
-            "vec2",
-            "vec3",
-            "vec4",
-            "string",
-            "Object",
-            "Event",
-            "Type",
-            "Function");
-    return objectTypes.contains(type)
-        || (!PRIMITIVE_TYPES.contains(type) && !VECTOR_TYPES.contains(type));
+    if (CORE_DATA_TYPES.contains(type)
+        && !PRIMITIVE_TYPES.contains(type)
+        && !VECTOR_TYPES.contains(type)) return true;
+    // Catch-all for user classes (not in core data types)
+    return !PRIMITIVE_TYPES.contains(type) && !VECTOR_TYPES.contains(type);
   }
 }
