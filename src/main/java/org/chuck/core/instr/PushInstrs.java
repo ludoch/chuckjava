@@ -10,6 +10,10 @@ public class PushInstrs {
       val = v;
     }
 
+    public long getVal() {
+      return val;
+    }
+
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
       s.reg.push(val);
@@ -142,6 +146,10 @@ public class PushInstrs {
       index = i;
     }
 
+    public int getIndex() {
+      return index;
+    }
+
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
       s.reg.push((Double) s.getCode().getConstant(index));
@@ -158,6 +166,10 @@ public class PushInstrs {
 
     public LdcString(int i) {
       index = i;
+    }
+
+    public int getIndex() {
+      return index;
     }
 
     @Override

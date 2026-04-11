@@ -4,12 +4,30 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.chuck.core.ChuckCode;
+import org.chuck.core.instr.ArithmeticInstrs;
 import org.chuck.core.instr.ControlInstrs;
 import org.chuck.core.instr.PushInstrs;
 import org.chuck.core.instr.StackInstrs;
 import org.junit.jupiter.api.Test;
 
 public class OptimizerTest {
+
+  @Test
+  public void testConstantFolding() {
+    ChuckCode code = new ChuckCode("test");
+    code.addInstruction(new PushInstrs.PushInt(10));
+    code.addInstruction(new PushInstrs.PushInt(20));
+    code.addInstruction(new ArithmeticInstrs.AddInt());
+
+    assertEquals(3, code.getNumInstructions());
+
+    Optimizer.optimize(code);
+
+    // Should evaluate 10 + 20 = 30
+    assertEquals(1, code.getNumInstructions());
+    assertTrue(code.getInstruction(0) instanceof PushInstrs.PushInt);
+    assertEquals(30, ((PushInstrs.PushInt) code.getInstruction(0)).getVal());
+  }
 
   @Test
   public void testDupPopRemoval() {

@@ -28,10 +28,8 @@ public class ChuckFullCompilerTest {
     ChuckEmitter emitter = new ChuckEmitter();
     ChuckCode bytecode = emitter.emit(ast, "SimpleProgram");
 
-    // 3. Verify Bytecode (expected: [PushInt(1), PushInt(2), AddInt(), AdvanceTime(), Pop()])
-    // ANTLR version might have slightly different instruction count due to block wrapping or
-    // similar, but the core logic should be same.
-    assertTrue(bytecode.getNumInstructions() >= 5);
+    // 3. Verify Bytecode (expected optimized: [PushInt(3), AdvanceTime(), Pop()])
+    assertTrue(bytecode.getNumInstructions() >= 3);
 
     // 4. Run in VM
     ChuckVM vm = new ChuckVM(44100);
