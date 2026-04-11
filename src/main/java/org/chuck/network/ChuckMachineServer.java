@@ -1,8 +1,11 @@
 package org.chuck.network;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.chuck.core.ChuckVM;
 
 public class ChuckMachineServer {
+  private static final Logger logger = Logger.getLogger(ChuckMachineServer.class.getName());
   private final ChuckVM vm;
   private final OscIn oscIn;
   private final int port = 8888;
@@ -19,7 +22,7 @@ public class ChuckMachineServer {
     oscIn.addAddress("/chuck/status");
     oscIn.addAddress("/chuck/kill");
     oscIn.port(port);
-    System.out.println("Machine Server listening on port " + port);
+    logger.info("Machine Server listening on port " + port);
 
     Thread.ofVirtual()
         .name("Machine-Command-Handler")
@@ -32,23 +35,23 @@ public class ChuckMachineServer {
                     switch (msg.address) {
                       case "/chuck/add" -> {
                         String file = msg.getString(0);
-                        System.out.println("Received OSC: add " + file);
+                        logger.info("Received OSC: add " + file);
                         vm.add(file);
                       }
                       case "/chuck/remove" -> {
                         int id = msg.getInt(0);
-                        System.out.println("Received OSC: remove " + id);
+                        logger.info("Received OSC: remove " + id);
                         vm.removeShred(id);
                       }
                       case "/chuck/replace" -> {
                         int id = msg.getInt(0);
                         String file = msg.getString(1);
-                        System.out.println("Received OSC: replace " + id + " with " + file);
+                        logger.info("Received OSC: replace " + id + " with " + file);
                         vm.removeShred(id);
                         vm.add(file);
                       }
                       case "/chuck/kill" -> {
-                        System.out.println("Received OSC: kill");
+                        logger.info("Received OSC: kill");
                         System.exit(0);
                       }
                     }
@@ -56,7 +59,7 @@ public class ChuckMachineServer {
                   Thread.sleep(10);
                 } catch (Exception e) {
                   if (vm.getLogLevel() >= 2) {
-                    e.printStackTrace();
+                    logger.log(Level.SEVERE, "Error in Machine Server", e);
                   }
                 }
               }

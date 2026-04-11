@@ -96,6 +96,8 @@ public class MachineCall implements ChuckInstr {
       }
       case "version" -> s.reg.pushObject(new ChuckString(vm.getVersion()));
       case "platform" -> s.reg.pushObject(new ChuckString(vm.getPlatform()));
+      case "jitter" -> s.reg.push(vm.getAverageJitter());
+      case "maxJitter" -> s.reg.push((double) vm.getMaxJitter());
       case "loglevel" -> {
         if (argc > 0 && args[0] != null) {
           vm.setLogLevel(((Number) args[0]).intValue());

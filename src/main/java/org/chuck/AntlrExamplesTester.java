@@ -2,20 +2,24 @@ package org.chuck;
 
 import java.nio.file.*;
 import java.util.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import org.antlr.v4.runtime.*;
 import org.chuck.compiler.*;
 
 /** Batch test utility to verify the ANTLR4 parser against all example files. */
 public class AntlrExamplesTester {
+  private static final Logger logger = Logger.getLogger(AntlrExamplesTester.class.getName());
+
   public static void main(String[] args) {
     Path examplesPath = Paths.get("examples");
     if (!Files.exists(examplesPath)) {
-      System.err.println("Examples directory not found!");
+      logger.severe("Examples directory not found!");
       return;
     }
 
-    System.out.println("🔍 Starting ANTLR4 Batch Test on all examples...");
+    logger.info("🔍 Starting ANTLR4 Batch Test on all examples...");
 
     try {
       List<Path> ckFiles =
@@ -23,7 +27,7 @@ public class AntlrExamplesTester {
               .filter(p -> p.toString().endsWith(".ck"))
               .collect(Collectors.toList());
 
-      System.out.println("Found " + ckFiles.size() + " .ck files.");
+      logger.info("Found " + ckFiles.size() + " .ck files.");
 
       int passed = 0;
       int failed = 0;
@@ -41,8 +45,7 @@ public class AntlrExamplesTester {
         boolean isDisabled = pathStr.contains(".disabled") || pathStr.contains(".deps");
         boolean shouldFail = isErrorTest || isDisabled;
 
-        System.out.print(
-            "Testing: " + pathStr + (shouldFail ? " [Expected Failure]" : "") + " ... ");
+        String testInfo = "Testing: " + pathStr + (shouldFail ? " [Expected Failure]" : "");
         try {
           String source = Files.readString(file);
 
@@ -94,41 +97,41 @@ public class AntlrExamplesTester {
           emitter.emit(ast, fileName);
 
           if (shouldFail) {
-            System.out.println("❌ FAILED (Expected failure but passed)");
+            logger.info(testInfo + " ... ❌ FAILED (Expected failure but passed)");
             failed++;
             unexpectedPasses++;
             failureDetails.add(pathStr + ": Expected failure but passed");
           } else {
-            System.out.println("✅ PASSED");
+            logger.info(testInfo + " ... ✅ PASSED");
             passed++;
           }
         } catch (Exception e) {
           if (shouldFail) {
-            System.out.println("✅ PASSED (Expected failure)");
+            logger.info(testInfo + " ... ✅ PASSED (Expected failure)");
             passed++;
             expectedFailures++;
           } else {
-            System.out.println("❌ FAILED");
+            logger.info(testInfo + " ... ❌ FAILED");
             failed++;
             failureDetails.add(pathStr + ": " + e.getMessage());
           }
         }
       }
 
-      System.out.println("\n--- Batch Test Results ---");
-      System.out.println("TOTAL:             " + ckFiles.size());
-      System.out.println(
+      logger.info("\n--- Batch Test Results ---");
+      logger.info("TOTAL:             " + ckFiles.size());
+      logger.info(
           "PASSED:            " + passed + " (incl. " + expectedFailures + " expected failures)");
-      System.out.println(
+      logger.info(
           "FAILED:            " + failed + " (incl. " + unexpectedPasses + " unexpected passes)");
 
       if (failed > 0) {
-        System.out.println("\nFailure Details:");
-        failureDetails.forEach(System.out::println);
+        logger.info("\nFailure Details:");
+        failureDetails.forEach(logger::info);
       }
 
     } catch (Exception e) {
-      e.printStackTrace();
+      logger.log(Level.SEVERE, "Error during batch test", e);
     }
   }
 }

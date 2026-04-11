@@ -99,7 +99,7 @@ public class ChuginLoader {
         | InstantiationException
         | NoSuchMethodException
         | InvocationTargetException e) {
-      System.err.println("Failed to instantiate chugin type " + type + ": " + e.getMessage());
+      logger.log(Level.SEVERE, "Failed to instantiate chugin type " + type, e);
       return null;
     }
   }

@@ -35,6 +35,12 @@ public class ChuckVM {
 
   // Current logical time in samples
   private final AtomicLong now = new AtomicLong(0);
+  private final java.util.concurrent.atomic.AtomicLong totalJitter =
+      new java.util.concurrent.atomic.AtomicLong(0);
+  private final java.util.concurrent.atomic.AtomicLong wakeCount =
+      new java.util.concurrent.atomic.AtomicLong(0);
+  private final java.util.concurrent.atomic.AtomicLong maxJitter =
+      new java.util.concurrent.atomic.AtomicLong(0);
 
   // Shred management
   private final PriorityQueue<ChuckShred> shreduler = new PriorityQueue<>();
@@ -481,6 +487,11 @@ public class ChuckVM {
         if (ready.isEmpty()) break;
 
         for (ChuckShred nextShred : ready) {
+          long jitter = currentTime - nextShred.getWakeTime();
+          totalJitter.addAndGet(jitter);
+          wakeCount.incrementAndGet();
+          if (jitter > maxJitter.get()) maxJitter.set(jitter);
+
           nextShred.resume(this);
           if (!nextShred.isDone() && !nextShred.isWaiting()) {
             schedule(nextShred);
@@ -495,6 +506,15 @@ public class ChuckVM {
 
       now.incrementAndGet();
     }
+  }
+
+  public double getAverageJitter() {
+    long count = wakeCount.get();
+    return count == 0 ? 0.0 : (double) totalJitter.get() / count;
+  }
+
+  public long getMaxJitter() {
+    return maxJitter.get();
   }
 
   public int getActiveShredCount() {

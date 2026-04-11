@@ -189,6 +189,14 @@ public class ChuckMachineApiTest {
     assertTrue(out.get(0).contains("["), "Expected ChuckArray output [...], got: " + out.get(0));
   }
 
+  @Test
+  public void testMachineJitter() throws InterruptedException {
+    // Basic verification that jitter calls don't crash and return numbers
+    List<String> out = runChuck("<<< Machine.jitter(), Machine.maxJitter() >>>;", 10);
+    assertEquals(1, out.size());
+    assertTrue(out.get(0).contains("0.0"), "Expected jitter output");
+  }
+
   // -------------------------------------------------------------------------
   // Machine.eval() — compile and spork a snippet inline
   // -------------------------------------------------------------------------

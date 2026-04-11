@@ -3,6 +3,8 @@ package org.chuck.core;
 import java.nio.file.*;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.chuck.host.ChuckHost;
 
 /**
@@ -10,6 +12,7 @@ import org.chuck.host.ChuckHost;
  * instance.
  */
 public class JavaMachine {
+  private static final Logger logger = Logger.getLogger(JavaMachine.class.getName());
   private final ChuckHost host;
   private final Map<Path, Integer> activeShreds = new ConcurrentHashMap<>();
 
@@ -23,7 +26,7 @@ public class JavaMachine {
     path.register(
         watcher, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_MODIFY);
 
-    System.out.println("🎸 ChucK-Java Machine Watching: " + dirPath);
+    logger.info("🎸 ChucK-Java Machine Watching: " + dirPath);
 
     while (true) {
       WatchKey key = watcher.take();
@@ -40,7 +43,7 @@ public class JavaMachine {
 
   private void reload(Path path) {
     try {
-      System.out.println("🔄 Reloading: " + path.getFileName());
+      logger.info("🔄 Reloading: " + path.getFileName());
 
       // 1. Remove old shred if exists
       if (activeShreds.containsKey(path)) {
@@ -52,11 +55,11 @@ public class JavaMachine {
       int id = host.spork(task);
       activeShreds.put(path, id);
 
-      System.out.println("✅ Sporked Java Shred: " + id);
+      logger.info("✅ Sporked Java Shred: " + id);
     } catch (Exception e) {
-      System.err.println("❌ Failed to load " + path.getFileName());
+      logger.severe("❌ Failed to load " + path.getFileName());
       if (host.getVM().getLogLevel() >= 2) {
-        e.printStackTrace();
+        logger.log(Level.SEVERE, "Error reloading " + path, e);
       }
     }
   }
