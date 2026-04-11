@@ -33,8 +33,6 @@ public class ChuckMidiNative {
     }
 
     private void initBindings() {
-        @SuppressWarnings("unused")
-        Linker linker = Linker.nativeLinker();
         String os = System.getProperty("os.name").toLowerCase();
         String libName = os.contains("win") ? "rtmidi.dll" : 
                          os.contains("mac") ? "librtmidi.dylib" : "librtmidi.so";
