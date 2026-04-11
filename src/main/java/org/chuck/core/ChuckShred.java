@@ -1,5 +1,6 @@
 package org.chuck.core;
 
+import java.lang.invoke.MethodHandle;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Set;
@@ -366,43 +367,25 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
 
         // Interpreter Loop
         while (!isDone && isRunning && code != null && pc < code.getNumInstructions()) {
-          ChuckInstr instr = code.getInstruction(pc);
-          if (instr == null) break;
+          MethodHandle handle = code.getHandle(pc);
+          if (handle == null) break;
 
-          // Safety check: prevent infinite tight loops from hanging the VM
+          // Safety check
           if (++instructionCount > MAX_INSTRUCTIONS_BEFORE_YIELD) {
             instructionCount = 0;
-            this.yield(0); // Force yield to allow other shreds/audio to run
+            this.yield(0);
             break;
           }
 
-          // Execute instruction
           int oldPc = pc;
           ChuckCode oldCode = code;
           try {
-            instr.execute(vm, this);
-          } catch (RuntimeException e) {
-            int line = (code != null) ? code.getLineNumber(pc) : -1;
-            String name = (code != null) ? code.getName() : "unknown";
-            String rawMsg = e.getMessage();
-            if (rawMsg == null) rawMsg = e.getClass().getSimpleName();
-            String type = rawMsg.contains(":") ? rawMsg.split(":")[0] : rawMsg;
-            String msg =
-                String.format(
-                    "[chuck]:(EXCEPTION) %s: on line[%d] in shred[id=%d:%s]", type, line, id, name);
-            if (rawMsg.contains("index[")) {
-              msg += " " + rawMsg.substring(rawMsg.indexOf("index["));
-            }
-            vm.print(msg + "\n");
-            if (vm.getLogLevel() >= 2) {
-              e.printStackTrace();
-            }
-            isDone = true;
-            isRunning = false;
-            return;
+            handle.invokeExact(vm, this);
+          } catch (Throwable e) {
+            if (e instanceof RuntimeException re) throw re;
+            throw new RuntimeException(e);
           }
 
-          // Only increment PC if it wasn't changed by the instruction (e.g. Jump, Call)
           if (code == oldCode && pc == oldPc) {
             pc++;
           }

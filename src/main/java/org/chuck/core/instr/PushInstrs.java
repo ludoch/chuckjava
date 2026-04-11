@@ -116,4 +116,58 @@ public class PushInstrs {
       s.reg.push(Math.random() > 0.5 ? 1L : 0L);
     }
   }
+
+  public static class LdcInt implements ChuckInstr {
+    int index;
+
+    public LdcInt(int i) {
+      index = i;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push((Long) s.getCode().getConstant(index));
+    }
+
+    @Override
+    public String toString() {
+      return "LdcInt(" + index + ")";
+    }
+  }
+
+  public static class LdcFloat implements ChuckInstr {
+    int index;
+
+    public LdcFloat(int i) {
+      index = i;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push((Double) s.getCode().getConstant(index));
+    }
+
+    @Override
+    public String toString() {
+      return "LdcFloat(" + index + ")";
+    }
+  }
+
+  public static class LdcString implements ChuckInstr {
+    int index;
+
+    public LdcString(int i) {
+      index = i;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.pushObject(new ChuckString((String) s.getCode().getConstant(index)));
+    }
+
+    @Override
+    public String toString() {
+      return "LdcString(" + index + ")";
+    }
+  }
 }

@@ -3,172 +3,878 @@
 This document lists all built-in Unit Generators supported by ChucK-Java.
 
 ## ADSR
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Adsr`
+
+### Parameters
+- `state` (State)
+- `currentLevel` (float)
+- `attackTime` (float)
+- `decayTime` (float)
+- `sustainLevel` (float)
+- `releaseTime` (float)
+- `attackInc` (float)
+- `decayInc` (float)
+- `releaseInc` (float)
+
+### Methods
+- `attackTime()` -> double
+- `decayTime()` -> double
+- `sustainLevel()` -> double
+- `releaseTime()` -> double
+- `keyOn(int)` -> void
+- `keyOn()` -> void
+- `keyOff()` -> void
+- `keyOff(int)` -> void
+- `getAttackTime()` -> double
+- `getDecayTime()` -> double
+- `getSustainLevel()` -> double
+- `getReleaseTime()` -> double
+- `getCurrentLevel()` -> float
+- `set(float, float, float, float)` -> void
+- `set(double, double, double, double)` -> void
+- `state()` -> int
+- `getState()` -> int
 
 ## Adc
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Adc`
+
+### Parameters
+- `inputL` (float)
+- `inputR` (float)
+
+### Methods
+- `setInputSample(int, float)` -> void
+- `getInputLeft()` -> float
+- `getInputRight()` -> float
 
 ## Adsr
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Adsr`
+
+### Parameters
+- `state` (State)
+- `currentLevel` (float)
+- `attackTime` (float)
+- `decayTime` (float)
+- `sustainLevel` (float)
+- `releaseTime` (float)
+- `attackInc` (float)
+- `decayInc` (float)
+- `releaseInc` (float)
+
+### Methods
+- `attackTime()` -> double
+- `decayTime()` -> double
+- `sustainLevel()` -> double
+- `releaseTime()` -> double
+- `keyOn(int)` -> void
+- `keyOn()` -> void
+- `keyOff()` -> void
+- `keyOff(int)` -> void
+- `getAttackTime()` -> double
+- `getDecayTime()` -> double
+- `getSustainLevel()` -> double
+- `getReleaseTime()` -> double
+- `getCurrentLevel()` -> float
+- `set(float, float, float, float)` -> void
+- `set(double, double, double, double)` -> void
+- `state()` -> int
+- `getState()` -> int
 
 ## AutoCorr
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.AutoCorr`
+
+### Parameters
+- `size` (int)
+- `buffer` (float[])
+- `pos` (int)
+
+### Methods
+- `getSize()` -> int
+- `setSize(int)` -> void
 
 ## BPF
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.BPF`
+
+### Parameters
+- `cutoff` (double)
+- `q` (double)
+- `b0` (double)
+- `b1` (double)
+- `b2` (double)
+- `a1` (double)
+- `a2` (double)
+- `x1` (double)
+- `x2` (double)
+- `y1` (double)
+- `y2` (double)
+
+### Methods
+- `Q()` -> double
+- `Q(double)` -> double
+- `freq()` -> double
+- `freq(double)` -> double
 
 ## BRF
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.BRF`
+
+### Parameters
+- `cutoff` (double)
+- `q` (double)
+- `b0` (double)
+- `b1` (double)
+- `b2` (double)
+- `a1` (double)
+- `a2` (double)
+- `x1` (double)
+- `x2` (double)
+- `y1` (double)
+- `y2` (double)
+
+### Methods
+- `Q()` -> double
+- `Q(double)` -> double
+- `freq()` -> double
+- `freq(double)` -> double
 
 ## BandedWG
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.BandedWG`
+
+### Parameters
+- `delays` (DelayL[])
+- `filters` (OnePole[])
+- `decayCoef` (double[])
+- `envLevel` (double[])
+- `noise` (Noise)
+- `freq` (double)
+- `bowing` (boolean)
+- `bowVelocity` (float)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## BeeThree
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.BeeThree`
+
+### Parameters
+- `op1` (SinOsc)
+- `op2` (SinOsc)
+- `op3` (SinOsc)
+- `env` (Adsr)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## BiQuad
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.BiQuad`
+
+### Parameters
+- `prad` (double)
+- `pfreq` (double)
+- `eqzs` (boolean)
+- `x1` (double)
+- `x2` (double)
+- `y1` (double)
+- `y2` (double)
+- `b0` (double)
+- `b1` (double)
+- `b2` (double)
+- `a1` (double)
+- `a2` (double)
+
+### Methods
+- `freq(double)` -> double
+- `norm(double)` -> double
+- `radius(double)` -> double
+- `setPrad(double)` -> void
+- `setPfreq(double)` -> void
+- `setEqzs(double)` -> void
+- `getPrad()` -> double
+- `getPfreq()` -> double
 
 ## BiQuadStk
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.BiQuadStk`
+
+### Parameters
+- `b0` (double)
+- `b1` (double)
+- `b2` (double)
+- `a1` (double)
+- `a2` (double)
+- `x1` (double)
+- `x2` (double)
+- `y1` (double)
+- `y2` (double)
+
+### Methods
+- `setB0(double)` -> void
+- `setB1(double)` -> void
+- `setB2(double)` -> void
+- `setA1(double)` -> void
+- `setA2(double)` -> void
+- `setCoeffs(double, double, double, double, double)` -> void
+- `clear()` -> void
+- `gain()` -> double
+- `gain(double)` -> double
+- `Q()` -> double
+- `Q(double)` -> void
+- `freq()` -> double
+- `freq(double)` -> void
+- `set(double, double)` -> void
 
 ## Blackhole
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Blackhole`
 
 ## Blit
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.Blit`
+
+### Parameters
+- `phase` (double)
+- `rate` (double)
+- `period` (double)
+- `m` (int)
+- `nHarmonics` (int)
+- `frequency` (double)
+
+### Methods
+- `freq()` -> double
+- `freq(double)` -> double
+- `setFrequency(double)` -> void
+- `setHarmonics(int)` -> void
+- `harmonics(int)` -> int
+- `harmonics()` -> int
+- `reset()` -> void
 
 ## BlitSaw
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.BlitSaw`
+
+### Methods
+- `setData(int, long)` -> void
+- `freq()` -> double
+- `freq(double)` -> double
+- `setFreq(double)` -> void
+- `setSync(int)` -> void
+- `setPhase(double)` -> void
+- `getFreq()` -> double
+- `getPhase()` -> double
+- `setWidth(double)` -> void
+- `getWidth()` -> double
+- `getSync()` -> int
+- `last()` -> float
+- `init(double)` -> void
+- `sync(int)` -> int
+- `sync()` -> int
+- `width()` -> double
+- `width(double)` -> double
+- `phase(double)` -> double
+- `phase()` -> double
 
 ## BlitSquare
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.BlitSquare`
+
+### Methods
+- `setData(int, long)` -> void
+- `freq()` -> double
+- `freq(double)` -> double
+- `setFreq(double)` -> void
+- `setSync(int)` -> void
+- `setPhase(double)` -> void
+- `getFreq()` -> double
+- `getPhase()` -> double
+- `setWidth(double)` -> void
+- `getWidth()` -> double
+- `getSync()` -> int
+- `last()` -> float
+- `init(double)` -> void
+- `sync(int)` -> int
+- `sync()` -> int
+- `width()` -> double
+- `width(double)` -> double
+- `phase(double)` -> double
+- `phase()` -> double
 
 ## BlowBotl
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.BlowBotl`
+
+### Parameters
+- `tube` (DelayL)
+- `filter` (OnePole)
+- `noise` (Noise)
+- `env` (Adsr)
+- `noiseGain` (float)
+- `endReflection` (float)
+- `pressure` (float)
+- `freq` (double)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## BlowHole
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.BlowHole`
+
+### Parameters
+- `bore` (DelayL)
+- `tonehole` (DelayL)
+- `filter` (OnePole)
+- `noise` (Noise)
+- `env` (Adsr)
+- `pressure` (float)
+- `noiseGain` (float)
+- `toneCoeff` (float)
+- `ventCoeff` (float)
+- `freq` (double)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
+- `tonehole(double)` -> void
+- `vent(double)` -> void
 
 ## Brass
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.Brass`
+
+### Parameters
+- `delayLine` (DelayL)
+- `filter` (OnePole)
+- `adsr` (Adsr)
+- `lipFilter` (float)
+- `pressure` (float)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
+- `lip(float)` -> void
 
 ## CNoise
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.CNoise`
+
+### Parameters
+- `mode` (int)
+- `pinkRows` (long[])
+- `pinkRunning` (long)
+- `pinkIndex` (int)
+- `brownAccum` (double)
+- `xorState` (long)
+- `fprob` (double)
+- `rng` (Random)
+
+### Methods
+- `fprob(double)` -> double
+- `fprob()` -> double
+- `mode()` -> String
+- `mode(String)` -> String
 
 ## Centroid
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.Centroid`
 
 ## Chorus
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.fx.Chorus`
+
+### Parameters
+- `delayLine` (DelayL)
+- `lfo` (SinOsc)
+- `modDepth` (float)
+- `baseDelaySamples` (float)
+- `mix` (float)
+
+### Methods
+- `setMix(float)` -> void
+- `setModFreq(double)` -> void
+- `setModDepth(float)` -> void
 
 ## Chroma
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.Chroma`
+
+### Methods
+- `setSampleRate(float)` -> void
 
 ## Clarinet
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.Clarinet`
+
+### Parameters
+- `delayLine` (DelayL)
+- `reedTable` (ReedTable)
+- `filter` (OneZero)
+- `envelope` (Envelope)
+- `noise` (Noise)
+- `vibrato` (SinOsc)
+- `noiseGain` (float)
+- `vibratoGain` (float)
+- `outputGain` (float)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## DCT
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.DCT`
+
+### Parameters
+- `size` (int)
+- `buffer` (float[])
+- `pos` (int)
+
+### Methods
+- `getSize()` -> int
+- `setSize(int)` -> void
 
 ## Delay
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.fx.Delay`
+
+### Parameters
+- `buffer` (float[])
+- `writePos` (int)
+- `delaySamples` (int)
+
+### Methods
+- `setDelay(int)` -> void
+- `setDelay(double)` -> void
+- `getDelay()` -> double
+- `init(double, double)` -> void
+- `delay()` -> double
 
 ## DelayA
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.fx.DelayA`
+
+### Parameters
+- `buffer` (float[])
+- `writePos` (int)
+- `outPoint` (int)
+- `delay` (double)
+- `alpha` (double)
+- `coeff` (double)
+- `apInput` (double)
+- `apOutput` (double)
+- `needNext` (boolean)
+- `nextOut` (double)
+
+### Methods
+- `setDelay(double)` -> void
+- `getDelay()` -> double
+- `setDelaySec(double)` -> void
+- `delay()` -> double
 
 ## DelayL
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.fx.DelayL`
+
+### Parameters
+- `buffer` (float[])
+- `writePos` (int)
+- `delaySamples` (double)
+
+### Methods
+- `setDelay(double)` -> void
+- `getDelay()` -> double
+- `init(double, double)` -> void
+- `delay()` -> double
 
 ## DelayP
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.fx.DelayP`
+
+### Parameters
+- `buffer` (float[])
+- `writePos` (int)
+- `maxSamples` (int)
+- `delaySamples` (double)
+- `shiftRate` (double)
+- `readA` (double)
+- `readB` (double)
+- `xfadeLen` (int)
+- `xfadePos` (int)
+
+### Methods
+- `max(double)` -> void
+- `delay()` -> double
+- `delay(double)` -> void
+- `shift(double)` -> void
+- `shift()` -> double
 
 ## Dyno
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.fx.Dyno`
+
+### Parameters
+- `mode` (int)
+- `thresh` (float)
+- `ratio` (float)
+- `slopeAbove` (float)
+- `slopeBelow` (float)
+- `attackTime` (float)
+- `releaseTime` (float)
+- `knee` (float)
+- `externalGain` (float)
+- `envelope` (float)
+
+### Methods
+- `attackTime(double)` -> void
+- `attackTime()` -> double
+- `releaseTime(double)` -> void
+- `releaseTime()` -> double
+- `thresh()` -> float
+- `thresh(float)` -> void
+- `ratio(float)` -> void
+- `ratio()` -> float
+- `slopeAbove(float)` -> void
+- `slopeAbove()` -> float
+- `slopeBelow()` -> float
+- `slopeBelow(float)` -> void
+- `compressor()` -> void
+- `limiter()` -> void
+- `expander()` -> void
+- `gate()` -> void
+- `duck()` -> void
+- `mode(int)` -> void
+- `mode()` -> int
+- `set(float, float, double, double)` -> void
 
 ## Echo
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.fx.Echo`
+
+### Parameters
+- `delayLine` (Delay)
+- `mix` (float)
+- `lastWet` (float)
+
+### Methods
+- `setDelay(int)` -> void
+- `setMix(float)` -> void
+- `setMax(double)` -> void
 
 ## Envelope
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Envelope`
+
+### Parameters
+- `target` (float)
+- `value` (float)
+- `rate` (float)
+
+### Methods
+- `keyOn()` -> void
+- `keyOff()` -> void
+- `setDuration(long)` -> void
+- `setKeyOn(double)` -> void
+- `setKeyOff(double)` -> void
+- `getValue()` -> float
+- `setValue(float)` -> void
+- `setTarget(float)` -> void
+- `setTime(float)` -> void
 
 ## FFT
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.FFT`
+
+### Parameters
+- `size` (int)
+- `windowType` (int)
+- `ring` (float[])
+- `writePos` (int)
+- `win` (double[])
+
+### Methods
+- `setWindow(int)` -> void
+- `getWindow()` -> int
+- `getSize()` -> int
+- `setSize(int)` -> void
 
 ## FMVoices
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.FMVoices`
+
+### Parameters
+- `carrier` (SinOsc)
+- `vibrato` (SinOsc)
+- `mod1` (SinOsc)
+- `mod2` (SinOsc)
+- `env` (Adsr)
+- `modEnv` (Adsr)
+- `baseFreq` (double)
+- `vibratoDepth` (float)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
+- `setVibratoDepth(double)` -> void
 
 ## FeatureCollector
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.FeatureCollector`
 
 ## FilterBasic
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.FilterBasic`
+
+### Parameters
+- `freq` (double)
+- `Q` (double)
+
+### Methods
+- `Q()` -> double
+- `Q(double)` -> void
+- `freq()` -> double
+- `freq(double)` -> void
+- `set(double, double)` -> void
 
 ## FilterStk
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.FilterStk`
+
+### Parameters
+- `gain` (double)
+
+### Methods
+- `gain()` -> double
+- `gain(double)` -> double
+- `clear()` -> void
+- `Q()` -> double
+- `Q(double)` -> void
+- `freq()` -> double
+- `freq(double)` -> void
+- `set(double, double)` -> void
 
 ## Flip
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.Flip`
+
+### Parameters
+- `size` (int)
+- `buffer` (float[])
+- `pos` (int)
+
+### Methods
+- `getSize()` -> int
+- `setSize(int)` -> void
 
 ## Flute
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.Flute`
+
+### Parameters
+- `delayLine` (DelayL)
+- `filter` (OnePole)
+- `adsr` (Adsr)
+- `noise` (Noise)
+- `jetDelay` (float)
+- `noiseGain` (float)
+- `endReflection` (float)
+- `jetReflection` (float)
+- `pressure` (float)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## Flux
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.Flux`
+
+### Parameters
+- `prevMagnitudes` (float[])
 
 ## FrencHrn
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.FrencHrn`
+
+### Parameters
+- `mod` (SinOsc)
+- `car` (SinOsc)
+- `sub` (SinOsc)
+- `env` (Adsr)
+- `freq` (double)
+- `modIndex` (double)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## FullRect
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.FullRect`
 
 ## GVerb
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.fx.GVerb`
+
+### Parameters
+- `delays` (Delay[])
+- `mix` (float)
+- `roomSize` (float)
+- `damping` (float)
+
+### Methods
+- `roomSize(float)` -> void
+- `damping(float)` -> void
+- `mix(float)` -> void
 
 ## Gain
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Gain`
+
+### Methods
+- `setDb(float)` -> void
+- `db()` -> float
+- `db(float)` -> float
 
 ## GainDB
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.GainDB`
+
+### Parameters
+- `db` (double)
+
+### Methods
+- `gain(double)` -> double
+- `gain(float)` -> float
+- `gain()` -> double
+- `setDb(double)` -> void
+- `db(float)` -> float
+- `db()` -> float
 
 ## HPF
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.HPF`
+
+### Parameters
+- `cutoff` (double)
+- `q` (double)
+- `b0` (double)
+- `b1` (double)
+- `b2` (double)
+- `a1` (double)
+- `a2` (double)
+- `x1` (double)
+- `x2` (double)
+- `y1` (double)
+- `y2` (double)
+
+### Methods
+- `Q()` -> double
+- `Q(double)` -> double
+- `freq()` -> double
+- `freq(double)` -> double
 
 ## HalfRect
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.HalfRect`
 
 ## HevyMetl
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.HevyMetl`
+
+### Parameters
+- `carrier1` (SinOsc)
+- `carrier2` (SinOsc)
+- `mod1` (SinOsc)
+- `mod2` (SinOsc)
+- `env1` (Adsr)
+- `env2` (Adsr)
+- `baseFreq` (double)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## HnkyTonk
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.HnkyTonk`
+
+### Parameters
+- `modA` (SinOsc)
+- `carA` (SinOsc)
+- `modB` (SinOsc)
+- `carB` (SinOsc)
+- `env` (Adsr)
+- `freq` (double)
+- `modIndex` (double)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## IDCT
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.IDCT`
 
 ## IFFT
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.IFFT`
+
+### Parameters
+- `size` (int)
+- `buffer` (float[])
+- `readPos` (int)
+
+### Methods
+- `setSize(int)` -> void
 
 ## Identity2
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Identity2`
 
 ## Impulse
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Impulse`
+
+### Parameters
+- `nextValue` (float)
+
+### Methods
+- `setNext(float)` -> void
 
 ## JCRev
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.fx.JCRev`
+
+### Parameters
+- `allpass` (AllPass[])
+- `comb` (Comb[])
+- `outLeft` (Delay)
+- `outRight` (Delay)
+- `mix` (float)
+
+### Methods
+- `setMix(float)` -> void
 
 ## JetTabl
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.JetTabl`
 
 ## KrstlChr
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.KrstlChr`
+
+### Parameters
+- `mods` (SinOsc[])
+- `cars` (SinOsc[])
+- `env` (Adsr)
+- `freq` (double)
+- `modIndex` (double)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## LPF
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.Lpf`
+
+### Parameters
+- `cutoff` (float)
+- `resonance` (float)
+- `v0` (float)
+- `v1` (float)
+
+### Methods
+- `setCutoff(float)` -> void
 
 ## LiSa
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.LiSa`
+
+### Parameters
+- `buffer` (float[])
+- `recPos` (int)
+- `isRecording` (boolean)
+- `voices` (Voice[])
+
+### Methods
+- `rate(int, float)` -> void
+- `playPos()` -> double
+- `play(int)` -> void
+- `play(int, int)` -> void
+- `loop0(int)` -> void
+- `record(int)` -> void
+- `duration(long)` -> void
+- `pos(int, long)` -> void
+- `loop(int, int)` -> void
+- `loop(int)` -> void
+- `bi(int)` -> void
 
 ## LiSa10
 Category: Built-in Unit Generator
@@ -177,7 +883,24 @@ Category: Built-in Unit Generator
 Category: Built-in Unit Generator
 
 ## LiSa2
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.LiSa2`
+
+### Parameters
+- `buffer` (float[][])
+- `recPos` (int)
+- `isRecording` (boolean)
+- `voices` (Voice[])
+
+### Methods
+- `rate(int, float)` -> void
+- `play(int, int)` -> void
+- `play(int)` -> void
+- `record(int)` -> void
+- `duration(long)` -> void
+- `pos(int, long)` -> void
+- `loop(int, int)` -> void
+- `loop(int)` -> void
+- `bi(int)` -> void
 
 ## LiSa4
 Category: Built-in Unit Generator
@@ -189,173 +912,797 @@ Category: Built-in Unit Generator
 Category: Built-in Unit Generator
 
 ## Lpf
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.Lpf`
+
+### Parameters
+- `cutoff` (float)
+- `resonance` (float)
+- `v0` (float)
+- `v1` (float)
+
+### Methods
+- `setCutoff(float)` -> void
 
 ## Mandolin
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.Mandolin`
+
+### Methods
+- `pluck(float)` -> void
 
 ## Mesh2D
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.Mesh2D`
+
+### Parameters
+- `NX` (int)
+- `NY` (int)
+- `v` (float[][])
+- `v_prev` (float[][])
+- `v_next` (float[][])
+- `xpickup` (float)
+- `ypickup` (float)
+- `xpitch` (float)
+- `ypitch` (float)
+- `decay` (float)
+
+### Methods
+- `nx(int)` -> void
+- `nx(double)` -> void
+- `ny(int)` -> void
+- `ny(double)` -> void
+- `decay(double)` -> void
+- `noteOn(int)` -> void
+- `noteOn(float)` -> void
+- `noteOn(long)` -> void
+- `noteOn(double)` -> void
+- `pickupX(double)` -> void
+- `pickupY(double)` -> void
+- `noteOff(double)` -> void
+- `clear()` -> void
+- `x(double)` -> void
+- `y(double)` -> void
 
 ## Mix16
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Mix16`
 
 ## Mix2
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Mix2`
 
 ## Mix4
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Mix4`
 
 ## Mix8
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Mix8`
 
 ## MixN
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.MixN`
 
 ## ModalBar
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.ModalBar`
+
+### Parameters
+- `phase` (double[])
+- `decayEn` (double[])
+- `phaseInc` (double[])
+- `decayCoef` (double[])
+- `freq` (double)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## Modulate
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Modulate`
+
+### Parameters
+- `vibrato` (SinOsc)
+- `vibratoRate` (float)
+- `vibratoGain` (float)
+
+### Methods
+- `vibratoGain()` -> float
+- `vibratoGain(float)` -> void
+- `vibratoRate(float)` -> void
+- `vibratoRate()` -> float
 
 ## Moog
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.Moog`
+
+### Parameters
+- `oscillators` (SinOsc[])
+- `filter` (Lpf)
+- `adsr` (Adsr)
+- `filterQ` (float)
+- `filterSweep` (float)
+- `freq` (double)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
+- `filterQ(float)` -> void
+- `filterSweep(float)` -> void
 
 ## NRev
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.fx.NRev`
+
+### Parameters
+- `allpass` (AllPass[])
+- `mix` (float)
+
+### Methods
+- `mix(float)` -> void
+- `mix()` -> float
 
 ## Noise
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.Noise`
+
+### Parameters
+- `random` (Random)
 
 ## OnePole
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.OnePole`
+
+### Parameters
+- `b0` (float)
+- `a1` (float)
+- `lastOutput` (float)
+
+### Methods
+- `setPole(float)` -> void
+- `setB0(float)` -> void
+- `setA1(float)` -> void
 
 ## OneZero
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.OneZero`
+
+### Parameters
+- `b0` (float)
+- `b1` (float)
+- `lastInput` (float)
+
+### Methods
+- `setB0(float)` -> void
+- `setB1(float)` -> void
+- `setZero(float)` -> void
 
 ## PRCRev
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.fx.PRCRev`
+
+### Parameters
+- `allpass` (AllPass[])
+- `comb` (Comb[])
+- `mix` (float)
+
+### Methods
+- `mix(float)` -> void
+- `mix()` -> float
 
 ## Pan16
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Pan16`
+
+### Parameters
+- `pan` (float)
+
+### Methods
+- `pan()` -> float
+- `pan(float)` -> float
 
 ## Pan2
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Pan2`
+
+### Parameters
+- `left` (Gain)
+- `right` (Gain)
+- `pan` (float)
+- `panType` (int)
+- `gL` (float)
+- `gR` (float)
+
+### Methods
+- `pan()` -> float
+- `pan(float)` -> float
+- `panType(int)` -> int
+- `setPan(float)` -> void
+- `getPan()` -> float
+- `setPanType(int)` -> void
 
 ## Pan4
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Pan4`
+
+### Parameters
+- `pan` (float)
+
+### Methods
+- `pan()` -> float
+- `pan(float)` -> float
 
 ## Pan8
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Pan8`
+
+### Parameters
+- `pan` (float)
+
+### Methods
+- `pan()` -> float
+- `pan(float)` -> float
 
 ## PanN
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.PanN`
+
+### Parameters
+- `pan` (float)
+
+### Methods
+- `pan()` -> float
+- `pan(float)` -> float
 
 ## PercFlut
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.PercFlut`
+
+### Parameters
+- `carrier1` (SinOsc)
+- `carrier2` (SinOsc)
+- `mod1` (SinOsc)
+- `mod2` (SinOsc)
+- `env1` (Adsr)
+- `env2` (Adsr)
+- `baseFreq` (double)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## Phasor
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.Phasor`
+
+### Methods
+- `setData(int, long)` -> void
+- `freq()` -> double
+- `freq(double)` -> double
+- `setFreq(double)` -> void
+- `setSync(int)` -> void
+- `setPhase(double)` -> void
+- `getFreq()` -> double
+- `getPhase()` -> double
+- `setWidth(double)` -> void
+- `getWidth()` -> double
+- `getSync()` -> int
+- `last()` -> float
+- `init(double)` -> void
+- `sync(int)` -> int
+- `sync()` -> int
+- `width()` -> double
+- `width(double)` -> double
+- `phase(double)` -> double
+- `phase()` -> double
 
 ## PitShift
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.fx.PitShift`
+
+### Parameters
+- `delays` (DelayL[])
+- `shift` (double)
+- `phase` (double)
+- `windowSize` (int)
+
+### Methods
+- `shift(double)` -> void
+- `shift()` -> double
 
 ## Plucked
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.Plucked`
+
+### Parameters
+- `delayLine` (DelayL)
+- `loopFilter` (OneZero)
+- `excitation` (Impulse)
+- `baseFreq` (float)
+
+### Methods
+- `setData(int, long)` -> void
+- `noteOn(float)` -> void
+- `setFreq(double)` -> void
 
 ## PoleZero
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.PoleZero`
+
+### Parameters
+- `b0` (double)
+- `b1` (double)
+- `a1` (double)
+- `lastInput` (double)
+- `lastOutput` (double)
+
+### Methods
+- `setB0(double)` -> void
+- `setB1(double)` -> void
+- `setA1(double)` -> void
+- `setAllpass(double)` -> void
+- `setBlockZero(double)` -> void
 
 ## PulseOsc
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.PulseOsc`
+
+### Methods
+- `setData(int, long)` -> void
+- `freq()` -> double
+- `freq(double)` -> double
+- `setFreq(double)` -> void
+- `setSync(int)` -> void
+- `setPhase(double)` -> void
+- `getFreq()` -> double
+- `getPhase()` -> double
+- `setWidth(double)` -> void
+- `getWidth()` -> double
+- `getSync()` -> int
+- `last()` -> float
+- `init(double)` -> void
+- `sync(int)` -> int
+- `sync()` -> int
+- `width()` -> double
+- `width(double)` -> double
+- `phase(double)` -> double
+- `phase()` -> double
 
 ## RMS
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.RMS`
+
+### Parameters
+- `ring` (float[])
+- `writePos` (int)
+- `size` (int)
+
+### Methods
+- `setSize(int)` -> void
 
 ## ResonZ
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.ResonZ`
+
+### Parameters
+- `freq` (float)
+- `Q` (float)
+- `a0` (float)
+- `b1` (float)
+- `b2` (float)
+- `y1` (float)
+- `y2` (float)
+
+### Methods
+- `setFreq(float)` -> void
+- `setQ(float)` -> void
+- `set(float, float)` -> void
 
 ## Rhodey
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.Rhodey`
+
+### Parameters
+- `carrier` (SinOsc)
+- `modulator` (SinOsc)
+- `carrierEnv` (Adsr)
+- `modulatorEnv` (Adsr)
+- `baseFreq` (double)
+- `modIndex` (float)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## Rolloff
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.Rolloff`
+
+### Parameters
+- `percent` (float)
+
+### Methods
+- `percent(float)` -> void
+- `percent()` -> float
 
 ## SawOsc
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.SawOsc`
+
+### Methods
+- `setFrequency(float)` -> void
+- `setData(int, long)` -> void
+- `freq()` -> double
+- `freq(double)` -> double
+- `setFreq(double)` -> void
+- `setSync(int)` -> void
+- `setPhase(double)` -> void
+- `getFreq()` -> double
+- `getPhase()` -> double
+- `setWidth(double)` -> void
+- `getWidth()` -> double
+- `getSync()` -> int
+- `last()` -> float
+- `init(double)` -> void
+- `sync(int)` -> int
+- `sync()` -> int
+- `width()` -> double
+- `width(double)` -> double
+- `phase(double)` -> double
+- `phase()` -> double
 
 ## Saxofony
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.Saxofony`
+
+### Parameters
+- `delayLine` (DelayL)
+- `reedTable` (ReedTable)
+- `filter` (OneZero)
+- `adsr` (Adsr)
+- `pressure` (float)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## Shakers
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.Shakers`
+
+### Parameters
+- `random` (Random)
+- `type` (int)
+- `energy` (float)
+- `shakeLevel` (float)
+- `numObjects` (int)
+- `systemDecay` (float)
+- `filter` (ResonZ)
+
+### Methods
+- `noteOn(float)` -> void
+- `energy(float)` -> void
+- `objects(int)` -> void
+- `preset(int)` -> void
 
 ## SinOsc
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.SinOsc`
+
+### Methods
+- `setData(int, long)` -> void
+- `freq()` -> double
+- `freq(double)` -> double
+- `setFreq(double)` -> void
+- `setSync(int)` -> void
+- `setPhase(double)` -> void
+- `getFreq()` -> double
+- `getPhase()` -> double
+- `setWidth(double)` -> void
+- `getWidth()` -> double
+- `getSync()` -> int
+- `last()` -> float
+- `init(double)` -> void
+- `sync(int)` -> int
+- `sync()` -> int
+- `width()` -> double
+- `width(double)` -> double
+- `phase(double)` -> double
+- `phase()` -> double
 
 ## Sitar
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.Sitar`
+
+### Parameters
+- `delayLine` (DelayL)
+- `filter` (OnePole)
+- `noise` (Noise)
+- `loopGain` (float)
+- `ampmult` (float)
+
+### Methods
+- `noteOn(float)` -> void
+- `setFreq(double)` -> void
 
 ## SndBuf
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.SndBuf`
+
+### Parameters
+- `samples` (float[])
+- `pos` (double)
+- `rate` (double)
+- `loop` (boolean)
+
+### Methods
+- `samples()` -> long
+- `setLoop(boolean)` -> void
+- `setRead(String)` -> void
+- `setSamples(float[])` -> void
+- `setRate(double)` -> void
+- `setPos(double)` -> void
+- `valueAt(long)` -> float
+- `ready()` -> int
+- `length()` -> long
+- `set(String)` -> void
+- `isDone()` -> boolean
+- `pos()` -> long
+- `db()` -> float
+- `db(float)` -> float
 
 ## SndBuf2
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.SndBuf2`
+
+### Parameters
+- `samples` (float[][])
+- `pos` (double)
+- `rate` (double)
+- `loop` (boolean)
+
+### Methods
+- `rate(double)` -> void
+- `setRead(String)` -> void
+- `pos(double)` -> void
+- `loop(int)` -> void
+- `read(String)` -> void
 
 ## SqrOsc
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.SqrOsc`
+
+### Methods
+- `setData(int, long)` -> void
+- `freq()` -> double
+- `freq(double)` -> double
+- `setFreq(double)` -> void
+- `setSync(int)` -> void
+- `setPhase(double)` -> void
+- `getFreq()` -> double
+- `getPhase()` -> double
+- `setWidth(double)` -> void
+- `getWidth()` -> double
+- `getSync()` -> int
+- `last()` -> float
+- `init(double)` -> void
+- `sync(int)` -> int
+- `sync()` -> int
+- `width()` -> double
+- `width(double)` -> double
+- `phase(double)` -> double
+- `phase()` -> double
 
 ## Step
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Step`
+
+### Parameters
+- `nextValue` (float)
+
+### Methods
+- `setNext(float)` -> void
 
 ## StifKarp
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.StifKarp`
+
+### Parameters
+- `delayLine` (DelayL)
+- `filter` (OnePole)
+- `pickupPos` (float)
+- `lastInput` (float)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
+- `pickupPos(float)` -> void
 
 ## SubNoise
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.SubNoise`
+
+### Parameters
+- `lastValue` (float)
+- `rate` (int)
+- `count` (int)
+
+### Methods
+- `rate()` -> int
+- `rate(int)` -> void
 
 ## Teabox
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.Teabox`
+
+### Methods
+- `Q()` -> double
+- `Q(double)` -> void
+- `freq()` -> double
+- `freq(double)` -> void
+- `set(double, double)` -> void
 
 ## TriOsc
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.TriOsc`
+
+### Methods
+- `setData(int, long)` -> void
+- `freq()` -> double
+- `freq(double)` -> double
+- `setFreq(double)` -> void
+- `setSync(int)` -> void
+- `setPhase(double)` -> void
+- `getFreq()` -> double
+- `getPhase()` -> double
+- `setWidth(double)` -> void
+- `getWidth()` -> double
+- `getSync()` -> int
+- `last()` -> float
+- `init(double)` -> void
+- `sync(int)` -> int
+- `sync()` -> int
+- `width()` -> double
+- `width(double)` -> double
+- `phase(double)` -> double
+- `phase()` -> double
 
 ## TubeBell
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.TubeBell`
+
+### Parameters
+- `carrier1` (SinOsc)
+- `carrier2` (SinOsc)
+- `mod1` (SinOsc)
+- `mod2` (SinOsc)
+- `env1` (Adsr)
+- `env2` (Adsr)
+- `baseFreq` (double)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## TwoPole
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.TwoPole`
+
+### Parameters
+- `b0` (double)
+- `a1` (double)
+- `a2` (double)
+- `out1` (double)
+- `out2` (double)
+- `resFreq` (double)
+- `resRad` (double)
+- `resNorm` (boolean)
+
+### Methods
+- `freq()` -> double
+- `freq(double)` -> double
+- `norm(double)` -> double
+- `setB0(double)` -> void
+- `setA1(double)` -> void
+- `setA2(double)` -> void
+- `radius()` -> double
+- `radius(double)` -> double
+- `setResonance(double, double)` -> void
+- `setResonance(double, double, boolean)` -> void
 
 ## TwoZero
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.filter.TwoZero`
+
+### Parameters
+- `b0` (double)
+- `b1` (double)
+- `b2` (double)
+- `in1` (double)
+- `in2` (double)
+- `notchFreq` (double)
+- `notchRad` (double)
+
+### Methods
+- `freq()` -> double
+- `freq(double)` -> double
+- `setB0(double)` -> void
+- `setB1(double)` -> void
+- `setB2(double)` -> void
+- `setNotch(double, double)` -> void
+- `radius()` -> double
+- `radius(double)` -> double
 
 ## UnFlip
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.UnFlip`
+
+### Parameters
+- `playback` (float[])
+- `playPos` (int)
 
 ## VoicForm
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.VoicForm`
+
+### Parameters
+- `filters` (BPF[])
+- `env` (Adsr)
+- `buzz` (SinOsc)
+- `freq` (double)
+- `phonemeIdx` (int)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
+- `phoneme(int)` -> void
 
 ## WaveLoop
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.osc.WaveLoop`
 
 ## Wurley
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.stk.Wurley`
+
+### Parameters
+- `carrier` (SinOsc)
+- `modulator` (SinOsc)
+- `carrierEnv` (Adsr)
+- `modulatorEnv` (Adsr)
+- `baseFreq` (double)
+- `modIndex` (float)
+
+### Methods
+- `noteOn(float)` -> void
+- `noteOff(float)` -> void
+- `setFreq(double)` -> void
 
 ## WvIn
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.WvIn`
+
+### Methods
+- `path(String)` -> String
 
 ## WvOut
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.WvOut`
+
+### Parameters
+- `fos` (FileOutputStream)
+- `totalSamples` (long)
+- `numChannels` (int)
+
+### Methods
+- `isRecording()` -> boolean
+- `record(float, float)` -> void
+- `close()` -> void
+- `open(String)` -> void
 
 ## WvOut2
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.util.WvOut2`
+
+### Parameters
+- `fos` (FileOutputStream)
+- `totalSamples` (long)
+
+### Methods
+- `closeFile()` -> void
+- `wavWrite(String)` -> void
 
 ## XCorr
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.XCorr`
+
+### Parameters
+- `size` (int)
+- `bufA` (float[])
+- `bufB` (float[])
+- `posA` (int)
+- `posB` (int)
+- `sourceCount` (int)
+
+### Methods
+- `getSize()` -> int
+- `setSize(int)` -> void
 
 ## ZCR
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.ZCR`
+
+### Parameters
+- `frameSize` (int)
+- `buffer` (float[])
+- `bufIdx` (int)
+- `result` (float)
+- `lastSample` (float)
+
+### Methods
+- `setFrameSize(int)` -> void
+- `getFrameSize()` -> int
+- `getZCR()` -> float
+- `addSample(float)` -> float
+- `last()` -> float
 
 ## ZeroX
-Category: Built-in Unit Generator
+Class: `org.chuck.audio.analysis.ZeroX`
+
+### Parameters
+- `lastInput` (float)
 

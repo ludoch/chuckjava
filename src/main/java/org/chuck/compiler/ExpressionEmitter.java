@@ -34,8 +34,14 @@ public class ExpressionEmitter {
       case ChuckAST.IntExp e -> {
         code.addInstruction(new PushInstrs.PushInt(e.value()));
       }
-      case ChuckAST.FloatExp e -> code.addInstruction(new PushInstrs.PushFloat(e.value()));
-      case ChuckAST.StringExp e -> code.addInstruction(new PushInstrs.PushString(e.value()));
+      case ChuckAST.FloatExp e -> {
+        int idx = code.addConstant(e.value());
+        code.addInstruction(new PushInstrs.LdcFloat(idx));
+      }
+      case ChuckAST.StringExp e -> {
+        int idx = code.addConstant(e.value());
+        code.addInstruction(new PushInstrs.LdcString(idx));
+      }
       case ChuckAST.MeExp _ -> code.addInstruction(new PushInstrs.PushMe());
       case ChuckAST.UnaryExp e -> {
         if (e.op() == ChuckAST.Operator.S_OR) {

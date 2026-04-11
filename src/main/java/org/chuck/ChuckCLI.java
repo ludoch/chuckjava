@@ -151,9 +151,33 @@ public class ChuckCLI {
             new org.chuck.compiler.ChuckANTLRParser(tokens);
         parser.program();
         System.out.println("✅ Syntax check passed: " + fileName);
+      } catch (ChuckCompilerException e) {
+        printRichError(e);
       } catch (Exception e) {
-        System.err.println("❌ Syntax error in " + fileName + ": " + e.getMessage());
+        System.err.println("❌ Error: " + e.getMessage());
       }
+    }
+  }
+
+  private void printRichError(ChuckCompilerException e) {
+    System.err.println("❌ " + e.getMessage());
+    try {
+      if (e.getFile() != null && !e.getFile().equals("unknown")) {
+        java.nio.file.Path path = Paths.get(e.getFile());
+        if (Files.exists(path)) {
+          List<String> lines = Files.readAllLines(path);
+          if (e.getLine() > 0 && e.getLine() <= lines.size()) {
+            String line = lines.get(e.getLine() - 1);
+            System.err.println("  " + line);
+            System.err.print("  ");
+            for (int i = 0; i < e.getColumn(); i++) {
+              System.err.print(i < line.length() && line.charAt(i) == '\t' ? '\t' : ' ');
+            }
+            System.err.println("^");
+          }
+        }
+      }
+    } catch (Exception ignored) {
     }
   }
 
@@ -219,6 +243,8 @@ public class ChuckCLI {
           int id = vm.run(source, fileName);
           ChuckShred shred = vm.getShred(id);
           if (shred != null) initialShreds.add(shred);
+        } catch (ChuckCompilerException e) {
+          printRichError(e);
         } catch (Exception e) {
           System.err.println("❌ Error loading " + fileName + ": " + e.getMessage());
         }
@@ -227,7 +253,11 @@ public class ChuckCLI {
       // OTF commands in same process
       for (String cmd : otfCommands) {
         if (cmd.startsWith("+")) {
-          vm.add(cmd.substring(1));
+          try {
+            vm.add(cmd.substring(1));
+          } catch (ChuckCompilerException e) {
+            printRichError(e);
+          }
         } else if (cmd.startsWith("-")) {
           vm.removeShred(Integer.parseInt(cmd.substring(1)));
         } else if (cmd.equals("^")) {
@@ -251,6 +281,8 @@ public class ChuckCLI {
       if (audio != null) audio.stop();
       if (verbose > 0) System.out.println("✅ Finished.");
 
+    } catch (ChuckCompilerException e) {
+      printRichError(e);
     } catch (Exception e) {
       System.err.println("❌ VM Error: " + e.getMessage());
       e.printStackTrace();
