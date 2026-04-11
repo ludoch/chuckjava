@@ -1,5 +1,8 @@
 package org.chuck.audio.filter;
 
+import static org.chuck.audio.VectorAudio.SPECIES;
+
+import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 
 /** A simple Low Pass Filter. */
@@ -27,12 +30,34 @@ public class Lpf extends ChuckUGen {
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
+    // 1. Sum inputs using SIMD
+    float[] inputSum = new float[length];
+    if (getNumSources() > 0) {
+      for (ChuckUGen src : sources) {
+        float[] temp = new float[length];
+        src.tick(temp, 0, length, systemTime);
+
+        int i = 0;
+        int bound = SPECIES.loopBound(length);
+        for (; i < bound; i += SPECIES.length()) {
+          FloatVector v1 = FloatVector.fromArray(SPECIES, inputSum, i);
+          FloatVector v2 = FloatVector.fromArray(SPECIES, temp, i);
+          v1.add(v2).intoArray(inputSum, i);
+        }
+        for (; i < length; i++) inputSum[i] += temp[i];
+      }
+    } else {
+      // If no sources, copy from input buffer (which might have direct chuckTo data)
+      System.arraycopy(buffer, offset, inputSum, 0, length);
+    }
+
+    // 2. Apply filter (recursive, so scalar for now)
     float alpha = (float) (2.0 * Math.PI * cutoff / sampleRate);
     alpha = Math.min(Math.max(alpha, 0.0f), 1.0f);
 
     float localV0 = v0;
     for (int i = 0; i < length; i++) {
-      float in = buffer[offset + i];
+      float in = inputSum[i];
       localV0 = localV0 + alpha * (in - localV0);
       buffer[offset + i] = localV0;
     }
