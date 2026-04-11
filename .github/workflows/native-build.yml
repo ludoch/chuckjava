@@ -1,40 +1,16 @@
-name: Build
+name: Native Build
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
   release:
     types: [created]
-  workflow_dispatch:
 
 jobs:
-  # ─────────────────────────────────────────────────────────────────────────────
-  # JVM unit tests (fast, no GraalVM needed)
-  # ─────────────────────────────────────────────────────────────────────────────
-  test:
-    name: JVM tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up GraalVM JDK 25
-        uses: graalvm/setup-graalvm@v1
-        with:
-          java-version: '25'
-          distribution: 'graalvm-community'
-          cache: maven
-
-      - name: Run JVM tests (130 tests)
-        run: mvn test -B
-
   # ─────────────────────────────────────────────────────────────────────────────
   # Native CLI + IDE bundle, per platform
   # ─────────────────────────────────────────────────────────────────────────────
   native:
     name: Native build (${{ matrix.os }})
-    needs: test
     strategy:
       fail-fast: false
       matrix:
