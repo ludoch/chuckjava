@@ -1,5 +1,5 @@
-import org.chuck.audio.Noise;
-import org.chuck.audio.Lpf;
+import org.chuck.audio.osc.Noise;
+import org.chuck.audio.filter.Lpf;
 import org.chuck.core.Shred;
 import static org.chuck.core.ChuckDSL.*;
 

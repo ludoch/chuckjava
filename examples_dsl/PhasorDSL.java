@@ -1,5 +1,5 @@
-import org.chuck.audio.Phasor;
-import org.chuck.audio.PulseOsc;
+import org.chuck.audio.osc.Phasor;
+import org.chuck.audio.osc.PulseOsc;
 import org.chuck.core.Shred;
 import static org.chuck.core.ChuckDSL.*;
 

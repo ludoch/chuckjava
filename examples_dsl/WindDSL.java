@@ -1,5 +1,5 @@
-import org.chuck.audio.Noise;
-import org.chuck.audio.BiQuad;
+import org.chuck.audio.osc.Noise;
+import org.chuck.audio.filter.BiQuad;
 import org.chuck.core.Shred;
 import static org.chuck.core.ChuckDSL.*;
 

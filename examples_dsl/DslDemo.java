@@ -1,4 +1,10 @@
 import org.chuck.audio.*;
+import org.chuck.audio.analysis.*;
+import org.chuck.audio.filter.*;
+import org.chuck.audio.fx.*;
+import org.chuck.audio.osc.*;
+import org.chuck.audio.stk.*;
+import org.chuck.audio.util.*;
 import org.chuck.core.Shred;
 import static org.chuck.core.ChuckDSL.*;
 

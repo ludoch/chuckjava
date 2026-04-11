@@ -1,5 +1,5 @@
-import org.chuck.audio.Impulse;
-import org.chuck.audio.BiQuad;
+import org.chuck.audio.util.Impulse;
+import org.chuck.audio.filter.BiQuad;
 import org.chuck.core.Shred;
 import static org.chuck.core.ChuckDSL.*;
 

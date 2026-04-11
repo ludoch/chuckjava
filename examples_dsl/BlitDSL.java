@@ -1,5 +1,5 @@
-import org.chuck.audio.Blit;
-import org.chuck.audio.JCRev;
+import org.chuck.audio.osc.Blit;
+import org.chuck.audio.fx.JCRev;
 import org.chuck.core.Shred;
 import static org.chuck.core.ChuckDSL.*;
 

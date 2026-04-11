@@ -1,5 +1,5 @@
-import org.chuck.audio.SinOsc;
-import org.chuck.audio.Chorus;
+import org.chuck.audio.osc.SinOsc;
+import org.chuck.audio.fx.Chorus;
 import org.chuck.core.Shred;
 import static org.chuck.core.ChuckDSL.*;
 

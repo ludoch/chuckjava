@@ -1,54 +1,54 @@
 package org.chuck;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-
 import org.chuck.core.ChuckDSL;
 import org.chuck.core.ChuckVM;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 
 public class PolyphonyDSLTest {
 
-    @Test
-    public void testPolyphonyDSLOutput() throws Exception {
-        int sampleRate = 44100;
-        ChuckVM vm = new ChuckVM(sampleRate);
-        
-        // Use a list to capture prints
-        List<String> prints = Collections.synchronizedList(new ArrayList<>());
-        vm.addPrintListener(prints::add);
+  @Test
+  public void testPolyphonyDSLOutput() throws Exception {
+    int sampleRate = 44100;
+    ChuckVM vm = new ChuckVM(sampleRate);
 
-        // Load and spork PolyphonyDSL
-        Runnable polyphonyTask = ChuckDSL.load(Paths.get("examples_dsl/PolyphonyDSL.java"));
-        vm.spork(polyphonyTask);
+    // Use a list to capture prints
+    List<String> prints = Collections.synchronizedList(new ArrayList<>());
+    vm.addPrintListener(prints::add);
 
-        // Process a few seconds of audio and monitor DAC output
-        double maxRMS = 0;
-        int secondsToTest = 2;
-        int bufferSize = 512;
-        
-        System.out.println("Testing PolyphonyDSL for " + secondsToTest + " seconds...");
-        
-        long totalSamples = (long) secondsToTest * sampleRate;
-        for (long i = 0; i < totalSamples; i++) {
-            vm.advanceTime(1);
-            
-            // Check DAC channels directly
-            float sumSq = 0;
-            for (int c = 0; c < vm.getNumChannels(); c++) {
-                float sample = vm.getChannelLastOut(c);
-                sumSq += sample * sample;
-            }
-            double rms = Math.sqrt(sumSq / vm.getNumChannels());
-            if (rms > maxRMS) maxRMS = rms;
-        }
+    // Load and spork PolyphonyDSL
+    Runnable polyphonyTask = ChuckDSL.load(Paths.get("examples_dsl/PolyphonyDSL.java"));
+    vm.spork(polyphonyTask);
 
-        System.out.println("Max RMS detected: " + maxRMS);
-        System.out.println("Prints received: " + prints);
+    // Process a few seconds of audio and monitor DAC output
+    double maxRMS = 0;
+    int secondsToTest = 2;
+    int bufferSize = 512;
 
-        assertTrue(maxRMS > 0.001, "PolyphonyDSL produced no sound (Max RMS was " + maxRMS + ")");
+    System.out.println("Testing PolyphonyDSL for " + secondsToTest + " seconds...");
+
+    long totalSamples = (long) secondsToTest * sampleRate;
+    for (long i = 0; i < totalSamples; i++) {
+      vm.advanceTime(1);
+
+      // Check DAC channels directly
+      float sumSq = 0;
+      for (int c = 0; c < vm.getNumChannels(); c++) {
+        float sample = vm.getChannelLastOut(c);
+        sumSq += sample * sample;
+      }
+      double rms = Math.sqrt(sumSq / vm.getNumChannels());
+      if (rms > maxRMS) maxRMS = rms;
     }
+
+    System.out.println("Max RMS detected: " + maxRMS);
+    System.out.println("Prints received: " + prints);
+
+    assertTrue(maxRMS > 0.001, "PolyphonyDSL produced no sound (Max RMS was " + maxRMS + ")");
+  }
 }

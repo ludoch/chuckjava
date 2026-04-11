@@ -1,5 +1,5 @@
-import org.chuck.audio.Clarinet;
-import org.chuck.audio.JCRev;
+import org.chuck.audio.stk.Clarinet;
+import org.chuck.audio.fx.JCRev;
 import org.chuck.core.Shred;
 import static org.chuck.core.ChuckDSL.*;
 

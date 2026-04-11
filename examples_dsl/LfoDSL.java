@@ -1,4 +1,4 @@
-import org.chuck.audio.SinOsc;
+import org.chuck.audio.osc.SinOsc;
 import org.chuck.core.Shred;
 import static org.chuck.core.ChuckDSL.*;
 

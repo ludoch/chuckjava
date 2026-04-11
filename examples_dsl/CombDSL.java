@@ -1,6 +1,6 @@
-import org.chuck.audio.Noise;
-import org.chuck.audio.Gain;
-import org.chuck.audio.Delay;
+import org.chuck.audio.osc.Noise;
+import org.chuck.audio.util.Gain;
+import org.chuck.audio.fx.Delay;
 import org.chuck.core.Shred;
 import static org.chuck.core.ChuckDSL.*;
 

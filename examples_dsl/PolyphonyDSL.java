@@ -1,5 +1,5 @@
-import org.chuck.audio.TriOsc;
-import org.chuck.audio.Adsr;
+import org.chuck.audio.osc.TriOsc;
+import org.chuck.audio.util.Adsr;
 import org.chuck.core.ChuckDSL;
 import org.chuck.core.Shred;
 import org.chuck.core.ChuckVM;
