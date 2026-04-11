@@ -65,4 +65,29 @@ public class ChuckDocReflectionTest {
         assertFalse(out.isEmpty());
         assertEquals("My Global Func", out.get(0).trim());
     }
+
+    @Test
+    public void testAtDocDirectiveReflection() throws InterruptedException {
+        String src = 
+            "@doc \"Directly documented\"\n" +
+            "int y;\n" +
+            "<<< Reflect.docGlobal(\"y\") >>>;";
+        List<String> out = runAndGetOutput(src);
+        assertFalse(out.isEmpty());
+        assertEquals("Directly documented", out.get(0).trim());
+    }
+
+    @Test
+    public void testAtDocOnMemberReflection() throws InterruptedException {
+        String src = 
+            "class Baz {\n" +
+            "    @doc \"Member doc\"\n" +
+            "    int m;\n" +
+            "}\n" +
+            "new Baz @=> Baz b;\n" +
+            "<<< Reflect.doc(b, \"m\") >>>;";
+        List<String> out = runAndGetOutput(src);
+        assertFalse(out.isEmpty());
+        assertEquals("Member doc", out.get(0).trim());
+    }
 }

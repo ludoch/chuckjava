@@ -58,6 +58,15 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             }
             return new ChuckAST.ImportStmt(path, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
         }
+        if (ctx.ID() != null && ctx.ID().getText().equals("doc")) {
+            if (ctx.STRING() != null) {
+                String text = ctx.STRING().getText();
+                if (text.startsWith("\"") && text.endsWith("\"")) {
+                    text = text.substring(1, text.length() - 1);
+                }
+                lastDocComment = text;
+            }
+        }
         return null;
     }
 

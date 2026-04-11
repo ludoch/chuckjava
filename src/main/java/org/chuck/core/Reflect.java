@@ -44,6 +44,11 @@ public class Reflect extends ChuckObject {
                 return desc.methodDocs().get(key);
             }
         }
+
+        // Check field docs
+        if (desc.fieldDocs().containsKey(member)) {
+            return desc.fieldDocs().get(member);
+        }
         
         return "";
     }

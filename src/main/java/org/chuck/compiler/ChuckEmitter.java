@@ -628,7 +628,7 @@ public class ChuckEmitter {
                 for (ChuckAST.Stmt i : imported) registerClassNames(i);
             }
             case ChuckAST.ClassDefStmt s -> {
-                userClassRegistry.putIfAbsent(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, s.isAbstract(), s.isInterface(), null, new HashMap<>(), new HashMap<>(), s.access(), s.doc(), new HashMap<>()));
+                userClassRegistry.putIfAbsent(s.name(), new UserClassDescriptor(s.name(), s.parentName(), new ArrayList<>(), new ArrayList<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), new HashMap<>(), null, s.isAbstract(), s.isInterface(), null, new HashMap<>(), new HashMap<>(), s.access(), s.doc(), new HashMap<>(), new HashMap<>()));
                 UserClassDescriptor desc = userClassRegistry.get(s.name());
                 registerStaticFieldsRecursive(s.body(), desc);
                 for (ChuckAST.Stmt inner : s.body()) registerClassNames(inner);
@@ -1272,6 +1272,7 @@ public class ChuckEmitter {
                 List<ChuckAST.Stmt> flattenedBody = new ArrayList<>();
                 flattenStmts(s.body(), flattenedBody);
 
+                Map<String, String> fieldDocs = new HashMap<>();
                 for (ChuckAST.Stmt bodyStmt : flattenedBody) {
                     switch (bodyStmt) {
                         case ChuckAST.DeclStmt f -> {
@@ -1283,6 +1284,7 @@ public class ChuckEmitter {
                                 fieldAccess.put(f.name(), f.access());
                                 fieldNames.add(f.name());
                             }
+                            if (f.doc() != null) fieldDocs.put(f.name(), f.doc());
                         }
                         case ChuckAST.FuncDefStmt m -> methods.add(m);
                         case ChuckAST.ClassDefStmt inner -> emitStatement(inner, null);
@@ -1307,10 +1309,11 @@ public class ChuckEmitter {
                                     fieldAccess.put(rDecl.name(), rDecl.access());
                                 } else {
                                     fieldDefs.add(new String[]{rDecl.type(), rDecl.name()});
-                                fieldAccess.put(rDecl.name(), rDecl.access());
+                                    fieldAccess.put(rDecl.name(), rDecl.access());
                                 }
                                 fieldNames.add(rDecl.name());
                             }
+                            if (rDecl.doc() != null) fieldDocs.put(rDecl.name(), rDecl.doc());
                         }
                         case ChuckAST.ExpStmt es when es.exp() instanceof ChuckAST.DeclExp rDecl -> {
                             // Standalone declaration like 'static int a[];'
@@ -1322,6 +1325,7 @@ public class ChuckEmitter {
                                 fieldAccess.put(rDecl.name(), rDecl.access());
                                 fieldNames.add(rDecl.name());
                             }
+                            if (rDecl.doc() != null) fieldDocs.put(rDecl.name(), rDecl.doc());
                         }
                         default -> {
                         }
@@ -1339,8 +1343,7 @@ public class ChuckEmitter {
                 // methodCodes/staticMethodCodes are mutable maps; stubs added in pass 1 below become visible here.
                 userClassRegistry.put(s.name(), new UserClassDescriptor(
                         s.name(), s.parentName(), fieldDefs, staticFieldDefs, methodCodes, staticMethodCodes,
-                        staticInts, staticIsDouble, staticObjects, null, s.isAbstract(), s.isInterface(), null, fieldAccess, methodAccess, s.access(), s.doc(), methodDocs));
-
+                        staticInts, staticIsDouble, staticObjects, null, s.isAbstract(), s.isInterface(), null, fieldAccess, methodAccess, s.access(), s.doc(), methodDocs, fieldDocs));
                 // Track methods defined so far to detect duplicates
                 java.util.Set<String> definedMethods = new java.util.HashSet<>();
                 currentClassMethodsList = methods;
@@ -1431,7 +1434,7 @@ public class ChuckEmitter {
                 // Update descriptor with compiled pre-constructor
                 userClassRegistry.put(s.name(), new UserClassDescriptor(
                         s.name(), s.parentName(), fieldDefs, staticFieldDefs, methodCodes, staticMethodCodes,
-                        staticInts, staticIsDouble, staticObjects, preCtorCodeLocal, s.isAbstract(), s.isInterface(), null, fieldAccess, methodAccess, s.access(), s.doc(), methodDocs));
+                        staticInts, staticIsDouble, staticObjects, preCtorCodeLocal, s.isAbstract(), s.isInterface(), null, fieldAccess, methodAccess, s.access(), s.doc(), methodDocs, fieldDocs));
 
                 // Pass 2: compile method bodies (all stubs already registered above)
                 for (Map.Entry<ChuckAST.FuncDefStmt, ChuckCode> entry : methodCodeMap.entrySet()) {
@@ -1557,7 +1560,8 @@ public class ChuckEmitter {
                         methodAccess,
                         s.access(),
                         s.doc(),
-                        methodDocs);
+                        methodDocs,
+                        fieldDocs);
 
                 // Add static methods to the main methods map too, for resolution on instances
                 methodCodes.putAll(staticMethodCodes);

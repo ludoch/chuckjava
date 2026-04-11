@@ -93,11 +93,11 @@ win1 => WinFuncEnv win2 => dac;
 win1.setParzen();
 win2.setWelch();
 
-fun void loop(WinFuncEnv @ win, dur envTime) {
+fun void playLoop(WinFuncEnv @ win, dur envTime) {
     repeat(500) {
         playWindow(win, envTime, envTime);
     }
 }
 
-spork ~ loop(win1, 70::ms);
-loop(win2, 73::ms);
+spork ~ playLoop(win1, 70::ms);
+playLoop(win2, 73::ms);
