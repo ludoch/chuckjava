@@ -43,8 +43,7 @@ public class StatementEmitter {
                             || nm.equals("maybe") || nm.equals("second") || nm.equals("ms") || nm.equals("samp")
                             || nm.equals("minute") || nm.equals("hour");
                     if (!knownName) {
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + ide.line() + ":" + ide.column()
-                                + ": error: undefined variable '" + nm + "'");
+                        throw new org.chuck.core.ChuckCompilerException("undefined variable '" + nm + "'", parent.getCurrentFile(), ide.line(), ide.column());
                     }
                 }
                 parent.emitExpression(s.exp(), code);
@@ -242,13 +241,11 @@ public class StatementEmitter {
             case ChuckAST.DeclStmt s -> {
                 // Check for 'auto' without initialization
                 if (s.type().equals("auto")) {
-                    throw new RuntimeException(parent.getCurrentFile() + ":" + s.line() + ":" + s.column()
-                            + ": error: 'auto' requires initialization (cannot declare 'auto' without a value)");
+                    throw new org.chuck.core.ChuckCompilerException("'auto' requires initialization (cannot declare 'auto' without a value)", parent.getCurrentFile(), s.line(), s.column());
                 }
                 // Check for static variable declared outside class scope
                 if (s.isStatic() && (parent.getCurrentClass() == null || parent.getLocalScopes().size() > 1)) {
-                    throw new RuntimeException(parent.getCurrentFile() + ":" + s.line() + ":" + s.column()
-                            + ": error: static variables must be declared at class scope");
+                    throw new org.chuck.core.ChuckCompilerException("static variables must be declared at class scope", parent.getCurrentFile(), s.line(), s.column());
                 }
                 // Track empty-array variable declarations
                 if (!s.arraySizes().isEmpty() && s.arraySizes().get(0) instanceof ChuckAST.IntExp sz0 && sz0.value() < 0) {
@@ -266,9 +263,8 @@ public class StatementEmitter {
                 if (useGlobal) {
                     String prevType = parent.getGlobalVarTypes().get(s.name());
                     if (prevType != null && !prevType.equals(s.type()) && !prevType.equals("int") && !prevType.equals("float") && !prevType.equals("string")) {
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + s.line() + ":" + s.column()
-                                + ": error: global " + prevType + " '" + s.name() + "' has different type '" + s.type()
-                                + "' than already existing global " + prevType + " of the same name");
+                        throw new org.chuck.core.ChuckCompilerException("global " + prevType + " '" + s.name() + "' has different type '" + s.type()
+                                + "' than already existing global " + prevType + " of the same name", parent.getCurrentFile(), s.line(), s.column());
                     }
                     parent.getGlobalVarTypes().put(s.name(), s.type());
                 }
@@ -345,16 +341,14 @@ public class StatementEmitter {
                     String opSuffix = s.name().startsWith("__pub_op__") ? s.name().substring("__pub_op__".length()) : s.name().substring("__op__".length());
                     // ~ is never a valid overloadable operator
                     if (opSuffix.equals("~")) {
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + s.line() + ":" + s.column()
-                                + ": error: cannot overload operator '" + opSuffix + "'");
+                        throw new org.chuck.core.ChuckCompilerException("cannot overload operator '" + opSuffix + "'", parent.getCurrentFile(), s.line(), s.column());
                     }
                     // ++ and -- cannot be overloaded for primitive types
                     java.util.Set<String> primitiveTypes = java.util.Set.of("int", "float", "string", "time", "dur", "void");
                     if ((opSuffix.equals("++") || opSuffix.equals("--")) && s.argTypes().size() >= 1) {
                         for (String argType : s.argTypes()) {
                             if (primitiveTypes.contains(argType)) {
-                                throw new RuntimeException(parent.getCurrentFile() + ":" + s.line() + ":" + s.column()
-                                        + ": error: cannot overload operator '" + opSuffix + "' for primitive type '" + argType + "'");
+                                throw new org.chuck.core.ChuckCompilerException("cannot overload operator '" + opSuffix + "' for primitive type '" + argType + "'", parent.getCurrentFile(), s.line(), s.column());
                             }
                         }
                     }
@@ -362,8 +356,7 @@ public class StatementEmitter {
                     if ((opSuffix.equals("=>") || opSuffix.equals("@=>")) && s.argTypes().size() >= 1) {
                         for (String argType : s.argTypes()) {
                             if (parent.isKnownUGenType(argType)) {
-                                throw new RuntimeException(parent.getCurrentFile() + ":" + s.line() + ":" + s.column()
-                                        + ": error: cannot overload '" + opSuffix + "' for UGen subtype '" + argType + "'");
+                                throw new org.chuck.core.ChuckCompilerException("cannot overload '" + opSuffix + "' for UGen subtype '" + argType + "'", parent.getCurrentFile(), s.line(), s.column());
                             }
                         }
                     }
@@ -410,8 +403,7 @@ public class StatementEmitter {
 
                 // Check for missing return in non-void function
                 if (!parent.getCurrentFuncReturnType().equals("void") && !parent.isCurrentFuncHasReturn()) {
-                    throw new RuntimeException(parent.getCurrentFile() + ":" + s.line() + ":" + s.column()
-                            + ": error: not all control paths in 'fun " + parent.getCurrentFuncReturnType() + " " + s.name() + "()' return a value");
+                    throw new org.chuck.core.ChuckCompilerException("not all control paths in 'fun " + parent.getCurrentFuncReturnType() + " " + s.name() + "()' return a value", parent.getCurrentFile(), s.line(), s.column());
                 }
 
                 parent.setCurrentFuncReturnType(prevReturnType);
@@ -426,8 +418,7 @@ public class StatementEmitter {
             case ChuckAST.ReturnStmt s -> {
                 // Check for return value in void function
                 if (s.exp() != null && "void".equals(parent.getCurrentFuncReturnType())) {
-                    throw new RuntimeException(parent.getCurrentFile() + ":" + s.line() + ":" + s.column()
-                            + ": error: function was defined with return type 'void' -- but returning a value");
+                    throw new org.chuck.core.ChuckCompilerException("function was defined with return type 'void' -- but returning a value", parent.getCurrentFile(), s.line(), s.column());
                 }
                 parent.setCurrentFuncHasReturn(true);
                 if (s.exp() != null) {
@@ -440,7 +431,7 @@ public class StatementEmitter {
                 if (s.parentName() != null) {
                     java.util.Set<String> primitives = java.util.Set.of("int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar");
                     if (primitives.contains(s.parentName())) {
-                        throw new RuntimeException(parent.getCurrentFile() + ": error: cannot extend primitive type '" + s.parentName() + "'");
+                        throw new org.chuck.core.ChuckCompilerException("cannot extend primitive type '" + s.parentName() + "'", parent.getCurrentFile(), s.line(), s.column());
                     }
                 }
                 List<String[]> fieldDefs = new ArrayList<>();
@@ -552,20 +543,17 @@ public class StatementEmitter {
 
                     if (isCtor || m.name().equals(s.name())) {
                         if (m.isStatic()) {
-                            throw new RuntimeException(parent.getCurrentFile() + ":" + m.line() + ":" + m.column()
-                                    + ": error: constructor cannot be declared as 'static'");
+                            throw new org.chuck.core.ChuckCompilerException("constructor cannot be declared as 'static'", parent.getCurrentFile(), m.line(), m.column());
                         }
                         if (m.returnType() != null && !m.returnType().equals("void") && !m.returnType().isEmpty()) {
-                            throw new RuntimeException(parent.getCurrentFile() + ":" + m.line() + ":" + m.column()
-                                    + ": error: constructor must return void -- returning type '" + m.returnType() + "'");
+                            throw new org.chuck.core.ChuckCompilerException("constructor must return void -- returning type '" + m.returnType() + "'", parent.getCurrentFile(), m.line(), m.column());
                         }
                     }
 
                     String methodKey = parent.getMethodKey(methodName, m.argTypes());
                     if (definedMethods.contains(methodKey)) {
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + m.line() + ":" + m.column()
-                                + ": error: cannot overload function with identical arguments -- '"
-                                + methodName + "' already defined in class '" + s.name() + "'");
+                        throw new org.chuck.core.ChuckCompilerException("cannot overload function with identical arguments -- '"
+                                + methodName + "' already defined in class '" + s.name() + "'", parent.getCurrentFile(), m.line(), m.column());
                     }
                     definedMethods.add(methodKey);
 
@@ -663,9 +651,8 @@ public class StatementEmitter {
                     parent.setLocalCount(0); // Reset for next method
 
                     if (!parent.getCurrentFuncReturnType().equals("void") && !parent.isCurrentFuncHasReturn()) {
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + m.line() + ":" + m.column()
-                                + ": error: not all control paths in 'fun " + parent.getCurrentFuncReturnType() + " "
-                                + s.name() + "." + m.name() + "()' return a value");
+                        throw new org.chuck.core.ChuckCompilerException("not all control paths in 'fun " + parent.getCurrentFuncReturnType() + " "
+                                + s.name() + "." + m.name() + "()' return a value", parent.getCurrentFile(), m.line(), m.column());
                     }
 
                     parent.setCurrentFuncReturnType(prevReturnType);

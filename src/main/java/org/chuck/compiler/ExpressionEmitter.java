@@ -70,21 +70,18 @@ public class ExpressionEmitter {
             }
             case ChuckAST.DeclExp e -> {
                 if (!parent.isKnownType(e.type())) {
-                    throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                            + ": error: undefined type '" + e.type() + "'");
+                    throw error(e, "undefined type '" + e.type() + "'");
                 }
 
                 if (e.name().startsWith("@new_")) {
                     boolean isArrayNew = e.name().startsWith("@new_array_");
                     java.util.Set<String> primitives = java.util.Set.of("int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar");
                     if (primitives.contains(e.type()) && !isArrayNew) {
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                + ": error: cannot use 'new' on primitive type '" + e.type() + "'");
+                        throw error(e, "cannot use 'new' on primitive type '" + e.type() + "'");
                     }
                 }
                 if (e.isStatic() && (parent.getCurrentClass() == null || parent.getLocalScopes().size() > 1)) {
-                    throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                            + ": error: static variables must be declared at class scope");
+                    throw error(e, "static variables must be declared at class scope");
                 }
                 if (!e.arraySizes().isEmpty() && e.arraySizes().get(0) instanceof ChuckAST.IntExp sz0e && sz0e.value() < 0) {
                     parent.getEmptyArrayVars().add(e.name());
@@ -103,9 +100,8 @@ public class ExpressionEmitter {
                 if (useGlobal) {
                     String prevType = parent.getGlobalVarTypes().get(e.name());
                     if (prevType != null && !prevType.equals(e.type()) && !prevType.equals("int") && !prevType.equals("float") && !prevType.equals("string")) {
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                + ": error: global " + prevType + " '" + e.name() + "' has different type '" + e.type()
-                                + "' than already existing global " + prevType + " of the same name");
+                        throw new org.chuck.core.ChuckCompilerException("global " + prevType + " '" + e.name() + "' has different type '" + e.type()
+                                + "' than already existing global " + prevType + " of the same name", parent.getCurrentFile(), e.line(), e.column());
                     }
                     parent.getGlobalVarTypes().put(e.name(), e.type());
                 }
@@ -184,17 +180,14 @@ public class ExpressionEmitter {
                     if (e.rhs() instanceof ChuckAST.DeclExp rDecl && rDecl.type().equals("auto")) {
                         if (e.lhs() instanceof ChuckAST.IdExp(String n, int _, int _)) {
                             if (n.equals("null")) {
-                                throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                        + ": error: cannot infer 'auto' type from 'null'");
+                                throw new org.chuck.core.ChuckCompilerException("cannot infer 'auto' type from 'null'", parent.getCurrentFile(), e.line(), e.column());
                             }
                             if (n.equals("void")) {
-                                throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                        + ": error: cannot infer 'auto' type from 'void'");
+                                throw new org.chuck.core.ChuckCompilerException("cannot infer 'auto' type from 'void'", parent.getCurrentFile(), e.line(), e.column());
                             }
                             String lhsType = parent.getVarTypeByName(n);
                             if ("auto".equals(lhsType)) {
-                                throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                        + ": error: cannot infer 'auto' type from another 'auto' variable");
+                                throw new org.chuck.core.ChuckCompilerException("cannot infer 'auto' type from another 'auto' variable", parent.getCurrentFile(), e.line(), e.column());
                             }
                         }
                     }
@@ -202,40 +195,34 @@ public class ExpressionEmitter {
                             && !rDecl2.arraySizes().isEmpty()) {
                         ChuckAST.Exp sz = rDecl2.arraySizes().get(0);
                         if (sz instanceof ChuckAST.IntExp szInt && szInt.value() < 0) {
-                            throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                    + ": error: cannot connect '=>' to empty array '[ ]' declaration");
+                            throw new org.chuck.core.ChuckCompilerException("cannot connect '=>' to empty array '[ ]' declaration", parent.getCurrentFile(), e.line(), e.column());
                         }
                     }
                     if (e.op() == ChuckAST.Operator.CHUCK && e.lhs() instanceof ChuckAST.DeclExp lDecl2
                             && !lDecl2.arraySizes().isEmpty()) {
                         ChuckAST.Exp sz = lDecl2.arraySizes().get(0);
                         if (sz instanceof ChuckAST.IntExp szInt && szInt.value() < 0) {
-                            throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                    + ": error: cannot connect '=>' from empty array '[ ]' declaration");
+                            throw new org.chuck.core.ChuckCompilerException("cannot connect '=>' from empty array '[ ]' declaration", parent.getCurrentFile(), e.line(), e.column());
                         }
                     }
                     if (e.rhs() instanceof ChuckAST.DeclExp rDecl3 && rDecl3.isStatic()) {
                         if (parent.getCurrentClass() == null || parent.getLocalScopes().size() > 1) {
-                            throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                    + ": error: static variables must be declared at class scope");
+                            throw new org.chuck.core.ChuckCompilerException("static variables must be declared at class scope", parent.getCurrentFile(), e.line(), e.column());
                         }
                         parent.checkStaticInitSource(e.lhs());
                     }
                     if (e.op() == ChuckAST.Operator.CHUCK && e.lhs() instanceof ChuckAST.IdExp lhsId2
                             && parent.getEmptyArrayVars().contains(lhsId2.name())) {
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                + ": error: cannot connect empty array '" + lhsId2.name() + "[]' => to other UGens");
+                        throw new org.chuck.core.ChuckCompilerException("cannot connect empty array '" + lhsId2.name() + "[]' => to other UGens", parent.getCurrentFile(), e.line(), e.column());
                     }
                     if (e.op() == ChuckAST.Operator.AT_CHUCK && e.rhs() instanceof ChuckAST.DeclExp rDecl4
                             && !rDecl4.arraySizes().isEmpty()
                             && rDecl4.arraySizes().get(0) instanceof ChuckAST.IntExp szI4 && szI4.value() >= 0) {
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                + ": error: cannot use '@=>' to assign to array declaration with explicit size");
+                        throw new org.chuck.core.ChuckCompilerException("cannot use '@=>' to assign to array declaration with explicit size", parent.getCurrentFile(), e.line(), e.column());
                     }
                     Object rhs = e.rhs();
                     if (rhs instanceof ChuckAST.BlockStmt) {
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                + ": error: cannot '=>' from/to a multi-variable declaration");
+                        throw new org.chuck.core.ChuckCompilerException("cannot '=>' from/to a multi-variable declaration", parent.getCurrentFile(), e.line(), e.column());
                     }
                     if (e.rhs() instanceof ChuckAST.DeclExp rDecl) {
                         ChuckAST.DeclExp resolvedDecl = rDecl;
@@ -267,9 +254,8 @@ public class ExpressionEmitter {
                     if (lhsType != null && parent.getUserClassRegistry().containsKey(lhsType)) {
                         String rhsType = parent.getVarType(e.rhs());
                         String rhsName = rhsType != null ? rhsType : lhsType;
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                + ": error: cannot resolve operator '=^' on types '"
-                                + lhsType + "' and '" + rhsName + "'");
+                        throw new org.chuck.core.ChuckCompilerException("cannot resolve operator '=^' on types '"
+                                + lhsType + "' and '" + rhsName + "'", parent.getCurrentFile(), e.line(), e.column());
                     }
                     this.emitExpression(e.lhs(), code);
                     parent.emitChuckTarget(e.rhs(), code, e.op());
@@ -280,8 +266,7 @@ public class ExpressionEmitter {
                 } else if (e.op() == ChuckAST.Operator.NEW) {
                     if (e.rhs() instanceof ChuckAST.IntExp szNew && szNew.value() < 0) {
                         String typeName = e.lhs() instanceof ChuckAST.IdExp tid ? tid.name() : "?";
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                + ": error: cannot use 'new " + typeName + "[]' with empty brackets");
+                        throw new org.chuck.core.ChuckCompilerException("cannot use 'new " + typeName + "[]' with empty brackets", parent.getCurrentFile(), e.line(), e.column());
                     }
                     this.emitExpression(e.rhs(), code);
                     code.addInstruction(new ArrayInstrs.NewArray(null, 1));
@@ -289,8 +274,7 @@ public class ExpressionEmitter {
                         || e.op() == ChuckAST.Operator.TIMES_CHUCK || e.op() == ChuckAST.Operator.DIVIDE_CHUCK
                         || e.op() == ChuckAST.Operator.PERCENT_CHUCK) {
                     if (e.rhs() instanceof ChuckAST.DeclExp) {
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                + ": error: cannot use compound assignment operator with a variable declaration");
+                        throw error(e, "cannot use compound assignment operator with a variable declaration");
                     }
                     if (e.op() == ChuckAST.Operator.PLUS_CHUCK
                             && e.lhs() instanceof ChuckAST.IntExp lhsInt && lhsInt.value() == 1
@@ -310,20 +294,17 @@ public class ExpressionEmitter {
                     }
                     if (e.rhs() instanceof ChuckAST.IdExp rid) {
                         if (rid.name().equals("now")) {
-                            throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                    + ": error: cannot perform compound assignment on 'now'");
+                            throw error(e, "cannot perform compound assignment on 'now'");
                         }
                         if (rid.name().equals("pi") || rid.name().equals("e") || rid.name().equals("maybe")) {
-                            throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                    + ": error: cannot assign to read-only value '" + rid.name() + "'");
+                            throw error(e, "cannot assign to read-only value '" + rid.name() + "'");
                         }
                     } else if (e.rhs() instanceof ChuckAST.DotExp rdot
                             && rdot.base() instanceof ChuckAST.IdExp baseId
                             && baseId.name().equals("Math")) {
                         switch (rdot.member()) {
                             case "PI", "TWO_PI", "HALF_PI", "E", "INFINITY", "NEGATIVE_INFINITY", "NaN", "nan" ->
-                                throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                        + ": error: 'Math." + rdot.member() + "' is a constant, and is not assignable");
+                                throw error(e, "'Math." + rdot.member() + "' is a constant, and is not assignable");
                             default -> {
                             }
                         }
@@ -385,8 +366,7 @@ public class ExpressionEmitter {
                     parent.emitChuckTarget(e.rhs(), code, e.op());
                 } else if (e.op() == ChuckAST.Operator.POSTFIX_PLUS_PLUS || e.op() == ChuckAST.Operator.POSTFIX_MINUS_MINUS) {
                     if (e.rhs() instanceof ChuckAST.DeclExp) {
-                        throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column()
-                                + ": error: cannot use compound assignment operator with a variable declaration");
+                        throw error(e, "cannot use compound assignment operator with a variable declaration");
                     }
                     boolean isPostfixPlus = e.op() == ChuckAST.Operator.POSTFIX_PLUS_PLUS;
                     String rhsType = parent.getVarType(e.rhs());
@@ -488,13 +468,13 @@ public class ExpressionEmitter {
                     if (e.op() == ChuckAST.Operator.PLUS) {
                         if (e.lhs() instanceof ChuckAST.IdExp(String fnName, int _, int _)) {
                             boolean isFuncRef = parent.getFunctions().keySet().stream().anyMatch(k -> k.startsWith(fnName + ":"));
-                            if (isFuncRef) throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column() + ": error: cannot perform '+' on '[fun]" + fnName + "()' and value");
+                            if (isFuncRef) throw error(e, "cannot perform '+' on '[fun]" + fnName + "()' and value");
                         }
                         if (e.lhs() instanceof ChuckAST.DotExp lhsDot && lhsDot.base() instanceof ChuckAST.IdExp baseId && parent.getUserClassRegistry().containsKey(baseId.name())) {
                             UserClassDescriptor d = parent.getUserClassRegistry().get(baseId.name());
                             String memName = lhsDot.member();
                             boolean isMemberFunc = d.methods().containsKey(memName) || d.staticMethods().keySet().stream().anyMatch(k -> k.startsWith(memName + ":"));
-                            if (isMemberFunc) throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column() + ": error: cannot perform '+' on '[fun]" + baseId.name() + "." + memName + "()' and value");
+                            if (isMemberFunc) throw error(e, "cannot perform '+' on '[fun]" + baseId.name() + "." + memName + "()' and value");
                         }
                     }
                     {
@@ -607,8 +587,8 @@ public class ExpressionEmitter {
                     }
                     if (e.op() == ChuckAST.Operator.PLUS || e.op() == ChuckAST.Operator.MINUS || e.op() == ChuckAST.Operator.TIMES || e.op() == ChuckAST.Operator.DIVIDE) {
                         java.util.Set<String> ugenGlobals = java.util.Set.of("dac", "blackhole", "adc");
-                        if (e.lhs() instanceof ChuckAST.IdExp lid && ugenGlobals.contains(lid.name())) throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column() + ": error: cannot perform arithmetic on UGen '" + lid.name() + "'");
-                        if (e.rhs() instanceof ChuckAST.IdExp rid && ugenGlobals.contains(rid.name())) throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column() + ": error: cannot perform arithmetic on UGen '" + rid.name() + "'");
+                        if (e.lhs() instanceof ChuckAST.IdExp lid && ugenGlobals.contains(lid.name())) throw error(e, "cannot perform arithmetic on UGen '" + lid.name() + "'");
+                        if (e.rhs() instanceof ChuckAST.IdExp rid && ugenGlobals.contains(rid.name())) throw error(e, "cannot perform arithmetic on UGen '" + rid.name() + "'");
                     }
                     if (e.op() != ChuckAST.Operator.AND && e.op() != ChuckAST.Operator.OR) {
                         this.emitExpression(e.lhs(), code); this.emitExpression(e.rhs(), code);
@@ -671,8 +651,8 @@ public class ExpressionEmitter {
             case ChuckAST.IdExp e -> {
                 Integer localOffset = parent.getLocalOffset(e.name());
                 String varType = parent.getVarType(e);
-                if (e.name().equals("this") && parent.getCurrentClass() == null) throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column() + ": error: keyword 'this' cannot be used outside class definition");
-                if (e.name().equals("super") && parent.isInStaticFuncContext()) throw new RuntimeException(parent.getCurrentFile() + ":" + e.line() + ":" + e.column() + ": error: keyword 'super' cannot be used inside static functions");
+                if (e.name().equals("this") && parent.getCurrentClass() == null) throw error(e, "keyword 'this' cannot be used outside class definition");
+                if (e.name().equals("super") && parent.isInStaticFuncContext()) throw error(e, "keyword 'super' cannot be used inside static functions");
                 boolean isField = parent.getCurrentClass() != null && (parent.getCurrentClassFields().contains(e.name()) || parent.hasInstanceField(parent.getCurrentClass(), e.name()));
                 if (isField) { code.addInstruction(new StackInstrs.PushThis()); code.addInstruction(new FieldInstrs.GetUserField(e.name())); }
                 else if (localOffset != null) code.addInstruction(new VarInstrs.LoadLocal(localOffset));
@@ -870,5 +850,9 @@ public class ExpressionEmitter {
             case ChuckAST.TypeofExp e -> { this.emitExpression(e.expr(), code); code.addInstruction(new TypeInstrs.TypeofInstr()); }
             case ChuckAST.InstanceofExp e -> { this.emitExpression(e.expr(), code); code.addInstruction(new TypeInstrs.InstanceofInstr(e.typeName())); }
         }
+    }
+
+    private org.chuck.core.ChuckCompilerException error(ChuckAST.Exp e, String message) {
+        return new org.chuck.core.ChuckCompilerException(message, parent.getCurrentFile(), e.line(), e.column());
     }
 }

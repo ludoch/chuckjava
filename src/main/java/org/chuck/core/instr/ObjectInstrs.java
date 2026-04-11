@@ -72,7 +72,7 @@ public class ObjectInstrs {
                     s.reg.push(0L);
                     return;
                 }
-                throw new RuntimeException("NullPointerException: cannot call method '" + mName + "' on null object");
+                throw new org.chuck.core.ChuckRuntimeException("NullPointerException: cannot call method '" + mName + "' on null object");
             }
 
             String className = null;
@@ -282,9 +282,9 @@ public class ObjectInstrs {
                     } catch (InvocationTargetException ite) {
                         Throwable cause = ite.getCause();
                         if (cause instanceof RuntimeException re) throw re;
-                        throw new RuntimeException(ite.getClass().getSimpleName() + ": " + ite.getMessage());
+                        throw new org.chuck.core.ChuckRuntimeException(ite.getClass().getSimpleName() + ": " + ite.getMessage());
                     } catch (Exception e) {
-                        throw new RuntimeException(e.getClass().getSimpleName() + ": " + e.getMessage());
+                        throw new org.chuck.core.ChuckRuntimeException(e.getClass().getSimpleName() + ": " + e.getMessage());
                     }
                 }
             } catch (Exception e) {}

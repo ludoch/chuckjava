@@ -235,7 +235,7 @@ public class ChuckArray extends ChuckObject {
         int i = (int) idx;
         if (i < 0) i = types.size() + i;
         if (i < 0 || i >= types.size()) {
-            throw new RuntimeException("ArrayOutofBounds: index[" + idx + "] size[" + types.size() + "]");
+            throw new org.chuck.core.ChuckRuntimeException("ArrayOutofBounds: index[" + idx + "] size[" + types.size() + "]");
         }
         return i;
     }

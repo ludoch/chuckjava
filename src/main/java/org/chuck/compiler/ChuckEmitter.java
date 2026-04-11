@@ -10,6 +10,8 @@ import org.chuck.core.AdvanceTime;
 import org.chuck.core.CallFunc;
 import org.chuck.core.ChuckArray;
 import org.chuck.core.ChuckCode;
+import org.chuck.core.ChuckCompilerException;
+import org.chuck.core.ChuckLanguage;
 import org.chuck.core.ChuckInstr;
 import org.chuck.core.ChuckPrint;
 import org.chuck.core.ChuckType;
@@ -159,24 +161,21 @@ public class ChuckEmitter {
     public Map<String, String> getFunctionReturnTypes() { return functionReturnTypes; }
     public void setCurrentClassMethodsList(List<ChuckAST.FuncDefStmt> currentClassMethodsList) { this.currentClassMethodsList = currentClassMethodsList; }
 
+    private void error(int line, int col, String msg) {
+        throw new ChuckCompilerException(msg, currentFile, line, col);
+    }
+
     boolean isObjectType(String type) {
-        if (type == null) return false;
-        if (type.endsWith("[]")) return true;
-        if (userClassRegistry.containsKey(type)) return true;
-        if (isKnownUGenType(type)) return true;
-        java.util.Set<String> objects = java.util.Set.of("complex", "polar", "vec2", "vec3", "vec4", "string", "Object", "Event", "Type", "Function");
-        return objects.contains(type);
+        return ChuckLanguage.isObjectType(type) || userClassRegistry.containsKey(type);
     }
 
     boolean isKnownType(String type) {
         if (type == null) return false;
-        String baseType = type.replaceAll("\\[\\]", "");
-        boolean known = isKnownUGenType(baseType) || CORE_DATA_TYPES.contains(baseType) || userClassRegistry.containsKey(baseType);
-        if (!known && type.contains("Function")) {
-            System.err.println("isKnownType failed for: '" + type + "', baseType: '" + baseType + "'");
-            System.err.println("CORE_DATA_TYPES contains Function? " + CORE_DATA_TYPES.contains("Function"));
-        }
-        return known;
+        String baseType = getBaseType(type);
+        return ChuckLanguage.CORE_DATA_TYPES.contains(baseType) 
+            || ChuckLanguage.CORE_UGENS.contains(baseType)
+            || UGenRegistry.isRegistered(baseType)
+            || userClassRegistry.containsKey(baseType);
     }
 
     boolean isIOType(String type) {
@@ -185,7 +184,7 @@ public class ChuckEmitter {
     }
 
     boolean isKnownUGenType(String type) {
-        return UGenRegistry.isRegistered(type) || CORE_UGENS.contains(type);
+        return UGenRegistry.isRegistered(type) || ChuckLanguage.CORE_UGENS.contains(type);
     }
 
     String getMethodKey(String name, List<String> argTypes) {
@@ -576,7 +575,7 @@ public class ChuckEmitter {
         boolean hasContent = statements.stream().anyMatch(s
                 -> !(s instanceof ChuckAST.BlockStmt bs && bs.statements().isEmpty()));
         if (!hasContent) {
-            throw new RuntimeException(programName + ":1:1: syntax error\n(empty file)");
+            throw new ChuckCompilerException("syntax error\n(empty file)", programName, 1, 1);
         }
 
         for (ChuckAST.Stmt stmt : statements) registerClassNames(stmt);
@@ -685,7 +684,7 @@ public class ChuckEmitter {
                 if (!list.isEmpty() && list.get(0) instanceof ChuckAST.DeclExp de) {
                     line = de.line(); col = de.column();
                 }
-                throw new RuntimeException(currentFile + ":" + line + ":" + col + ": error: cannot '=>' from/to a multi-variable declaration");
+                error(line, col, "cannot '=>' from/to a multi-variable declaration");
             }
             if (!list.isEmpty()) emitChuckTarget(list.get(0), code, op);
             return;
@@ -699,7 +698,7 @@ public class ChuckEmitter {
                 if (e.name().equals("pi") || e.name().equals("e") || e.name().equals("maybe") || 
                     e.name().equals("true") || e.name().equals("false") || e.name().equals("null") ||
                     constants.contains(e.name())) {
-                    throw new RuntimeException(currentFile + ":" + e.line() + ":" + e.column() + ": error: cannot assign to read-only value '" + e.name() + "'");
+                    error(e.line(), e.column(), "cannot assign to read-only value '" + e.name() + "'");
                 }
                 String type = getVarType(exp);
                 boolean isUGen = type != null && (isKnownUGenType(type) || isSubclassOfUGen(type));
@@ -756,7 +755,7 @@ public class ChuckEmitter {
                     // Math constants are read-only and cannot be assigned to
                     switch (e.member()) {
                         case "PI", "TWO_PI", "HALF_PI", "E", "INFINITY", "NEGATIVE_INFINITY", "NaN", "nan", "infinity", "negative_infinity" ->
-                            throw new RuntimeException(currentFile + ": error: 'Math." + e.member() + "' is a constant, and is not assignable");
+                            error(e.line(), e.column(), "'Math." + e.member() + "' is a constant, and is not assignable");
                         default -> {
                         }
                     }
@@ -897,15 +896,13 @@ public class ChuckEmitter {
 
         if (access == org.chuck.compiler.ChuckAST.AccessModifier.PRIVATE) {
             if (currentClass == null || !currentClass.equals(className)) {
-                throw new RuntimeException(currentFile + ":" + line + ":" + col
-                        + ": error: cannot access private " + (isMethod ? "method" : "field") + " '" + memberName + "' of class '" + className + "'");
+                error(line, col, "cannot access private " + (isMethod ? "method" : "field") + " '" + memberName + "' of class '" + className + "'");
             }
         }
 
         if (access == org.chuck.compiler.ChuckAST.AccessModifier.PROTECTED) {
             if (currentClass == null || !isSubclassOf(currentClass, className)) {
-                throw new RuntimeException(currentFile + ":" + line + ":" + col
-                        + ": error: cannot access protected " + (isMethod ? "method" : "field") + " '" + memberName + "' of class '" + className + "'");
+                error(line, col, "cannot access protected " + (isMethod ? "method" : "field") + " '" + memberName + "' of class '" + className + "'");
             }
         }
     }
@@ -952,8 +949,7 @@ public class ChuckEmitter {
      * Returns true if the type name is a vector or complex primitive type.
      */
     static boolean isVecType(String type) {
-        return type != null && (type.equals("vec2") || type.equals("vec3") || type.equals("vec4")
-                || type.equals("complex") || type.equals("polar"));
+        return ChuckLanguage.isVectorType(type) || "complex".equals(type) || "polar".equals(type);
     }
 
     /**
@@ -968,14 +964,14 @@ public class ChuckEmitter {
             case ChuckAST.IdExp id -> {
                 // Member field access
                 if (currentClassFields.contains(id.name())) {
-                    throw new RuntimeException(currentFile + ": error: cannot access non-static variable '"
+                    error(id.line(), id.column(), "cannot access non-static variable '"
                             + currentClass + "." + id.name() + "' to initialize a static variable");
                 }
                 // Local variable from outer scope (not a builtin)
                 if (globalVarTypes.containsKey(id.name()) || getVarTypeByName(id.name()) != null) {
                     // Check if it's a global var defined outside the class (local to the file)
                     if (!currentClassFields.contains(id.name())) {
-                        throw new RuntimeException(currentFile + ": error: cannot access local variable '"
+                        error(id.line(), id.column(), "cannot access local variable '"
                                 + id.name() + "' to initialize a static variable");
                     }
                 }
@@ -985,7 +981,7 @@ public class ChuckEmitter {
                     // Check if it's a member method (non-static) of the current class
                     for (ChuckAST.FuncDefStmt m : currentClassMethodsList) {
                         if (m.name().equals(fid.name()) && !m.isStatic() && !m.name().equals(currentClass)) {
-                            throw new RuntimeException(currentFile + ": error: cannot call non-static function '"
+                            error(fid.line(), fid.column(), "cannot call non-static function '"
                                     + currentClass + "." + fid.name() + "()' to initialize a static variable");
                         }
                     }
@@ -1001,7 +997,7 @@ public class ChuckEmitter {
                             }
                         }
                         if (!isClassStatic) {
-                            throw new RuntimeException(currentFile + ": error: cannot call local function '"
+                            error(fid.line(), fid.column(), "cannot call local function '"
                                     + fid.name() + "()' to initialize a static variable");
                         }
                     }
@@ -1031,8 +1027,7 @@ public class ChuckEmitter {
                 case ChuckAST.ExpStmt es when es.exp() instanceof ChuckAST.BinaryExp be
                 && (be.op() == ChuckAST.Operator.CHUCK || be.op() == ChuckAST.Operator.AT_CHUCK)
                 && be.rhs() instanceof ChuckAST.DeclExp rhs && rhs.isStatic() ->
-                    throw new RuntimeException(currentFile + ":" + be.line() + ":" + be.column()
-                            + ": error: static variables must be declared at class scope");
+                    error(be.line(), be.column(), "static variables must be declared at class scope");
                 case ChuckAST.BlockStmt inner ->
                     checkNoStaticInBlock(inner.statements());
                 default -> {

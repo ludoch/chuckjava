@@ -13,7 +13,7 @@ public class WaitEvent implements ChuckInstr {
         } else if (raw instanceof UserObject uo && uo.eventDelegate != null) {
             uo.eventDelegate.waitOn(shred, vm);
         } else {
-            throw new RuntimeException("Chucked non-event object to now");
+            throw new org.chuck.core.ChuckRuntimeException("Chucked non-event object to now");
         }
     }
 }

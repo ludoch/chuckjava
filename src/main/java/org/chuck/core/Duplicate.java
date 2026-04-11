@@ -7,7 +7,7 @@ public class Duplicate implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
         int sp = s.reg.getSp();
-        if (sp == 0) throw new RuntimeException("ChucK stack underflow on Duplicate");
+        if (sp == 0) throw new org.chuck.core.ChuckRuntimeException("ChucK stack underflow on Duplicate");
         
         int topRef = sp - 1;
         if (s.reg.isObjectAt(topRef)) {

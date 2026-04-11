@@ -17,16 +17,6 @@ public class TypeInferenceEngine {
     private final Map<String, String> functionReturnTypes;
     private final String currentClass;
 
-    private static final java.util.Set<String> CORE_DATA_TYPES = java.util.Set.of(
-            "int", "float", "string", "time", "dur", "void", "vec2", "vec3", "vec4", "complex", "polar", "Object", "Array", "Type", "Function", "auto",
-            "MidiMsg", "HidMsg", "OscMsg", "FileIO", "IO", "SerialIO", "OscIn", "OscOut", "OscBundle", "MidiIn", "MidiOut", "Hid", "StringTokenizer", "RegEx", "Reflect"
-    );
-
-    private static final java.util.Set<String> CORE_UGENS = java.util.Set.of(
-            "OscIn", "OscOut", "OscMsg", "FileIO", "IO", "Std", "Math", "Machine", "UGen", "UGen_Multi", "UGen_Stereo",
-            "UAna", "Shred", "Thread", "ChucK", "Event"
-    );
-
     public TypeInferenceEngine(
             Map<String, UserClassDescriptor> userClassRegistry,
             Map<String, String> globalVarTypes,
@@ -58,7 +48,7 @@ public class TypeInferenceEngine {
                 if (type == null && userClassRegistry.containsKey(id.name())) {
                     type = id.name();
                 }
-                if (type == null && (CORE_DATA_TYPES.contains(id.name()) || isKnownUGenType(id.name()))) {
+                if (type == null && (org.chuck.core.ChuckLanguage.CORE_DATA_TYPES.contains(id.name()) || isKnownUGenType(id.name()))) {
                     type = id.name();
                 }
                 yield type;
@@ -244,12 +234,12 @@ public class TypeInferenceEngine {
     }
 
     private boolean isKnownUGenType(String type) {
-        return UGenRegistry.isRegistered(type) || CORE_UGENS.contains(type);
+        return UGenRegistry.isRegistered(type) || org.chuck.core.ChuckLanguage.CORE_UGENS.contains(type);
     }
 
     private boolean isSubclassOfUGen(String className) {
         if (className == null) return false;
-        if (isKnownUGenType(className)) return !CORE_DATA_TYPES.contains(className);
+        if (isKnownUGenType(className)) return !org.chuck.core.ChuckLanguage.CORE_DATA_TYPES.contains(className);
         UserClassDescriptor d = userClassRegistry.get(className);
         if (d == null) return false;
         return isSubclassOfUGen(d.parentName());

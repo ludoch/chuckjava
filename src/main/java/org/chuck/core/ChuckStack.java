@@ -18,7 +18,7 @@ public class ChuckStack {
     }
 
     public void push(long val) {
-        if (sp >= primitives.length) throw new RuntimeException("ChucK stack overflow: " + primitives.length);
+        if (sp >= primitives.length) throw new org.chuck.core.ChuckRuntimeException("ChucK stack overflow: " + primitives.length);
         primitives[sp] = val;
         isDouble[sp] = false;
         isObject[sp] = false;
@@ -26,7 +26,7 @@ public class ChuckStack {
     }
 
     public void push(double val) {
-        if (sp >= primitives.length) throw new RuntimeException("ChucK stack overflow: " + primitives.length);
+        if (sp >= primitives.length) throw new org.chuck.core.ChuckRuntimeException("ChucK stack overflow: " + primitives.length);
         primitives[sp] = Double.doubleToRawLongBits(val);
         isDouble[sp] = true;
         isObject[sp] = false;
@@ -34,7 +34,7 @@ public class ChuckStack {
     }
 
     public void pushObject(Object obj) {
-        if (sp >= primitives.length) throw new RuntimeException("ChucK stack overflow: " + primitives.length);
+        if (sp >= primitives.length) throw new org.chuck.core.ChuckRuntimeException("ChucK stack overflow: " + primitives.length);
         objects[sp] = obj;
         isObject[sp] = true;
         isDouble[sp] = false;
@@ -126,20 +126,20 @@ public Object popObject() {
     }
 
     public void dup() {
-        if (sp <= 0) throw new RuntimeException("ChucK stack underflow on Dup");
+        if (sp <= 0) throw new org.chuck.core.ChuckRuntimeException("ChucK stack underflow on Dup");
         copySlot(sp - 1, sp);
         sp++;
     }
 
     public void dup2() {
-        if (sp < 2) throw new RuntimeException("ChucK stack underflow on Dup2");
+        if (sp < 2) throw new org.chuck.core.ChuckRuntimeException("ChucK stack underflow on Dup2");
         copySlot(sp - 2, sp);
         copySlot(sp - 1, sp + 1);
         sp += 2;
     }
 
     public void rot() {
-        if (sp < 3) throw new RuntimeException("ChucK stack underflow on Rot");
+        if (sp < 3) throw new org.chuck.core.ChuckRuntimeException("ChucK stack underflow on Rot");
         // [a, b, c] -> [b, c, a] where c is top
         int i1 = sp - 1, i2 = sp - 2, i3 = sp - 3;
         long p3 = primitives[i3]; boolean d3 = isDouble[i3]; boolean o3 = isObject[i3]; Object obj3 = objects[i3];
@@ -149,7 +149,7 @@ public Object popObject() {
     }
 
     private void copySlot(int from, int to) {
-        if (to >= primitives.length) throw new RuntimeException("ChucK stack overflow");
+        if (to >= primitives.length) throw new org.chuck.core.ChuckRuntimeException("ChucK stack overflow");
         primitives[to] = primitives[from];
         isDouble[to] = isDouble[from];
         isObject[to] = isObject[from];
@@ -157,7 +157,7 @@ public Object popObject() {
     }
 
     public void swap() {
-        if (sp < 2) throw new RuntimeException("ChucK stack underflow on Swap");
+        if (sp < 2) throw new org.chuck.core.ChuckRuntimeException("ChucK stack underflow on Swap");
         int i1 = sp - 1, i2 = sp - 2;
         
         long tmpP = primitives[i1];
