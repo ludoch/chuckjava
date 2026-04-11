@@ -254,7 +254,7 @@ Class: `org.chuck.audio.osc.BlitSaw`
 ### Methods
 - `setData(int, long)` -> void
 - `freq()` -> double
-- `freq(double)` -> double
+- `freq(double)` -> double : Set the frequency in Hz.
 - `setFreq(double)` -> void
 - `setSync(int)` -> void
 - `setPhase(double)` -> void
@@ -278,7 +278,7 @@ Class: `org.chuck.audio.osc.BlitSquare`
 ### Methods
 - `setData(int, long)` -> void
 - `freq()` -> double
-- `freq(double)` -> double
+- `freq(double)` -> double : Set the frequency in Hz.
 - `setFreq(double)` -> void
 - `setSync(int)` -> void
 - `setPhase(double)` -> void
@@ -705,6 +705,8 @@ Class: `org.chuck.audio.fx.GVerb`
 - `mix(float)` -> void
 
 ## Gain
+Description: Gain control UGen.
+
 Class: `org.chuck.audio.util.Gain`
 
 ### Methods
@@ -1160,7 +1162,7 @@ Class: `org.chuck.audio.osc.Phasor`
 ### Methods
 - `setData(int, long)` -> void
 - `freq()` -> double
-- `freq(double)` -> double
+- `freq(double)` -> double : Set the frequency in Hz.
 - `setFreq(double)` -> void
 - `setSync(int)` -> void
 - `setPhase(double)` -> void
@@ -1228,7 +1230,7 @@ Class: `org.chuck.audio.osc.PulseOsc`
 ### Methods
 - `setData(int, long)` -> void
 - `freq()` -> double
-- `freq(double)` -> double
+- `freq(double)` -> double : Set the frequency in Hz.
 - `setFreq(double)` -> void
 - `setSync(int)` -> void
 - `setPhase(double)` -> void
@@ -1307,7 +1309,7 @@ Class: `org.chuck.audio.osc.SawOsc`
 - `setFrequency(float)` -> void
 - `setData(int, long)` -> void
 - `freq()` -> double
-- `freq(double)` -> double
+- `freq(double)` -> double : Set the frequency in Hz.
 - `setFreq(double)` -> void
 - `setSync(int)` -> void
 - `setPhase(double)` -> void
@@ -1359,12 +1361,14 @@ Class: `org.chuck.audio.stk.Shakers`
 - `preset(int)` -> void
 
 ## SinOsc
+Description: A sine wave oscillator.
+
 Class: `org.chuck.audio.osc.SinOsc`
 
 ### Methods
 - `setData(int, long)` -> void
 - `freq()` -> double
-- `freq(double)` -> double
+- `freq(double)` -> double : Set the frequency in Hz.
 - `setFreq(double)` -> void
 - `setSync(int)` -> void
 - `setPhase(double)` -> void
@@ -1443,7 +1447,7 @@ Class: `org.chuck.audio.osc.SqrOsc`
 ### Methods
 - `setData(int, long)` -> void
 - `freq()` -> double
-- `freq(double)` -> double
+- `freq(double)` -> double : Set the frequency in Hz.
 - `setFreq(double)` -> void
 - `setSync(int)` -> void
 - `setPhase(double)` -> void
@@ -1513,7 +1517,7 @@ Class: `org.chuck.audio.osc.TriOsc`
 ### Methods
 - `setData(int, long)` -> void
 - `freq()` -> double
-- `freq(double)` -> double
+- `freq(double)` -> double : Set the frequency in Hz.
 - `setFreq(double)` -> void
 - `setSync(int)` -> void
 - `setPhase(double)` -> void

@@ -5,8 +5,10 @@ import static org.chuck.audio.VectorAudio.SPECIES;
 
 import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
+import org.chuck.core.doc;
 
 /** A sine wave oscillator. */
+@doc("A sine wave oscillator.")
 public class SinOsc extends Osc {
   public SinOsc(float sampleRate) {
     super(sampleRate);

@@ -31,6 +31,7 @@ public abstract class Osc extends ChuckUGen {
   }
 
   /** ChucK-style method call: osc.freq(440) */
+  @org.chuck.core.doc("Set the frequency in Hz.")
   public double freq(double f) {
     this.freq = f;
     return f;

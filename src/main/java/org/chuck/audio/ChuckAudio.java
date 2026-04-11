@@ -29,6 +29,15 @@ public class ChuckAudio {
   private Gain masterGainUGen;
   private int verbose = 1;
 
+  // Drift tracking (Wall Clock)
+  private long lastBufferTimeNanos = 0;
+  private final java.util.concurrent.atomic.AtomicLong totalDriftNanos =
+      new java.util.concurrent.atomic.AtomicLong(0);
+  private final java.util.concurrent.atomic.AtomicLong driftCount =
+      new java.util.concurrent.atomic.AtomicLong(0);
+  private final java.util.concurrent.atomic.AtomicLong maxDriftNanos =
+      new java.util.concurrent.atomic.AtomicLong(0);
+
   // Optional recorder
   private WvOut recorder;
 
@@ -104,7 +113,20 @@ public class ChuckAudio {
                 byte[] outBuf = new byte[bytesPerBuffer];
                 byte[] inBuf = inputLine != null ? new byte[bytesPerBuffer] : null;
 
+                long expectedBufferNanos = (long) (bufferSize * 1_000_000_000.0 / sampleRate);
+                lastBufferTimeNanos = System.nanoTime();
+
                 while (running) {
+                  long startTime = System.nanoTime();
+                  long elapsedSinceLast = startTime - lastBufferTimeNanos;
+                  long drift = elapsedSinceLast - expectedBufferNanos;
+                  if (drift > 0) {
+                    totalDriftNanos.addAndGet(drift);
+                    driftCount.incrementAndGet();
+                    if (drift > maxDriftNanos.get()) maxDriftNanos.set(drift);
+                  }
+                  lastBufferTimeNanos = startTime;
+
                   // ── Capture: read only if available to avoid blocking output
                   if (inputLine != null && inBuf != null) {
                     int available = inputLine.available();
@@ -197,6 +219,15 @@ public class ChuckAudio {
 
   public boolean isRecording() {
     return recorder != null && recorder.isRecording();
+  }
+
+  public double getAverageDriftMs() {
+    long count = driftCount.get();
+    return count == 0 ? 0.0 : (totalDriftNanos.get() / (double) count) / 1_000_000.0;
+  }
+
+  public double getMaxDriftMs() {
+    return maxDriftNanos.get() / 1_000_000.0;
   }
 
   public void stop() {

@@ -233,6 +233,10 @@ public class VarInstrs {
       offset = o;
     }
 
+    public int getOffset() {
+      return offset;
+    }
+
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
       s.reg.push(s.mem.getData(s.getFramePointer() + offset));
@@ -257,6 +261,10 @@ public class VarInstrs {
 
     public StoreLocalInt(int o) {
       offset = o;
+    }
+
+    public int getOffset() {
+      return offset;
     }
 
     @Override
@@ -331,6 +339,35 @@ public class VarInstrs {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
       vm.setGlobalFloat(name, s.reg.peekAsDouble(0));
+    }
+  }
+
+  public static class IncLocalInt implements ChuckInstr {
+    int offset;
+    long delta;
+
+    public IncLocalInt(int o, long d) {
+      offset = o;
+      delta = d;
+    }
+
+    public int getOffset() {
+      return offset;
+    }
+
+    public long getDelta() {
+      return delta;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      int idx = s.getFramePointer() + offset;
+      s.mem.setData(idx, s.mem.getData(idx) + delta);
+    }
+
+    @Override
+    public String toString() {
+      return "IncLocalInt(" + offset + ", " + delta + ")";
     }
   }
 }

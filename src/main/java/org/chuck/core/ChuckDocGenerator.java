@@ -30,7 +30,13 @@ public class ChuckDocGenerator {
 
         Class<?> clazz = findClass(name);
         if (clazz != null) {
-          // Check for class-level doc or description
+          // Check for class-level doc annotation
+          doc classDoc = clazz.getAnnotation(doc.class);
+          if (classDoc != null) {
+            out.println("Description: " + classDoc.value());
+            out.println();
+          }
+
           out.println("Class: `" + clazz.getName() + "`");
           out.println();
 
@@ -67,12 +73,17 @@ public class ChuckDocGenerator {
           if (!methods.isEmpty()) {
             out.println("### Methods");
             for (Method m : methods) {
+              doc methodDoc = m.getAnnotation(doc.class);
               out.print("- `" + m.getName() + "(");
               Class<?>[] params = m.getParameterTypes();
               for (int i = 0; i < params.length; i++) {
                 out.print(params[i].getSimpleName() + (i < params.length - 1 ? ", " : ""));
               }
-              out.println(")` -> " + m.getReturnType().getSimpleName());
+              out.print(")` -> " + m.getReturnType().getSimpleName());
+              if (methodDoc != null) {
+                out.print(" : " + methodDoc.value());
+              }
+              out.println();
             }
             out.println();
           }

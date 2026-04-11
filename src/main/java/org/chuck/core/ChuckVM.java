@@ -42,6 +42,20 @@ public class ChuckVM {
   private final java.util.concurrent.atomic.AtomicLong maxJitter =
       new java.util.concurrent.atomic.AtomicLong(0);
 
+  private org.chuck.audio.ChuckAudio audio;
+
+  public void setAudio(org.chuck.audio.ChuckAudio audio) {
+    this.audio = audio;
+  }
+
+  public double getAverageDrift() {
+    return audio != null ? audio.getAverageDriftMs() : 0.0;
+  }
+
+  public double getMaxDrift() {
+    return audio != null ? audio.getMaxDriftMs() : 0.0;
+  }
+
   // Shred management
   private final PriorityQueue<ChuckShred> shreduler = new PriorityQueue<>();
   private final Map<Integer, ChuckShred> activeShreds = new ConcurrentHashMap<>();

@@ -277,6 +277,9 @@ public class TypeInferenceEngine {
                     "gc" -> {
                   yield "int";
                 }
+                case "jitter", "maxJitter", "drift", "maxDrift" -> {
+                  yield "float";
+                }
                 case "version", "platform", "os" -> {
                   yield "string";
                 }

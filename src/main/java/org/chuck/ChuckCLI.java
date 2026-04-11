@@ -204,6 +204,7 @@ public class ChuckCLI {
       if (!silent) {
         audio = new ChuckAudio(vm, bufferSize, numChannels, sampleRate);
         audio.setVerbose(verbose);
+        vm.setAudio(audio);
         audio.start();
       } else {
         // Silent engine: advance time as fast as possible

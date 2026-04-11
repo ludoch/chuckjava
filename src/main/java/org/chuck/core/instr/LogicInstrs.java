@@ -168,4 +168,100 @@ public class LogicInstrs {
       s.reg.push(val == 0 ? 1L : 0L);
     }
   }
+
+  // --- Specialized Integer Comparisons ---
+
+  public static class EqInt implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push(s.reg.popLong() == s.reg.popLong() ? 1L : 0L);
+    }
+  }
+
+  public static class NeqInt implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push(s.reg.popLong() != s.reg.popLong() ? 1L : 0L);
+    }
+  }
+
+  public static class LtInt implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long r = s.reg.popLong(), l = s.reg.popLong();
+      s.reg.push(l < r ? 1L : 0L);
+    }
+  }
+
+  public static class LeInt implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long r = s.reg.popLong(), l = s.reg.popLong();
+      s.reg.push(l <= r ? 1L : 0L);
+    }
+  }
+
+  public static class GtInt implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long r = s.reg.popLong(), l = s.reg.popLong();
+      s.reg.push(l > r ? 1L : 0L);
+    }
+  }
+
+  public static class GeInt implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long r = s.reg.popLong(), l = s.reg.popLong();
+      s.reg.push(l >= r ? 1L : 0L);
+    }
+  }
+
+  // --- Specialized Float Comparisons ---
+
+  public static class EqFloat implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push(s.reg.popDouble() == s.reg.popDouble() ? 1L : 0L);
+    }
+  }
+
+  public static class NeqFloat implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      s.reg.push(s.reg.popDouble() != s.reg.popDouble() ? 1L : 0L);
+    }
+  }
+
+  public static class LtFloat implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      double r = s.reg.popDouble(), l = s.reg.popDouble();
+      s.reg.push(l < r ? 1L : 0L);
+    }
+  }
+
+  public static class LeFloat implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      double r = s.reg.popDouble(), l = s.reg.popDouble();
+      s.reg.push(l <= r ? 1L : 0L);
+    }
+  }
+
+  public static class GtFloat implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      double r = s.reg.popDouble(), l = s.reg.popDouble();
+      s.reg.push(l > r ? 1L : 0L);
+    }
+  }
+
+  public static class GeFloat implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      double r = s.reg.popDouble(), l = s.reg.popDouble();
+      s.reg.push(l >= r ? 1L : 0L);
+    }
+  }
 }

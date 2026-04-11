@@ -99,6 +99,21 @@ public class Optimizer {
           }
         }
 
+        // 1d. IncLocal Optimization: [LoadLocalInt(o), PushInt(d), AddInt, StoreLocalInt(o)] ->
+        // [IncLocalInt(o, d)]
+        ChuckInstr i4 = (i + 3 < instrs.size()) ? instrs.get(i + 3) : null;
+        if (i1 instanceof VarInstrs.LoadLocalInt l
+            && i2 instanceof PushInstrs.PushInt p
+            && i3 instanceof ArithmeticInstrs.AddInt
+            && i4 instanceof VarInstrs.StoreLocalInt s) {
+          if (l.getOffset() == s.getOffset()) {
+            next.add(new VarInstrs.IncLocalInt(l.getOffset(), p.getVal()));
+            i += 3;
+            changed = true;
+            continue;
+          }
+        }
+
         next.add(i1);
       }
       if (changed) {

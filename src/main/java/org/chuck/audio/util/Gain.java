@@ -5,11 +5,13 @@ package org.chuck.audio.util;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorSpecies;
 import org.chuck.audio.ChuckUGen;
+import org.chuck.core.doc;
 
 /**
  * A Gain UGen that can apply a multiplier to its input. Demonstrates the JDK Vector API for block
  * processing.
  */
+@doc("Gain control UGen.")
 public class Gain extends ChuckUGen {
   private static final VectorSpecies<Float> SPECIES = FloatVector.SPECIES_PREFERRED;
 

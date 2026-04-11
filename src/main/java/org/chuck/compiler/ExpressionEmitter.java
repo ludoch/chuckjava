@@ -879,17 +879,39 @@ public class ExpressionEmitter {
 
             case S_OR -> code.addInstruction(new ArithmeticInstrs.BitwiseOrAny());
             case S_AND -> code.addInstruction(new ArithmeticInstrs.BitwiseAndAny());
-            case LT -> code.addInstruction(new LogicInstrs.LessThanAny());
+            case LT -> {
+              if (isInt) code.addInstruction(new LogicInstrs.LtInt());
+              else if (isFloat) code.addInstruction(new LogicInstrs.LtFloat());
+              else code.addInstruction(new LogicInstrs.LessThanAny());
+            }
             case LE -> {
               String lt = parent.getExprType(e.lhs());
               if ("IO".equals(lt) || "FileIO".equals(lt))
                 code.addInstruction(new MiscInstrs.ChuckWriteIO());
+              else if (isInt) code.addInstruction(new LogicInstrs.LeInt());
+              else if (isFloat) code.addInstruction(new LogicInstrs.LeFloat());
               else code.addInstruction(new LogicInstrs.LessOrEqualAny());
             }
-            case GT -> code.addInstruction(new LogicInstrs.GreaterThanAny());
-            case GE -> code.addInstruction(new LogicInstrs.GreaterOrEqualAny());
-            case EQ -> code.addInstruction(new LogicInstrs.EqualsAny());
-            case NEQ -> code.addInstruction(new LogicInstrs.NotEqualsAny());
+            case GT -> {
+              if (isInt) code.addInstruction(new LogicInstrs.GtInt());
+              else if (isFloat) code.addInstruction(new LogicInstrs.GtFloat());
+              else code.addInstruction(new LogicInstrs.GreaterThanAny());
+            }
+            case GE -> {
+              if (isInt) code.addInstruction(new LogicInstrs.GeInt());
+              else if (isFloat) code.addInstruction(new LogicInstrs.GeFloat());
+              else code.addInstruction(new LogicInstrs.GreaterOrEqualAny());
+            }
+            case EQ -> {
+              if (isInt) code.addInstruction(new LogicInstrs.EqInt());
+              else if (isFloat) code.addInstruction(new LogicInstrs.EqFloat());
+              else code.addInstruction(new LogicInstrs.EqualsAny());
+            }
+            case NEQ -> {
+              if (isInt) code.addInstruction(new LogicInstrs.NeqInt());
+              else if (isFloat) code.addInstruction(new LogicInstrs.NeqFloat());
+              else code.addInstruction(new LogicInstrs.NotEqualsAny());
+            }
             case DUR_MUL -> {
               this.emitExpression(e.lhs(), code);
               if (e.rhs() instanceof ChuckAST.IdExp id)
