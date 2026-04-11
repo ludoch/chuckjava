@@ -20,6 +20,13 @@ public class ExpressionEmitter {
 
     /**
      * Emits instructions for the given expression.
+     * 
+     * <p><b>Stack Protocol:</b>
+     * <ul>
+     *   <li>[Before]: (Empty or current context)</li>
+     *   <li>[After]: Exactly one value pushed (int, float, or object reference), 
+     *       unless the expression is a void call.</li>
+     * </ul>
      */
     void emitExpression(ChuckAST.Exp exp, ChuckCode code) {
         if (exp == null) return;

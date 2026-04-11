@@ -667,6 +667,16 @@ public class ChuckEmitter {
         new ExpressionEmitter(this).emitExpression(exp, code);
     }
 
+    /**
+     * Emits instructions for the target of a ChucK operator (=> or @=>).
+     * 
+     * <p><b>Stack Protocol:</b>
+     * <ul>
+     *   <li>[Before]: The value to be assigned/connected is on the stack.</li>
+     *   <li>[After]: The value remains on the stack (for chaining), 
+     *       unless it was a primitive assignment which may pop depending on instruction.</li>
+     * </ul>
+     */
     void emitChuckTarget(Object target, ChuckCode code, ChuckAST.Operator op) {
         if (target instanceof List<?> list) {
             if (list.size() > 1) {
@@ -837,6 +847,15 @@ public class ChuckEmitter {
         }
     }
 
+    /**
+     * Emits instructions for the swap operator (<=>).
+     * 
+     * <p><b>Stack Protocol:</b>
+     * <ul>
+     *   <li>[Before]: (Empty or current context)</li>
+     *   <li>[After]: Net stack change is zero.</li>
+     * </ul>
+     */
     void emitSwapTarget(ChuckAST.Exp lhs, ChuckAST.Exp rhs, ChuckCode code) {
         if (lhs instanceof ChuckAST.IdExp l && rhs instanceof ChuckAST.IdExp r) {
             Integer lo = getLocalOffset(l.name()), ro = getLocalOffset(r.name());

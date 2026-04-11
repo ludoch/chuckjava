@@ -12,6 +12,19 @@ public class StatementEmitter {
     public StatementEmitter(ChuckEmitter parent) {
         this.parent = parent;
     }
+    /**
+     * Emits instructions for the given statement.
+     * 
+     * <p><b>Stack Protocol:</b>
+     * <ul>
+     *   <li>[Before]: (Empty or current context)</li>
+     *   <li>[After]: Stack state is preserved (net change is zero), 
+     *       as all intermediate results are popped or stored.</li>
+     * </ul>
+     *
+     * @param stmt The AST statement node.
+     * @param code The instruction container to emit into.
+     */
     public void emitStatement(ChuckAST.Stmt stmt, ChuckCode code) {
         if (stmt == null) return;
         if (code != null) code.setActiveLineNumber(stmt.line());
