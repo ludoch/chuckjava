@@ -30,6 +30,7 @@ public class ChuckEmitter {
   private final java.util.Set<String> constants = new java.util.HashSet<>();
 
   private int localCount = 0;
+  private int maxLocalCount = 0;
   private boolean inPreCtor = false;
 
   private final Map<String, UserClassDescriptor> userClassRegistry;
@@ -178,6 +179,15 @@ public class ChuckEmitter {
 
   public void setLocalCount(int localCount) {
     this.localCount = localCount;
+    if (this.localCount > maxLocalCount) maxLocalCount = this.localCount;
+  }
+
+  public int getMaxLocalCount() {
+    return maxLocalCount;
+  }
+
+  public void resetMaxLocalCount() {
+    this.maxLocalCount = 0;
   }
 
   public boolean isInPreCtor() {
@@ -788,6 +798,7 @@ public class ChuckEmitter {
       registerClassesToCode(stmt, code);
     }
 
+    resetMaxLocalCount();
     Map<String, String> globalDocsMap = new HashMap<>();
     for (ChuckAST.Stmt stmt : statements) {
       if (!(stmt instanceof ChuckAST.FuncDefStmt)
@@ -796,6 +807,8 @@ public class ChuckEmitter {
         emitStatementWithDocs(stmt, code, globalDocsMap);
       }
     }
+    code.setStackSize(getMaxLocalCount());
+
     // Optimize all generated code objects
     Optimizer.optimize(code);
     for (ChuckCode func : functions.values()) {

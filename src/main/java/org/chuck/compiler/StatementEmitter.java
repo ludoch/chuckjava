@@ -506,9 +506,11 @@ public class StatementEmitter {
         }
         parent.getLocalScopes().push(scope);
         parent.getLocalTypeScopes().push(typeScope);
+        parent.resetMaxLocalCount();
         funcCode.addInstruction(new VarInstrs.MoveArgs(s.argNames().size()));
         this.emitStatement(s.body(), funcCode);
         funcCode.addInstruction(new ControlInstrs.ReturnFunc());
+        funcCode.setStackSize(parent.getMaxLocalCount());
         parent.getLocalScopes().pop();
         parent.getLocalTypeScopes().pop();
         parent.setLocalCount(savedLocalCount);
@@ -758,6 +760,7 @@ public class StatementEmitter {
         ChuckCode preCtorCodeLocal = new ChuckCode("__preCtor__" + s.name());
         parent.getLocalScopes().push(new HashMap<>());
         parent.getLocalTypeScopes().push(new HashMap<>());
+        parent.resetMaxLocalCount();
         int savedLocalCount = parent.getLocalCount();
         boolean savedInPreCtor = parent.isInPreCtor();
         parent.setLocalCount(0);
@@ -788,6 +791,7 @@ public class StatementEmitter {
           this.emitStatement(bodyStmt, preCtorCodeLocal);
         }
 
+        preCtorCodeLocal.setStackSize(parent.getMaxLocalCount());
         parent.getLocalScopes().pop();
         parent.getLocalTypeScopes().pop();
         parent.setLocalCount(savedLocalCount);
@@ -882,6 +886,7 @@ public class StatementEmitter {
         ChuckCode staticInitCodeLocal = new ChuckCode("__staticInit__" + s.name());
         String savedClass = parent.getCurrentClass();
         parent.setCurrentClass(s.name());
+        parent.resetMaxLocalCount();
         for (ChuckAST.Stmt bodyStmt : flattenedBody) {
           boolean isStaticInit = false;
           String staticFieldName = null;
@@ -959,6 +964,7 @@ public class StatementEmitter {
             }
           }
         }
+        staticInitCodeLocal.setStackSize(parent.getMaxLocalCount());
         parent.setCurrentClass(savedClass);
         ChuckCode finalStaticInitCode =
             staticInitCodeLocal.getNumInstructions() > 0 ? staticInitCodeLocal : null;

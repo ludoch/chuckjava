@@ -110,4 +110,44 @@ public class ArrayInstrs {
       s.reg.pushObject(a);
     }
   }
+
+  // --- Specialized Array Access ---
+
+  public static class GetArrayIntFast implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long idx = s.reg.popLong();
+      ChuckArray a = (ChuckArray) s.reg.popObject();
+      s.reg.push(a.getInt(a.resolveIndex(idx)));
+    }
+  }
+
+  public static class GetArrayFloatFast implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long idx = s.reg.popLong();
+      ChuckArray a = (ChuckArray) s.reg.popObject();
+      s.reg.push(a.getFloat(a.resolveIndex(idx)));
+    }
+  }
+
+  public static class SetArrayIntFast implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long idx = s.reg.popLong();
+      ChuckArray a = (ChuckArray) s.reg.popObject();
+      long val = s.reg.peekLong(0);
+      a.setInt(a.resolveIndex(idx), val);
+    }
+  }
+
+  public static class SetArrayFloatFast implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long idx = s.reg.popLong();
+      ChuckArray a = (ChuckArray) s.reg.popObject();
+      double val = s.reg.peekAsDouble(0);
+      a.setFloat(a.resolveIndex(idx), val);
+    }
+  }
 }

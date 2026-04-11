@@ -13,10 +13,19 @@ public class ChuckCode {
   private final List<Object> constantPool = new ArrayList<>();
   private int activeLineNumber = -1;
   private int numArgs = 0;
+  private int stackSize = 0;
   private String returnType = "void";
 
   public ChuckCode(String name) {
     this.name = name;
+  }
+
+  public void setStackSize(int s) {
+    this.stackSize = s;
+  }
+
+  public int getStackSize() {
+    return stackSize;
   }
 
   public List<Object> getConstantPool() {

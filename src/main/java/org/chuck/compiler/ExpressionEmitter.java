@@ -608,10 +608,21 @@ public class ExpressionEmitter {
             }
             case ChuckAST.ArrayAccessExp ae -> {
               this.emitExpression(ae.base(), code);
+              String baseType = parent.getExprType(ae.base());
+              String elemType =
+                  (baseType != null && baseType.endsWith("[]"))
+                      ? baseType.substring(0, baseType.length() - 2)
+                      : null;
               for (int i = 0; i < ae.indices().size(); i++) {
                 this.emitExpression(ae.indices().get(i), code);
                 if (i < ae.indices().size() - 1) code.addInstruction(new ArrayInstrs.GetArrayInt());
-                else code.addInstruction(new ArrayInstrs.SetArrayInt());
+                else {
+                  if ("int".equals(elemType))
+                    code.addInstruction(new ArrayInstrs.SetArrayIntFast());
+                  else if ("float".equals(elemType))
+                    code.addInstruction(new ArrayInstrs.SetArrayFloatFast());
+                  else code.addInstruction(new ArrayInstrs.SetArrayInt());
+                }
               }
             }
             default -> {}
@@ -630,10 +641,21 @@ public class ExpressionEmitter {
             }
             case ChuckAST.ArrayAccessExp ae -> {
               this.emitExpression(ae.base(), code);
+              String baseType = parent.getExprType(ae.base());
+              String elemType =
+                  (baseType != null && baseType.endsWith("[]"))
+                      ? baseType.substring(0, baseType.length() - 2)
+                      : null;
               for (int i = 0; i < ae.indices().size(); i++) {
                 this.emitExpression(ae.indices().get(i), code);
                 if (i < ae.indices().size() - 1) code.addInstruction(new ArrayInstrs.GetArrayInt());
-                else code.addInstruction(new ArrayInstrs.SetArrayInt());
+                else {
+                  if ("int".equals(elemType))
+                    code.addInstruction(new ArrayInstrs.SetArrayIntFast());
+                  else if ("float".equals(elemType))
+                    code.addInstruction(new ArrayInstrs.SetArrayFloatFast());
+                  else code.addInstruction(new ArrayInstrs.SetArrayInt());
+                }
               }
             }
             default -> {}
@@ -920,7 +942,10 @@ public class ExpressionEmitter {
             }
             case WRITE_IO -> code.addInstruction(new MiscInstrs.ChuckWriteIO());
             case AND -> {
-              String lt = parent.getExprType(e.lhs()), rt = parent.getExprType(e.rhs());
+              String rt = parent.getExprType(e.rhs());
+              String lt = parent.getExprType(e.lhs());
+              boolean bothInt = "int".equals(lt) && "int".equals(rt);
+
               if ("Event".equals(lt) || "Event".equals(rt)) {
                 this.emitExpression(e.lhs(), code);
                 this.emitExpression(e.rhs(), code);
@@ -930,12 +955,16 @@ public class ExpressionEmitter {
                 int jumpIdx = code.getNumInstructions();
                 code.addInstruction(null);
                 this.emitExpression(e.rhs(), code);
+                if (bothInt) code.addInstruction(new LogicInstrs.AndInt());
                 int endIdx = code.getNumInstructions();
                 code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfFalseAndPushFalse(endIdx));
               }
             }
             case OR -> {
-              String lt = parent.getExprType(e.lhs()), rt = parent.getExprType(e.rhs());
+              String rt = parent.getExprType(e.rhs());
+              String lt = parent.getExprType(e.lhs());
+              boolean bothInt = "int".equals(lt) && "int".equals(rt);
+
               if ("Event".equals(lt) || "Event".equals(rt)) {
                 this.emitExpression(e.lhs(), code);
                 this.emitExpression(e.rhs(), code);
@@ -945,6 +974,7 @@ public class ExpressionEmitter {
                 int jumpIdx = code.getNumInstructions();
                 code.addInstruction(null);
                 this.emitExpression(e.rhs(), code);
+                if (bothInt) code.addInstruction(new LogicInstrs.OrInt());
                 int endIdx = code.getNumInstructions();
                 code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfTrueAndPushTrue(endIdx));
               }
@@ -1161,9 +1191,23 @@ public class ExpressionEmitter {
       }
       case ChuckAST.ArrayAccessExp e -> {
         this.emitExpression(e.base(), code);
-        for (ChuckAST.Exp index : e.indices()) {
-          this.emitExpression(index, code);
-          code.addInstruction(new ArrayInstrs.GetArrayInt());
+        String baseType = parent.getExprType(e.base());
+        String elemType =
+            (baseType != null && baseType.endsWith("[]"))
+                ? baseType.substring(0, baseType.length() - 2)
+                : null;
+
+        for (int i = 0; i < e.indices().size(); i++) {
+          this.emitExpression(e.indices().get(i), code);
+          if (i < e.indices().size() - 1) {
+            code.addInstruction(
+                new ArrayInstrs.GetArrayInt()); // Still need generic for intermediate dims if any
+          } else {
+            if ("int".equals(elemType)) code.addInstruction(new ArrayInstrs.GetArrayIntFast());
+            else if ("float".equals(elemType))
+              code.addInstruction(new ArrayInstrs.GetArrayFloatFast());
+            else code.addInstruction(new ArrayInstrs.GetArrayInt());
+          }
         }
       }
       case ChuckAST.CallExp e -> {

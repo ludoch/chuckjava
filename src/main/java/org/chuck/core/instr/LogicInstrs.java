@@ -161,6 +161,22 @@ public class LogicInstrs {
     }
   }
 
+  public static class AndInt implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long r = s.reg.popLong(), l = s.reg.popLong();
+      s.reg.push((l != 0 && r != 0) ? 1L : 0L);
+    }
+  }
+
+  public static class OrInt implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long r = s.reg.popLong(), l = s.reg.popLong();
+      s.reg.push((l != 0 || r != 0) ? 1L : 0L);
+    }
+  }
+
   public static class LogicalNot implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
