@@ -62,7 +62,6 @@ import javafx.stage.FileChooser;
 import javafx.stage.Popup;
 import javafx.stage.Stage;
 import org.chuck.audio.ChuckAudio;
-import org.chuck.audio.UAnaBlob;
 import org.chuck.audio.analysis.FFT;
 import org.chuck.audio.util.Gain;
 import org.chuck.audio.util.Scope;
@@ -2265,8 +2264,8 @@ public class ChuckIDE extends Application {
     gc.setFill(Color.BLACK);
     gc.fillRect(0, 0, w, h);
 
-    UAnaBlob blob = analyzer.upchuck();
-    float[] mags = blob.getFvals();
+    if (analyzer == null) return;
+    float[] mags = analyzer.getLatestMags();
     if (mags == null || mags.length == 0) return;
 
     gc.setStroke(Color.LIME);

@@ -24,6 +24,8 @@ public class FFT extends UAna {
   private float[] ring; // ring buffer of raw samples
   private int writePos = 0; // next write position
   private double[] win; // cached window coefficients
+  private volatile float[] latestMags; // for UI thread
+  private int samplesSinceLastFFT = 0;
 
   public FFT() {
     this(1024);
@@ -77,6 +79,13 @@ public class FFT extends UAna {
   protected float compute(float input, long systemTime) {
     ring[writePos] = input;
     writePos = (writePos + 1) % size;
+
+    // Automatic upchuck for visualization (50% overlap)
+    if (++samplesSinceLastFFT >= size / 2) {
+      samplesSinceLastFFT = 0;
+      computeUAna();
+    }
+
     return input;
   }
 
@@ -136,9 +145,17 @@ public class FFT extends UAna {
     // Store first size/2 bins (positive frequencies)
     int bins = size / 2;
     List<Complex> spectrum = new ArrayList<>(bins);
+    float[] magnitudes = new float[bins];
     for (int i = 0; i < bins; i++) {
-      spectrum.add(new Complex((float) re[i], (float) im[i]));
+      Complex c = new Complex((float) re[i], (float) im[i]);
+      spectrum.add(c);
+      magnitudes[i] = c.magnitude();
     }
     lastBlob.setCvals(spectrum);
+    this.latestMags = magnitudes;
+  }
+
+  public float[] getLatestMags() {
+    return latestMags;
   }
 }
