@@ -442,6 +442,7 @@ public class ChuckIDE extends Application {
   private Canvas visualizerCanvas;
   private Canvas scopeCanvas;
   private Canvas waterfallCanvas;
+  private Canvas phaseScopeCanvas;
   private FFT analyzer;
   private Scope scope;
   private javafx.animation.AnimationTimer visTimer;
@@ -632,6 +633,13 @@ public class ChuckIDE extends Application {
     waterfallCanvas.widthProperty().bind(waterfallStack.widthProperty());
     waterfallCanvas.heightProperty().bind(waterfallStack.heightProperty());
 
+    phaseScopeCanvas = new Canvas();
+    StackPane phaseScopeStack = new StackPane(phaseScopeCanvas);
+    phaseScopeStack.setStyle("-fx-background-color: black;");
+    phaseScopeStack.setPrefHeight(80);
+    phaseScopeCanvas.widthProperty().bind(phaseScopeStack.widthProperty());
+    phaseScopeCanvas.heightProperty().bind(phaseScopeStack.heightProperty());
+
     VBox visBox =
         new VBox(
             2,
@@ -640,11 +648,14 @@ public class ChuckIDE extends Application {
             new Label("Oscilloscope"),
             scopeStack,
             new Label("Waterfall"),
-            waterfallStack);
+            waterfallStack,
+            new Label("Stereo Phase"),
+            phaseScopeStack);
     visBox.setStyle("-fx-background-color: #222; -fx-padding: 5;");
     VBox.setVgrow(specStack, Priority.ALWAYS);
     VBox.setVgrow(scopeStack, Priority.ALWAYS);
     VBox.setVgrow(waterfallStack, Priority.ALWAYS);
+    VBox.setVgrow(phaseScopeStack, Priority.ALWAYS);
     for (javafx.scene.Node n : visBox.getChildren()) {
       if (n instanceof Label l) l.setTextFill(Color.LIGHTGRAY);
     }
@@ -2182,6 +2193,7 @@ public class ChuckIDE extends Application {
             renderSpectrum();
             renderScope();
             renderWaterfall();
+            renderPhaseScope();
             updateVMTime();
             updateShredList();
           }
@@ -2365,6 +2377,47 @@ public class ChuckIDE extends Application {
     if (intensity < 0.6) return Color.RED;
     if (intensity < 0.8) return Color.YELLOW;
     return Color.WHITE;
+  }
+
+  private void renderPhaseScope() {
+    if (phaseScopeCanvas == null || vm == null) return;
+    GraphicsContext gc = phaseScopeCanvas.getGraphicsContext2D();
+    double w = phaseScopeCanvas.getWidth();
+    double h = phaseScopeCanvas.getHeight();
+    if (w <= 0 || h <= 0) return;
+
+    // Fading effect for phase scope
+    gc.setFill(Color.rgb(0, 0, 0, 0.2));
+    gc.fillRect(0, 0, w, h);
+
+    // Ensure we have stereo output
+    if (vm.getDacChannel(0) == null || vm.getDacChannel(1) == null) return;
+
+    float[] dataL = vm.getDacChannel(0).getVisBuffer();
+    float[] dataR = vm.getDacChannel(1).getVisBuffer();
+    if (dataL == null || dataR == null || dataL.length == 0 || dataR.length == 0) return;
+
+    int len = Math.min(dataL.length, dataR.length);
+    gc.setStroke(Color.CYAN);
+    gc.setLineWidth(1.0);
+    gc.beginPath();
+
+    double centerX = w / 2.0;
+    double centerY = h / 2.0;
+
+    for (int i = 0; i < len; i++) {
+      // Phase scope: x = L - R, y = L + R (or simpler: x = L, y = -R for traditional X-Y)
+      // Standard Goniometer mapping:
+      // X = (Right - Left) / sqrt(2)
+      // Y = (Right + Left) / sqrt(2)
+      // Let's use a simpler L/R X-Y plot for now to show stereo width
+      double x = centerX + (dataL[i] * centerX * 0.9);
+      double y = centerY - (dataR[i] * centerY * 0.9);
+
+      if (i == 0) gc.moveTo(x, y);
+      else gc.lineTo(x, y);
+    }
+    gc.stroke();
   }
 
   private void toggleRecord(Button btn) {
