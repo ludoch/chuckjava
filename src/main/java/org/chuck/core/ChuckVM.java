@@ -240,6 +240,10 @@ public class ChuckVM {
     return globalFunctionDocs.keySet();
   }
 
+  public Map<String, UserClassDescriptor> getUserClassRegistry() {
+    return userClassRegistry;
+  }
+
   public UserClassDescriptor getUserClass(String name) {
     return userClassRegistry.get(name);
   }
@@ -509,9 +513,7 @@ public class ChuckVM {
           wakeCount.incrementAndGet();
           if (jitter > maxJitter.get()) maxJitter.set(jitter);
 
-          // Only resume — do NOT reschedule here with the stale wakeTime.
-          // The shred will call vm.schedule(this) from inside yield() once it
-          // has updated wakeTime to the correct next wake point.
+          // Synchronous resume: waits for the shred to reach its next yield point.
           nextShred.resume(this);
         }
       }

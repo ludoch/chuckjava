@@ -2027,7 +2027,8 @@ public class ChuckIDE extends Application {
       List<org.chuck.compiler.ChuckAST.Stmt> ast =
           (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
 
-      org.chuck.compiler.ChuckEmitter emitter = new org.chuck.compiler.ChuckEmitter();
+      org.chuck.compiler.ChuckEmitter emitter =
+          new org.chuck.compiler.ChuckEmitter(vm.getUserClassRegistry());
       ChuckCode code = emitter.emit(ast, path);
 
       ChuckShred shred = new ChuckShred(code);

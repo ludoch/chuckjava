@@ -14,7 +14,7 @@ public class MeInstrs {
   public static class MeArgs implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      s.reg.push((long) s.args());
+      s.reg.push((long) s.args().length);
     }
   }
 
