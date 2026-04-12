@@ -617,9 +617,9 @@ public class ExpressionEmitter {
                 this.emitExpression(ae.indices().get(i), code);
                 if (i < ae.indices().size() - 1) code.addInstruction(new ArrayInstrs.GetArrayInt());
                 else {
-                  if ("int".equals(elemType))
+                  if (ae.indices().size() == 1 && "int".equals(elemType))
                     code.addInstruction(new ArrayInstrs.SetArrayIntFast());
-                  else if ("float".equals(elemType))
+                  else if (ae.indices().size() == 1 && "float".equals(elemType))
                     code.addInstruction(new ArrayInstrs.SetArrayFloatFast());
                   else code.addInstruction(new ArrayInstrs.SetArrayInt());
                 }
@@ -650,9 +650,9 @@ public class ExpressionEmitter {
                 this.emitExpression(ae.indices().get(i), code);
                 if (i < ae.indices().size() - 1) code.addInstruction(new ArrayInstrs.GetArrayInt());
                 else {
-                  if ("int".equals(elemType))
+                  if (ae.indices().size() == 1 && "int".equals(elemType))
                     code.addInstruction(new ArrayInstrs.SetArrayIntFast());
-                  else if ("float".equals(elemType))
+                  else if (ae.indices().size() == 1 && "float".equals(elemType))
                     code.addInstruction(new ArrayInstrs.SetArrayFloatFast());
                   else code.addInstruction(new ArrayInstrs.SetArrayInt());
                 }
@@ -1203,8 +1203,9 @@ public class ExpressionEmitter {
             code.addInstruction(
                 new ArrayInstrs.GetArrayInt()); // Still need generic for intermediate dims if any
           } else {
-            if ("int".equals(elemType)) code.addInstruction(new ArrayInstrs.GetArrayIntFast());
-            else if ("float".equals(elemType))
+            if (e.indices().size() == 1 && "int".equals(elemType))
+              code.addInstruction(new ArrayInstrs.GetArrayIntFast());
+            else if (e.indices().size() == 1 && "float".equals(elemType))
               code.addInstruction(new ArrayInstrs.GetArrayFloatFast());
             else code.addInstruction(new ArrayInstrs.GetArrayInt());
           }
@@ -1337,6 +1338,18 @@ public class ExpressionEmitter {
               && dot.base() instanceof ChuckAST.IdExp id
               && parent.getUserClassRegistry().containsKey(id.name())) bt = id.name();
           if (bt != null) {
+            // Specialization for built-in UGen method calls (single arg)
+            if (argc == 1 && (parent.isKnownUGenType(bt) || parent.isSubclassOfUGen(bt))) {
+              String argType = argTypes.get(0);
+              if ("float".equals(argType) || "int".equals(argType)) {
+                this.emitExpression(dot.base(), code);
+                this.emitExpression(e.args().get(0), code);
+                if ("float".equals(argType))
+                  code.addInstruction(new ObjectInstrs.CallBuiltinFloat(dot.member()));
+                else code.addInstruction(new ObjectInstrs.CallBuiltinInt(dot.member()));
+                return;
+              }
+            }
             if (bt.equals("string") || bt.endsWith("[]")) {
               this.emitExpression(dot.base(), code);
               for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);

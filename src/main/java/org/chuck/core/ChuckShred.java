@@ -547,6 +547,22 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
     destructibles.clear();
   }
 
+  public ChuckDuration getDuration(double samples) {
+    return ChuckObjectPool.getDuration(samples);
+  }
+
+  public void releaseDuration(ChuckDuration d) {
+    ChuckObjectPool.releaseDuration(d);
+  }
+
+  public ChuckString getString(String val) {
+    return ChuckObjectPool.getString(val);
+  }
+
+  public void releaseString(ChuckString s) {
+    ChuckObjectPool.releaseString(s);
+  }
+
   @Override
   public int compareTo(ChuckShred other) {
     return Long.compare(this.wakeTime, other.wakeTime);

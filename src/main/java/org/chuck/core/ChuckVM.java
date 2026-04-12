@@ -674,6 +674,17 @@ public class ChuckVM {
             .count();
     sb.append("JIT fragments: ").append(jitCount).append("\n");
 
+    // Recent Failures
+    java.util.List<ChuckShred> failures =
+        deadShreds.stream().filter(s -> s.getLastExceptionMessage() != null).toList();
+    if (!failures.isEmpty()) {
+      sb.append("\n--- Recent Exceptions ---\n");
+      for (int i = Math.max(0, failures.size() - 5); i < failures.size(); i++) {
+        ChuckShred s = failures.get(i);
+        sb.append(String.format("  [%d] %s\n", s.getId(), s.getLastExceptionMessage()));
+      }
+    }
+
     return sb.toString();
   }
 

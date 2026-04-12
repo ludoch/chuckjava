@@ -6,78 +6,72 @@ public class ChuckString extends ChuckObject {
 
   public ChuckString(String initial) {
     super(ChuckType.STRING);
-    this.sb = new StringBuilder(initial == null ? "" : initial);
+    this.sb = new StringBuilder(initial != null ? initial : "");
+  }
+
+  public void setValue(String val) {
+    sb.setLength(0);
+    sb.append(val != null ? val : "");
+  }
+
+  public ChuckString set(Object val) {
+    sb.setLength(0);
+    sb.append(valToString(val));
+    return this;
   }
 
   public long length() {
     return sb.length();
   }
 
-  public long charAt(long i) {
-    return (i >= 0 && i < sb.length()) ? sb.charAt((int) i) : 0;
+  public long charAt(long index) {
+    if (index < 0 || index >= sb.length()) return 0;
+    return sb.charAt((int) index);
   }
 
-  public void setCharAt(long i, long c) {
-    if (i >= 0 && i < sb.length()) sb.setCharAt((int) i, (char) c);
+  public void setCharAt(long index, long ch) {
+    if (index >= 0 && index < sb.length()) {
+      sb.setCharAt((int) index, (char) ch);
+    }
   }
 
   public ChuckString substring(long start) {
-    int s = Math.max(0, Math.min((int) start, sb.length()));
-    return new ChuckString(sb.substring(s));
+    return getStringFromPool(sb.substring((int) start));
   }
 
-  public ChuckString substring(long start, long len) {
-    int s = Math.max(0, Math.min((int) start, sb.length()));
-    int e = Math.max(s, Math.min(s + (int) len, sb.length()));
-    return new ChuckString(sb.substring(s, e));
+  public ChuckString substring(long start, long end) {
+    return getStringFromPool(sb.substring((int) start, (int) end));
   }
 
-  private String valToString(Object val) {
-    if (val instanceof Long l) return String.valueOf((char) l.intValue());
-    if (val instanceof ChuckString cs) return cs.toString();
-    return String.valueOf(val);
-  }
-
-  public ChuckString insert(long i, Object val) {
-    int idx = Math.max(0, Math.min((int) i, sb.length()));
-    sb.insert(idx, valToString(val));
+  public ChuckString insert(long offset, Object val) {
+    sb.insert((int) offset, valToString(val));
     return this;
   }
 
   public ChuckString erase(long start, long len) {
-    int s = Math.max(0, Math.min((int) start, sb.length()));
-    int e = Math.max(s, Math.min(s + (int) len, sb.length()));
-    sb.delete(s, e);
-    return this;
-  }
-
-  /** ChucK 1.5.1.3+: replace(substr, replacement) */
-  public ChuckString replace(Object substr, Object replacement) {
-    String sub = valToString(substr);
-    String rep = valToString(replacement);
-    if (sub.isEmpty()) return this;
-
-    int idx = sb.indexOf(sub);
-    while (idx != -1) {
-      sb.replace(idx, idx + sub.length(), rep);
-      idx = sb.indexOf(sub, idx + rep.length());
-    }
+    sb.delete((int) start, (int) (start + len));
     return this;
   }
 
   public ChuckString replace(long start, Object val) {
-    int s = Math.max(0, Math.min((int) start, sb.length()));
-    String v = valToString(val);
-    int e = Math.max(s, Math.min(s + v.length(), sb.length()));
-    sb.replace(s, e, v);
+    String s = valToString(val);
+    sb.replace((int) start, (int) (start + s.length()), s);
+    return this;
+  }
+
+  public ChuckString replace(Object oldVal, Object newVal) {
+    String os = valToString(oldVal);
+    String ns = valToString(newVal);
+    int idx = sb.indexOf(os);
+    while (idx != -1) {
+      sb.replace(idx, idx + os.length(), ns);
+      idx = sb.indexOf(os, idx + ns.length());
+    }
     return this;
   }
 
   public ChuckString replace(long start, long len, Object val) {
-    int s = Math.max(0, Math.min((int) start, sb.length()));
-    int e = Math.max(s, Math.min(s + (int) len, sb.length()));
-    String v = valToString(val);
-    sb.replace(s, e, v);
+    sb.replace((int) start, (int) (start + len), valToString(val));
     return this;
   }
 
@@ -98,34 +92,36 @@ public class ChuckString extends ChuckObject {
   }
 
   public ChuckString lower() {
-    return new ChuckString(sb.toString().toLowerCase());
+    return getStringFromPool(sb.toString().toLowerCase());
   }
 
   public ChuckString upper() {
-    return new ChuckString(sb.toString().toUpperCase());
+    return getStringFromPool(sb.toString().toUpperCase());
   }
 
   public ChuckString trim() {
-    return new ChuckString(sb.toString().trim());
+    return getStringFromPool(sb.toString().trim());
   }
 
   public ChuckString ltrim() {
-    return new ChuckString(sb.toString().stripLeading());
+    String s = sb.toString();
+    int i = 0;
+    while (i < s.length() && Character.isWhitespace(s.charAt(i))) i++;
+    return getStringFromPool(s.substring(i));
   }
 
   public ChuckString rtrim() {
-    return new ChuckString(sb.toString().stripTrailing());
+    String s = sb.toString();
+    int i = s.length() - 1;
+    while (i >= 0 && Character.isWhitespace(s.charAt(i))) i--;
+    return getStringFromPool(s.substring(0, i + 1));
   }
 
-  public ChuckString set(Object val) {
-    sb.setLength(0);
-    sb.append(valToString(val));
-    return this;
-  }
-
-  public void setValue(String val) {
-    sb.setLength(0);
-    sb.append(val == null ? "" : val);
+  private ChuckString getStringFromPool(String s) {
+    if (ChuckShred.CURRENT_SHRED.isBound()) {
+      return ChuckShred.CURRENT_SHRED.get().getString(s);
+    }
+    return new ChuckString(s);
   }
 
   /** Returns the directory path if the string is a file path. */
@@ -135,11 +131,16 @@ public class ChuckString extends ChuckObject {
     // Standardize to forward slashes and ensure trailing slash if not empty
     result = result.replace('\\', '/');
     if (!result.isEmpty() && !result.endsWith("/")) result += "/";
-    return new ChuckString(result);
+    return getStringFromPool(result);
   }
 
   @Override
   public String toString() {
     return sb.toString();
+  }
+
+  private static String valToString(Object val) {
+    if (val == null) return "null";
+    return val.toString();
   }
 }

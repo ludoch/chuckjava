@@ -251,10 +251,6 @@ public class ObjectInstrs {
               s.reg.pushObject(cs.rtrim());
               return;
             }
-            case "set" -> {
-              s.reg.pushObject(cs.set(args[0]));
-              return;
-            }
           }
         }
 
@@ -1110,6 +1106,48 @@ public class ObjectInstrs {
           s.reg.pushObject(null);
         }
       }
+    }
+  }
+
+  public static class CallBuiltinFloat implements ChuckInstr {
+    public String mName;
+
+    public CallBuiltinFloat(String m) {
+      mName = m;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      double val = s.reg.popAsDouble();
+      Object obj = s.reg.popObject();
+      if (obj instanceof org.chuck.audio.osc.Osc o) {
+        if (mName.equals("freq")) o.freq(val);
+        else if (mName.equals("gain")) o.gain((float) val);
+        else if (mName.equals("phase")) o.setPhase(val);
+      } else if (obj instanceof org.chuck.audio.ChuckUGen u) {
+        if (mName.equals("gain")) u.gain((float) val);
+      }
+      s.reg.push(val);
+    }
+  }
+
+  public static class CallBuiltinInt implements ChuckInstr {
+    public String mName;
+
+    public CallBuiltinInt(String m) {
+      mName = m;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long val = s.reg.popAsLong();
+      Object obj = s.reg.popObject();
+      if (obj instanceof org.chuck.audio.osc.Osc o) {
+        if (mName.equals("sync")) o.setSync((int) val);
+      } else if (obj instanceof org.chuck.audio.filter.Lpf l) {
+        if (mName.equals("cutoff")) l.setCutoff((float) val);
+      }
+      s.reg.push(val);
     }
   }
 }
