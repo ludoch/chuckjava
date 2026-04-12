@@ -512,12 +512,21 @@ public class ChuckVM {
     while (now.get() < targetTime) {
       long currentTime = now.get();
 
-      // 0. Check timeouts
+      // 0. Check timeouts (must happen even in fast path for event reliability)
       fireTimeouts(currentTime);
 
+      // FAST PATH: Check if we can skip the scheduler lock entirely for this sample
+      if (currentTime + 1 < nextWakeTime.get()) {
+        // No shreds waking up, skip fireTimeouts and shreduler checks
+        for (DacChannel chan : dacChannels) chan.tick(currentTime);
+        blackhole.tick(currentTime);
+        now.incrementAndGet();
+        continue;
+      }
+
+      // SLOW PATH: At least one shred might wake up
       // 1. Run all shreds scheduled for this time (allow 0-yield chaining)
       int safety = 0;
-      boolean shredsRan = false;
       while (safety++ < 1000) {
         List<ChuckShred> ready = new ArrayList<>();
         shredulerLock.lock();
@@ -533,7 +542,6 @@ public class ChuckVM {
         }
 
         if (ready.isEmpty()) break;
-        shredsRan = true;
 
         for (ChuckShred nextShred : ready) {
           long jitter = currentTime - nextShred.getWakeTime();
