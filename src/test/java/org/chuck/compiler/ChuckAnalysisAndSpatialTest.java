@@ -1,19 +1,31 @@
 package org.chuck.compiler;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.antlr.v4.runtime.*;
-import org.chuck.audio.*;
-import org.chuck.audio.analysis.*;
-import org.chuck.audio.filter.*;
-import org.chuck.audio.fx.*;
-import org.chuck.audio.osc.*;
-import org.chuck.audio.stk.*;
-import org.chuck.audio.util.*;
-import org.chuck.core.*;
+import org.antlr.v4.runtime.BaseErrorListener;
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.RecognitionException;
+import org.antlr.v4.runtime.Recognizer;
+import org.chuck.audio.analysis.Kurtosis;
+import org.chuck.audio.analysis.MFCC;
+import org.chuck.audio.analysis.SFM;
+import org.chuck.audio.analysis.ZCR;
+import org.chuck.audio.stk.BeeThree;
+import org.chuck.audio.stk.FMVoices;
+import org.chuck.audio.stk.HevyMetl;
+import org.chuck.audio.stk.PercFlut;
+import org.chuck.audio.stk.TubeBell;
+import org.chuck.audio.stk.Wurley;
+import org.chuck.core.ChuckCode;
+import org.chuck.core.ChuckShred;
+import org.chuck.core.ChuckVM;
 import org.junit.jupiter.api.Test;
 
 /**

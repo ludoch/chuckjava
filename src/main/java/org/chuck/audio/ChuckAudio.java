@@ -157,22 +157,18 @@ public class ChuckAudio {
                       }
                     }
 
-                    // IMPORTANT: Advance time BEFORE ticking DAC to ensure shreds run
+                    // IMPORTANT: Advance time BEFORE reading DAC to ensure shreds run.
+                    // advanceTime() ticks DAC channels as roots of the pull graph;
+                    // getDacChannel(c).getLastOut() gives the computed sample for each channel.
                     vm.advanceTime(samplesToProcess);
 
                     // Interleave Left/Right for stereo output
                     for (int c = 0; c < numChannels; c++) {
-                      float sample;
-                      if (masterGainUGen != null) {
-                        // If we have an IDE master gain UGen, it is connected to dacChannels
-                        // already. Ticking it will pull through the whole graph.
-                        // NOTE: For multi-channel, we'd need a Stereo master gain.
-                        // For now, we use the mono masterGainUGen lastOut.
-                        sample = masterGainUGen.getLastOut() * masterGain;
-                      } else {
-                        // Fallback: pull directly from VM dac channels
-                        sample = vm.getDacChannel(c).getLastOut() * masterGain;
-                      }
+                      // Always read directly from the DAC channel — the VM already ticked it.
+                      // masterGainUGen is intentionally NOT used here: it is never ticked by
+                      // advanceTime() (it is a sink of the DAC, not a source), so getLastOut()
+                      // would always return 0.  Volume is controlled by the masterGain scalar.
+                      float sample = vm.getDacChannel(c).getLastOut() * masterGain;
 
                       sumSq += (double) sample * sample;
                       short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);

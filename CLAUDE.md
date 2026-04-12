@@ -83,6 +83,7 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - **`org.chuck.core.instr`** — Modular instruction set organized by category (`ArithmeticInstrs`, `ControlInstrs`, `TypeInstrs`, etc.)
 
 ### Recently Fixed Issues (2026-03-10)
+
 - `SetMemberIntByName` was missing — now created, uses reflection + `setData` fallback
 - `++`/`--`, `!`, `&&`, `||`, `%`, `=` (ASSIGN), string literals added to lexer+parser
 - Emitter now handles: `UnaryExp`, `StringExp`, `ReturnStmt`, `ASSIGN`, `CallMethod`, `MathFunc`, `StdFtom`, all 22 UGen types in `InstantiateAndSetGlobal`
@@ -90,6 +91,7 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - Concurrency model was audited and confirmed correct — Virtual Thread yield works via `ReentrantLock`
 
 ### Recently Fixed Issues (2026-03-22)
+
 - `emitChuckTarget(DeclExp)` bug: `StackSwap + Pop + StoreLocal` stored default 0 instead of source; replaced with `Pop + StoreLocal`
 - ANTLR grammar precedence: `conditionalOp` (ternary `?:`) was listed below `chuckOp` (`=>`), giving it lower priority; swapped to fix `a ? b : c => x` parsing
 - Added `BlitSaw` and `BlitSquare` PolyBLEP band-limited oscillators
@@ -99,6 +101,7 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - Full `me.*` shred API: `path()`, `source()`, `sourcePath()`, `running()`, `done()`; new instruction classes `MeId`, `MePath`, `MeRunning`
 
 ### Recently Fixed Issues (2026-03-23)
+
 - `SwapLocal` type-tag corruption: `setRef(idx, null)` was marking int slots as objects; fixed by copying all four parallel arrays respecting source-slot type flags
 - Root-scope array declarations now use global storage (`InstantiateSetAndPushGlobal`) so `vm.getGlobalObject(name)` returns them correctly
 - Added `vec2` type (2-element vector, stored as `ChuckArray(2)`)
@@ -112,6 +115,7 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - Added `SFM` (Spectral Flatness Measure) and `Kurtosis` UAnas — both chain after `FFT`, pull `getFvals()` from upstream blob
 
 ### Std Library & Machine API Additions (2026-03-30)
+
 - `Std.itoa(long)` — int to string
 - `Std.ftoa(double, long)` — float to string with decimal places
 - `Std.ftoi(double)` — float to int (truncate)
@@ -130,11 +134,13 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - Tests: 11 tests in `ChuckStdTest` (all passing)
 
 ### Recently Fixed Issues (2026-03-30)
+
 - `TwoPole`, `TwoZero`, `PoleZero`, `DelayA`, `Blit`, `CNoise` UGens added and tested.
 - `Machine` API expanded with `version`, `platform`, `timeofday`, etc.
 - `Std` library expanded with `itoa`, `ftoa`, `scalef`, `abs`.
 
 ### Recently Fixed Issues (2026-04-03)
+
 - **Complex/Polar Logic**: Implemented `Math.rtop()` and `Math.ptor()` for conversion; fixed `scalar * complex/polar` dispatch in emitter.
 - **`ChuckArray.sort()`**: Full implementation for all types (int, float, complex, polar, vec, string); numeric arrays sort by value, others by magnitude/alphabetically.
 - **Math Constants**: Added `Math.j` (#(0,1)) and supported lowercase `pi`, `e`, `sqrt2` for ChucK compatibility.
@@ -146,6 +152,7 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - **Console Verbosity**: Removed sample-rate debug prints from `DacChannel` that caused massive log files.
 
 ### Recently Fixed Issues (2026-04-04)
+
 - **Forward References**: Implemented multi-pass emission in `ChuckEmitter` to support calling functions and classes before they are defined in the source.
 - **Variable Shadowing**: Corrected variable resolution order to strictly follow Local > Class/Inherited > Global hierarchy, ensuring correct shadowing semantics.
 - **Nested Classes**: Implemented recursive class registration and emission, supporting experimental nested class definitions.
@@ -163,7 +170,7 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 **`examples_dsl/` directory** — 19 ready-to-run Java DSL shreds (each implements `Shred`, no `package` declaration):
 
 | File | Source `.ck` | Demonstrates |
-|------|-------------|--------------|
+| ------- | ------------- | -------------- |
 | `SineDSL.java` | `basic/adsr.ck` | Basic SinOsc |
 | `FmDSL.java` | `basic/fm.ck` | FM with ADSR |
 | `AdsrDSL.java` | `basic/adsr.ck` | ADSR envelope, MIDI-to-freq |
@@ -191,6 +198,7 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 **Tests:** `DslExamplesTest` (20 `@Test` methods) covers every example above except the infinite-loop demo. Each test compiles the `.java` file at runtime via `ChuckDSL.load()`, sporks it into a headless VM, and asserts `maxRms > 0.001`.
 
 ### Recently Fixed Issues (2026-04-05)
+
 - **Complex/Polar Integration**: Fully implemented `complex` and `polar` types, including arithmetic, array initialization, and special formatting in `ChuckPrint`.
 - **Method Call Resolution**: Improved implicit instance method resolution for bare calls within classes.
 - **executeSynchronous Refactor**: Fixed nested method calls in constructors by tracking `framePointer` instead of stack pointer.
@@ -202,11 +210,13 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 ### Stdlib Additions (2026-04-06)
 
 **Std library (`Std.java`):**
+
 - `Std.rand()` — random int in [0, RAND_MAX]
 - `Std.randf()` — random float in [0.0, 1.0)
 - `Std.system(cmd)` — execute a shell command via `ProcessBuilder`; returns exit code
 
 **New stdlib classes:**
+
 - `ConsoleInput` — `readline()`, `prompt(string)`, `ready()`, `can_wait()`; shared `BufferedReader` on `System.in`
 - `KBHit` — `kbhit()` / `hit()`, `getchar()`, `can_wait()`; background virtual thread queues keypresses from `System.in`
 - `MidiFileIn` — `open(string)`, `read(MidiMsg)`, `more()`, `rewind()`, `close()`, `size()`, `numTracks()`, `resolution()`; uses `javax.sound.midi.MidiSystem`; merges and sorts all tracks by tick
@@ -219,7 +229,7 @@ All four classes registered in `ChuckFactory` and in `reflect-config.json` for G
 All functions from section 5.2 of `missing.md` are now implemented in `MathInstrs.MathFunc`:
 
 | Category | Functions |
-|----------|-----------|
+| ---------- | ----------- |
 | Hyperbolic trig | `sinh(x)`, `cosh(x)`, `tanh(x)` |
 | Geometry / numeric | `hypot(x,y)`, `fmod(x,y)`, `remainder(x,y)` |
 | Scalar | `min(a,b)`, `max(a,b)`, `exp2(x)` |
@@ -235,6 +245,7 @@ The emitter's existing `default` fallthrough already pushes all args and calls `
 ### GraalVM Native Image & IDE Bundle (2026-04-05)
 
 **Native executable (`-Pnative` profile):**
+
 - `NativeMain.java` — headless entry point (no JavaFX dependency)
 - `ChuckCLI.java` — IDE launch now uses `Class.forName()` so native image compiles cleanly
 - `src/main/resources/META-INF/native-image/org.chuck/chuck-java/` — auto-discovered config:
@@ -245,10 +256,12 @@ The emitter's existing `default` fallthrough already pushes all args and calls `
 - Output: `target/chuck` (Linux/Mac) or `target/chuck.exe` (Windows) — ~49 MB, no JRE needed
 
 **Native test support (`-DskipNativeTests=false`):**
+
 - 108 of 130 tests run natively; 22 excluded (`DslExamplesTest` + `PolyphonyDSLTest`) because they use `ChuckDSL.load()` → `javax.tools.JavaCompiler` which is unavailable in native image
 - `ChuckShred.allPublicMethods` in reflect-config fixes `me.running()` / `me.numArgs()` in native image
 
 **IDE bundle (`-Pide-bundle` profile):**
+
 - Uses `jpackage` to produce a self-contained directory or installer
 - `jpackage.type` property defaults to `app-image`; override per-platform: `dmg`, `deb`, `rpm`, `msi`, `exe`
 - Fat JAR includes `ServicesResourceTransformer` (merges JavaFX `META-INF/services/` entries)
@@ -256,12 +269,14 @@ The emitter's existing `default` fallthrough already pushes all args and calls `
 - **AOT cache (JEP 483, JDK 24+):** build does a training run to generate `chuck.aot` alongside the JAR; the cache is bundled inside the app-image and loaded via `-XX:AOTCache=$APPDIR/lib/app/chuck.aot`. Pre-warms class loading and ANTLR ATN init, reducing IDE startup time. Skip with `-DskipAot=true` (CI and Docker use this automatically).
 
 **Cross-platform CI (`/.github/workflows/build.yml`):**
+
 - GitHub Actions matrix: `ubuntu-latest`, `macos-latest`, `windows-latest`
 - Each runner: (1) runs JVM tests, (2) builds native CLI, (3) runs 108 native tests, (4) builds IDE bundle
 - macOS builds `.dmg`; Windows/Linux build `app-image`
 - Release job attaches all three native binaries to GitHub Releases automatically
 
 **Docker (`Dockerfile`):**
+
 - Builds Linux native binary from any platform with Docker installed
 - Based on `ghcr.io/graalvm/native-image-community:25`
 - `docker build --output dist/linux .` → extracts `chuck` binary
@@ -270,6 +285,7 @@ The emitter's existing `default` fallthrough already pushes all args and calls `
 ### Major Additions (2026-04-06)
 
 #### Language Features
+
 - **`typeof(expr)`** — returns type name as string; `TypeInstrs.TypeofInstr` pops value, inspects Java type
 - **`instanceof(expr, TypeName)`** — returns 1/0; `TypeInstrs.InstanceofInstr` walks class hierarchy
 - **`abstract class`** / **`interface`** — `ABSTRACT`/`INTERFACE` grammar tokens; `UserClassDescriptor.isAbstract/isInterface` flags; `ChuckFactory` throws on instantiation attempt
@@ -280,7 +296,9 @@ The emitter's existing `default` fallthrough already pushes all args and calls `
 - **`Machine.*` property reads** — `Machine.realtime`, `Machine.silent`, etc. without `()` now handled in `DotExp` emitter path (previously fell through to `GetFieldByName` on null)
 
 #### AI / ML Library (`org.chuck.core.ai`)
+
 All six classes from ChucK's `ulib_ai.cpp` implemented:
+
 - `KNN` — k-nearest neighbor regression; `train(float[][], float[][])`, `predict(float[], float[])`, `k`
 - `KNN2` — k-nearest neighbor classification; `train`, `predict`, `search`, `k`
 - `SVM` — linear one-vs-rest SVM (subgradient descent); `train`, `predict`, `save(string)`, `load(string)`
@@ -290,6 +308,7 @@ All six classes from ChucK's `ulib_ai.cpp` implemented:
 All registered in `ChuckFactory`; each extends `ChuckObject` with `super(ChuckType.OBJECT)`.
 
 #### New UGens / UAnas
+
 - **`DelayP`** — pitch-shifting delay; two crossfading read-heads; API: `delay(samples)`, `max(samples)`, `shift(semitones)`
 - **`JetTabl`** — STK jet saturation curve `x*(0.2−x²*0.12)`, used internally by `Flute`
 - **`FilterBasic`** — abstract filter base; `freq(double)`, `Q(double)`, `set(double,double)`
@@ -300,15 +319,16 @@ All registered in `ChuckFactory`; each extends `ChuckObject` with `super(ChuckTy
 - STK instruments: `VoicForm`, `ModalBar`, `BandedWG`, `BlowBotl`, `BlowHole`, `HnkyTonk`, `FrencHrn`, `KrstlChr`
 
 #### Stdlib & Networking
+
 - **`OscEvent`** — subclass of `OscIn`; registered in `ChuckFactory`; same API (`port`, `addAddress`, `recv`)
 - **`ChuckTypeObj`** — runtime `Type` introspection object: `name()`, `parent()`, `isa(string)`, `eq(Type)`; registered as `"Type"` in `ChuckFactory`
 - **`ConsoleInput`**, **`KBHit`**, **`MidiFileIn`**, **`HidOut`** — all registered in `ChuckFactory` and `reflect-config.json`
 
 #### Bug Fixes
+
 - Removed `EXE [N]` trace `System.out.println` from `ChuckShred.execute()`
 - `mvn package` fix: AI/ML classes were missing `super(ChuckType.OBJECT)` constructors — incremental `mvn test` masked this; clean build exposed it
 - `FilterStk.gain(double)` return type changed from `void` to `double` to match `ChuckUGen` override
-
 
 ### Key Design Patterns
 

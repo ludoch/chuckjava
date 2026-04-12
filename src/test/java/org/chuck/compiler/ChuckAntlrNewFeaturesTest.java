@@ -1,19 +1,26 @@
 package org.chuck.compiler;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.antlr.v4.runtime.*;
-import org.chuck.audio.*;
-import org.chuck.audio.analysis.*;
-import org.chuck.audio.filter.*;
-import org.chuck.audio.fx.*;
-import org.chuck.audio.osc.*;
-import org.chuck.audio.stk.*;
-import org.chuck.audio.util.*;
-import org.chuck.core.*;
+import org.antlr.v4.runtime.BaseErrorListener;
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.CharStreams;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.RecognitionException;
+import org.antlr.v4.runtime.Recognizer;
+import org.chuck.audio.filter.BPF;
+import org.chuck.audio.filter.BRF;
+import org.chuck.audio.filter.HPF;
+import org.chuck.audio.osc.BlitSaw;
+import org.chuck.audio.osc.BlitSquare;
+import org.chuck.core.ChuckCode;
+import org.chuck.core.ChuckShred;
+import org.chuck.core.ChuckVM;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -142,11 +149,13 @@ public class ChuckAntlrNewFeaturesTest {
   @Test
   public void testSwitchMatchFirst() throws InterruptedException {
     String src =
-        "1 => int v;\n"
-            + "switch (v) {\n"
-            + "  case 1: <<< \"one\" >>>;\n"
-            + "  case 2: <<< \"two\" >>>;\n"
-            + "}\n";
+        """
+        1 => int v;
+        switch (v) {
+          case 1: <<< "one" >>>;
+          case 2: <<< "two" >>>;
+        }
+        """;
     List<String> out = runChuck(src, 10);
     assertEquals(1, out.size());
     assertTrue(out.get(0).contains("one"), "Expected 'one', got: " + out.get(0));
@@ -155,11 +164,13 @@ public class ChuckAntlrNewFeaturesTest {
   @Test
   public void testSwitchMatchSecond() throws InterruptedException {
     String src =
-        "2 => int v;\n"
-            + "switch (v) {\n"
-            + "  case 1: <<< \"one\" >>>;\n"
-            + "  case 2: <<< \"two\" >>>;\n"
-            + "}\n";
+        """
+        2 => int v;
+        switch (v) {
+          case 1: <<< "one" >>>;
+          case 2: <<< "two" >>>;
+        }
+        """;
     List<String> out = runChuck(src, 10);
     assertEquals(1, out.size());
     assertTrue(out.get(0).contains("two"), "Expected 'two', got: " + out.get(0));
@@ -168,11 +179,13 @@ public class ChuckAntlrNewFeaturesTest {
   @Test
   public void testSwitchDefault() throws InterruptedException {
     String src =
-        "99 => int v;\n"
-            + "switch (v) {\n"
-            + "  case 1: <<< \"one\" >>>;\n"
-            + "  default: <<< \"other\" >>>;\n"
-            + "}\n";
+        """
+        99 => int v;
+        switch (v) {
+          case 1: <<< "one" >>>;
+          default: <<< "other" >>>;
+        }
+        """;
     List<String> out = runChuck(src, 10);
     assertEquals(1, out.size());
     assertTrue(out.get(0).contains("other"), "Expected 'other', got: " + out.get(0));
@@ -181,11 +194,13 @@ public class ChuckAntlrNewFeaturesTest {
   @Test
   public void testSwitchNoMatch() throws InterruptedException {
     String src =
-        "5 => int v;\n"
-            + "switch (v) {\n"
-            + "  case 1: <<< \"one\" >>>;\n"
-            + "  case 2: <<< \"two\" >>>;\n"
-            + "}\n";
+        """
+        5 => int v;
+        switch (v) {
+          case 1: <<< "one" >>>;
+          case 2: <<< "two" >>>;
+        }
+        """;
     List<String> out = runChuck(src, 10);
     assertEquals(0, out.size()); // nothing printed
   }
@@ -388,7 +403,10 @@ public class ChuckAntlrNewFeaturesTest {
 
   @Test
   public void testStaticIntLiteral() throws InterruptedException {
-    String src = "class Foo { 42 => static int S; }\n" + "<<< Foo.S >>>;";
+    String src =
+        """
+                 class Foo { 42 => static int S; }
+                 <<< Foo.S >>>;""";
     List<String> out = runChuck(src, 10);
     assertEquals(1, out.size());
     assertTrue(out.get(0).contains("42"), "Expected 42, got: " + out.get(0));
@@ -396,7 +414,10 @@ public class ChuckAntlrNewFeaturesTest {
 
   @Test
   public void testStaticFloatLiteral() throws InterruptedException {
-    String src = "class Bar { 3.14 => static float F; }\n" + "<<< Bar.F >>>;";
+    String src =
+        """
+                 class Bar { 3.14 => static float F; }
+                 <<< Bar.F >>>;""";
     List<String> out = runChuck(src, 10);
     assertEquals(1, out.size());
     assertTrue(out.get(0).contains("3.14"), "Expected 3.14, got: " + out.get(0));
@@ -406,9 +427,10 @@ public class ChuckAntlrNewFeaturesTest {
   public void testStaticUGenInit() throws InterruptedException {
     // Test that static UGen is instantiated (non-null) and methods work
     String src =
-        "class Baz { static SinOsc OSC; }\n"
-            + "440 => Baz.OSC.freq;\n"
-            + "<<< Baz.OSC.freq()$int >>>;";
+        """
+        class Baz { static SinOsc OSC; }
+        440 => Baz.OSC.freq;
+        <<< Baz.OSC.freq()$int >>>;""";
     List<String> out = runChuck(src, 10);
     assertEquals(1, out.size());
     assertTrue(out.get(0).contains("440"), "Expected 440, got: " + out.get(0));
@@ -416,7 +438,10 @@ public class ChuckAntlrNewFeaturesTest {
 
   @Test
   public void testStaticStringCtor() throws InterruptedException {
-    String src = "class Foo { static string S(\"hello\"); }\n" + "<<< Foo.S >>>;";
+    String src =
+        """
+                 class Foo { static string S("hello"); }
+                 <<< Foo.S >>>;""";
     List<String> out = runChuck(src, 10);
     assertEquals(1, out.size());
     assertTrue(out.get(0).contains("hello"), "Expected hello, got: " + out.get(0));
@@ -425,7 +450,10 @@ public class ChuckAntlrNewFeaturesTest {
   @Test
   public void testStaticDurInit() throws InterruptedException {
     // 3::second stored as dur (samples)
-    String src = "class D { 3::second => static dur T; }\n" + "<<< (D.T / second)$int >>>;";
+    String src =
+        """
+                 class D { 3::second => static dur T; }
+                 <<< (D.T / second)$int >>>;""";
     List<String> out = runChuck(src, 10);
     assertEquals(1, out.size());
     assertTrue(out.get(0).contains("3"), "Expected 3, got: " + out.get(0));

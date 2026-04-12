@@ -9,6 +9,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.prefs.Preferences;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -71,6 +73,7 @@ import org.chuck.core.ChuckVM;
 import org.chuck.hid.HidMsg;
 import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.LineNumberFactory;
+import org.fxmisc.richtext.event.MouseOverTextEvent;
 import org.fxmisc.richtext.model.StyleSpans;
 import org.fxmisc.richtext.model.StyleSpansBuilder;
 
@@ -277,6 +280,9 @@ public class ChuckIDE extends Application {
     }
   }
 
+  /** A user-declared variable or function found by scanning the current editor text. */
+  private record UserSymbol(String name, String type, String signature) {}
+
   private ListView<ShredInfo> shredListView;
   private Label statusLabel;
   private TreeView<File> fileBrowser;
@@ -298,6 +304,14 @@ public class ChuckIDE extends Application {
   // Completion
   private Popup currentPopup;
 
+  // Recent files
+  private static final int MAX_RECENT = 10;
+  private final Preferences prefs = Preferences.userNodeForPackage(ChuckIDE.class);
+  private Menu recentFilesMenu;
+
+  // Doc hover popup
+  private Popup docHoverPopup;
+
   // Master Controls
   private Label vmTimeLabel;
   private Slider masterGainSlider;
@@ -311,15 +325,11 @@ public class ChuckIDE extends Application {
     vm = new ChuckVM(sampleRate);
     vm.addPrintListener(this::print);
 
-    // Setup Master Gain
+    // Master gain is a scalar multiplier applied in ChuckAudio (not a UGen in the signal path).
+    // Wiring the Gain UGen into the DAC pull-graph would leave it un-ticked → silence.
     masterGain = new Gain();
-    // IDE master gain is a final stage. In a real ChucK VM, dac is the end.
-    // For the IDE, we want to monitor the dac output through a master gain.
-    vm.getDacChannel(0).chuckTo(masterGain);
-    vm.getDacChannel(1).chuckTo(masterGain);
 
     audio = new ChuckAudio(vm, 512, 2, sampleRate);
-    audio.setMasterGainUGen(masterGain); // We need this method in ChuckAudio
 
     List<String> rawArgs = getParameters().getRaw();
     for (String arg : rawArgs) {
@@ -656,7 +666,7 @@ public class ChuckIDE extends Application {
         .subscribe(ignore -> editor.setStyleSpans(0, computeHighlighting(editor.getText())));
     editor.setStyleSpans(0, computeHighlighting(editor.getText()));
 
-    // Code Completion Trigger
+    // Code Completion Trigger — manual (Ctrl+Space) and auto (. and ::)
     editor.addEventHandler(
         KeyEvent.KEY_PRESSED,
         e -> {
@@ -666,9 +676,51 @@ public class ChuckIDE extends Application {
           }
         });
 
+    editor.addEventHandler(
+        KeyEvent.KEY_TYPED,
+        e -> {
+          String ch = e.getCharacter();
+          if (".".equals(ch)) {
+            Platform.runLater(() -> showCompletionPopup(editor));
+          } else if (":".equals(ch)) {
+            int pos = editor.getCaretPosition();
+            if (pos >= 2 && "::".equals(editor.getText(pos - 2, pos))) {
+              Platform.runLater(() -> showCompletionPopup(editor));
+            }
+          }
+        });
+
+    // Hover doc — show after 600 ms over a word
+    editor.setMouseOverTextDelay(java.time.Duration.ofMillis(600));
+    editor.addEventHandler(
+        MouseOverTextEvent.MOUSE_OVER_TEXT_BEGIN,
+        e -> {
+          int charIdx = e.getCharacterIndex();
+          String text = editor.getText();
+          String word = extractWordAt(text, charIdx);
+          if (word.isEmpty()) return;
+          String docText = lookupDoc(word, null);
+          if (docText == null && charIdx > 0) {
+            // Try member lookup: find dot before the hovered word
+            String fullBefore = text.substring(0, charIdx);
+            int lastDot = fullBefore.lastIndexOf('.');
+            if (lastDot > 0) {
+              String beforeDot = fullBefore.substring(0, lastDot);
+              String varName = extractWordAt(beforeDot, beforeDot.length());
+              if (!varName.isEmpty()) {
+                String type = resolveVariableType(varName, fullBefore);
+                docText = lookupDoc(type, word);
+              }
+            }
+          }
+          if (docText != null) showDocHoverPopup(docText, e.getScreenPosition());
+        });
+    editor.addEventHandler(MouseOverTextEvent.MOUSE_OVER_TEXT_END, e -> hideDocHoverPopup());
+
     editor.setOnMouseClicked(
         e -> {
           if (currentPopup != null) currentPopup.hide();
+          hideDocHoverPopup();
         });
 
     Tab tab = new Tab(title, editor);
@@ -677,8 +729,11 @@ public class ChuckIDE extends Application {
   }
 
   private void showCompletionPopup(CodeArea editor) {
-    @SuppressWarnings("unused")
-    String fullText = editor.getText();
+    if (currentPopup != null) {
+      currentPopup.hide();
+      currentPopup = null;
+    }
+
     int caretPos = editor.getCaretPosition();
     String textBefore = editor.getText(0, caretPos);
 
@@ -695,24 +750,23 @@ public class ChuckIDE extends Application {
 
     List<String> candidates;
     String filter;
+    String resolvedType = null;
 
     if (prefix.contains("::")) {
       // Duration completion: 1::[second]
       int colIdx = prefix.lastIndexOf("::");
-      candidates = DURATION_CANDIDATES;
+      candidates = new java.util.ArrayList<>(DURATION_CANDIDATES);
       filter = prefix.substring(colIdx + 2);
     } else if (prefix.contains(".")) {
       // Member completion: s.[gain]
       int dotIdx = prefix.lastIndexOf('.');
       String varName = prefix.substring(0, dotIdx);
       filter = prefix.substring(dotIdx + 1);
-
-      // Try to resolve the variable's type
-      String type = resolveVariableType(varName, textBefore);
-      candidates = getDynamicMemberCandidates(type);
+      resolvedType = resolveVariableType(varName, textBefore);
+      candidates = new java.util.ArrayList<>(getDynamicMemberCandidates(resolvedType));
     } else {
-      // Global/New Area completion: Only show Types (SinOsc) and Keywords
-      candidates =
+      // Global context: types, keywords, and user-declared symbols
+      List<String> base =
           TYPE_CANDIDATES.stream()
               .filter(
                   s ->
@@ -728,10 +782,17 @@ public class ChuckIDE extends Application {
                                   "fun", "class", "dac", "adc", "now", "me", "chout", "cherr")
                               .contains(s))
               .collect(Collectors.toList());
+      candidates = new java.util.ArrayList<>(base);
+      // Add user-declared variables and functions
+      for (UserSymbol sym : scanUserSymbols(editor.getText())) {
+        if (!candidates.contains(sym.name())) candidates.add(sym.name());
+      }
       filter = prefix;
     }
 
     final String finalFilter = filter.toLowerCase();
+    final String finalResolvedType = resolvedType;
+
     List<String> matches =
         candidates.stream()
             .filter(s -> s.toLowerCase().startsWith(finalFilter))
@@ -741,13 +802,42 @@ public class ChuckIDE extends Application {
 
     if (matches.isEmpty()) return;
 
+    // ── Completion list ──
     ListView<String> listView = new ListView<>();
     listView.getItems().addAll(matches);
-    listView.setPrefHeight(Math.min(matches.size() * 24 + 2, 200));
-    listView.setPrefWidth(150);
+    listView.setPrefWidth(175);
+    listView.setPrefHeight(Math.min(matches.size() * 24 + 4, 200));
+
+    // ── Doc panel ──
+    Label docLabel = new Label("Select an item for documentation");
+    docLabel.setWrapText(true);
+    docLabel.setPrefWidth(235);
+    docLabel.setMaxHeight(196);
+    docLabel.setAlignment(javafx.geometry.Pos.TOP_LEFT);
+    docLabel.setStyle(
+        "-fx-background-color: #fefde8; -fx-padding: 8; -fx-font-size: 11;"
+            + " -fx-border-color: #ddd; -fx-border-width: 0 0 0 1;");
+
+    listView
+        .getSelectionModel()
+        .selectedItemProperty()
+        .addListener(
+            (obs, old, sel) -> {
+              if (sel == null) return;
+              String docText =
+                  finalResolvedType != null
+                      ? lookupDoc(finalResolvedType, sel)
+                      : lookupDoc(sel, null);
+              docLabel.setText(docText != null ? docText : sel);
+            });
+
+    HBox popupContent = new HBox(listView, docLabel);
+    popupContent.setStyle(
+        "-fx-background-color: white; -fx-border-color: #aaa; -fx-border-width: 1;"
+            + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 6, 0, 0, 2);");
 
     Popup popup = new Popup();
-    popup.getContent().add(listView);
+    popup.getContent().add(popupContent);
     popup.setAutoHide(true);
     this.currentPopup = popup;
 
@@ -799,31 +889,86 @@ public class ChuckIDE extends Application {
   }
 
   private List<String> getDynamicMemberCandidates(String type) {
-    try {
-      // Map ChucK types to our Java classes
-      String className = "org.chuck.audio." + type;
-      if (type.equals("IO")) className = "org.chuck.core.ChuckIO";
+    Class<?> cls = resolveChuckClass(type);
+    if (cls == null) return MEMBER_CANDIDATES;
 
-      Class<?> cls = Class.forName(className);
-      return java.util.Arrays.stream(cls.getMethods())
-          .filter(m -> java.lang.reflect.Modifier.isPublic(m.getModifiers()))
-          .map(java.lang.reflect.Method::getName)
-          .filter(name -> name.startsWith("set"))
-          .map(
-              name -> {
-                // Convert setFreq -> freq, setGain -> gain
-                String prop = name.substring(3);
-                if (prop.length() > 0) {
-                  return Character.toLowerCase(prop.charAt(0)) + prop.substring(1);
-                }
-                return name;
-              })
-          .distinct()
-          .collect(Collectors.toList());
-    } catch (ClassNotFoundException e) {
-      // Fallback to static member list if reflection fails
-      return MEMBER_CANDIDATES;
+    Set<String> objectMethods =
+        Set.of(
+            "hashCode",
+            "equals",
+            "toString",
+            "getClass",
+            "notify",
+            "notifyAll",
+            "wait",
+            "clone",
+            "finalize");
+
+    java.util.LinkedHashSet<String> seen = new java.util.LinkedHashSet<>();
+    Set<String> setterProps = new java.util.HashSet<>();
+
+    // First pass: setter → property name (setFreq → freq)
+    for (java.lang.reflect.Method m : cls.getMethods()) {
+      if (!java.lang.reflect.Modifier.isPublic(m.getModifiers())) continue;
+      String n = m.getName();
+      if (n.startsWith("set") && n.length() > 3) {
+        String prop = Character.toLowerCase(n.charAt(3)) + n.substring(4);
+        setterProps.add(prop);
+        seen.add(prop);
+      }
     }
+
+    // Second pass: other public methods (skip Object noise, skip getters covered by setter)
+    for (java.lang.reflect.Method m : cls.getMethods()) {
+      if (!java.lang.reflect.Modifier.isPublic(m.getModifiers())) continue;
+      String n = m.getName();
+      if (objectMethods.contains(n) || n.startsWith("set")) continue;
+      if (n.startsWith("get") && n.length() > 3) {
+        String prop = Character.toLowerCase(n.charAt(3)) + n.substring(4);
+        if (setterProps.contains(prop)) continue; // already shown as property
+      }
+      seen.add(n);
+    }
+
+    return new java.util.ArrayList<>(seen);
+  }
+
+  /** Resolve a ChucK type name to a Java class, searching known packages. */
+  private Class<?> resolveChuckClass(String type) {
+    if (type == null || type.isEmpty()) return null;
+    String[][] mappings = {
+      {type, "org.chuck.audio." + type},
+      {type, "org.chuck.audio.osc." + type},
+      {type, "org.chuck.audio.fx." + type},
+      {type, "org.chuck.audio.filter." + type},
+      {type, "org.chuck.audio.stk." + type},
+      {type, "org.chuck.audio.util." + type},
+      {type, "org.chuck.audio.analysis." + type},
+      {type, "org.chuck.core." + type},
+      {type, "org.chuck.core.ai." + type},
+    };
+    // Special renames
+    String overrideClass =
+        switch (type) {
+          case "IO" -> "org.chuck.core.ChuckIO";
+          case "Std" -> "org.chuck.core.Std";
+          case "Machine" -> "org.chuck.core.Machine";
+          case "me" -> "org.chuck.core.ChuckShred";
+          default -> null;
+        };
+    if (overrideClass != null) {
+      try {
+        return Class.forName(overrideClass);
+      } catch (ClassNotFoundException ignored) {
+      }
+    }
+    for (String[] row : mappings) {
+      try {
+        return Class.forName(row[1]);
+      } catch (ClassNotFoundException ignored) {
+      }
+    }
+    return null;
   }
 
   private CodeArea getCurrentEditor() {
@@ -888,12 +1033,16 @@ public class ChuckIDE extends Application {
     MenuItem exitItem = new MenuItem("Exit");
     exitItem.setOnAction(e -> Platform.exit());
 
+    recentFilesMenu = new Menu("Open _Recent");
+    rebuildRecentMenu();
+
     fileMenu
         .getItems()
         .addAll(
             newItem,
             openItem,
             openProj,
+            recentFilesMenu,
             saveItem,
             saveAsItem,
             closeTabItem,
@@ -1479,6 +1628,7 @@ public class ChuckIDE extends Application {
       addNewTab(file.getName(), Files.readString(file.toPath()));
       tabToFile.put(tabPane.getSelectionModel().getSelectedItem(), file);
       print("Loaded: " + file.getAbsolutePath());
+      addToRecentFiles(file);
     } catch (IOException ex) {
       print("Error loading file: " + ex.getMessage());
     }
@@ -1525,6 +1675,7 @@ public class ChuckIDE extends Application {
         tab.setText(file.getName());
         tabToFile.put(tab, file);
         print("Saved: " + file.getAbsolutePath());
+        addToRecentFiles(file);
       } catch (IOException ex) {
         print("Error saving: " + ex.getMessage());
       }
@@ -1548,5 +1699,189 @@ public class ChuckIDE extends Application {
 
   public static void main(String[] args) {
     launch(args);
+  }
+
+  // ── Recent files ───────────────────────────────────────────────────────────
+
+  private void addToRecentFiles(File f) {
+    String path = f.getAbsolutePath();
+    List<String> recent = new java.util.ArrayList<>(getRecentFilePaths());
+    recent.remove(path);
+    recent.add(0, path);
+    if (recent.size() > MAX_RECENT) recent = recent.subList(0, MAX_RECENT);
+    for (int j = 0; j < MAX_RECENT; j++) {
+      if (j < recent.size()) prefs.put("recent." + j, recent.get(j));
+      else prefs.remove("recent." + j);
+    }
+    rebuildRecentMenu();
+  }
+
+  private List<String> getRecentFilePaths() {
+    List<String> paths = new java.util.ArrayList<>();
+    for (int j = 0; j < MAX_RECENT; j++) {
+      String p = prefs.get("recent." + j, null);
+      if (p != null) paths.add(p);
+    }
+    return paths;
+  }
+
+  private void rebuildRecentMenu() {
+    if (recentFilesMenu == null) return;
+    recentFilesMenu.getItems().clear();
+    List<String> paths = getRecentFilePaths();
+    if (paths.isEmpty()) {
+      MenuItem empty = new MenuItem("(no recent files)");
+      empty.setDisable(true);
+      recentFilesMenu.getItems().add(empty);
+      return;
+    }
+    for (String p : paths) {
+      File f = new File(p);
+      String label = f.getName() + "   \u2014   " + p; // em dash separator
+      MenuItem mi = new MenuItem(label);
+      mi.setDisable(!f.exists());
+      mi.setOnAction(
+          e -> {
+            if (f.exists()) loadFileIntoEditor(f);
+          });
+      recentFilesMenu.getItems().add(mi);
+    }
+    recentFilesMenu.getItems().add(new SeparatorMenuItem());
+    MenuItem clear = new MenuItem("Clear Recent");
+    clear.setOnAction(
+        e -> {
+          for (int j = 0; j < MAX_RECENT; j++) prefs.remove("recent." + j);
+          rebuildRecentMenu();
+        });
+    recentFilesMenu.getItems().add(clear);
+  }
+
+  // ── Doc lookup ─────────────────────────────────────────────────────────────
+
+  /**
+   * Look up documentation for a ChucK type and optional member. Returns null if not found. Falls
+   * back to a formatted method signature when @doc is absent.
+   */
+  private String lookupDoc(String typeName, String memberName) {
+    if (typeName == null || typeName.isEmpty()) return null;
+    Class<?> cls = resolveChuckClass(typeName);
+    if (cls == null) return null;
+
+    if (memberName == null || memberName.isEmpty()) {
+      doc classDoc = cls.getAnnotation(doc.class);
+      if (classDoc != null) return typeName + "\n" + classDoc.value();
+      String parent = cls.getSuperclass() != null ? cls.getSuperclass().getSimpleName() : "Object";
+      return typeName + " (" + parent + ")";
+    }
+
+    // Find matching method: exact name or set/get prefix
+    java.lang.reflect.Method best = null;
+    for (java.lang.reflect.Method m : cls.getMethods()) {
+      String n = m.getName();
+      if (n.equals(memberName)
+          || n.equals("set" + capitalize(memberName))
+          || n.equals("get" + capitalize(memberName))) {
+        if (best == null || n.equals(memberName)) best = m;
+      }
+    }
+    if (best == null) return null;
+
+    doc memberDoc = best.getAnnotation(doc.class);
+    String sig = formatMethodSig(best, memberName);
+    return memberDoc != null ? sig + "\n" + memberDoc.value() : sig;
+  }
+
+  private String capitalize(String s) {
+    return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
+  }
+
+  private String formatMethodSig(java.lang.reflect.Method m, String alias) {
+    StringBuilder sb = new StringBuilder(alias != null ? alias : m.getName());
+    sb.append("(");
+    Class<?>[] params = m.getParameterTypes();
+    for (int j = 0; j < params.length; j++) {
+      if (j > 0) sb.append(", ");
+      sb.append(params[j].getSimpleName());
+    }
+    sb.append(")");
+    String ret = m.getReturnType().getSimpleName();
+    if (!"void".equals(ret)) sb.append(" \u2192 ").append(ret); // →
+    return sb.toString();
+  }
+
+  // ── Hover doc popup ────────────────────────────────────────────────────────
+
+  private void showDocHoverPopup(String text, javafx.geometry.Point2D pos) {
+    hideDocHoverPopup();
+    Label label = new Label(text);
+    label.setWrapText(true);
+    label.setMaxWidth(340);
+    label.setStyle(
+        "-fx-background-color: #fefde8; -fx-border-color: #c8c050;"
+            + " -fx-border-radius: 3; -fx-background-radius: 3;"
+            + " -fx-padding: 6 10 6 10; -fx-font-size: 11;");
+    docHoverPopup = new Popup();
+    docHoverPopup.getContent().add(label);
+    docHoverPopup.setAutoHide(true);
+    docHoverPopup.show(stage, pos.getX() + 12, pos.getY() + 14);
+  }
+
+  private void hideDocHoverPopup() {
+    if (docHoverPopup != null) {
+      docHoverPopup.hide();
+      docHoverPopup = null;
+    }
+  }
+
+  // ── User-symbol scanner ────────────────────────────────────────────────────
+
+  /**
+   * Scans the editor text for user-declared variables (Type varName) and functions (fun retType
+   * name(...)) to include them in global completion.
+   */
+  private List<UserSymbol> scanUserSymbols(String code) {
+    List<UserSymbol> symbols = new java.util.ArrayList<>();
+    Set<String> builtinKeywords =
+        Set.of("if", "else", "while", "for", "return", "new", "fun", "class", "spork", "repeat");
+
+    // Variable declarations: Type varName (starts with uppercase type)
+    Matcher m = Pattern.compile("\\b([A-Z][a-zA-Z0-9]*)\\s+([a-z_][a-zA-Z0-9_]*)\\b").matcher(code);
+    while (m.find()) {
+      String type = m.group(1), name = m.group(2);
+      if (!builtinKeywords.contains(name)) {
+        symbols.add(new UserSymbol(name, type, type + " " + name));
+      }
+    }
+
+    // Function declarations: fun retType name(...)
+    m =
+        Pattern.compile(
+                "\\bfun\\s+([a-zA-Z][a-zA-Z0-9]*)\\s+([a-zA-Z][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)")
+            .matcher(code);
+    while (m.find()) {
+      String retType = m.group(1), name = m.group(2), args = m.group(3);
+      symbols.add(new UserSymbol(name, retType, "fun " + retType + " " + name + "(" + args + ")"));
+    }
+
+    return symbols;
+  }
+
+  // ── Word extraction helper ─────────────────────────────────────────────────
+
+  private boolean isWordChar(char c) {
+    return Character.isLetterOrDigit(c) || c == '_';
+  }
+
+  /**
+   * Extracts the word that spans position {@code pos} in {@code text}. If {@code pos} is at a
+   * non-word character, returns "".
+   */
+  private String extractWordAt(String text, int pos) {
+    if (text == null || pos < 0 || pos > text.length()) return "";
+    int end = pos;
+    while (end < text.length() && isWordChar(text.charAt(end))) end++;
+    int start = pos;
+    while (start > 0 && isWordChar(text.charAt(start - 1))) start--;
+    return text.substring(start, end);
   }
 }

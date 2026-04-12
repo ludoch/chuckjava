@@ -1,14 +1,10 @@
 package org.chuck;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import org.chuck.audio.*;
-import org.chuck.audio.analysis.*;
-import org.chuck.audio.filter.*;
-import org.chuck.audio.fx.*;
-import org.chuck.audio.osc.*;
-import org.chuck.audio.stk.*;
-import org.chuck.audio.util.*;
+import org.chuck.audio.util.Mix4;
+import org.chuck.audio.util.Pan4;
+import org.chuck.audio.util.Step;
 import org.junit.jupiter.api.Test;
 
 public class MultiChannelTest {
