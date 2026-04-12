@@ -397,6 +397,23 @@ public class ChuckIDE extends Application {
   // Track files per tab
   private final Map<Tab, File> tabToFile = new java.util.HashMap<>();
 
+  // Track editor wrapper (StackPane with flash overlay) per tab
+  private final Map<Tab, StackPane> tabToWrapper = new java.util.HashMap<>();
+
+  // OTF: track which shred was sporked from each tab (last one wins)
+  private final Map<Tab, Integer> tabToShredId = new java.util.HashMap<>();
+
+  // Toolbar button refs (needed for lockdown disable/enable)
+  private Button addShredBtnRef;
+  private Button replaceBtnRef;
+
+  // Stall / lockdown detection (mirrors miniAudicle's 2-second stall timeout)
+  private long lastVmTimeSample = -1;
+  private int stallFrameCount = 0;
+  private static final int STALL_FRAMES_LOCKDOWN = 40; // ~2 s at 20 Hz animation-timer rate
+  private boolean lockdownMode = false;
+  private Label stallWarningLabel;
+
   // Visualizers
   @SuppressWarnings("unused")
   private Pane visContainer; // Container for dynamic resizing
@@ -828,7 +845,18 @@ public class ChuckIDE extends Application {
           hideDocHoverPopup();
         });
 
-    Tab tab = new Tab(title, editor);
+    // Wrap editor in a StackPane so we can overlay a flash rectangle for OTF visual feedback
+    javafx.scene.shape.Rectangle flashRect = new javafx.scene.shape.Rectangle();
+    flashRect.setMouseTransparent(true);
+    flashRect.setOpacity(0);
+    flashRect.widthProperty().bind(editor.widthProperty());
+    flashRect.heightProperty().bind(editor.heightProperty());
+
+    StackPane editorWrapper = new StackPane(editor, flashRect);
+    editorWrapper.getProperties().put("flashRect", flashRect);
+
+    Tab tab = new Tab(title, editorWrapper);
+    tabToWrapper.put(tab, editorWrapper);
     tabPane.getTabs().add(tab);
     tabPane.getSelectionModel().select(tab);
   }
@@ -1347,9 +1375,13 @@ public class ChuckIDE extends Application {
 
   private CodeArea getCurrentEditor() {
     Tab tab = tabPane.getSelectionModel().getSelectedItem();
-    if (tab != null && tab.getContent() instanceof CodeArea area) {
+    if (tab == null) return null;
+    if (tab.getContent() instanceof StackPane sp
+        && !sp.getChildren().isEmpty()
+        && sp.getChildren().get(0) instanceof CodeArea area) {
       return area;
     }
+    if (tab.getContent() instanceof CodeArea area) return area;
     return null;
   }
 
@@ -1549,9 +1581,11 @@ public class ChuckIDE extends Application {
     Button addShredBtn = new Button("Add Shred  [Ctrl+Enter]");
     addShredBtn.setStyle("-fx-background-color: #b8f0b8; -fx-font-weight: bold;");
     addShredBtn.setOnAction(e -> addShred());
+    this.addShredBtnRef = addShredBtn;
 
-    Button replaceBtn = new Button("Replace Last  [Ctrl+Shift+Enter]");
+    Button replaceBtn = new Button("Replace  [Ctrl+Shift+Enter]");
     replaceBtn.setOnAction(e -> replaceLastShred());
+    this.replaceBtnRef = replaceBtn;
 
     Button removeLastBtn = new Button("Remove Last  [Ctrl+.]");
     removeLastBtn.setOnAction(e -> removeLastShred());
@@ -1563,8 +1597,22 @@ public class ChuckIDE extends Application {
     Button recordBtn = new Button("Record");
     recordBtn.setOnAction(e -> toggleRecord(recordBtn));
 
+    stallWarningLabel = new Label("⚠ VM Stalled");
+    stallWarningLabel.setStyle(
+        "-fx-text-fill: white; -fx-background-color: #cc2200;"
+            + " -fx-padding: 2 8 2 8; -fx-background-radius: 3; -fx-font-weight: bold;");
+    stallWarningLabel.setVisible(false);
+
     ToolBar tb =
-        new ToolBar(addShredBtn, replaceBtn, removeLastBtn, stopAllBtn, new Separator(), recordBtn);
+        new ToolBar(
+            addShredBtn,
+            replaceBtn,
+            removeLastBtn,
+            stopAllBtn,
+            new Separator(),
+            recordBtn,
+            new Separator(),
+            stallWarningLabel);
 
     // Keyboard shortcuts on the scene — wired after scene is set
     Platform.runLater(
@@ -1763,9 +1811,14 @@ public class ChuckIDE extends Application {
   // ── Shred management ───────────────────────────────────────────────────────
 
   private void addShred() {
+    if (lockdownMode) {
+      print("[IDE] VM stalled — lockdown active. Stop all shreds first.");
+      return;
+    }
     CodeArea editor = getCurrentEditor();
     if (editor == null) return;
 
+    Tab currentTab = tabPane.getSelectionModel().getSelectedItem();
     File currentFile = getCurrentFile();
     String path = currentFile != null ? currentFile.getName() : "Untitled.ck";
     statusLabel.setText("  Compiling…");
@@ -1787,6 +1840,8 @@ public class ChuckIDE extends Application {
         }
         ShredInfo info = new ShredInfo(id, currentFile.getName(), shredObj);
         shredListView.getItems().add(info);
+        tabToShredId.put(currentTab, id);
+        flashEditor(currentTab, javafx.scene.paint.Color.LIMEGREEN);
         print("Sporked Java Shred " + id + " (" + currentFile.getName() + ")");
         updateStatus();
         return;
@@ -1813,7 +1868,8 @@ public class ChuckIDE extends Application {
       String name = currentFile != null ? currentFile.getName() : "User";
       ShredInfo info = new ShredInfo(shred.getId(), name, shred);
       shredListView.getItems().add(info);
-
+      tabToShredId.put(currentTab, shred.getId());
+      flashEditor(currentTab, javafx.scene.paint.Color.LIMEGREEN);
       print("Sporked Shred " + shred.getId() + " (" + name + ")");
       updateStatus();
 
@@ -1821,26 +1877,64 @@ public class ChuckIDE extends Application {
       String msg = ex.getMessage() != null ? ex.getMessage() : ex.toString();
       print("Compilation Error: " + msg);
       highlightErrorLine(msg);
+      flashEditor(currentTab, javafx.scene.paint.Color.RED);
       statusLabel.setText("  Compilation failed");
     }
   }
 
   private void replaceLastShred() {
-    if (!shredListView.getItems().isEmpty()) {
-      ShredInfo last = shredListView.getItems().get(shredListView.getItems().size() - 1);
-      vm.removeShred(last.id);
-      shredListView.getItems().remove(last);
-      print("Replacing Shred " + last.id);
+    if (lockdownMode) {
+      print("[IDE] VM stalled — lockdown active. Stop all shreds first.");
+      return;
     }
+    Tab currentTab = tabPane.getSelectionModel().getSelectedItem();
+    // Prefer the shred that was sporked from this tab; fall back to the last in the list
+    Integer tabShredId = tabToShredId.get(currentTab);
+    ShredInfo toRemove = null;
+    if (tabShredId != null) {
+      for (ShredInfo si : shredListView.getItems()) {
+        if (si.id == tabShredId) {
+          toRemove = si;
+          break;
+        }
+      }
+    }
+    if (toRemove == null && !shredListView.getItems().isEmpty()) {
+      toRemove = shredListView.getItems().get(shredListView.getItems().size() - 1);
+    }
+    if (toRemove != null) {
+      vm.removeShred(toRemove.id);
+      shredListView.getItems().remove(toRemove);
+      tabToShredId.remove(currentTab);
+      print("Replacing Shred " + toRemove.id);
+    }
+    // addShred will flash green; pre-flash orange to indicate replace
+    flashEditor(currentTab, javafx.scene.paint.Color.ORANGE);
     addShred();
   }
 
   private void removeLastShred() {
-    if (!shredListView.getItems().isEmpty()) {
-      ShredInfo last = shredListView.getItems().get(shredListView.getItems().size() - 1);
-      vm.removeShred(last.id);
-      shredListView.getItems().remove(last);
-      print("Removed Shred " + last.id);
+    Tab currentTab = tabPane.getSelectionModel().getSelectedItem();
+    // Prefer the shred from this tab
+    Integer tabShredId = tabToShredId.get(currentTab);
+    ShredInfo toRemove = null;
+    if (tabShredId != null) {
+      for (ShredInfo si : shredListView.getItems()) {
+        if (si.id == tabShredId) {
+          toRemove = si;
+          break;
+        }
+      }
+    }
+    if (toRemove == null && !shredListView.getItems().isEmpty()) {
+      toRemove = shredListView.getItems().get(shredListView.getItems().size() - 1);
+    }
+    if (toRemove != null) {
+      vm.removeShred(toRemove.id);
+      shredListView.getItems().remove(toRemove);
+      tabToShredId.remove(currentTab);
+      flashEditor(currentTab, javafx.scene.paint.Color.GRAY);
+      print("Removed Shred " + toRemove.id);
       updateStatus();
     }
   }
@@ -1859,6 +1953,8 @@ public class ChuckIDE extends Application {
     print("Stopping all shreds…");
     vm.clear();
     shredListView.getItems().clear();
+    tabToShredId.clear();
+    exitLockdown();
     statusLabel.setText("  VM cleared");
   }
 
@@ -1897,9 +1993,52 @@ public class ChuckIDE extends Application {
     // Removed shredListView.refresh() to keep buttons responsive
   }
 
+  // ── Stall / lockdown ───────────────────────────────────────────────────────
+
+  private void enterLockdown() {
+    if (lockdownMode) return;
+    lockdownMode = true;
+    if (addShredBtnRef != null) addShredBtnRef.setDisable(true);
+    if (replaceBtnRef != null) replaceBtnRef.setDisable(true);
+    if (stallWarningLabel != null) {
+      stallWarningLabel.setText("⚠ VM Stalled");
+      stallWarningLabel.setVisible(true);
+    }
+    statusLabel.setText("  ⚠ VM stalled — lockdown");
+  }
+
+  private void exitLockdown() {
+    lockdownMode = false;
+    stallFrameCount = 0;
+    lastVmTimeSample = -1;
+    if (addShredBtnRef != null) addShredBtnRef.setDisable(false);
+    if (replaceBtnRef != null) replaceBtnRef.setDisable(false);
+    if (stallWarningLabel != null) stallWarningLabel.setVisible(false);
+  }
+
   private void updateVMTime() {
-    double seconds = vm.getCurrentTime() / (double) vm.getSampleRate();
+    long nowSample = vm.getCurrentTime();
+    double seconds = nowSample / (double) vm.getSampleRate();
     vmTimeLabel.setText(String.format("Time: %.3fs", seconds));
+
+    // Stall detection: if the VM hasn't advanced since the last frame, increment stall counter.
+    // The animation timer fires at ~60 fps; we sample every ~3 frames → ~20 Hz, matching
+    // miniAudicle's VMMONITOR_REFRESH_RATE. A 2-second stall triggers lockdown.
+    boolean shredsRunning = !shredListView.getItems().isEmpty();
+    if (shredsRunning) {
+      if (nowSample == lastVmTimeSample) {
+        if (++stallFrameCount >= STALL_FRAMES_LOCKDOWN) {
+          enterLockdown();
+        }
+      } else {
+        stallFrameCount = 0;
+        if (lockdownMode) exitLockdown();
+      }
+    } else {
+      stallFrameCount = 0;
+      if (lockdownMode) exitLockdown();
+    }
+    lastVmTimeSample = nowSample;
   }
 
   private void renderSpectrum() {
@@ -1975,6 +2114,25 @@ public class ChuckIDE extends Application {
     } catch (IOException ex) {
       print("Recording error: " + ex.getMessage());
     }
+  }
+
+  // ── OTF Visual feedback (flash) ────────────────────────────────────────────
+
+  /**
+   * Flashes the editor background with {@code color} for ~400 ms, fading out — matching
+   * miniAudicle's animateAdd/animateError visual cues.
+   */
+  private void flashEditor(Tab tab, javafx.scene.paint.Color color) {
+    StackPane wrapper = tabToWrapper.get(tab);
+    if (wrapper == null) return;
+    Object obj = wrapper.getProperties().get("flashRect");
+    if (!(obj instanceof javafx.scene.shape.Rectangle rect)) return;
+    rect.setFill(color);
+    javafx.animation.FadeTransition ft =
+        new javafx.animation.FadeTransition(javafx.util.Duration.millis(400), rect);
+    ft.setFromValue(0.35);
+    ft.setToValue(0.0);
+    ft.play();
   }
 
   // ── Error line highlighting ─────────────────────────────────────────────────
