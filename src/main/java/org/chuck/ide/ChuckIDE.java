@@ -415,6 +415,15 @@ public class ChuckIDE extends Application {
   // Audio preferences (take effect on next IDE launch)
   private int prefSampleRate = 44100;
   private int prefBufferSize = 512;
+  private String prefOutputDevice = "";
+  private String prefInputDevice = "";
+
+  // VU meter bars (updated in animation timer)
+  private javafx.scene.control.ProgressBar vuLeft;
+  private javafx.scene.control.ProgressBar vuRight;
+
+  // Dirty-tracking: original text saved per tab (for unsaved-changes prompt)
+  private final Map<Tab, String> tabSavedText = new java.util.HashMap<>();
 
   // Toolbar button refs (needed for lockdown disable/enable)
   private Button addShredBtnRef;
@@ -466,6 +475,8 @@ public class ChuckIDE extends Application {
     // Load persisted audio preferences
     prefSampleRate = prefs.getInt("audio.sampleRate", 44100);
     prefBufferSize = prefs.getInt("audio.bufferSize", 512);
+    prefOutputDevice = prefs.get("audio.outputDevice", "");
+    prefInputDevice = prefs.get("audio.inputDevice", "");
 
     vm = new ChuckVM(prefSampleRate);
     vm.addPrintListener(this::print);
@@ -475,6 +486,8 @@ public class ChuckIDE extends Application {
     masterGain = new Gain();
 
     audio = new ChuckAudio(vm, prefBufferSize, 2, prefSampleRate);
+    audio.setOutputDeviceName(prefOutputDevice);
+    audio.setInputDeviceName(prefInputDevice);
 
     List<String> rawArgs = getParameters().getRaw();
     for (String arg : rawArgs) {
@@ -615,7 +628,22 @@ public class ChuckIDE extends Application {
               audio.setMasterGain(newV.floatValue());
             });
 
-    VBox masterControls = new VBox(5, new Label("Master Gain"), masterGainSlider, vmTimeLabel);
+    // VU meters — live peak level indicators, updated by the animation timer
+    vuLeft = new javafx.scene.control.ProgressBar(0);
+    vuRight = new javafx.scene.control.ProgressBar(0);
+    vuLeft.setPrefWidth(Double.MAX_VALUE);
+    vuRight.setPrefWidth(Double.MAX_VALUE);
+    vuLeft.setStyle("-fx-accent: limegreen;");
+    vuRight.setStyle("-fx-accent: limegreen;");
+
+    HBox vuBox = new HBox(4, new Label("L"), vuLeft, new Label("R"), vuRight);
+    vuBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+    HBox.setHgrow(vuLeft, Priority.ALWAYS);
+    HBox.setHgrow(vuRight, Priority.ALWAYS);
+
+    VBox masterControls =
+        new VBox(
+            5, new Label("Master Gain"), masterGainSlider, new Label("Level"), vuBox, vmTimeLabel);
     masterControls.setStyle("-fx-background-color: #eee; -fx-padding: 8; -fx-border-color: #ccc;");
     masterControls.setMinHeight(0);
 
@@ -912,8 +940,63 @@ public class ChuckIDE extends Application {
     Tab tab = new Tab(title, tabContent);
     tabToWrapper.put(tab, editorWrapper);
     tabToArgs.put(tab, argsField);
+    tabSavedText.put(
+        tab, content); // baseline = initial content (empty for new, file text for loaded)
+
+    // Mark tab dirty when content changes
+    editor
+        .plainTextChanges()
+        .subscribe(
+            ch -> {
+              String saved = tabSavedText.get(tab);
+              boolean dirty = saved == null || !editor.getText().equals(saved);
+              String base = tab.getText().replaceFirst("^\\* ?", "");
+              String wanted = dirty ? "* " + base : base;
+              if (!tab.getText().equals(wanted)) tab.setText(wanted);
+            });
+
+    // Intercept tab close — prompt if dirty
+    tab.setOnCloseRequest(
+        e -> {
+          if (isTabDirty(tab) && !confirmClose(tab)) {
+            e.consume(); // cancel close
+          } else {
+            tabToFile.remove(tab);
+            tabToWrapper.remove(tab);
+            tabToArgs.remove(tab);
+            tabToShredId.remove(tab);
+            tabSavedText.remove(tab);
+          }
+        });
+
     tabPane.getTabs().add(tab);
     tabPane.getSelectionModel().select(tab);
+  }
+
+  private boolean isTabDirty(Tab tab) {
+    String saved = tabSavedText.get(tab);
+    CodeArea ed = editorFromTab(tab);
+    if (ed == null) return false;
+    return saved == null || !ed.getText().equals(saved);
+  }
+
+  /** Returns true if the user chose to proceed (discard or saved), false to cancel. */
+  private boolean confirmClose(Tab tab) {
+    String name = tab.getText().replaceFirst("^\\* ?", "");
+    Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+    alert.setTitle("Unsaved Changes");
+    alert.setHeaderText("\"" + name + "\" has unsaved changes.");
+    alert.setContentText("Save before closing?");
+    ButtonType save = new ButtonType("Save");
+    ButtonType discard = new ButtonType("Discard");
+    ButtonType cancel = ButtonType.CANCEL;
+    alert.getButtonTypes().setAll(save, discard, cancel);
+    var result = alert.showAndWait().orElse(cancel);
+    if (result == save) {
+      saveFile(stage);
+      return true;
+    }
+    return result == discard;
   }
 
   // ── Kind badge colours (used in cell factory) ─────────────────────────────
@@ -1498,9 +1581,13 @@ public class ChuckIDE extends Application {
     closeTabItem.setOnAction(
         e -> {
           Tab sel = tabPane.getSelectionModel().getSelectedItem();
-          if (sel != null) {
+          if (sel != null && (!isTabDirty(sel) || confirmClose(sel))) {
             tabPane.getTabs().remove(sel);
             tabToFile.remove(sel);
+            tabToWrapper.remove(sel);
+            tabToArgs.remove(sel);
+            tabToShredId.remove(sel);
+            tabSavedText.remove(sel);
           }
         });
 
@@ -2121,6 +2208,25 @@ public class ChuckIDE extends Application {
       if (lockdownMode) exitLockdown();
     }
     lastVmTimeSample = nowSample;
+
+    // VU meters: read peak-with-decay from audio engine
+    if (vuLeft != null && vuRight != null && audio != null) {
+      double peak0 = Math.min(1.0, audio.getPeakOut(0));
+      double peak1 = Math.min(1.0, audio.getPeakOut(1));
+      vuLeft.setProgress(peak0);
+      vuRight.setProgress(peak1);
+      // Colour: green < -6 dBFS, yellow < -3 dBFS, red ≥ -3 dBFS
+      String leftStyle =
+          peak0 > 0.707
+              ? "-fx-accent: red;"
+              : peak0 > 0.5 ? "-fx-accent: gold;" : "-fx-accent: limegreen;";
+      String rightStyle =
+          peak1 > 0.707
+              ? "-fx-accent: red;"
+              : peak1 > 0.5 ? "-fx-accent: gold;" : "-fx-accent: limegreen;";
+      if (!leftStyle.equals(vuLeft.getStyle())) vuLeft.setStyle(leftStyle);
+      if (!rightStyle.equals(vuRight.getStyle())) vuRight.setStyle(rightStyle);
+    }
   }
 
   private void renderSpectrum() {
@@ -2269,8 +2375,11 @@ public class ChuckIDE extends Application {
 
   private void loadFileIntoEditor(File file) {
     try {
-      addNewTab(file.getName(), Files.readString(file.toPath()));
-      tabToFile.put(tabPane.getSelectionModel().getSelectedItem(), file);
+      String text = Files.readString(file.toPath());
+      addNewTab(file.getName(), text);
+      Tab tab = tabPane.getSelectionModel().getSelectedItem();
+      tabToFile.put(tab, file);
+      tabSavedText.put(tab, text); // mark clean immediately after load
       print("Loaded: " + file.getAbsolutePath());
       addToRecentFiles(file);
     } catch (IOException ex) {
@@ -2296,7 +2405,10 @@ public class ChuckIDE extends Application {
       saveFileAs(stage);
     } else {
       try {
-        Files.writeString(file.toPath(), getCurrentEditor().getText());
+        String text = getCurrentEditor().getText();
+        Files.writeString(file.toPath(), text);
+        tabSavedText.put(tab, text);
+        tab.setText(file.getName()); // remove dirty asterisk
         print("Saved: " + file.getAbsolutePath());
       } catch (IOException ex) {
         print("Error saving: " + ex.getMessage());
@@ -2314,10 +2426,12 @@ public class ChuckIDE extends Application {
     File file = fc.showSaveDialog(stage);
     if (file != null) {
       try {
-        Files.writeString(file.toPath(), getCurrentEditor().getText());
+        String text = getCurrentEditor().getText();
+        Files.writeString(file.toPath(), text);
         Tab tab = tabPane.getSelectionModel().getSelectedItem();
         tab.setText(file.getName());
         tabToFile.put(tab, file);
+        tabSavedText.put(tab, text);
         print("Saved: " + file.getAbsolutePath());
         addToRecentFiles(file);
       } catch (IOException ex) {
@@ -2390,6 +2504,20 @@ public class ChuckIDE extends Application {
             javafx.collections.FXCollections.observableArrayList(128, 256, 512, 1024, 2048));
     bufBox.setValue(prefBufferSize);
 
+    // Device lists (probed at dialog open time)
+    java.util.List<String> outDevices = ChuckAudio.getOutputDeviceNames();
+    java.util.List<String> inDevices = ChuckAudio.getInputDeviceNames();
+
+    javafx.scene.control.ChoiceBox<String> outDevBox =
+        new javafx.scene.control.ChoiceBox<>(
+            javafx.collections.FXCollections.observableArrayList(outDevices));
+    outDevBox.setValue(outDevices.contains(prefOutputDevice) ? prefOutputDevice : "");
+
+    javafx.scene.control.ChoiceBox<String> inDevBox =
+        new javafx.scene.control.ChoiceBox<>(
+            javafx.collections.FXCollections.observableArrayList(inDevices));
+    inDevBox.setValue(inDevices.contains(prefInputDevice) ? prefInputDevice : "");
+
     Label restartNote = new Label("⚠ Changes take effect after restarting the IDE.");
     restartNote.setStyle("-fx-text-fill: #884400; -fx-font-style: italic;");
 
@@ -2401,7 +2529,11 @@ public class ChuckIDE extends Application {
     audioGrid.add(srBox, 1, 0);
     audioGrid.add(new Label("Buffer size (samples):"), 0, 1);
     audioGrid.add(bufBox, 1, 1);
-    audioGrid.add(restartNote, 0, 2, 2, 1);
+    audioGrid.add(new Label("Output device:"), 0, 2);
+    audioGrid.add(outDevBox, 1, 2);
+    audioGrid.add(new Label("Input device:"), 0, 3);
+    audioGrid.add(inDevBox, 1, 3);
+    audioGrid.add(restartNote, 0, 4, 2, 1);
 
     Tab audioTab = new Tab("Audio", audioGrid);
     audioTab.setClosable(false);
@@ -2440,8 +2572,12 @@ public class ChuckIDE extends Application {
               // Audio — persist for next launch
               prefSampleRate = srBox.getValue();
               prefBufferSize = bufBox.getValue();
+              prefOutputDevice = outDevBox.getValue() != null ? outDevBox.getValue() : "";
+              prefInputDevice = inDevBox.getValue() != null ? inDevBox.getValue() : "";
               prefs.putInt("audio.sampleRate", prefSampleRate);
               prefs.putInt("audio.bufferSize", prefBufferSize);
+              prefs.put("audio.outputDevice", prefOutputDevice);
+              prefs.put("audio.inputDevice", prefInputDevice);
 
               // Apply font size to all open editors immediately
               String fontStyle =

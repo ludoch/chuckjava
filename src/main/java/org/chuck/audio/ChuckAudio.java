@@ -45,6 +45,50 @@ public class ChuckAudio {
   // Optional recorder
   private WvOut recorder;
 
+  /** Name of the preferred output mixer (empty = system default). */
+  private String outputDeviceName = "";
+
+  /** Name of the preferred input mixer (empty = system default). */
+  private String inputDeviceName = "";
+
+  public void setOutputDeviceName(String name) {
+    this.outputDeviceName = name == null ? "" : name;
+  }
+
+  public void setInputDeviceName(String name) {
+    this.inputDeviceName = name == null ? "" : name;
+  }
+
+  /** Returns all mixer names that support SourceDataLine (playback). */
+  public static java.util.List<String> getOutputDeviceNames() {
+    java.util.List<String> names = new java.util.ArrayList<>();
+    names.add(""); // system default
+    for (javax.sound.sampled.Mixer.Info info : AudioSystem.getMixerInfo()) {
+      try {
+        javax.sound.sampled.Mixer m = AudioSystem.getMixer(info);
+        DataLine.Info dl = new DataLine.Info(SourceDataLine.class, null);
+        if (m.isLineSupported(dl)) names.add(info.getName());
+      } catch (Exception ignored) {
+      }
+    }
+    return names;
+  }
+
+  /** Returns all mixer names that support TargetDataLine (capture). */
+  public static java.util.List<String> getInputDeviceNames() {
+    java.util.List<String> names = new java.util.ArrayList<>();
+    names.add(""); // system default
+    for (javax.sound.sampled.Mixer.Info info : AudioSystem.getMixerInfo()) {
+      try {
+        javax.sound.sampled.Mixer m = AudioSystem.getMixer(info);
+        DataLine.Info dl = new DataLine.Info(TargetDataLine.class, null);
+        if (m.isLineSupported(dl)) names.add(info.getName());
+      } catch (Exception ignored) {
+      }
+    }
+    return names;
+  }
+
   public ChuckAudio(ChuckVM vm, int bufferSize, int numChannels, float sampleRate) {
     this.vm = vm;
     this.bufferSize = bufferSize;
@@ -66,39 +110,83 @@ public class ChuckAudio {
     this.targetGain = gain;
   }
 
+  /** Opens a SourceDataLine on the named mixer, falling back to system default. */
+  private SourceDataLine openOutputLine(AudioFormat fmt) throws LineUnavailableException {
+    if (!outputDeviceName.isEmpty()) {
+      for (javax.sound.sampled.Mixer.Info info : AudioSystem.getMixerInfo()) {
+        if (info.getName().equals(outputDeviceName)) {
+          try {
+            javax.sound.sampled.Mixer m = AudioSystem.getMixer(info);
+            DataLine.Info dl = new DataLine.Info(SourceDataLine.class, fmt);
+            SourceDataLine line = (SourceDataLine) m.getLine(dl);
+            logger.log(Level.INFO, "[Audio] Output device: " + info.getName());
+            return line;
+          } catch (Exception ignored) {
+            logger.log(
+                Level.WARNING,
+                "[Audio] Could not open output device '"
+                    + outputDeviceName
+                    + "', falling back to default");
+          }
+        }
+      }
+    }
+    return (SourceDataLine) AudioSystem.getLine(new DataLine.Info(SourceDataLine.class, fmt));
+  }
+
+  /** Opens a TargetDataLine on the named mixer, falling back to system default. */
+  private TargetDataLine openInputLine(AudioFormat fmt) throws LineUnavailableException {
+    if (!inputDeviceName.isEmpty()) {
+      for (javax.sound.sampled.Mixer.Info info : AudioSystem.getMixerInfo()) {
+        if (info.getName().equals(inputDeviceName)) {
+          try {
+            javax.sound.sampled.Mixer m = AudioSystem.getMixer(info);
+            DataLine.Info dl = new DataLine.Info(TargetDataLine.class, fmt);
+            TargetDataLine line = (TargetDataLine) m.getLine(dl);
+            logger.log(Level.INFO, "[Audio] Input device: " + info.getName());
+            return line;
+          } catch (Exception ignored) {
+            logger.log(
+                Level.WARNING,
+                "[Audio] Could not open input device '"
+                    + inputDeviceName
+                    + "', falling back to default");
+          }
+        }
+      }
+    }
+    return (TargetDataLine) AudioSystem.getLine(new DataLine.Info(TargetDataLine.class, fmt));
+  }
+
   private void initJavaSound() {
     // Recompute alpha for actual sample rate: 1 − exp(−1/(sr × rampSeconds))
     gainSmoothAlpha = (float) (1.0 - Math.exp(-1.0 / (sampleRate * 0.02)));
     AudioFormat format = new AudioFormat(sampleRate, 16, numChannels, true, false);
     // Output
     try {
-      DataLine.Info outInfo = new DataLine.Info(SourceDataLine.class, format);
-      outputLine = (SourceDataLine) AudioSystem.getLine(outInfo);
+      outputLine = openOutputLine(format);
       outputLine.open(format, bufferSize * numChannels * 4);
     } catch (LineUnavailableException e) {
       logger.log(Level.SEVERE, "Audio output unavailable: " + e.getMessage());
     }
     // Input (microphone) — optional
     try {
-      DataLine.Info inInfo = new DataLine.Info(TargetDataLine.class, format);
-      if (!AudioSystem.isLineSupported(inInfo)) {
+      if (!AudioSystem.isLineSupported(new DataLine.Info(TargetDataLine.class, format))) {
         // Try mono if stereo not supported
         AudioFormat monoFormat = new AudioFormat(sampleRate, 16, 1, true, false);
-        inInfo = new DataLine.Info(TargetDataLine.class, monoFormat);
-        if (AudioSystem.isLineSupported(inInfo)) {
-          inputLine = (TargetDataLine) AudioSystem.getLine(inInfo);
-          inputLine.open(monoFormat, bufferSize * 1 * 4);
+        if (AudioSystem.isLineSupported(new DataLine.Info(TargetDataLine.class, monoFormat))) {
+          inputLine = openInputLine(monoFormat);
+          inputLine.open(monoFormat, bufferSize * 4);
           numInputChannels = 1;
           logger.log(Level.INFO, "[Audio] Microphone input line opened (MONO): " + monoFormat);
         }
       } else {
-        inputLine = (TargetDataLine) AudioSystem.getLine(inInfo);
+        inputLine = openInputLine(format);
         inputLine.open(format, bufferSize * numChannels * 4);
         logger.log(Level.INFO, "[Audio] Microphone input line opened: " + format);
       }
     } catch (LineUnavailableException | SecurityException e) {
       logger.log(Level.INFO, "[Audio] Microphone access failed: " + e.getMessage());
-      // No mic access — adc will produce silence
       inputLine = null;
     }
   }
@@ -143,6 +231,9 @@ public class ChuckAudio {
                   }
 
                   double sumSq = 0;
+                  // Reset per-buffer peak accumulators
+                  float[] bufPeak = new float[numChannels];
+
                   // ── Per-sample/block processing ─────────────────────────────────────
                   for (int i = 0; i < bufferSize; ) {
                     // Check if we can do a block (currently, we always advance time by 1
@@ -180,6 +271,8 @@ public class ChuckAudio {
                       float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
 
                       sumSq += (double) sample * sample;
+                      float abs = Math.abs(sample);
+                      if (abs > bufPeak[c]) bufPeak[c] = abs;
                       short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
 
                       // Write directly to off-heap MemorySegment
@@ -196,6 +289,11 @@ public class ChuckAudio {
                     if (rms > 1e-9) {
                       vm.print(String.format("[Audio] Engine RMS: %.6f\n", rms));
                     }
+                  }
+
+                  // Publish peak levels for VU meters (with ~10ms decay per buffer)
+                  for (int c = 0; c < numChannels && c < peakOut.length; c++) {
+                    peakOut[c] = Math.max(bufPeak[c], peakOut[c] * 0.97f);
                   }
 
                   // Transfer from off-heap to byte array for JavaSound write
@@ -233,6 +331,13 @@ public class ChuckAudio {
 
   public double getMaxDriftMs() {
     return maxDriftNanos.get() / 1_000_000.0;
+  }
+
+  /** Peak amplitude [0,1] for each output channel — updated every buffer for the VU meters. */
+  private final float[] peakOut = new float[8];
+
+  public float getPeakOut(int channel) {
+    return channel < peakOut.length ? peakOut[channel] : 0f;
   }
 
   public void stop() {
