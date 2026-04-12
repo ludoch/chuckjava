@@ -54,6 +54,12 @@ public class ChuckShred implements Comparable<ChuckShred> {
   public int pc = 0;
   private int framePointer = 0; // Index in mem stack where current frame starts
 
+  private final ChuckObjectPool.ShredAllocator allocator = ChuckObjectPool.acquireAllocator();
+
+  public ChuckObjectPool.ShredAllocator getAllocator() {
+    return allocator;
+  }
+
   public ChuckShred(ChuckCode code) {
     this.id = ID_GENERATOR.getAndIncrement();
     this.code = code;
@@ -211,6 +217,7 @@ public class ChuckShred implements Comparable<ChuckShred> {
       }
     }
     closeables.clear();
+    ChuckObjectPool.releaseAllocator(allocator);
     // Signal completion to anything waiting on this shred
     abort();
   }
