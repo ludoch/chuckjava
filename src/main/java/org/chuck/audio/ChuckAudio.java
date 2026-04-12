@@ -2,6 +2,7 @@ package org.chuck.audio;
 
 import java.io.IOException;
 import java.lang.foreign.*;
+import java.nio.ByteOrder;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.sound.sampled.*;
@@ -233,55 +234,38 @@ public class ChuckAudio {
                   // Reset per-buffer peak accumulators
                   float[] bufPeak = new float[numChannels];
 
-                  // ── Per-sample/block processing ─────────────────────────────────────
-                  for (int i = 0; i < bufferSize; ) {
-                    long currentTime = vm.getCurrentTime();
-                    long nextWake = vm.getNextWakeTime();
-
-                    // How many samples can we process before the next shred needs to wake up?
-                    // Never process more than the remaining buffer size.
-                    int samplesToProcess =
-                        (int) Math.min(bufferSize - i, Math.max(1, nextWake - currentTime));
-
+                  // ── Per-sample processing ─────────────────────────────────────
+                  for (int i = 0; i < bufferSize; i++) {
                     // Feed ADC
                     if (inBuf != null) {
-                      // Note: ADC block feeding needs care if samplesToProcess > 1
-                      // For now, if we process a block, we only feed the first sample's ADC data
-                      // or we loop. Let's loop for correctness.
-                      for (int s = 0; s < samplesToProcess; s++) {
-                        for (int c = 0; c < numChannels; c++) {
-                          int inputChan = Math.min(c, numInputChannels - 1);
-                          int idx = ((i + s) * numInputChannels + inputChan) * 2;
-                          short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
-                          vm.adc.setInputSample(c, pcm / 32768.0f);
-                        }
+                      for (int c = 0; c < numChannels; c++) {
+                        int inputChan = Math.min(c, numInputChannels - 1);
+                        int idx = (i * numInputChannels + inputChan) * 2;
+                        short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
+                        vm.adc.setInputSample(c, pcm / 32768.0f);
                       }
                     }
 
-                    // IMPORTANT: Advance time BEFORE reading DAC to ensure shreds run.
-                    vm.advanceTime(samplesToProcess);
+                    // Advance time by 1 sample
+                    vm.advanceTime(1);
 
                     // Smooth gain toward target to prevent zipper noise on rapid slider changes.
-                    // If processing a block, we should ideally smooth across the whole block.
-                    // For now, we apply the target gain to the whole block.
-                    smoothedGain = targetGain;
+                    smoothedGain += gainSmoothAlpha * (targetGain - smoothedGain);
 
                     // Interleave Left/Right for stereo output
                     for (int c = 0; c < numChannels; c++) {
-                      // Multi-sample tick support in DacChannel
-                      vm.getDacChannel(c)
-                          .tick(outSeg, i, samplesToProcess, currentTime, smoothedGain);
+                      float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
 
-                      // Update per-buffer peak accumulators (using the last sample of the block for
-                      // peak is a shortcut,
-                      // ideally we'd scan the block, but DacChannel.tick can do that).
-                      float lastSample = vm.getDacChannel(c).getLastOut();
-                      sumSq += (double) lastSample * lastSample * samplesToProcess;
-                      float abs = Math.abs(lastSample);
+                      sumSq += (double) sample * sample;
+                      float abs = Math.abs(sample);
                       if (abs > bufPeak[c]) bufPeak[c] = abs;
-                    }
+                      short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
 
-                    i += samplesToProcess;
+                      // Write directly to off-heap MemorySegment
+                      long offset = (long) (i * numChannels + c) * 2;
+                      outSeg.set(
+                          ValueLayout.JAVA_SHORT.withOrder(ByteOrder.LITTLE_ENDIAN), offset, s16);
+                    }
                   }
 
                   if (verbose > 1 || (verbose > 0 && vm.getCurrentTime() % (sampleRate * 2) == 0)) {
