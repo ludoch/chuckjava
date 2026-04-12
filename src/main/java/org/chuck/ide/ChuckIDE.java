@@ -83,25 +83,49 @@ import org.fxmisc.richtext.model.StyleSpansBuilder;
  */
 public class ChuckIDE extends Application {
 
+  /** Completion item: the text to insert, a short label to display, and its kind badge. */
+  private record CompItem(String insertText, String label, String kind) {}
+
   private static final List<String> TYPE_CANDIDATES =
       List.of(
+          // Primitives / control
           "int",
           "float",
           "dur",
           "time",
           "string",
           "void",
-          "Event",
+          "auto",
           "if",
           "else",
           "while",
           "for",
           "repeat",
+          "do",
+          "until",
           "return",
+          "break",
+          "continue",
           "new",
           "spork",
           "fun",
           "class",
+          "extends",
+          "public",
+          "private",
+          "static",
+          "abstract",
+          "interface",
+          "loop",
+          "switch",
+          "case",
+          "default",
+          // Built-in events / types
+          "Event",
+          "Object",
+          "UGen",
+          "UAna",
+          // Oscillators
           "SinOsc",
           "SawOsc",
           "TriOsc",
@@ -111,10 +135,47 @@ public class ChuckIDE extends Application {
           "Noise",
           "Impulse",
           "Step",
+          "BlitSaw",
+          "BlitSquare",
+          "Blit",
+          // Filters
+          "LPF",
+          "HPF",
+          "BPF",
+          "BRF",
+          "ResonZ",
+          "BiQuad",
+          "OnePole",
+          "OneZero",
+          "TwoPole",
+          "TwoZero",
+          "PoleZero",
+          // Effects
+          "Echo",
+          "Delay",
+          "DelayL",
+          "DelayA",
+          "DelayP",
+          "Chorus",
+          "JCRev",
+          "AllPass",
+          "Pan2",
+          "Gain",
+          // Envelopes
+          "ADSR",
+          "Adsr",
+          "Envelope",
+          // STK instruments
           "Mandolin",
           "Clarinet",
           "Plucked",
           "Rhodey",
+          "Wurley",
+          "BeeThree",
+          "HevyMetl",
+          "PercFlut",
+          "TubeBell",
+          "FMVoices",
           "Bowed",
           "StifKarp",
           "Moog",
@@ -123,37 +184,51 @@ public class ChuckIDE extends Application {
           "Brass",
           "Saxofony",
           "Shakers",
-          "ADSR",
-          "Adsr",
-          "Envelope",
-          "Gain",
-          "Pan2",
+          "ModalBar",
+          "VoicForm",
+          // Analysis (UAna)
           "FFT",
           "IFFT",
-          "LiSa",
-          "Gen5",
-          "Gen7",
-          "Gen10",
+          "DCT",
+          "IDCT",
+          "ZCR",
           "RMS",
           "Centroid",
-          "Echo",
-          "Delay",
-          "DelayL",
-          "JCRev",
-          "Chorus",
-          "ResonZ",
-          "Lpf",
-          "OnePole",
-          "OneZero",
-          "MidiIn",
+          "MFCC",
+          "SFM",
+          "Kurtosis",
+          "AutoCorr",
+          "XCorr",
+          "Chroma",
+          "FeatureCollector",
+          // Buffers / I/O
           "SndBuf",
           "WvOut",
-          "IO",
+          "LiSa",
+          "MidiIn",
+          "MidiMsg",
+          "MidiFileIn",
           "OscIn",
           "OscOut",
           "OscMsg",
+          "OscEvent",
           "Hid",
           "HidMsg",
+          "HidOut",
+          "IO",
+          "FileIO",
+          "StringTokenizer",
+          "ConsoleInput",
+          "KBHit",
+          "SerialIO",
+          // AI / ML
+          "KNN",
+          "KNN2",
+          "SVM",
+          "MLP",
+          "HMM",
+          "PCA",
+          // Builtins
           "dac",
           "adc",
           "blackhole",
@@ -161,13 +236,23 @@ public class ChuckIDE extends Application {
           "second",
           "ms",
           "samp",
+          "minute",
+          "hour",
+          "day",
+          "week",
           "Std",
           "Math",
           "Machine",
           "me",
           "chout",
           "cherr",
-          "newline");
+          "newline",
+          // Literals
+          "true",
+          "false",
+          "null",
+          "maybe",
+          "pi");
 
   private static final List<String> MEMBER_CANDIDATES =
       List.of(
@@ -210,15 +295,29 @@ public class ChuckIDE extends Application {
 
   // ── Syntax highlighting patterns ───────────────────────────────────────────
   private static final String KEYWORD_PATTERN =
-      "\\b(if|else|while|for|repeat|return|new|spork|fun|class|extends|public|private|static|void)\\b";
+      "\\b(if|else|while|for|repeat|return|break|continue|new|spork|fun|class|"
+          + "extends|public|private|static|void|abstract|interface|loop|do|until|"
+          + "auto|switch|case|default)\\b";
   private static final String TYPE_PATTERN =
-      "\\b(int|float|dur|time|string|"
-          + "SinOsc|SawOsc|TriOsc|SqrOsc|PulseOsc|Phasor|Noise|Impulse|Step|"
-          + "Mandolin|Clarinet|Plucked|Rhodey|Bowed|StifKarp|Moog|Flute|Sitar|Brass|Saxofony|Shakers|"
-          + "ADSR|Adsr|Gain|Pan2|FFT|IFFT|LiSa|Gen5|Gen7|Gen10|Echo|Delay|DelayL|JCRev|Chorus|ResonZ|Lpf|OnePole|OneZero|"
-          + "MidiIn|SndBuf|WvOut|OscIn|OscOut|OscMsg|Hid|HidMsg)\\b";
+      "\\b(int|float|dur|time|string|complex|polar|vec2|vec3|vec4|"
+          + "SinOsc|SawOsc|TriOsc|SqrOsc|PulseOsc|Phasor|Noise|Impulse|Step|BlitSaw|BlitSquare|Blit|"
+          + "LPF|HPF|BPF|BRF|ResonZ|BiQuad|OnePole|OneZero|TwoPole|TwoZero|PoleZero|"
+          + "Echo|Delay|DelayL|DelayA|DelayP|Chorus|JCRev|AllPass|Pan2|Gain|"
+          + "ADSR|Adsr|Envelope|"
+          + "Mandolin|Clarinet|Plucked|Rhodey|Wurley|BeeThree|HevyMetl|PercFlut|TubeBell|FMVoices|"
+          + "Bowed|StifKarp|Moog|Flute|Sitar|Brass|Saxofony|Shakers|ModalBar|VoicForm|"
+          + "FFT|IFFT|DCT|IDCT|ZCR|RMS|Centroid|MFCC|SFM|Kurtosis|AutoCorr|XCorr|Chroma|FeatureCollector|"
+          + "SndBuf|WvOut|LiSa|MidiIn|MidiMsg|MidiFileIn|"
+          + "OscIn|OscOut|OscMsg|OscEvent|Hid|HidMsg|HidOut|"
+          + "IO|FileIO|StringTokenizer|ConsoleInput|KBHit|SerialIO|"
+          + "KNN|KNN2|SVM|MLP|HMM|PCA|"
+          + "Event|Object|UGen|UAna)\\b";
   private static final String BUILTIN_PATTERN =
-      "\\b(dac|adc|blackhole|now|second|ms|samp|Std|Math|Machine|me|chout|cherr|newline)\\b";
+      "\\b(dac|adc|blackhole|now|second|ms|samp|minute|hour|day|week|"
+          + "Std|Math|Machine|me|chout|cherr|newline)\\b";
+  private static final String BOOLEAN_PATTERN = "\\b(true|false|null|maybe|pi|e|sqrt2)\\b";
+  private static final String ANNOTATION_PATTERN =
+      "@(doc|operator|construct|destruct|this|return)\\b";
   private static final String NUMBER_PATTERN = "\\b\\d+(\\.\\d+)?\\b";
   private static final String STRING_PATTERN = "\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"";
   private static final String COMMENT_PATTERN = "//[^\n]*|/\\*.*?\\*/";
@@ -229,6 +328,9 @@ public class ChuckIDE extends Application {
           "(?<COMMENT>"
               + COMMENT_PATTERN
               + ")"
+              + "|(?<ANNOTATION>"
+              + ANNOTATION_PATTERN
+              + ")"
               + "|(?<KEYWORD>"
               + KEYWORD_PATTERN
               + ")"
@@ -237,6 +339,9 @@ public class ChuckIDE extends Application {
               + ")"
               + "|(?<BUILTIN>"
               + BUILTIN_PATTERN
+              + ")"
+              + "|(?<BOOLEAN>"
+              + BOOLEAN_PATTERN
               + ")"
               + "|(?<STRING>"
               + STRING_PATTERN
@@ -605,17 +710,21 @@ public class ChuckIDE extends Application {
       String styleClass =
           m.group("COMMENT") != null
               ? "ck-comment"
-              : m.group("KEYWORD") != null
-                  ? "ck-keyword"
-                  : m.group("TYPE") != null
-                      ? "ck-type"
-                      : m.group("BUILTIN") != null
-                          ? "ck-builtin"
-                          : m.group("STRING") != null
-                              ? "ck-string"
-                              : m.group("NUMBER") != null
-                                  ? "ck-number"
-                                  : m.group("CHUCKOP") != null ? "ck-chuckop" : null;
+              : m.group("ANNOTATION") != null
+                  ? "ck-annotation"
+                  : m.group("KEYWORD") != null
+                      ? "ck-keyword"
+                      : m.group("TYPE") != null
+                          ? "ck-type"
+                          : m.group("BUILTIN") != null
+                              ? "ck-builtin"
+                              : m.group("BOOLEAN") != null
+                                  ? "ck-boolean"
+                                  : m.group("STRING") != null
+                                      ? "ck-string"
+                                      : m.group("NUMBER") != null
+                                          ? "ck-number"
+                                          : m.group("CHUCKOP") != null ? "ck-chuckop" : null;
       spansBuilder.add(Collections.emptyList(), m.start() - lastEnd);
       spansBuilder.add(
           styleClass != null ? Collections.singleton(styleClass) : Collections.emptyList(),
@@ -628,30 +737,23 @@ public class ChuckIDE extends Application {
 
   /** Apply highlight colours as inline JavaFX CSS (avoids needing an external file). */
   private void applyInlineStyles(Scene scene) {
-    scene
-        .getRoot()
-        .setStyle(
-            ".ck-comment  { -rtfx-background-color: transparent; -fx-fill: #5c7a5c; }"
-                + ".ck-keyword  { -fx-fill: #cc7722; -fx-font-weight: bold; }"
-                + ".ck-type     { -fx-fill: #2255aa; -fx-font-weight: bold; }"
-                + ".ck-builtin  { -fx-fill: #8844aa; }"
-                + ".ck-string   { -fx-fill: #b5491c; }"
-                + ".ck-number   { -fx-fill: #1c7c1c; }"
-                + ".ck-chuckop  { -fx-fill: #aa3322; -fx-font-weight: bold; }");
+    String css =
+        ".ck-comment    { -rtfx-background-color: transparent; -fx-fill: #6a9955; }"
+            + ".ck-annotation { -fx-fill: #c792ea; -fx-font-style: italic; }"
+            + ".ck-keyword    { -fx-fill: #c586c0; -fx-font-weight: bold; }"
+            + ".ck-type       { -fx-fill: #4ec9b0; -fx-font-weight: bold; }"
+            + ".ck-builtin    { -fx-fill: #9cdcfe; }"
+            + ".ck-boolean    { -fx-fill: #569cd6; -fx-font-weight: bold; }"
+            + ".ck-string     { -fx-fill: #ce9178; }"
+            + ".ck-number     { -fx-fill: #b5cea8; }"
+            + ".ck-chuckop    { -fx-fill: #d4d4d4; -fx-font-weight: bold; }";
+    scene.getRoot().setStyle(css);
     // Inject into scene stylesheets so RichTextFX picks them up
     scene
         .getStylesheets()
         .add(
             "data:text/css,"
-                + java.net.URLEncoder.encode(
-                    ".ck-comment  { -rtfx-background-color: transparent; -fx-fill: #5c7a5c; }"
-                        + ".ck-keyword  { -fx-fill: #cc7722; -fx-font-weight: bold; }"
-                        + ".ck-type     { -fx-fill: #2255aa; -fx-font-weight: bold; }"
-                        + ".ck-builtin  { -fx-fill: #8844aa; }"
-                        + ".ck-string   { -fx-fill: #b5491c; }"
-                        + ".ck-number   { -fx-fill: #1c7c1c; }"
-                        + ".ck-chuckop  { -fx-fill: #aa3322; -fx-font-weight: bold; }",
-                    java.nio.charset.StandardCharsets.UTF_8));
+                + java.net.URLEncoder.encode(css, java.nio.charset.StandardCharsets.UTF_8));
   }
 
   private void addNewTab(String title, String content) {
@@ -687,6 +789,8 @@ public class ChuckIDE extends Application {
             if (pos >= 2 && "::".equals(editor.getText(pos - 2, pos))) {
               Platform.runLater(() -> showCompletionPopup(editor));
             }
+          } else if ("(".equals(ch)) {
+            Platform.runLater(() -> showParamHint(editor));
           }
         });
 
@@ -728,6 +832,183 @@ public class ChuckIDE extends Application {
     tabPane.getSelectionModel().select(tab);
   }
 
+  // ── Kind badge colours (used in cell factory) ─────────────────────────────
+  private static final Map<String, String> KIND_COLORS =
+      Map.ofEntries(
+          Map.entry("osc", "#4ec9b0"),
+          Map.entry("fx", "#9cdcfe"),
+          Map.entry("filter", "#4fc1ff"),
+          Map.entry("stk", "#c3e88d"),
+          Map.entry("env", "#ffcb6b"),
+          Map.entry("ana", "#f78c6c"),
+          Map.entry("io", "#82aaff"),
+          Map.entry("ai", "#c792ea"),
+          Map.entry("kw", "#c586c0"),
+          Map.entry("type", "#4ec9b0"),
+          Map.entry("builtin", "#9cdcfe"),
+          Map.entry("dur", "#ffcb6b"),
+          Map.entry("lit", "#569cd6"),
+          Map.entry("var", "#dcdcaa"),
+          Map.entry("fun", "#dcdcaa"),
+          Map.entry("method", "#dcdcaa"));
+
+  /** Assign a short kind label to a global-scope candidate. */
+  private static String kindOf(String name) {
+    return switch (name) {
+      case "SinOsc",
+          "SawOsc",
+          "TriOsc",
+          "SqrOsc",
+          "PulseOsc",
+          "Phasor",
+          "Noise",
+          "Impulse",
+          "Step",
+          "BlitSaw",
+          "BlitSquare",
+          "Blit" ->
+          "osc";
+      case "LPF",
+          "HPF",
+          "BPF",
+          "BRF",
+          "ResonZ",
+          "BiQuad",
+          "OnePole",
+          "OneZero",
+          "TwoPole",
+          "TwoZero",
+          "PoleZero" ->
+          "filter";
+      case "Echo",
+          "Delay",
+          "DelayL",
+          "DelayA",
+          "DelayP",
+          "Chorus",
+          "JCRev",
+          "AllPass",
+          "Pan2",
+          "Gain" ->
+          "fx";
+      case "ADSR", "Adsr", "Envelope" -> "env";
+      case "Mandolin",
+          "Clarinet",
+          "Plucked",
+          "Rhodey",
+          "Wurley",
+          "BeeThree",
+          "HevyMetl",
+          "PercFlut",
+          "TubeBell",
+          "FMVoices",
+          "Bowed",
+          "StifKarp",
+          "Moog",
+          "Flute",
+          "Sitar",
+          "Brass",
+          "Saxofony",
+          "Shakers",
+          "ModalBar",
+          "VoicForm" ->
+          "stk";
+      case "FFT",
+          "IFFT",
+          "DCT",
+          "IDCT",
+          "ZCR",
+          "RMS",
+          "Centroid",
+          "MFCC",
+          "SFM",
+          "Kurtosis",
+          "AutoCorr",
+          "XCorr",
+          "Chroma",
+          "FeatureCollector" ->
+          "ana";
+      case "SndBuf",
+          "WvOut",
+          "LiSa",
+          "MidiIn",
+          "MidiMsg",
+          "MidiFileIn",
+          "OscIn",
+          "OscOut",
+          "OscMsg",
+          "OscEvent",
+          "Hid",
+          "HidMsg",
+          "HidOut",
+          "IO",
+          "FileIO",
+          "StringTokenizer",
+          "ConsoleInput",
+          "KBHit",
+          "SerialIO" ->
+          "io";
+      case "KNN", "KNN2", "SVM", "MLP", "HMM", "PCA" -> "ai";
+      case "second", "ms", "samp", "minute", "hour", "day", "week" -> "dur";
+      case "true", "false", "null", "maybe", "pi", "e", "sqrt2" -> "lit";
+      case "dac",
+          "adc",
+          "blackhole",
+          "now",
+          "Std",
+          "Math",
+          "Machine",
+          "me",
+          "chout",
+          "cherr",
+          "newline" ->
+          "builtin";
+      case "if",
+          "else",
+          "while",
+          "for",
+          "repeat",
+          "return",
+          "break",
+          "continue",
+          "new",
+          "spork",
+          "fun",
+          "class",
+          "extends",
+          "public",
+          "private",
+          "static",
+          "void",
+          "abstract",
+          "interface",
+          "loop",
+          "do",
+          "until",
+          "auto",
+          "switch",
+          "case",
+          "default" ->
+          "kw";
+      case "int",
+          "float",
+          "dur",
+          "time",
+          "string",
+          "complex",
+          "polar",
+          "vec2",
+          "vec3",
+          "vec4",
+          "Event",
+          "Object",
+          "UGen",
+          "UAna" ->
+          "type";
+      default -> "";
+    };
+  }
+
   private void showCompletionPopup(CodeArea editor) {
     if (currentPopup != null) {
       currentPopup.hide();
@@ -737,7 +1018,7 @@ public class ChuckIDE extends Application {
     int caretPos = editor.getCaretPosition();
     String textBefore = editor.getText(0, caretPos);
 
-    // Find the start of the current "word" (including dots and colons)
+    // Find the start of the current token (letters/digits/underscore/dots/colons)
     int i = textBefore.length() - 1;
     while (i >= 0
         && (Character.isLetterOrDigit(textBefore.charAt(i))
@@ -748,44 +1029,37 @@ public class ChuckIDE extends Application {
     }
     String prefix = textBefore.substring(i + 1).trim();
 
-    List<String> candidates;
+    List<CompItem> candidates;
     String filter;
     String resolvedType = null;
 
     if (prefix.contains("::")) {
       // Duration completion: 1::[second]
       int colIdx = prefix.lastIndexOf("::");
-      candidates = new java.util.ArrayList<>(DURATION_CANDIDATES);
       filter = prefix.substring(colIdx + 2);
+      candidates =
+          DURATION_CANDIDATES.stream()
+              .map(d -> new CompItem(d, d, "dur"))
+              .collect(Collectors.toList());
     } else if (prefix.contains(".")) {
       // Member completion: s.[gain]
       int dotIdx = prefix.lastIndexOf('.');
       String varName = prefix.substring(0, dotIdx);
       filter = prefix.substring(dotIdx + 1);
       resolvedType = resolveVariableType(varName, textBefore);
-      candidates = new java.util.ArrayList<>(getDynamicMemberCandidates(resolvedType));
+      candidates = getDynamicMemberCompItems(resolvedType);
     } else {
-      // Global context: types, keywords, and user-declared symbols
-      List<String> base =
-          TYPE_CANDIDATES.stream()
-              .filter(
-                  s ->
-                      Character.isUpperCase(s.charAt(0))
-                          || s.equals("int")
-                          || s.equals("float")
-                          || s.equals("dur")
-                          || s.equals("time")
-                          || s.equals("string")
-                          || s.equals("void")
-                          || List.of(
-                                  "if", "else", "while", "for", "repeat", "return", "new", "spork",
-                                  "fun", "class", "dac", "adc", "now", "me", "chout", "cherr")
-                              .contains(s))
-              .collect(Collectors.toList());
-      candidates = new java.util.ArrayList<>(base);
-      // Add user-declared variables and functions
+      // Global context
+      candidates = new java.util.ArrayList<>();
+      for (String name : TYPE_CANDIDATES) {
+        candidates.add(new CompItem(name, name, kindOf(name)));
+      }
+      // User-declared symbols
       for (UserSymbol sym : scanUserSymbols(editor.getText())) {
-        if (!candidates.contains(sym.name())) candidates.add(sym.name());
+        String kind = sym.signature().startsWith("fun ") ? "fun" : "var";
+        if (candidates.stream().noneMatch(c -> c.insertText().equals(sym.name()))) {
+          candidates.add(new CompItem(sym.name(), sym.name(), kind));
+        }
       }
       filter = prefix;
     }
@@ -793,30 +1067,76 @@ public class ChuckIDE extends Application {
     final String finalFilter = filter.toLowerCase();
     final String finalResolvedType = resolvedType;
 
-    List<String> matches =
+    List<CompItem> matches =
         candidates.stream()
-            .filter(s -> s.toLowerCase().startsWith(finalFilter))
+            .filter(c -> c.insertText().toLowerCase().startsWith(finalFilter))
             .distinct()
-            .sorted()
+            .sorted(java.util.Comparator.comparing(CompItem::insertText))
             .collect(Collectors.toList());
 
     if (matches.isEmpty()) return;
 
-    // ── Completion list ──
-    ListView<String> listView = new ListView<>();
+    // ── Completion list with kind badges ──────────────────────────────────
+    ListView<CompItem> listView = new ListView<>();
     listView.getItems().addAll(matches);
-    listView.setPrefWidth(175);
-    listView.setPrefHeight(Math.min(matches.size() * 24 + 4, 200));
+    listView.setPrefWidth(210);
+    listView.setPrefHeight(Math.min(matches.size() * 24 + 4, 220));
+    listView.setCellFactory(
+        lv ->
+            new ListCell<>() {
+              @Override
+              protected void updateItem(CompItem item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                  setGraphic(null);
+                  setText(null);
+                  return;
+                }
+                Label name = new Label(item.insertText());
+                name.setStyle("-fx-font-family: monospace; -fx-font-size: 12;");
+                HBox cell = new HBox(4, name);
+                cell.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+                if (!item.kind().isEmpty()) {
+                  String color = KIND_COLORS.getOrDefault(item.kind(), "#888");
+                  Label badge = new Label(item.kind());
+                  badge.setStyle(
+                      "-fx-font-size: 9; -fx-text-fill: "
+                          + color
+                          + ";"
+                          + " -fx-padding: 0 3 0 3; -fx-background-radius: 3;"
+                          + " -fx-border-color: "
+                          + color
+                          + "; -fx-border-radius: 3;"
+                          + " -fx-border-width: 1;");
+                  Region spacer = new Region();
+                  HBox.setHgrow(spacer, Priority.ALWAYS);
+                  cell.getChildren().addAll(spacer, badge);
+                }
+                setGraphic(cell);
+              }
+            });
 
-    // ── Doc panel ──
-    Label docLabel = new Label("Select an item for documentation");
-    docLabel.setWrapText(true);
-    docLabel.setPrefWidth(235);
-    docLabel.setMaxHeight(196);
-    docLabel.setAlignment(javafx.geometry.Pos.TOP_LEFT);
-    docLabel.setStyle(
-        "-fx-background-color: #fefde8; -fx-padding: 8; -fx-font-size: 11;"
-            + " -fx-border-color: #ddd; -fx-border-width: 0 0 0 1;");
+    // ── Doc panel ──────────────────────────────────────────────────────────
+    Label docTitle = new Label();
+    docTitle.setWrapText(true);
+    docTitle.setStyle(
+        "-fx-font-family: monospace; -fx-font-size: 11; -fx-font-weight: bold;"
+            + " -fx-text-fill: #4ec9b0;");
+
+    Label docSig = new Label();
+    docSig.setWrapText(true);
+    docSig.setStyle("-fx-font-family: monospace; -fx-font-size: 10; -fx-text-fill: #9cdcfe;");
+
+    Label docDesc = new Label("Select an item for documentation");
+    docDesc.setWrapText(true);
+    docDesc.setStyle("-fx-font-size: 11; -fx-text-fill: #d4d4d4;");
+
+    VBox docPanel = new VBox(4, docTitle, docSig, docDesc);
+    docPanel.setPrefWidth(260);
+    docPanel.setMaxHeight(220);
+    docPanel.setStyle(
+        "-fx-background-color: #252526; -fx-padding: 8;"
+            + " -fx-border-color: #555; -fx-border-width: 0 0 0 1;");
 
     listView
         .getSelectionModel()
@@ -824,17 +1144,40 @@ public class ChuckIDE extends Application {
         .addListener(
             (obs, old, sel) -> {
               if (sel == null) return;
-              String docText =
+              String rawDoc =
                   finalResolvedType != null
-                      ? lookupDoc(finalResolvedType, sel)
-                      : lookupDoc(sel, null);
-              docLabel.setText(docText != null ? docText : sel);
+                      ? lookupDoc(finalResolvedType, sel.insertText())
+                      : lookupDoc(sel.insertText(), null);
+              if (rawDoc != null) {
+                // Format: first line = title/sig, remaining = description
+                String[] lines = rawDoc.split("\n", 2);
+                docTitle.setText(lines[0]);
+                if (lines.length > 1) {
+                  // Check if second part starts with a description or more sig lines
+                  String rest = lines[1].trim();
+                  int nlIdx = rest.indexOf('\n');
+                  if (nlIdx >= 0) {
+                    docSig.setText(rest.substring(0, nlIdx).trim());
+                    docDesc.setText(rest.substring(nlIdx + 1).trim());
+                  } else {
+                    docSig.setText("");
+                    docDesc.setText(rest);
+                  }
+                } else {
+                  docSig.setText("");
+                  docDesc.setText(sel.kind().isEmpty() ? "" : "[" + sel.kind() + "]");
+                }
+              } else {
+                docTitle.setText(sel.insertText());
+                docSig.setText(sel.kind().isEmpty() ? "" : "[" + sel.kind() + "]");
+                docDesc.setText("");
+              }
             });
 
-    HBox popupContent = new HBox(listView, docLabel);
+    HBox popupContent = new HBox(listView, docPanel);
     popupContent.setStyle(
-        "-fx-background-color: white; -fx-border-color: #aaa; -fx-border-width: 1;"
-            + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.25), 6, 0, 0, 2);");
+        "-fx-background-color: #1e1e1e; -fx-border-color: #555; -fx-border-width: 1;"
+            + " -fx-effect: dropshadow(gaussian, rgba(0,0,0,0.5), 8, 0, 0, 3);");
 
     Popup popup = new Popup();
     popup.getContent().add(popupContent);
@@ -843,10 +1186,14 @@ public class ChuckIDE extends Application {
 
     listView.setOnKeyPressed(
         ke -> {
-          if (ke.getCode() == KeyCode.ENTER) {
-            complete(editor, listView.getSelectionModel().getSelectedItem(), finalFilter);
-            popup.hide();
-            currentPopup = null;
+          if (ke.getCode() == KeyCode.ENTER || ke.getCode() == KeyCode.TAB) {
+            ke.consume();
+            CompItem sel = listView.getSelectionModel().getSelectedItem();
+            if (sel != null) {
+              complete(editor, sel.insertText(), finalFilter);
+              popup.hide();
+              currentPopup = null;
+            }
           } else if (ke.getCode() == KeyCode.ESCAPE) {
             popup.hide();
             currentPopup = null;
@@ -856,9 +1203,12 @@ public class ChuckIDE extends Application {
     listView.setOnMouseClicked(
         me -> {
           if (me.getClickCount() == 2) {
-            complete(editor, listView.getSelectionModel().getSelectedItem(), finalFilter);
-            popup.hide();
-            currentPopup = null;
+            CompItem sel = listView.getSelectionModel().getSelectedItem();
+            if (sel != null) {
+              complete(editor, sel.insertText(), finalFilter);
+              popup.hide();
+              currentPopup = null;
+            }
           }
         });
 
@@ -874,6 +1224,29 @@ public class ChuckIDE extends Application {
     if (completion == null) return;
     int caret = editor.getCaretPosition();
     editor.replaceText(caret - filter.length(), caret, completion);
+  }
+
+  /** Returns CompItems for member completion of a given type, with kind="method". */
+  private List<CompItem> getDynamicMemberCompItems(String type) {
+    List<String> names = getDynamicMemberCandidates(type);
+    Class<?> cls = resolveChuckClass(type);
+    return names.stream()
+        .map(
+            name -> {
+              String sig = "";
+              if (cls != null) {
+                for (java.lang.reflect.Method m : cls.getMethods()) {
+                  if (m.getName().equals(name)
+                      || m.getName().equals("set" + capitalize(name))
+                      || m.getName().equals("get" + capitalize(name))) {
+                    sig = formatMethodSig(m, name);
+                    break;
+                  }
+                }
+              }
+              return new CompItem(name, sig.isEmpty() ? name : sig, "method");
+            })
+        .collect(Collectors.toList());
   }
 
   private String resolveVariableType(String varName, String textBefore) {
@@ -1813,17 +2186,71 @@ public class ChuckIDE extends Application {
 
   private void showDocHoverPopup(String text, javafx.geometry.Point2D pos) {
     hideDocHoverPopup();
-    Label label = new Label(text);
-    label.setWrapText(true);
-    label.setMaxWidth(340);
-    label.setStyle(
-        "-fx-background-color: #fefde8; -fx-border-color: #c8c050;"
-            + " -fx-border-radius: 3; -fx-background-radius: 3;"
-            + " -fx-padding: 6 10 6 10; -fx-font-size: 11;");
+    // Split into signature line and description
+    String[] parts = text.split("\n", 2);
+    VBox box = new VBox(3);
+    box.setStyle(
+        "-fx-background-color: #252526; -fx-border-color: #555;"
+            + " -fx-border-radius: 4; -fx-background-radius: 4;"
+            + " -fx-padding: 6 10 6 10;");
+    box.setMaxWidth(360);
+    Label title = new Label(parts[0]);
+    title.setStyle(
+        "-fx-font-family: monospace; -fx-font-size: 11; -fx-font-weight: bold;"
+            + " -fx-text-fill: #4ec9b0; -fx-wrap-text: true;");
+    title.setMaxWidth(340);
+    box.getChildren().add(title);
+    if (parts.length > 1 && !parts[1].isBlank()) {
+      Label desc = new Label(parts[1].trim());
+      desc.setStyle("-fx-font-size: 11; -fx-text-fill: #d4d4d4; -fx-wrap-text: true;");
+      desc.setMaxWidth(340);
+      box.getChildren().add(desc);
+    }
     docHoverPopup = new Popup();
-    docHoverPopup.getContent().add(label);
+    docHoverPopup.getContent().add(box);
     docHoverPopup.setAutoHide(true);
     docHoverPopup.show(stage, pos.getX() + 12, pos.getY() + 14);
+  }
+
+  /**
+   * Shows a small parameter-hint popup when '(' is typed after a method name, displaying the method
+   * signature.
+   */
+  private void showParamHint(CodeArea editor) {
+    int caret = editor.getCaretPosition();
+    if (caret < 2) return;
+    String textBefore = editor.getText(0, caret - 1); // exclude the '('
+    String word = extractWordAt(textBefore, textBefore.length());
+    if (word.isEmpty()) return;
+
+    // Try member lookup: type before dot
+    String sig = null;
+    int dotIdx = textBefore.lastIndexOf('.', textBefore.length() - word.length() - 1);
+    if (dotIdx > 0) {
+      String beforeDot = textBefore.substring(0, dotIdx);
+      String varName = extractWordAt(beforeDot, beforeDot.length());
+      if (!varName.isEmpty()) {
+        String type = resolveVariableType(varName, textBefore);
+        sig = lookupDoc(type, word);
+      }
+    }
+    if (sig == null) sig = lookupDoc(word, null);
+    if (sig == null) return;
+
+    // Show a small dark tooltip near the caret
+    String finalSig = sig;
+    hideDocHoverPopup();
+    Label hint = new Label(finalSig.split("\n")[0] + "(…)");
+    hint.setStyle(
+        "-fx-background-color: #252526; -fx-border-color: #555; -fx-border-radius: 3;"
+            + " -fx-padding: 2 6 2 6; -fx-font-family: monospace; -fx-font-size: 11;"
+            + " -fx-text-fill: #9cdcfe;");
+    docHoverPopup = new Popup();
+    docHoverPopup.getContent().add(hint);
+    docHoverPopup.setAutoHide(true);
+    editor
+        .getCaretBounds()
+        .ifPresent(b -> docHoverPopup.show(editor, b.getMaxX(), b.getMaxY() + 2));
   }
 
   private void hideDocHoverPopup() {
