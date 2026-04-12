@@ -51,14 +51,14 @@ public class Lpf extends ChuckUGen {
       System.arraycopy(buffer, offset, inputSum, 0, length);
     }
 
-    // 2. Apply filter (recursive, so scalar for now)
+    // 2. Apply filter
     float alpha = (float) (2.0 * Math.PI * cutoff / sampleRate);
     alpha = Math.min(Math.max(alpha, 0.0f), 1.0f);
+    float beta = 1.0f - alpha;
 
     float localV0 = v0;
     for (int i = 0; i < length; i++) {
-      float in = inputSum[i];
-      localV0 = localV0 + alpha * (in - localV0);
+      localV0 = alpha * inputSum[i] + beta * localV0;
       buffer[offset + i] = localV0;
     }
     v0 = localV0;

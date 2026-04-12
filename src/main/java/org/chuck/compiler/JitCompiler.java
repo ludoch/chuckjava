@@ -173,6 +173,77 @@ public class JitCompiler implements Opcodes {
             "setArrayInt",
             "(Lorg/chuck/core/ChuckArray;JJ)V",
             false);
+      } else if (instr instanceof ArithmeticInstrs.MinusInt) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitInsn(DUP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popLong", "()J", false);
+        mv.visitInsn(SWAP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popLong", "()J", false);
+        mv.visitInsn(LSUB);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(J)V", false);
+      } else if (instr instanceof ArithmeticInstrs.MinusFloat) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitInsn(DUP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popDouble", "()D", false);
+        mv.visitInsn(SWAP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popDouble", "()D", false);
+        mv.visitInsn(DSUB);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(D)V", false);
+      } else if (instr instanceof ArithmeticInstrs.TimesInt) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitInsn(DUP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popLong", "()J", false);
+        mv.visitInsn(SWAP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popLong", "()J", false);
+        mv.visitInsn(LMUL);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(J)V", false);
+      } else if (instr instanceof ArithmeticInstrs.TimesFloat) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitInsn(DUP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popDouble", "()D", false);
+        mv.visitInsn(SWAP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popDouble", "()D", false);
+        mv.visitInsn(DMUL);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(D)V", false);
+      } else if (instr instanceof LogicInstrs.EqInt) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitInsn(DUP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popLong", "()J", false);
+        mv.visitInsn(SWAP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popLong", "()J", false);
+        mv.visitInsn(LCMP);
+        Label l1 = new Label(), l2 = new Label();
+        mv.visitJumpInsn(IFNE, l1);
+        mv.visitLdcInsn(1L);
+        mv.visitJumpInsn(GOTO, l2);
+        mv.visitLabel(l1);
+        mv.visitLdcInsn(0L);
+        mv.visitLabel(l2);
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitInsn(SWAP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(J)V", false);
+      } else if (instr instanceof StackInstrs.Pop) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "pop", "()V", false);
+      } else if (instr instanceof StackInstrs.Dup) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "dup", "()V", false);
       } else if (instr instanceof ArithmeticInstrs.AddInt) {
         mv.visitVarInsn(ALOAD, 2);
         mv.visitFieldInsn(
