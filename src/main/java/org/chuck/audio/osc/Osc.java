@@ -180,6 +180,13 @@ public abstract class Osc extends ChuckUGen {
     return vZero.blend(vRes1, mask1).blend(vRes2, mask2);
   }
 
+  @Override
+  public void tick(float[] buffer, int offset, int length, long systemTime) {
+    for (int i = 0; i < length; i++) {
+      buffer[offset + i] = tick(systemTime == -1 ? -1 : systemTime + i);
+    }
+  }
+
   protected abstract double computeOsc(double phase);
 
   /**

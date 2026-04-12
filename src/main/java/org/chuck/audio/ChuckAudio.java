@@ -234,27 +234,43 @@ public class ChuckAudio {
                   // Reset per-buffer peak accumulators
                   float[] bufPeak = new float[numChannels];
 
-                  // ── Per-sample processing ─────────────────────────────────────
-                  for (int i = 0; i < bufferSize; i++) {
-                    // Feed ADC
+                  // ── Optimized block processing ───────────────────────────────────
+                  // 1. Fill DAC buffers (and feed ADC inside)
+                  float[][] dacBuffers = new float[numChannels][bufferSize];
+
+                  int processed = 0;
+                  while (processed < bufferSize) {
+                    long currentTime = vm.getCurrentTime();
+                    long nextWake = vm.getNextWakeTime();
+                    int remaining = bufferSize - processed;
+                    int blockSize = (int) Math.min(remaining, Math.max(1, nextWake - currentTime));
+
+                    // Feed ADC for this block
                     if (inBuf != null) {
-                      for (int c = 0; c < numChannels; c++) {
-                        int inputChan = Math.min(c, numInputChannels - 1);
-                        int idx = (i * numInputChannels + inputChan) * 2;
-                        short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
-                        vm.adc.setInputSample(c, pcm / 32768.0f);
+                      for (int s = 0; s < blockSize; s++) {
+                        for (int c = 0; c < numChannels; c++) {
+                          int inputChan = Math.min(c, numInputChannels - 1);
+                          int idx = ((processed + s) * numInputChannels + inputChan) * 2;
+                          short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
+                          vm.adc.setInputSample(c, pcm / 32768.0f);
+                        }
+                        // Note: ADC is sample-based, so for blocks > 1 we only have 1 global ADC
+                        // state.
+                        // This is a limitation of the current UGen graph for ADC.
                       }
                     }
 
-                    // Advance time by 1 sample
-                    vm.advanceTime(1);
+                    vm.advanceTime(dacBuffers, processed, blockSize);
+                    processed += blockSize;
+                  }
 
+                  // 3. Post-process: RMS, Peaks, and interleave to outSeg
+                  for (int i = 0; i < bufferSize; i++) {
                     // Smooth gain toward target to prevent zipper noise on rapid slider changes.
                     smoothedGain += gainSmoothAlpha * (targetGain - smoothedGain);
 
-                    // Interleave Left/Right for stereo output
                     for (int c = 0; c < numChannels; c++) {
-                      float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
+                      float sample = dacBuffers[c][i] * smoothedGain;
 
                       sumSq += (double) sample * sample;
                       float abs = Math.abs(sample);

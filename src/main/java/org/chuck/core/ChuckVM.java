@@ -441,10 +441,33 @@ public class ChuckVM {
     return shred.getId();
   }
 
+  private final java.util.concurrent.atomic.AtomicLong nextWakeTime =
+      new java.util.concurrent.atomic.AtomicLong(Long.MAX_VALUE);
+
+  public long getNextWakeTime() {
+    return nextWakeTime.get();
+  }
+
+  private void updateNextWakeTime() {
+    shredulerLock.lock();
+    try {
+      if (shreduler.isEmpty()) {
+        nextWakeTime.set(Long.MAX_VALUE);
+      } else {
+        nextWakeTime.set(shreduler.peek().getWakeTime());
+      }
+    } finally {
+      shredulerLock.unlock();
+    }
+  }
+
   public void schedule(ChuckShred shred) {
     shredulerLock.lock();
     try {
       shreduler.add(shred);
+      if (shred.getWakeTime() < nextWakeTime.get()) {
+        nextWakeTime.set(shred.getWakeTime());
+      }
       shredulerCondition.signalAll();
     } finally {
       shredulerLock.unlock();
@@ -484,16 +507,6 @@ public class ChuckVM {
     }
   }
 
-  public long getNextWakeTime() {
-    shredulerLock.lock();
-    try {
-      if (shreduler.isEmpty()) return Long.MAX_VALUE;
-      return shreduler.peek().getWakeTime();
-    } finally {
-      shredulerLock.unlock();
-    }
-  }
-
   public void advanceTime(long samples) {
     long targetTime = now.get() + samples;
     while (now.get() < targetTime) {
@@ -504,6 +517,7 @@ public class ChuckVM {
 
       // 1. Run all shreds scheduled for this time (allow 0-yield chaining)
       int safety = 0;
+      boolean shredsRan = false;
       while (safety++ < 1000) {
         List<ChuckShred> ready = new ArrayList<>();
         shredulerLock.lock();
@@ -511,11 +525,15 @@ public class ChuckVM {
           while (!shreduler.isEmpty() && shreduler.peek().getWakeTime() <= currentTime) {
             ready.add(shreduler.poll());
           }
+          if (!ready.isEmpty()) {
+            updateNextWakeTime();
+          }
         } finally {
           shredulerLock.unlock();
         }
 
         if (ready.isEmpty()) break;
+        shredsRan = true;
 
         for (ChuckShred nextShred : ready) {
           long jitter = currentTime - nextShred.getWakeTime();
@@ -537,6 +555,38 @@ public class ChuckVM {
       blackhole.tick(currentTime);
 
       now.incrementAndGet();
+    }
+  }
+
+  /** Optimized advancement that can process blocks using SIMD if no shreds wake up. */
+  public void advanceTime(float[][] dacBuffers, int offset, int length) {
+    int processed = 0;
+    while (processed < length) {
+      long currentTime = now.get();
+      long nextWake = nextWakeTime.get();
+
+      // How many samples can we process safely in a block?
+      int remaining = length - processed;
+      int blockSize = (int) Math.min(remaining, Math.max(1, nextWake - currentTime));
+
+      if (blockSize > 1) {
+        // FAST PATH: No shreds wake up in this window. Use SIMD.
+        for (int c = 0; c < numChannels; c++) {
+          dacChannels[c].tick(dacBuffers[c], offset + processed, blockSize, currentTime);
+        }
+        // Blackhole also needs to be ticked to pull any connected UGens
+        blackhole.tick(null, 0, blockSize, currentTime);
+
+        now.addAndGet(blockSize);
+        processed += blockSize;
+      } else {
+        // SLOW PATH: At least one shred wakes up now or in 1 sample.
+        advanceTime(1);
+        for (int c = 0; c < numChannels; c++) {
+          dacBuffers[c][offset + processed] = dacChannels[c].getLastOut();
+        }
+        processed++;
+      }
     }
   }
 
