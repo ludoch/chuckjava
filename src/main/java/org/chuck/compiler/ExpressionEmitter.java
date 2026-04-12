@@ -1339,12 +1339,17 @@ public class ExpressionEmitter {
             // Specialization for built-in UGen method calls (single arg)
             if (argc == 1 && (parent.isKnownUGenType(bt) || parent.isSubclassOfUGen(bt))) {
               String argType = argTypes.get(0);
-              if ("float".equals(argType) || "int".equals(argType)) {
+              String mn = dot.member();
+              Set<String> safeFloat = Set.of("freq", "gain", "phase", "cutoff");
+              Set<String> safeInt = Set.of("sync", "cutoff");
+
+              if (("float".equals(argType) && safeFloat.contains(mn))
+                  || ("int".equals(argType) && safeInt.contains(mn))) {
                 this.emitExpression(dot.base(), code);
                 this.emitExpression(e.args().get(0), code);
                 if ("float".equals(argType))
-                  code.addInstruction(new ObjectInstrs.CallBuiltinFloat(dot.member()));
-                else code.addInstruction(new ObjectInstrs.CallBuiltinInt(dot.member()));
+                  code.addInstruction(new ObjectInstrs.CallBuiltinFloat(mn));
+                else code.addInstruction(new ObjectInstrs.CallBuiltinInt(mn));
                 return;
               }
             }
