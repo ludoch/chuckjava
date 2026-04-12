@@ -26,7 +26,7 @@ public class PushInstrs {
   }
 
   public static class PushFloat implements ChuckInstr {
-    double v;
+    public double v;
 
     public PushFloat(double val) {
       v = val;
@@ -122,7 +122,7 @@ public class PushInstrs {
   }
 
   public static class LdcInt implements ChuckInstr {
-    int index;
+    public int index;
 
     public LdcInt(int i) {
       index = i;

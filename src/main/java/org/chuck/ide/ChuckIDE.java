@@ -535,11 +535,30 @@ public class ChuckIDE extends Application {
           "// Welcome to ChucK-Java!\nSinOsc s => dac;\n0.5 => s.gain;\n440 => s.freq;\n1::second => now;");
     }
 
-    // ── File browser ──
+    // ── Left Panel (Project & UGens) ──
     fileBrowser = createFileBrowser();
-    VBox leftPanel = new VBox(new Label("  Project"), fileBrowser);
+    VBox projectBox = new VBox(fileBrowser);
     VBox.setVgrow(fileBrowser, Priority.ALWAYS);
-    leftPanel.setPrefWidth(210);
+
+    UGenBrowser ugenBrowser = new UGenBrowser();
+    ugenBrowser.setOnInsert(
+        snippet -> {
+          CodeArea ed = getCurrentEditor();
+          if (ed != null) {
+            ed.insertText(ed.getCaretPosition(), snippet);
+          }
+        });
+
+    TabPane leftTabPane = new TabPane();
+    Tab projectTab = new Tab("Project", projectBox);
+    projectTab.setClosable(false);
+    Tab ugenTab = new Tab("UGens", ugenBrowser);
+    ugenTab.setClosable(false);
+    leftTabPane.getTabs().addAll(projectTab, ugenTab);
+
+    VBox leftPanel = new VBox(leftTabPane);
+    VBox.setVgrow(leftTabPane, Priority.ALWAYS);
+    leftPanel.setPrefWidth(240);
 
     // ── Shred panel ──
     shredListView = new ListView<>();
@@ -2221,9 +2240,6 @@ public class ChuckIDE extends Application {
     if (vuLeft != null && vuRight != null && audio != null) {
       double peak0 = Math.min(1.0, audio.getPeakOut(0));
       double peak1 = Math.min(1.0, audio.getPeakOut(1));
-      if (peak0 > 0.001 || peak1 > 0.001) {
-        System.out.println("VU: " + peak0 + " " + peak1);
-      }
       vuLeft.setProgress(peak0);
       vuRight.setProgress(peak1);
       // Colour: green < -6 dBFS, yellow < -3 dBFS, red ≥ -3 dBFS

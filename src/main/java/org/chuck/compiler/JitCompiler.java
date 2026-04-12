@@ -91,6 +91,167 @@ public class JitCompiler implements Opcodes {
             GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
         mv.visitLdcInsn(p.getVal());
         mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(J)V", false);
+      } else if (instr instanceof PushInstrs.PushFloat p) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitLdcInsn(p.v);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(D)V", false);
+      } else if (instr instanceof PushInstrs.LdcFloat p) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitVarInsn(ALOAD, 3);
+        mv.visitLdcInsn(p.getIndex());
+        mv.visitMethodInsn(
+            INVOKEVIRTUAL,
+            "org/chuck/core/ChuckCode",
+            "getConstant",
+            "(I)Ljava/lang/Object;",
+            false);
+        mv.visitTypeInsn(CHECKCAST, "java/lang/Double");
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D", false);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(D)V", false);
+      } else if (instr instanceof PushInstrs.LdcInt p) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitVarInsn(ALOAD, 3);
+        mv.visitLdcInsn(p.index);
+        mv.visitMethodInsn(
+            INVOKEVIRTUAL,
+            "org/chuck/core/ChuckCode",
+            "getConstant",
+            "(I)Ljava/lang/Object;",
+            false);
+        mv.visitTypeInsn(CHECKCAST, "java/lang/Long");
+        mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(J)V", false);
+      } else if (instr instanceof ObjectInstrs.CallBuiltinFloat cbf) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popAsDouble", "()D", false);
+        mv.visitVarInsn(DSTORE, 4);
+
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitMethodInsn(
+            INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popObject", "()Ljava/lang/Object;", false);
+        mv.visitVarInsn(ASTORE, 6);
+
+        Label notOsc = new Label();
+        Label notUGen = new Label();
+        Label endBuiltin = new Label();
+
+        mv.visitVarInsn(ALOAD, 6);
+        mv.visitTypeInsn(INSTANCEOF, "org/chuck/audio/osc/Osc");
+        mv.visitJumpInsn(IFEQ, notOsc);
+
+        mv.visitVarInsn(ALOAD, 6);
+        mv.visitTypeInsn(CHECKCAST, "org/chuck/audio/osc/Osc");
+        mv.visitVarInsn(DLOAD, 4);
+        if (cbf.mName.equals("freq")) {
+          mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/audio/osc/Osc", "freq", "(D)V", false);
+        } else if (cbf.mName.equals("gain")) {
+          mv.visitInsn(D2F);
+          mv.visitMethodInsn(
+              INVOKEVIRTUAL,
+              "org/chuck/audio/osc/Osc",
+              "gain",
+              "(F)Lorg/chuck/audio/ChuckUGen;",
+              false);
+          mv.visitInsn(POP);
+        } else if (cbf.mName.equals("phase")) {
+          mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/audio/osc/Osc", "setPhase", "(D)V", false);
+        } else {
+          mv.visitInsn(POP2);
+          mv.visitInsn(POP);
+        }
+        mv.visitJumpInsn(GOTO, endBuiltin);
+
+        mv.visitLabel(notOsc);
+        mv.visitVarInsn(ALOAD, 6);
+        mv.visitTypeInsn(INSTANCEOF, "org/chuck/audio/ChuckUGen");
+        mv.visitJumpInsn(IFEQ, notUGen);
+
+        if (cbf.mName.equals("gain")) {
+          mv.visitVarInsn(ALOAD, 6);
+          mv.visitTypeInsn(CHECKCAST, "org/chuck/audio/ChuckUGen");
+          mv.visitVarInsn(DLOAD, 4);
+          mv.visitInsn(D2F);
+          mv.visitMethodInsn(
+              INVOKEVIRTUAL,
+              "org/chuck/audio/ChuckUGen",
+              "gain",
+              "(F)Lorg/chuck/audio/ChuckUGen;",
+              false);
+          mv.visitInsn(POP);
+        }
+
+        mv.visitLabel(notUGen);
+        mv.visitLabel(endBuiltin);
+
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitVarInsn(DLOAD, 4);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(D)V", false);
+
+      } else if (instr instanceof ObjectInstrs.CallBuiltinInt cbi) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popAsLong", "()J", false);
+        mv.visitVarInsn(LSTORE, 4);
+
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitMethodInsn(
+            INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popObject", "()Ljava/lang/Object;", false);
+        mv.visitVarInsn(ASTORE, 6);
+
+        Label notOsc = new Label();
+        Label notLpf = new Label();
+        Label endBuiltin = new Label();
+
+        mv.visitVarInsn(ALOAD, 6);
+        mv.visitTypeInsn(INSTANCEOF, "org/chuck/audio/osc/Osc");
+        mv.visitJumpInsn(IFEQ, notOsc);
+
+        if (cbi.mName.equals("sync")) {
+          mv.visitVarInsn(ALOAD, 6);
+          mv.visitTypeInsn(CHECKCAST, "org/chuck/audio/osc/Osc");
+          mv.visitVarInsn(LLOAD, 4);
+          mv.visitInsn(L2I);
+          mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/audio/osc/Osc", "setSync", "(I)V", false);
+        }
+        mv.visitJumpInsn(GOTO, endBuiltin);
+
+        mv.visitLabel(notOsc);
+        mv.visitVarInsn(ALOAD, 6);
+        mv.visitTypeInsn(INSTANCEOF, "org/chuck/audio/filter/Lpf");
+        mv.visitJumpInsn(IFEQ, notLpf);
+
+        if (cbi.mName.equals("cutoff")) {
+          mv.visitVarInsn(ALOAD, 6);
+          mv.visitTypeInsn(CHECKCAST, "org/chuck/audio/filter/Lpf");
+          mv.visitVarInsn(LLOAD, 4);
+          mv.visitInsn(L2F);
+          mv.visitMethodInsn(
+              INVOKEVIRTUAL, "org/chuck/audio/filter/Lpf", "setCutoff", "(F)V", false);
+        }
+
+        mv.visitLabel(notLpf);
+        mv.visitLabel(endBuiltin);
+
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitVarInsn(LLOAD, 4);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(J)V", false);
       } else {
         // Generic call: instr.execute(vm, shred)
         mv.visitVarInsn(ALOAD, 3); // initialCode

@@ -95,7 +95,7 @@ public class ChuckDocGenerator {
     }
   }
 
-  private static Class<?> findClass(String typeName) {
+  public static Class<?> findClass(String typeName) {
     String[] packages = {
       "org.chuck.audio.osc",
       "org.chuck.audio.filter",
