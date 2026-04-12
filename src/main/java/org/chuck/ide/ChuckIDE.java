@@ -2246,10 +2246,14 @@ public class ChuckIDE extends Application {
     gc.setLineWidth(1.5);
     double binW = w / mags.length;
 
+    // Normalize by FFT size then map to dB: 0 dB at top, -80 dB at bottom
+    double norm = 2.0 / mags.length;
     gc.beginPath();
     for (int i = 0; i < mags.length; i++) {
       double x = i * binW;
-      double val = Math.min(1.0, mags[i] * 10.0);
+      double linear = mags[i] * norm;
+      double db = linear > 1e-9 ? 20.0 * Math.log10(linear) : -80.0;
+      double val = Math.max(0.0, Math.min(1.0, (db + 80.0) / 80.0));
       double y = h - (val * h);
       if (i == 0) gc.moveTo(x, y);
       else gc.lineTo(x, y);

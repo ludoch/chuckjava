@@ -519,6 +519,9 @@ public class ChuckVM {
         chan.tick(currentTime);
       }
 
+      // 3. Tick the blackhole so any UGens/UAnas chucked to it are also pulled
+      blackhole.tick(currentTime);
+
       now.incrementAndGet();
     }
   }

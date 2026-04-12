@@ -1,6 +1,5 @@
 package org.chuck.audio.util;
 
-import java.util.List;
 import org.chuck.audio.UAna;
 
 /** A Unit Analyzer that captures raw time-domain samples for an Oscilloscope. */
@@ -40,12 +39,11 @@ public class Scope extends UAna {
 
   @Override
   protected void computeUAna() {
-    // Copy samples in order (oldest to newest)
-    List<Complex> samples = new java.util.ArrayList<>(size);
+    // Copy raw samples in order (oldest to newest) for oscilloscope display
+    float[] samples = new float[size];
     for (int i = 0; i < size; i++) {
-      int idx = (writePos + i) % size;
-      samples.add(new Complex(ring[idx], 0));
+      samples[i] = ring[(writePos + i) % size];
     }
-    lastBlob.setCvals(samples);
+    lastBlob.setFvals(samples);
   }
 }
