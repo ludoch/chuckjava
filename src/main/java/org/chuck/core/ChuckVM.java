@@ -647,11 +647,33 @@ public class ChuckVM {
   public String status() {
     StringBuilder sb = new StringBuilder();
     sb.append("--- ChucK VM Status ---\n");
-    sb.append("Time: ").append(now.get()).append("\n");
+    sb.append("Time: ").append(now.get()).append(" samples\n");
     sb.append("Active Shreds: ").append(activeShreds.size()).append("\n");
     for (ChuckShred s : activeShreds.values()) {
-      sb.append("  [").append(s.getId()).append("] ").append(s.getCode().getName()).append("\n");
+      ChuckCode c = s.getCode();
+      sb.append("  [").append(s.getId()).append("] ").append(c != null ? c.getName() : "unknown");
+      if (c != null && c.getJitExecutable() != null) {
+        sb.append(" (JIT)");
+      }
+      sb.append("\n");
     }
+
+    // Performance Stats
+    sb.append("\n--- Performance ---\n");
+    sb.append(String.format("Avg Jitter: %.4f samples\n", getAverageJitter()));
+    sb.append(String.format("Max Jitter: %d samples\n", getMaxJitter()));
+    sb.append(String.format("Avg Drift:  %.4f ms\n", getAverageDrift()));
+    sb.append(String.format("Max Drift:  %.4f ms\n", getMaxDrift()));
+
+    // JIT Stats
+    long jitCount =
+        activeShreds.values().stream()
+            .map(ChuckShred::getCode)
+            .filter(c -> c != null && c.getJitExecutable() != null)
+            .distinct()
+            .count();
+    sb.append("JIT fragments: ").append(jitCount).append("\n");
+
     return sb.toString();
   }
 

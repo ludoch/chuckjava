@@ -2042,6 +2042,11 @@ public class ChuckIDE extends Application {
       print("Sporked Shred " + shred.getId() + " (" + name + ")");
       updateStatus();
 
+    } catch (org.chuck.core.ChuckCompilerException ex) {
+      print("Compilation Error: " + ex.getMessage());
+      highlightErrorLine(ex);
+      flashEditor(currentTab, javafx.scene.paint.Color.RED);
+      statusLabel.setText("  Compilation failed");
     } catch (Exception ex) {
       String msg = ex.getMessage() != null ? ex.getMessage() : ex.toString();
       print("Compilation Error: " + msg);
@@ -2358,6 +2363,23 @@ public class ChuckIDE extends Application {
   }
 
   // ── Error line highlighting ─────────────────────────────────────────────────
+
+  private void highlightErrorLine(org.chuck.core.ChuckCompilerException e) {
+    CodeArea editor = getCurrentEditor();
+    if (editor == null) return;
+    int lineNum = e.getLine() - 1;
+    int col = e.getColumn();
+    if (lineNum < 0 || lineNum >= editor.getParagraphs().size()) return;
+    editor.showParagraphAtTop(Math.max(0, lineNum - 3));
+    int lineStart = editor.position(lineNum, 0).toOffset();
+    int errorOffset =
+        editor.position(lineNum, Math.min(col, editor.getParagraph(lineNum).length())).toOffset();
+
+    // Select the whole line or just the point? ChucK usually selects the line.
+    int lineEnd = editor.position(lineNum, editor.getParagraph(lineNum).length()).toOffset();
+    editor.selectRange(lineStart, lineEnd);
+    editor.requestFocus();
+  }
 
   private void highlightErrorLine(String msg) {
     CodeArea editor = getCurrentEditor();
