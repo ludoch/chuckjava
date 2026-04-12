@@ -484,6 +484,16 @@ public class ChuckVM {
     }
   }
 
+  public long getNextWakeTime() {
+    shredulerLock.lock();
+    try {
+      if (shreduler.isEmpty()) return Long.MAX_VALUE;
+      return shreduler.peek().getWakeTime();
+    } finally {
+      shredulerLock.unlock();
+    }
+  }
+
   public void advanceTime(long samples) {
     long targetTime = now.get() + samples;
     while (now.get() < targetTime) {

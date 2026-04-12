@@ -37,10 +37,51 @@ public class DacChannel extends ChuckUGen {
     return lastOut;
   }
 
+  public void tick(
+      java.lang.foreign.MemorySegment outSeg,
+      int bufferIndex,
+      int length,
+      long systemTime,
+      float masterGain) {
+    float[] block = new float[length];
+    // Summon audio from sources into block
+    for (ChuckUGen src : sources) {
+      float[] temp = new float[length];
+      src.tick(temp, 0, length, systemTime);
+      // SIMD Addition: block += temp
+      int i = 0;
+      int bound = SPECIES.loopBound(length);
+      for (; i < bound; i += SPECIES.length()) {
+        FloatVector vBlock = FloatVector.fromArray(SPECIES, block, i);
+        FloatVector vSrc = FloatVector.fromArray(SPECIES, temp, i);
+        vBlock.add(vSrc).intoArray(block, i);
+      }
+      for (; i < length; i++) block[i] += temp[i];
+    }
+
+    // Apply local gain and master gain, then write to outSeg
+    float totalGain = gain * masterGain;
+    for (int i = 0; i < length; i++) {
+      float sample = block[i] * totalGain;
+      short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
+      // Write interleaved: channel 0 at 0, channel 1 at 2, etc.
+      // Total offset: (bufferIndex + i) * numChannels * 2 + (channelIndex * 2)
+      // Assuming 2 channels for now as per ChuckAudio hardcoding
+      long offset = (long) ((bufferIndex + i) * 2 + channelIndex) * 2;
+      outSeg.set(
+          java.lang.foreign.ValueLayout.JAVA_SHORT.withOrder(java.nio.ByteOrder.LITTLE_ENDIAN),
+          offset,
+          s16);
+
+      if (i == length - 1) {
+        lastOut = sample;
+        lastTickTime = systemTime + length - 1;
+      }
+    }
+  }
+
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
-    // Initialize buffer with zeros
-    for (int i = 0; i < length; i++) buffer[offset + i] = 0.0f;
 
     // Vectorized summing from all sources
     for (ChuckUGen src : sources) {
