@@ -99,9 +99,7 @@ public class ChuckEvent extends ChuckObject {
     if (toWake != null) {
       toWake.setWakeTime(vm.getCurrentTime());
       toWake.resume(vm);
-      if (!toWake.isDone() && !toWake.isWaiting()) {
-        vm.schedule(toWake);
-      }
+      // Do not reschedule here — yield() will reschedule with the correct next wakeTime.
     }
   }
 
@@ -140,9 +138,7 @@ public class ChuckEvent extends ChuckObject {
     for (ChuckShred s : toWake) {
       s.setWakeTime(vm.getCurrentTime());
       s.resume(vm);
-      if (!s.isDone() && !s.isWaiting()) {
-        vm.schedule(s);
-      }
+      // Do not reschedule here — yield() will reschedule with the correct next wakeTime.
     }
   }
 }

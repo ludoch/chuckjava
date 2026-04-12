@@ -780,6 +780,10 @@ public class ObjectInstrs {
       if (vm.isGlobalObject(n) && !n.startsWith("@new_")) {
         Object existing = vm.getGlobalObject(n);
         if (existing != null) {
+          // Re-register with the current shred so cleanup() disconnects it when the shred ends.
+          // Without this, a second spork reusing the same global UGen would leave it connected
+          // to the DAC forever (the UGen would not be in the new shred's ownedUGens).
+          if (existing instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
           s.reg.pushObject(existing);
           return;
         }

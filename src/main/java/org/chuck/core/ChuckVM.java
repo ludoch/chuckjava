@@ -379,6 +379,8 @@ public class ChuckVM {
       shred.setId(nextShredId++);
     }
     activeShreds.put(shred.getId(), shred);
+    // Initialize wakeTime to NOW so yield(n) sets absolute time = now + n, not 0 + n.
+    shred.setWakeTime(now.get());
     schedule(shred);
 
     // Start shred execution in a Virtual Thread
@@ -408,6 +410,7 @@ public class ChuckVM {
       shred.setId(nextShredId++);
     }
     activeShreds.put(shred.getId(), shred);
+    shred.setWakeTime(now.get());
     schedule(shred);
 
     Thread.ofVirtual()
@@ -463,9 +466,7 @@ public class ChuckVM {
             t.waitingShred().setEventWaitingOn(null);
             t.waitingShred().setWakeTime(currentTime);
             t.waitingShred().resume(this);
-            if (!t.waitingShred().isDone() && !t.waitingShred().isWaiting()) {
-              schedule(t.waitingShred());
-            }
+            // Do not reschedule here — yield() will reschedule with the correct wakeTime.
           }
           return true;
         });
@@ -506,10 +507,10 @@ public class ChuckVM {
           wakeCount.incrementAndGet();
           if (jitter > maxJitter.get()) maxJitter.set(jitter);
 
+          // Only resume — do NOT reschedule here with the stale wakeTime.
+          // The shred will call vm.schedule(this) from inside yield() once it
+          // has updated wakeTime to the correct next wake point.
           nextShred.resume(this);
-          if (!nextShred.isDone() && !nextShred.isWaiting()) {
-            schedule(nextShred);
-          }
         }
       }
 
@@ -560,8 +561,10 @@ public class ChuckVM {
   }
 
   public void removeShred(int id) {
-    ChuckShred s = activeShreds.get(id);
-    if (s != null) s.setDone(true);
+    ChuckShred s = activeShreds.remove(id);
+    if (s != null) {
+      s.cleanup(); // disconnect UGens immediately; also signals done + wakes virtual thread
+    }
   }
 
   public void resetShredId() {
@@ -611,13 +614,16 @@ public class ChuckVM {
   }
 
   public void clear() {
-    activeShreds.values().forEach(s -> s.setDone(true));
+    java.util.List<ChuckShred> shreds = new java.util.ArrayList<>(activeShreds.values());
     activeShreds.clear();
     shredulerLock.lock();
     try {
       shreduler.clear();
     } finally {
       shredulerLock.unlock();
+    }
+    for (ChuckShred s : shreds) {
+      s.cleanup();
     }
   }
 

@@ -308,6 +308,12 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
       this.wakeTime += samples;
       this.isRunning = false;
       condition.signal(); // Signal execute() loop that we are done for now
+      // Self-reschedule with the updated wakeTime before sleeping.
+      // advanceTime() no longer reschedules after resume() to avoid stale-wakeTime races.
+      ChuckVM currentVm = ChuckVM.CURRENT_VM.isBound() ? ChuckVM.CURRENT_VM.get() : null;
+      if (currentVm != null && !isDone) {
+        currentVm.schedule(this);
+      }
       while (!isRunning && !isDone) {
         condition.await();
       }
