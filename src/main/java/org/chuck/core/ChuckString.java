@@ -123,6 +123,11 @@ public class ChuckString extends ChuckObject {
     return this;
   }
 
+  public void setValue(String val) {
+    sb.setLength(0);
+    sb.append(val == null ? "" : val);
+  }
+
   /** Returns the directory path if the string is a file path. */
   public ChuckString path() {
     java.nio.file.Path p = java.nio.file.Paths.get(sb.toString()).getParent();

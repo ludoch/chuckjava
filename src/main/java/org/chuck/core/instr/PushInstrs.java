@@ -47,14 +47,14 @@ public class PushInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      s.reg.pushObject(new ChuckString(v));
+      s.reg.pushObject(ChuckObjectPool.getString(v));
     }
   }
 
   public static class PushNow implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      s.reg.pushObject(new ChuckDuration(vm.getCurrentTime()));
+      s.reg.pushObject(ChuckObjectPool.getDuration(vm.getCurrentTime()));
     }
   }
 
@@ -174,7 +174,7 @@ public class PushInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      s.reg.pushObject(new ChuckString((String) s.getCode().getConstant(index)));
+      s.reg.pushObject(ChuckObjectPool.getString((String) s.getCode().getConstant(index)));
     }
 
     @Override

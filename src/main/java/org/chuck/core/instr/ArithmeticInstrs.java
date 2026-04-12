@@ -20,7 +20,7 @@ public class ArithmeticInstrs {
       if (s.reg.isObject(0) || s.reg.isObject(1)) {
         Object r = s.reg.pop(), l = s.reg.pop();
         if (l instanceof ChuckDuration ld && r instanceof ChuckDuration rd) {
-          s.reg.pushObject(new ChuckDuration(ld.samples() + rd.samples()));
+          s.reg.pushObject(ChuckObjectPool.getDuration(ld.samples() + rd.samples()));
         } else if (l instanceof ChuckArray la
             && r instanceof ChuckArray ra
             && "complex".equals(la.vecTag)
@@ -44,7 +44,7 @@ public class ArithmeticInstrs {
         } else {
           String ls = (l instanceof Double d) ? String.format("%.6f", d) : String.valueOf(l);
           String rs = (r instanceof Double d) ? String.format("%.6f", d) : String.valueOf(r);
-          s.reg.pushObject(new ChuckString(ls + rs));
+          s.reg.pushObject(ChuckObjectPool.getString(ls + rs));
         }
       } else if (s.reg.isDouble(0) || s.reg.isDouble(1)) {
         double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
@@ -63,7 +63,7 @@ public class ArithmeticInstrs {
       if (s.reg.isObject(0) || s.reg.isObject(1)) {
         Object r = s.reg.pop(), l = s.reg.pop();
         if (l instanceof ChuckDuration ld && r instanceof ChuckDuration rd) {
-          s.reg.pushObject(new ChuckDuration(ld.samples() - rd.samples()));
+          s.reg.pushObject(ChuckObjectPool.getDuration(ld.samples() - rd.samples()));
         } else if (l instanceof ChuckArray la
             && r instanceof ChuckArray ra
             && "complex".equals(la.vecTag)
@@ -206,7 +206,8 @@ public class ArithmeticInstrs {
       if (s.reg.getSp() < 1) return;
       if (s.reg.isObject(0)) {
         Object o = s.reg.pop();
-        if (o instanceof ChuckDuration cd) s.reg.pushObject(new ChuckDuration(-cd.samples()));
+        if (o instanceof ChuckDuration cd)
+          s.reg.pushObject(ChuckObjectPool.getDuration(-cd.samples()));
         else s.reg.push(0.0);
       } else if (s.reg.isDouble(0)) {
         s.reg.push(-s.reg.popAsDouble());

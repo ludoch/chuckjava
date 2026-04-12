@@ -1,7 +1,21 @@
 package org.chuck.core;
 
 /** Represents a duration in ChucK (e.g., 10::ms). */
-public record ChuckDuration(double samples) implements Comparable<ChuckDuration> {
+public class ChuckDuration implements Comparable<ChuckDuration> {
+  private double samples;
+
+  public ChuckDuration(double samples) {
+    this.samples = samples;
+  }
+
+  public double samples() {
+    return samples;
+  }
+
+  public void setSamples(double samples) {
+    this.samples = samples;
+  }
+
   public static ChuckDuration of(double samples) {
     return new ChuckDuration(samples);
   }
@@ -21,5 +35,23 @@ public record ChuckDuration(double samples) implements Comparable<ChuckDuration>
   @Override
   public int compareTo(ChuckDuration o) {
     return Double.compare(this.samples, o.samples);
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    ChuckDuration that = (ChuckDuration) o;
+    return Double.compare(that.samples, samples) == 0;
+  }
+
+  @Override
+  public int hashCode() {
+    return Double.hashCode(samples);
+  }
+
+  @Override
+  public String toString() {
+    return "ChuckDuration(" + samples + ")";
   }
 }

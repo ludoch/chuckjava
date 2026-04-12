@@ -42,7 +42,7 @@ public class MiscInstrs {
             case "samp" -> v;
             default -> 0.0;
           };
-      s.reg.pushObject(new ChuckDuration(smp));
+      s.reg.pushObject(ChuckObjectPool.getDuration(smp));
     }
   }
 

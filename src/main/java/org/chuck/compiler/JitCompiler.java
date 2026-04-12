@@ -21,6 +21,14 @@ public class JitCompiler implements Opcodes {
     }
   }
 
+  public static long getArrayInt(org.chuck.core.ChuckArray a, long idx) {
+    return a.getInt(a.resolveIndex(idx));
+  }
+
+  public static void setArrayInt(org.chuck.core.ChuckArray a, long idx, long val) {
+    a.setInt(a.resolveIndex(idx), val);
+  }
+
   public static Class<?> compile(ChuckCode code, String className) {
     ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES | ClassWriter.COMPUTE_MAXS);
     String internalName = "org/chuck/jit/" + className;
@@ -96,6 +104,75 @@ public class JitCompiler implements Opcodes {
             GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
         mv.visitLdcInsn(p.getVal());
         mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(J)V", false);
+      } else if (instr instanceof ControlInstrs.Jump j) {
+        mv.visitJumpInsn(GOTO, labels[j.getTarget()]);
+        continue;
+      } else if (instr instanceof ControlInstrs.JumpIfFalse j) {
+        mv.visitVarInsn(ALOAD, 2); // shred
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popAsLong", "()J", false);
+        mv.visitInsn(LCONST_0);
+        mv.visitInsn(LCMP);
+        mv.visitJumpInsn(IFEQ, labels[j.getTarget()]);
+      } else if (instr instanceof ControlInstrs.JumpIfTrue j) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popAsLong", "()J", false);
+        mv.visitInsn(LCONST_0);
+        mv.visitInsn(LCMP);
+        mv.visitJumpInsn(IFNE, labels[j.getTarget()]);
+      } else if (instr instanceof ArrayInstrs.GetArrayIntFast) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitInsn(DUP);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitMethodInsn(
+            INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popLong", "()J", false); // idx
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitMethodInsn(
+            INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popObject", "()Ljava/lang/Object;", false);
+        mv.visitTypeInsn(CHECKCAST, "org/chuck/core/ChuckArray"); // array
+        mv.visitInsn(SWAP); // array, idx
+        mv.visitMethodInsn(
+            INVOKESTATIC,
+            "org/chuck/compiler/JitCompiler",
+            "getArrayInt",
+            "(Lorg/chuck/core/ChuckArray;J)J",
+            false);
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitInsn(SWAP);
+        mv.visitMethodInsn(INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "push", "(J)V", false);
+      } else if (instr instanceof ArrayInstrs.SetArrayIntFast) {
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitMethodInsn(
+            INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popLong", "()J", false); // idx
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitMethodInsn(
+            INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "popObject", "()Ljava/lang/Object;", false);
+        mv.visitTypeInsn(CHECKCAST, "org/chuck/core/ChuckArray"); // array
+        mv.visitInsn(SWAP); // array, idx
+        mv.visitVarInsn(ALOAD, 2);
+        mv.visitFieldInsn(
+            GETFIELD, "org/chuck/core/ChuckShred", "reg", "Lorg/chuck/core/ChuckStack;");
+        mv.visitLdcInsn(0);
+        mv.visitMethodInsn(
+            INVOKEVIRTUAL, "org/chuck/core/ChuckStack", "peekLong", "(I)J", false); // val
+        mv.visitMethodInsn(
+            INVOKESTATIC,
+            "org/chuck/compiler/JitCompiler",
+            "setArrayInt",
+            "(Lorg/chuck/core/ChuckArray;JJ)V",
+            false);
       } else if (instr instanceof ArithmeticInstrs.AddInt) {
         mv.visitVarInsn(ALOAD, 2);
         mv.visitFieldInsn(
