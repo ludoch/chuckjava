@@ -44,8 +44,8 @@ public class ChuckType {
   public static final ChuckType EVENT = new ChuckType("Event", OBJECT, 0, 0);
   public static final ChuckType INT = new ChuckType("int", null, 0, 0);
   public static final ChuckType FLOAT = new ChuckType("float", null, 0, 0);
-  public static final ChuckType DUR = new ChuckType("dur", null, 0, 0);
-  public static final ChuckType TIME = new ChuckType("time", null, 0, 0);
+  public static final ChuckType DUR = new ChuckType("dur", OBJECT, 0, 0);
+  public static final ChuckType TIME = new ChuckType("time", OBJECT, 0, 0);
   public static final ChuckType STRING = new ChuckType("string", OBJECT, 0, 0);
   public static final ChuckType ARRAY = new ChuckType("array", OBJECT, 0, 0);
 }

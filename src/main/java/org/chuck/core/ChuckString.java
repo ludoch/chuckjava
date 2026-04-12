@@ -118,9 +118,6 @@ public class ChuckString extends ChuckObject {
   }
 
   private ChuckString getStringFromPool(String s) {
-    if (ChuckShred.CURRENT_SHRED.isBound()) {
-      return ChuckShred.CURRENT_SHRED.get().getString(s);
-    }
     return new ChuckString(s);
   }
 

@@ -1,19 +1,16 @@
 package org.chuck.core;
 
-/** Represents a duration in ChucK (e.g., 10::ms). */
-public class ChuckDuration implements Comparable<ChuckDuration> {
-  private double samples;
+/** Represents a duration in ChucK (e.g., 10::ms). Immutable. */
+public final class ChuckDuration extends ChuckObject implements Comparable<ChuckDuration> {
+  private final double samples;
 
   public ChuckDuration(double samples) {
+    super(ChuckType.DUR);
     this.samples = samples;
   }
 
   public double samples() {
     return samples;
-  }
-
-  public void setSamples(double samples) {
-    this.samples = samples;
   }
 
   public static ChuckDuration of(double samples) {

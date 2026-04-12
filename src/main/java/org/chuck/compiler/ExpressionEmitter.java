@@ -99,9 +99,7 @@ public class ExpressionEmitter {
         int argCount = 0;
         boolean isUserClass = parent.getUserClassRegistry().containsKey(e.type());
         boolean forceGlobal = e.isGlobal();
-        boolean useGlobal =
-            forceGlobal
-                || (parent.getLocalScopes().size() <= 1 && parent.getCurrentClass() == null);
+        boolean useGlobal = forceGlobal; // Top-level vars are shred-local by default in ChucK
 
         if (useGlobal) {
           String prevType = parent.getGlobalVarTypes().get(e.name());

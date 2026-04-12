@@ -125,7 +125,7 @@ public class ChuckComplexScriptTest {
 
     String codeSource =
         """
-            int scale[3];
+            global int scale[3];
             60 => scale[0];
             64 => scale[1];
             67 => scale[2];

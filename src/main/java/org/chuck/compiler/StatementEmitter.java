@@ -299,7 +299,7 @@ public class StatementEmitter {
         boolean isUserClass = parent.getUserClassRegistry().containsKey(s.type());
         boolean isObject = parent.isObjectType(s.type());
         boolean forceGlobal = s.isGlobal();
-        boolean useGlobal = forceGlobal || parent.getLocalScopes().size() <= 1;
+        boolean useGlobal = forceGlobal; // Top-level vars are shred-local by default in ChucK
         // Compile-time check: detect global type conflicts
         if (useGlobal) {
           String prevType = parent.getGlobalVarTypes().get(s.name());
