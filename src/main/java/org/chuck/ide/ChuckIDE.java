@@ -412,6 +412,10 @@ public class ChuckIDE extends Application {
   private boolean prefUseSpaces = true;
   private int prefTabWidth = 4;
 
+  // Audio preferences (take effect on next IDE launch)
+  private int prefSampleRate = 44100;
+  private int prefBufferSize = 512;
+
   // Toolbar button refs (needed for lockdown disable/enable)
   private Button addShredBtnRef;
   private Button replaceBtnRef;
@@ -459,15 +463,18 @@ public class ChuckIDE extends Application {
     prefUseSpaces = prefs.getBoolean("editor.useSpaces", true);
     prefTabWidth = prefs.getInt("editor.tabWidth", 4);
 
-    int sampleRate = 44100;
-    vm = new ChuckVM(sampleRate);
+    // Load persisted audio preferences
+    prefSampleRate = prefs.getInt("audio.sampleRate", 44100);
+    prefBufferSize = prefs.getInt("audio.bufferSize", 512);
+
+    vm = new ChuckVM(prefSampleRate);
     vm.addPrintListener(this::print);
 
     // Master gain is a scalar multiplier applied in ChuckAudio (not a UGen in the signal path).
     // Wiring the Gain UGen into the DAC pull-graph would leave it un-ticked → silence.
     masterGain = new Gain();
 
-    audio = new ChuckAudio(vm, 512, 2, sampleRate);
+    audio = new ChuckAudio(vm, prefBufferSize, 2, prefSampleRate);
 
     List<String> rawArgs = getParameters().getRaw();
     for (String arg : rawArgs) {
@@ -2372,11 +2379,31 @@ public class ChuckIDE extends Application {
     editorTab.setClosable(false);
 
     // ── Audio tab ──────────────────────────────────────────────────────────
-    Label srLabel = new Label("Sample rate: 44100 Hz (restart IDE to change)");
-    Label bufLabel = new Label("Buffer size: 512 samples (restart IDE to change)");
-    VBox audioBox = new VBox(8, srLabel, bufLabel);
-    audioBox.setPadding(new Insets(12));
-    Tab audioTab = new Tab("Audio", audioBox);
+    javafx.scene.control.ChoiceBox<Integer> srBox =
+        new javafx.scene.control.ChoiceBox<>(
+            javafx.collections.FXCollections.observableArrayList(
+                22050, 44100, 48000, 88200, 96000));
+    srBox.setValue(prefSampleRate);
+
+    javafx.scene.control.ChoiceBox<Integer> bufBox =
+        new javafx.scene.control.ChoiceBox<>(
+            javafx.collections.FXCollections.observableArrayList(128, 256, 512, 1024, 2048));
+    bufBox.setValue(prefBufferSize);
+
+    Label restartNote = new Label("⚠ Changes take effect after restarting the IDE.");
+    restartNote.setStyle("-fx-text-fill: #884400; -fx-font-style: italic;");
+
+    javafx.scene.layout.GridPane audioGrid = new javafx.scene.layout.GridPane();
+    audioGrid.setHgap(12);
+    audioGrid.setVgap(10);
+    audioGrid.setPadding(new Insets(12));
+    audioGrid.add(new Label("Sample rate (Hz):"), 0, 0);
+    audioGrid.add(srBox, 1, 0);
+    audioGrid.add(new Label("Buffer size (samples):"), 0, 1);
+    audioGrid.add(bufBox, 1, 1);
+    audioGrid.add(restartNote, 0, 2, 2, 1);
+
+    Tab audioTab = new Tab("Audio", audioGrid);
     audioTab.setClosable(false);
 
     // ── About tab ─────────────────────────────────────────────────────────
@@ -2409,6 +2436,12 @@ public class ChuckIDE extends Application {
               prefs.putInt("editor.tabWidth", prefTabWidth);
               prefs.putBoolean("editor.useSpaces", prefUseSpaces);
               prefs.putBoolean("editor.smartIndent", prefSmartIndent);
+
+              // Audio — persist for next launch
+              prefSampleRate = srBox.getValue();
+              prefBufferSize = bufBox.getValue();
+              prefs.putInt("audio.sampleRate", prefSampleRate);
+              prefs.putInt("audio.bufferSize", prefBufferSize);
 
               // Apply font size to all open editors immediately
               String fontStyle =
