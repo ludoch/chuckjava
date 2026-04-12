@@ -38,9 +38,23 @@ public class PulseOsc extends Osc {
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
+    if (systemTime != -1
+        && systemTime == lastTickTime
+        && blockCache != null
+        && blockCache.length >= length) {
+      if (buffer != null) {
+        System.arraycopy(blockCache, 0, buffer, offset, length);
+      }
+      return;
+    }
+
     if (getNumSources() > 0) {
       super.tick(buffer, offset, length, systemTime);
       return;
+    }
+
+    if (blockCache == null || blockCache.length < length) {
+      blockCache = new float[length];
     }
 
     float f_freq = (float) freq;
@@ -82,7 +96,9 @@ public class PulseOsc extends Osc {
 
       vOut = vOut.sub(vPolyBlep(vP2, vInc));
 
-      vOut.mul(gain).intoArray(buffer, offset + i);
+      if (buffer != null) {
+        vOut.mul(gain).intoArray(buffer, offset + i);
+      }
 
       f_phase = (f_phase + f_inc * SPECIES.length()) % 1.0f;
       if (f_phase < 0) f_phase += 1.0f;
@@ -91,7 +107,15 @@ public class PulseOsc extends Osc {
     // Scalar fallback for remainder
     this.phase = f_phase;
     for (; i < length; i++) {
-      buffer[offset + i] = tick(systemTime == -1 ? -1 : systemTime + i);
+      float t = tick(systemTime == -1 ? -1 : systemTime + i);
+      if (buffer != null) {
+        buffer[offset + i] = t;
+      }
     }
+
+    if (buffer != null) {
+      System.arraycopy(buffer, offset, blockCache, 0, length);
+    }
+    lastTickTime = systemTime;
   }
 }

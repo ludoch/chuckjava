@@ -234,34 +234,47 @@ public class ChuckAudio {
                   // Reset per-buffer peak accumulators
                   float[] bufPeak = new float[numChannels];
 
-                  // ── Per-sample processing ─────────────────────────────────────
-                  for (int i = 0; i < bufferSize; i++) {
+                  // ── Adaptive block processing ─────────────────────────────────────
+                  float[][] dacBuffers = new float[numChannels][bufferSize];
+                  int processed = 0;
+                  while (processed < bufferSize) {
+                    long currentTime = vm.getCurrentTime();
+                    long nextWake = vm.getNextWakeTime();
+                    int remaining = bufferSize - processed;
+
+                    // How many samples can we process safely?
+                    // Limit to a reasonable max block size (e.g. 512) to keep visualization snappy
+                    int blockSize = (int) Math.min(remaining, Math.max(1, nextWake - currentTime));
+                    blockSize = Math.min(blockSize, 512);
+
                     // Feed ADC
                     if (inBuf != null) {
-                      for (int c = 0; c < numChannels; c++) {
-                        int inputChan = Math.min(c, numInputChannels - 1);
-                        int idx = (i * numInputChannels + inputChan) * 2;
-                        short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
-                        vm.adc.setInputSample(c, pcm / 32768.0f);
+                      for (int s = 0; s < blockSize; s++) {
+                        for (int c = 0; c < numChannels; c++) {
+                          int inputChan = Math.min(c, numInputChannels - 1);
+                          int idx = ((processed + s) * numInputChannels + inputChan) * 2;
+                          short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
+                          vm.adc.setInputSample(c, pcm / 32768.0f);
+                        }
                       }
                     }
 
-                    // Advance time by 1 sample
-                    vm.advanceTime(1);
+                    // Advance time and compute DAC output in optimized blocks
+                    vm.advanceTime(dacBuffers, processed, blockSize);
+                    processed += blockSize;
+                  }
 
-                    // Smooth gain toward target to prevent zipper noise on rapid slider changes.
+                  // ── Post-processing: Peaks and interleave to outSeg ────────────────
+                  for (int i = 0; i < bufferSize; i++) {
                     smoothedGain += gainSmoothAlpha * (targetGain - smoothedGain);
 
-                    // Interleave Left/Right for stereo output
                     for (int c = 0; c < numChannels; c++) {
-                      float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
-
+                      float sample = dacBuffers[c][i] * smoothedGain;
                       sumSq += (double) sample * sample;
                       float abs = Math.abs(sample);
                       if (abs > bufPeak[c]) bufPeak[c] = abs;
-                      short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
 
-                      // Write directly to off-heap MemorySegment
+                      short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
                       long offset = (long) (i * numChannels + c) * 2;
                       outSeg.set(
                           ValueLayout.JAVA_SHORT.withOrder(ByteOrder.LITTLE_ENDIAN), offset, s16);

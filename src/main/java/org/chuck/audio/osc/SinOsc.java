@@ -21,6 +21,15 @@ public class SinOsc extends Osc {
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
+    if (systemTime != -1
+        && systemTime == lastTickTime
+        && blockCache != null
+        && blockCache.length >= length) {
+      if (buffer != null) System.arraycopy(blockCache, 0, buffer, offset, length);
+      return;
+    }
+    if (blockCache == null || blockCache.length < length) blockCache = new float[length];
+
     // If we have sources (modulation), we must sum them first
     float[] inputSum = new float[length];
     if (getNumSources() > 0) {
@@ -69,7 +78,9 @@ public class SinOsc extends Osc {
       FloatVector vMod = FloatVector.fromArray(SPECIES, inputSum, i);
       vSin = vSin.add(vMod);
 
-      vSin.mul(gain).intoArray(buffer, offset + i);
+      if (buffer != null) {
+        vSin.mul(gain).intoArray(buffer, offset + i);
+      }
 
       f_phase = (f_phase + f_inc * SPECIES.length()) % 1.0f;
       if (f_phase < 0) f_phase += 1.0f;
@@ -78,7 +89,15 @@ public class SinOsc extends Osc {
     // Scalar fallback for remainder
     this.phase = f_phase;
     for (; i < length; i++) {
-      buffer[offset + i] = tick(systemTime == -1 ? -1 : systemTime + i);
+      float out = tick(systemTime == -1 ? -1 : systemTime + i);
+      if (buffer != null) buffer[offset + i] = out;
     }
+
+    if (buffer != null) {
+      System.arraycopy(buffer, offset, blockCache, 0, length);
+    } else {
+      // should not happen in pull-based but for safety
+    }
+    lastTickTime = systemTime;
   }
 }

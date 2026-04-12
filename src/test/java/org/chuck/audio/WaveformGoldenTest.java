@@ -82,10 +82,13 @@ public class WaveformGoldenTest {
     ChuckVM vm = new ChuckVM(SAMPLE_RATE);
     vm.run(code, "test");
     float[] buffer = new float[samples];
-    for (int i = 0; i < samples; i++) {
-      vm.advanceTime(1);
-      buffer[i] = vm.getChannelLastOut(0); // Test Mono for now
-    }
+    float[][] dacBufs = new float[2][samples];
+
+    // Render using the block-based optimized path
+    vm.advanceTime(dacBufs, 0, samples);
+
+    // Copy channel 0 to result
+    System.arraycopy(dacBufs[0], 0, buffer, 0, samples);
     return buffer;
   }
 

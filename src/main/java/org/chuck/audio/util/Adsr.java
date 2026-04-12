@@ -147,20 +147,33 @@ public class Adsr extends ChuckUGen {
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
+    if (systemTime != -1
+        && systemTime == lastTickTime
+        && blockCache != null
+        && blockCache.length >= length) {
+      if (buffer != null) System.arraycopy(blockCache, 0, buffer, offset, length);
+      return;
+    }
+    if (blockCache == null || blockCache.length < length) blockCache = new float[length];
+
     // Optimization: if we are in SUSTAIN or DONE, the gain is constant
     if (state == State.SUSTAIN_ENUM || state == State.DONE_ENUM) {
       float gainVal = (state == State.SUSTAIN_ENUM) ? sustainLevel : 0.0f;
-      int i = 0;
-      int bound = SPECIES.loopBound(length);
-      FloatVector vGain = FloatVector.broadcast(SPECIES, gainVal);
-      for (; i < bound; i += SPECIES.length()) {
-        var vIn = FloatVector.fromArray(SPECIES, buffer, offset + i);
-        vIn.mul(vGain).intoArray(buffer, offset + i);
+      if (buffer != null) {
+        int i = 0;
+        int bound = SPECIES.loopBound(length);
+        FloatVector vGain = FloatVector.broadcast(SPECIES, gainVal);
+        for (; i < bound; i += SPECIES.length()) {
+          var vIn = FloatVector.fromArray(SPECIES, buffer, offset + i);
+          vIn.mul(vGain).intoArray(buffer, offset + i);
+        }
+        for (; i < length; i++) buffer[offset + i] *= gainVal;
       }
-      for (; i < length; i++) buffer[offset + i] *= gainVal;
       currentLevel = gainVal;
-      lastTickTime = (systemTime == -1) ? -1 : systemTime + length - 1;
-      lastOut = buffer[offset + length - 1];
+      lastTickTime = systemTime;
+      for (int i = 0; i < length; i++)
+        blockCache[i] = (buffer != null) ? buffer[offset + i] : gainVal; // simplified
+      lastOut = blockCache[length - 1];
       return;
     }
 

@@ -37,31 +37,51 @@ public class Gain extends ChuckUGen {
   /** SIMD Optimized block processing using the JDK 25 Vector API. */
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
+    if (systemTime != -1
+        && systemTime == lastTickTime
+        && blockCache != null
+        && blockCache.length >= length) {
+      if (buffer != null) {
+        System.arraycopy(blockCache, 0, buffer, offset, length);
+      }
+      return;
+    }
+
+    if (blockCache == null || blockCache.length < length) {
+      blockCache = new float[length];
+    }
+
     int i = 0;
-    int upperBound = SPECIES.loopBound(length);
+    if (buffer != null) {
+      int upperBound = SPECIES.loopBound(length);
 
-    // Multiplier vector
-    FloatVector vGain = FloatVector.broadcast(SPECIES, this.gain);
+      // Multiplier vector
+      FloatVector vGain = FloatVector.broadcast(SPECIES, this.gain);
 
-    // Vectorized loop
-    for (; i < upperBound; i += SPECIES.length()) {
-      // Load block from buffer
-      var vIn = FloatVector.fromArray(SPECIES, buffer, offset + i);
-      // Apply gain
-      var vOut = vIn.mul(vGain);
-      // Store back
-      vOut.intoArray(buffer, offset + i);
+      // Vectorized loop
+      for (; i < upperBound; i += SPECIES.length()) {
+        // Load block from buffer
+        var vIn = FloatVector.fromArray(SPECIES, buffer, offset + i);
+        // Apply gain
+        var vOut = vIn.mul(vGain);
+        // Store back
+        vOut.intoArray(buffer, offset + i);
+      }
+
+      // Tail loop for remaining elements
+      for (; i < length; i++) {
+        buffer[offset + i] *= this.gain;
+      }
+
+      // Update lastOut for potential scalar callers
+      if (length > 0) {
+        lastOut = buffer[offset + length - 1];
+      }
     }
 
-    // Tail loop for remaining elements
-    for (; i < length; i++) {
-      buffer[offset + i] *= this.gain;
+    if (buffer != null) {
+      System.arraycopy(buffer, offset, blockCache, 0, length);
     }
-
-    // Update lastOut for potential scalar callers
-    if (length > 0) {
-      lastOut = buffer[offset + length - 1];
-      lastTickTime = (systemTime == -1) ? -1 : systemTime + length - 1;
-    }
+    lastTickTime = systemTime;
   }
 }

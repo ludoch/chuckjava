@@ -122,32 +122,40 @@ public class DacChannel extends ChuckUGen {
       // SIMD Addition: buffer += temp
       int i = 0;
       int bound = SPECIES.loopBound(length);
-      for (; i < bound; i += SPECIES.length()) {
-        FloatVector vSum = FloatVector.fromArray(SPECIES, buffer, offset + i);
-        FloatVector vSrc = FloatVector.fromArray(SPECIES, temp, i);
-        vSum.add(vSrc).intoArray(buffer, offset + i);
-      }
-      // Fallback
-      for (; i < length; i++) {
-        buffer[offset + i] += temp[i];
+      if (buffer != null) {
+        for (; i < bound; i += SPECIES.length()) {
+          FloatVector vSum = FloatVector.fromArray(SPECIES, buffer, offset + i);
+          FloatVector vSrc = FloatVector.fromArray(SPECIES, temp, i);
+          vSum.add(vSrc).intoArray(buffer, offset + i);
+        }
+        // Fallback
+        for (; i < length; i++) {
+          buffer[offset + i] += temp[i];
+        }
       }
     }
 
-    // Apply gain (vectorized)
     // Apply gain and write to output buffer
     for (int i = 0; i < length; i++) {
-      float sample = buffer[offset + i] * gain;
-      buffer[offset + i] = sample;
+      float sampleSum = (buffer != null) ? buffer[offset + i] : 0.0f;
+      float sample = sampleSum * gain;
+      if (buffer != null) buffer[offset + i] = sample;
 
       // Fill visualization buffer
       visBuffer[visWriteIdx] = sample;
       visWriteIdx = (visWriteIdx + 1) % visBuffer.length;
-    }
 
+      // Update blockCache for graph-sorting Fast Path
+      if (blockCache == null || blockCache.length < length) blockCache = new float[length];
+      blockCache[i] = sample;
+    }
     // Cache lastOut for scalar callers
-    if (length > 0) {
+    if (length > 0 && buffer != null) {
       lastOut = buffer[offset + length - 1];
       lastTickTime = systemTime + length - 1;
+    } else if (length > 0 && blockCache != null) {
+      lastOut = blockCache[length - 1];
+      lastTickTime = systemTime; // Block start time
     }
   }
 }

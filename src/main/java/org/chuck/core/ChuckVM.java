@@ -90,6 +90,51 @@ public class ChuckVM {
   public final Adc adc;
   public final Blackhole blackhole;
 
+  private volatile boolean graphDirty = true;
+  private org.chuck.audio.ChuckUGen[] sortedUGens = new org.chuck.audio.ChuckUGen[0];
+
+  public void invalidateGraph() {
+    graphDirty = true;
+  }
+
+  private void rebuildGraph() {
+    if (!graphDirty) return;
+
+    List<org.chuck.audio.ChuckUGen> result = new ArrayList<>();
+    java.util.Set<org.chuck.audio.ChuckUGen> visited =
+        java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+    java.util.Set<org.chuck.audio.ChuckUGen> stack =
+        java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+
+    // Traverse from roots: dacChannels and blackhole
+    for (DacChannel chan : dacChannels) {
+      sortDFS(chan, visited, stack, result);
+    }
+    sortDFS(blackhole, visited, stack, result);
+
+    this.sortedUGens = result.toArray(new org.chuck.audio.ChuckUGen[0]);
+    graphDirty = false;
+  }
+
+  private void sortDFS(
+      org.chuck.audio.ChuckUGen ugen,
+      java.util.Set<org.chuck.audio.ChuckUGen> visited,
+      java.util.Set<org.chuck.audio.ChuckUGen> stack,
+      List<org.chuck.audio.ChuckUGen> result) {
+    if (ugen == null || visited.contains(ugen)) return;
+
+    visited.add(ugen);
+    stack.add(ugen);
+
+    // Recursively visit sources (dependencies)
+    for (org.chuck.audio.ChuckUGen src : ugen.getSources()) {
+      sortDFS(src, visited, stack, result);
+    }
+
+    stack.remove(ugen);
+    result.add(ugen); // Post-order ensures dependencies come first
+  }
+
   // Listeners for printed output
   private final List<java.util.function.Consumer<String>> printListeners = new ArrayList<>();
 
@@ -578,17 +623,26 @@ public class ChuckVM {
       int blockSize = (int) Math.min(remaining, Math.max(1, nextWake - currentTime));
 
       if (blockSize > 1) {
-        // FAST PATH: No shreds wake up in this window. Use SIMD.
-        for (int c = 0; c < numChannels; c++) {
-          dacChannels[c].tick(dacBuffers[c], offset + processed, blockSize, currentTime);
+        // FAST PATH: No shreds wake up. Use Topologically Sorted SIMD processing.
+        rebuildGraph();
+
+        // 1. Tick all UGens in sorted order.
+        // Important: we pass 'currentTime' which is the time of the FIRST sample in the block.
+        for (org.chuck.audio.ChuckUGen ugen : sortedUGens) {
+          ugen.tick(null, 0, blockSize, currentTime);
         }
-        // Blackhole also needs to be ticked to pull any connected UGens
-        blackhole.tick(null, 0, blockSize, currentTime);
+
+        // 2. Collect final output from DAC channels into dacBuffers
+        for (int c = 0; c < numChannels; c++) {
+          System.arraycopy(
+              dacChannels[c].getBlockCache(), 0, dacBuffers[c], offset + processed, blockSize);
+        }
 
         now.addAndGet(blockSize);
         processed += blockSize;
       } else {
-        // SLOW PATH: At least one shred wakes up now or in 1 sample.
+        // SLOW PATH: A shred is waking up. Fall back to sample-by-sample.
+        // advanceTime(1) increments 'now' at the end of its loop.
         advanceTime(1);
         for (int c = 0; c < numChannels; c++) {
           dacBuffers[c][offset + processed] = dacChannels[c].getLastOut();
