@@ -441,6 +441,7 @@ public class ChuckIDE extends Application {
 
   private Canvas visualizerCanvas;
   private Canvas scopeCanvas;
+  private Canvas waterfallCanvas;
   private FFT analyzer;
   private Scope scope;
   private javafx.animation.AnimationTimer visTimer;
@@ -611,6 +612,7 @@ public class ChuckIDE extends Application {
     // Visualizer Canvases (wrapped in StackPanes for resizing)
     visualizerCanvas = new Canvas();
     scopeCanvas = new Canvas();
+    waterfallCanvas = new Canvas();
 
     StackPane specStack = new StackPane(visualizerCanvas);
     specStack.setStyle("-fx-background-color: black;");
@@ -624,11 +626,25 @@ public class ChuckIDE extends Application {
     scopeCanvas.widthProperty().bind(scopeStack.widthProperty());
     scopeCanvas.heightProperty().bind(scopeStack.heightProperty());
 
+    StackPane waterfallStack = new StackPane(waterfallCanvas);
+    waterfallStack.setStyle("-fx-background-color: black;");
+    waterfallStack.setPrefHeight(80);
+    waterfallCanvas.widthProperty().bind(waterfallStack.widthProperty());
+    waterfallCanvas.heightProperty().bind(waterfallStack.heightProperty());
+
     VBox visBox =
-        new VBox(2, new Label("Spectrum"), specStack, new Label("Oscilloscope"), scopeStack);
+        new VBox(
+            2,
+            new Label("Spectrum"),
+            specStack,
+            new Label("Oscilloscope"),
+            scopeStack,
+            new Label("Waterfall"),
+            waterfallStack);
     visBox.setStyle("-fx-background-color: #222; -fx-padding: 5;");
     VBox.setVgrow(specStack, Priority.ALWAYS);
     VBox.setVgrow(scopeStack, Priority.ALWAYS);
+    VBox.setVgrow(waterfallStack, Priority.ALWAYS);
     for (javafx.scene.Node n : visBox.getChildren()) {
       if (n instanceof Label l) l.setTextFill(Color.LIGHTGRAY);
     }
@@ -2165,6 +2181,7 @@ public class ChuckIDE extends Application {
           public void handle(long now) {
             renderSpectrum();
             renderScope();
+            renderWaterfall();
             updateVMTime();
             updateShredList();
           }
@@ -2312,6 +2329,42 @@ public class ChuckIDE extends Application {
       else gc.lineTo(x, y);
     }
     gc.stroke();
+  }
+
+  private void renderWaterfall() {
+    if (waterfallCanvas == null || analyzer == null) return;
+    GraphicsContext gc = waterfallCanvas.getGraphicsContext2D();
+    double w = waterfallCanvas.getWidth();
+    double h = waterfallCanvas.getHeight();
+    if (w <= 0 || h <= 0) return;
+
+    float[] mags = analyzer.getLatestMags();
+    if (mags == null || mags.length == 0) return;
+
+    // Shift existing image down by 1 pixel
+    javafx.scene.image.WritableImage snapshot = waterfallCanvas.snapshot(null, null);
+    gc.drawImage(snapshot, 0, 1);
+
+    // Draw new line at the top
+    double binW = w / mags.length;
+    double norm = 2.0 / mags.length;
+
+    for (int i = 0; i < mags.length; i++) {
+      double linear = mags[i] * norm;
+      double db = linear > 1e-9 ? 20.0 * Math.log10(linear) : -80.0;
+      double val = Math.max(0.0, Math.min(1.0, (db + 80.0) / 80.0));
+
+      gc.setFill(getWaterfallColor(val));
+      gc.fillRect(i * binW, 0, binW + 1, 1);
+    }
+  }
+
+  private Color getWaterfallColor(double intensity) {
+    if (intensity < 0.2) return Color.BLACK;
+    if (intensity < 0.4) return Color.BLUE;
+    if (intensity < 0.6) return Color.RED;
+    if (intensity < 0.8) return Color.YELLOW;
+    return Color.WHITE;
   }
 
   private void toggleRecord(Button btn) {
