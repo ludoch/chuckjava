@@ -91,14 +91,15 @@ public class DacChannel extends ChuckUGen {
   }
 
   private final float[] visBuffer = new float[2048];
-  private int visWriteIdx = 0;
+  private volatile int visWriteIdx = 0;
 
   public float[] getVisBuffer() {
     float[] copy = new float[visBuffer.length];
     int len = visBuffer.length;
-    // Copy in two parts: from writeIdx to end, then from 0 to writeIdx
-    System.arraycopy(visBuffer, visWriteIdx, copy, 0, len - visWriteIdx);
-    System.arraycopy(visBuffer, 0, copy, len - visWriteIdx, visWriteIdx);
+    int snapshotIdx = visWriteIdx; // Capture once to avoid race condition
+    // Copy in two parts: from snapshotIdx to end, then from 0 to snapshotIdx
+    System.arraycopy(visBuffer, snapshotIdx, copy, 0, len - snapshotIdx);
+    System.arraycopy(visBuffer, 0, copy, len - snapshotIdx, snapshotIdx);
     return copy;
   }
 
