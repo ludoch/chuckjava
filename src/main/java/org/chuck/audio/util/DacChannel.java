@@ -34,6 +34,11 @@ public class DacChannel extends ChuckUGen {
 
     lastOut = sum * gain;
     lastTickTime = systemTime;
+
+    // Fill visualization buffer
+    visBuffer[visWriteIdx] = lastOut;
+    visWriteIdx = (visWriteIdx + 1) % visBuffer.length;
+
     return lastOut;
   }
 
@@ -90,7 +95,10 @@ public class DacChannel extends ChuckUGen {
 
   public float[] getVisBuffer() {
     float[] copy = new float[visBuffer.length];
-    System.arraycopy(visBuffer, 0, copy, 0, visBuffer.length);
+    int len = visBuffer.length;
+    // Copy in two parts: from writeIdx to end, then from 0 to writeIdx
+    System.arraycopy(visBuffer, visWriteIdx, copy, 0, len - visWriteIdx);
+    System.arraycopy(visBuffer, 0, copy, len - visWriteIdx, visWriteIdx);
     return copy;
   }
 
