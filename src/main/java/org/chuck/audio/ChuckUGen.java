@@ -171,7 +171,10 @@ public abstract class ChuckUGen extends ChuckObject {
 
   /** Returns the most recent sample for a specific output channel. */
   public float getChannelLastOut(int i) {
-    if (i == 0) return lastOut;
+    // ChucK behavior: mono UGens provide their output to all requested channels.
+    // Stereo/multi-channel UGens provide specific channels.
+    if (numOutputs == 1) return lastOut;
+    if (i >= 0 && i < numOutputs) return lastOut; // Fallback for single-out multi-channel proxies
     return 0.0f;
   }
 

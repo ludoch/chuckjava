@@ -295,6 +295,9 @@ public class ChuckAudio {
                   for (int c = 0; c < numChannels && c < peakOut.length; c++) {
                     peakOut[c] = Math.max(bufPeak[c], peakOut[c] * 0.97f);
                   }
+                  if (verbose > 1 && (bufPeak[0] > 0.001f || bufPeak[1] > 0.001f)) {
+                    // System.out.printf("[Audio] Peaks: L=%.4f R=%.4f\n", bufPeak[0], bufPeak[1]);
+                  }
 
                   // Transfer from off-heap to byte array for JavaSound write
                   MemorySegment.copy(outSeg, ValueLayout.JAVA_BYTE, 0, outBuf, 0, bytesPerBuffer);

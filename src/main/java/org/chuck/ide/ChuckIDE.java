@@ -629,10 +629,12 @@ public class ChuckIDE extends Application {
             });
 
     // VU meters — live peak level indicators, updated by the animation timer
-    vuLeft = new javafx.scene.control.ProgressBar(0);
-    vuRight = new javafx.scene.control.ProgressBar(0);
-    vuLeft.setPrefWidth(Double.MAX_VALUE);
-    vuRight.setPrefWidth(Double.MAX_VALUE);
+    vuLeft = new javafx.scene.control.ProgressBar(0.01);
+    vuRight = new javafx.scene.control.ProgressBar(0.01);
+    vuLeft.setMinWidth(100);
+    vuRight.setMinWidth(100);
+    vuLeft.setMaxWidth(Double.MAX_VALUE);
+    vuRight.setMaxWidth(Double.MAX_VALUE);
     vuLeft.setStyle("-fx-accent: limegreen;");
     vuRight.setStyle("-fx-accent: limegreen;");
 
@@ -2219,6 +2221,9 @@ public class ChuckIDE extends Application {
     if (vuLeft != null && vuRight != null && audio != null) {
       double peak0 = Math.min(1.0, audio.getPeakOut(0));
       double peak1 = Math.min(1.0, audio.getPeakOut(1));
+      if (peak0 > 0.001 || peak1 > 0.001) {
+        System.out.println("VU: " + peak0 + " " + peak1);
+      }
       vuLeft.setProgress(peak0);
       vuRight.setProgress(peak1);
       // Colour: green < -6 dBFS, yellow < -3 dBFS, red ≥ -3 dBFS
