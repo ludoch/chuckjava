@@ -74,7 +74,7 @@ public class TriOsc extends Osc {
       var vFloorP = vIntP.castShape(SPECIES, 0);
       FloatVector vP = vPRaw.sub(vFloorP);
 
-      VectorMask<Float> mask = vP.lt(vWidth);
+      VectorMask<Float> mask = vP.compare(jdk.incubator.vector.VectorOperators.LT, vWidth);
 
       // True branch: -1.0 + 2.0 * p / width  ->  p * widthFactor1 - 1.0
       FloatVector vTrue = vP.mul(vWidthFactor1).sub(vOne);

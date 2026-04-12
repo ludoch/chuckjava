@@ -53,9 +53,17 @@ public class SawOsc extends Osc {
       // vPhases = (phase + offsets * inc)
       FloatVector vPhases = vOffsets.mul(vInc).add(f_phase);
 
-      // vSaw = 2 * vPhases - 1
-      // (Note: this is naive sawtooth, real PolyBLEP would be harder to vectorize)
+      // Wrap phases to [0, 1]
+      var intSpecies = jdk.incubator.vector.VectorSpecies.of(int.class, SPECIES.vectorShape());
+      var vIntP = vPhases.castShape(intSpecies, 0);
+      var vFloorP = vIntP.castShape(SPECIES, 0);
+      vPhases = vPhases.sub(vFloorP);
+
+      // vSaw = 2 * vPhases - 1 (naive)
       FloatVector vSaw = vPhases.mul(vTwo).sub(vOne);
+
+      // Correct with PolyBLEP
+      vSaw = vSaw.sub(vPolyBlep(vPhases, vInc));
 
       vSaw.mul(gain).intoArray(buffer, offset + i);
 

@@ -64,7 +64,12 @@ public class DacChannel extends ChuckUGen {
     for (int i = 0; i < length; i++) {
       float sample = block[i] * totalGain;
       short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
-      // Write interleaved: channel 0 at 0, channel 1 at 2, etc.
+
+      // Fill visualization buffer
+      visBuffer[visWriteIdx] = sample;
+      visWriteIdx = (visWriteIdx + 1) % visBuffer.length;
+
+      // Write interleaved
       // Total offset: (bufferIndex + i) * numChannels * 2 + (channelIndex * 2)
       // Assuming 2 channels for now as per ChuckAudio hardcoding
       long offset = (long) ((bufferIndex + i) * 2 + channelIndex) * 2;
@@ -78,6 +83,15 @@ public class DacChannel extends ChuckUGen {
         lastTickTime = systemTime + length - 1;
       }
     }
+  }
+
+  private final float[] visBuffer = new float[2048];
+  private int visWriteIdx = 0;
+
+  public float[] getVisBuffer() {
+    float[] copy = new float[visBuffer.length];
+    System.arraycopy(visBuffer, 0, copy, 0, visBuffer.length);
+    return copy;
   }
 
   @Override
@@ -112,15 +126,14 @@ public class DacChannel extends ChuckUGen {
     }
 
     // Apply gain (vectorized)
-    if (gain != 1.0f) {
-      int i = 0;
-      int bound = SPECIES.loopBound(length);
-      FloatVector vGain = FloatVector.broadcast(SPECIES, gain);
-      for (; i < bound; i += SPECIES.length()) {
-        FloatVector v = FloatVector.fromArray(SPECIES, buffer, offset + i);
-        v.mul(vGain).intoArray(buffer, offset + i);
-      }
-      for (; i < length; i++) buffer[offset + i] *= gain;
+    // Apply gain and write to output buffer
+    for (int i = 0; i < length; i++) {
+      float sample = buffer[offset + i] * gain;
+      buffer[offset + i] = sample;
+
+      // Fill visualization buffer
+      visBuffer[visWriteIdx] = sample;
+      visWriteIdx = (visWriteIdx + 1) % visBuffer.length;
     }
 
     // Cache lastOut for scalar callers

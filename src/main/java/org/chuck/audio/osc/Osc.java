@@ -155,6 +155,31 @@ public abstract class Osc extends ChuckUGen {
     return (float) computeOsc(phase);
   }
 
+  /** Vectorized PolyBLEP residual correction. */
+  protected static jdk.incubator.vector.FloatVector vPolyBlep(
+      jdk.incubator.vector.FloatVector vT, jdk.incubator.vector.FloatVector vDt) {
+    var species = vT.species();
+    var vZero = jdk.incubator.vector.FloatVector.zero(species);
+    var vOne = jdk.incubator.vector.FloatVector.broadcast(species, 1.0f);
+    var vTwo = jdk.incubator.vector.FloatVector.broadcast(species, 2.0f);
+
+    // Mask 1: t < dt
+    var mask1 = vT.compare(jdk.incubator.vector.VectorOperators.LT, vDt);
+    // t1 = t / dt
+    var vT1_1 = vT.div(vDt.add(1e-9f)); // Avoid div by zero
+    // res1 = t1 + t1 - t1*t1 - 1.0
+    var vRes1 = vT1_1.add(vT1_1).sub(vT1_1.mul(vT1_1)).sub(vOne);
+
+    // Mask 2: t > 1.0 - dt
+    var mask2 = vT.compare(jdk.incubator.vector.VectorOperators.GT, vOne.sub(vDt));
+    // t1 = (t - 1.0) / dt
+    var vT1_2 = vT.sub(vOne).div(vDt.add(1e-9f));
+    // res2 = t1*t1 + t1 + t1 + 1.0
+    var vRes2 = vT1_2.mul(vT1_2).add(vT1_2).add(vT1_2).add(vOne);
+
+    return vZero.blend(vRes1, mask1).blend(vRes2, mask2);
+  }
+
   protected abstract double computeOsc(double phase);
 
   /**

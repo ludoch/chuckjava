@@ -60,16 +60,27 @@ public class PulseOsc extends Osc {
       // Raw phase
       FloatVector vPRaw = vOffsets.mul(vInc).add(f_phase);
 
-      // p % 1.0 (approximated for positive phases)
+      // p % 1.0
       var intSpecies = jdk.incubator.vector.VectorSpecies.of(int.class, SPECIES.vectorShape());
       var vIntP = vPRaw.castShape(intSpecies, 0);
       var vFloorP = vIntP.castShape(SPECIES, 0);
       FloatVector vP = vPRaw.sub(vFloorP);
 
-      VectorMask<Float> mask = vP.lt(vWidth);
+      VectorMask<Float> mask = vP.compare(jdk.incubator.vector.VectorOperators.LT, vWidth);
 
       // Naive pulse (SIMD)
       FloatVector vOut = vMinusOne.blend(vOne, mask);
+
+      // Rising edge at phase 0
+      vOut = vOut.add(vPolyBlep(vP, vInc));
+
+      // Falling edge at phase width
+      FloatVector vP2 = vP.sub(vWidth);
+      // Wrap vP2 to [0, 1]
+      VectorMask<Float> maskNeg = vP2.compare(jdk.incubator.vector.VectorOperators.LT, 0.0f);
+      vP2 = vP2.add(vOne.blend(FloatVector.zero(SPECIES), maskNeg));
+
+      vOut = vOut.sub(vPolyBlep(vP2, vInc));
 
       vOut.mul(gain).intoArray(buffer, offset + i);
 

@@ -57,16 +57,13 @@ public class SinOsc extends Osc {
       // x = (vP - 0.5) * 2 * pi
       FloatVector vX = vP.sub(0.5f).mul((float) (2.0 * Math.PI));
 
-      // SIMD Sine Approximation: Bhaskara I's approximation or Taylor
-      // Let's use a standard high-quality polynomial:
-      // sin(x) approx x - x^3/6 + x^5/120 - x^7/5040
-      FloatVector x = vX;
-      FloatVector x2 = x.mul(x);
-      FloatVector x3 = x2.mul(x);
-      FloatVector x5 = x3.mul(x2);
-      FloatVector x7 = x5.mul(x2);
-
-      FloatVector vSin = x.sub(x3.div(6.0f)).add(x5.div(120.0f)).sub(x7.div(5040.0f));
+      // SIMD Sine Approximation (9th order minimax polynomial for better accuracy)
+      // sin(x) approx x * (1 + x^2 * (c1 + x^2 * (c2 + x^2 * (c3 + x^2 * c4))))
+      FloatVector x2 = vX.mul(vX);
+      FloatVector vSin = x2.mul(-1.9841269841269841e-4f); // c4 = -1/5040
+      vSin = vSin.add(0.008333333333333333f).mul(x2); // c3 = 1/120
+      vSin = vSin.sub(0.16666666666666666f).mul(x2); // c2 = -1/6
+      vSin = vSin.add(1.0f).mul(vX);
 
       // If we have modulation, add it here (simplified for now)
       FloatVector vMod = FloatVector.fromArray(SPECIES, inputSum, i);

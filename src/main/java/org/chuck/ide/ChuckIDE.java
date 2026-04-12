@@ -2289,6 +2289,7 @@ public class ChuckIDE extends Application {
   }
 
   private void renderScope() {
+    if (scopeCanvas == null || vm == null) return;
     GraphicsContext gc = scopeCanvas.getGraphicsContext2D();
     double w = scopeCanvas.getWidth();
     double h = scopeCanvas.getHeight();
@@ -2297,20 +2298,17 @@ public class ChuckIDE extends Application {
     gc.setFill(Color.BLACK);
     gc.fillRect(0, 0, w, h);
 
-    UAnaBlob blob = scope.upchuck();
-    if (blob == null) return;
-    float[] samples = blob.getFvals();
-    if (samples == null || samples.length == 0) return;
+    float[] data = vm.getDacChannel(0).getVisBuffer();
+    if (data == null || data.length == 0) return;
 
-    gc.setStroke(Color.CYAN);
+    gc.setStroke(Color.LIME);
     gc.setLineWidth(1.5);
-    double step = w / samples.length;
-    double midY = h / 2.0;
-
     gc.beginPath();
-    for (int i = 0; i < samples.length; i++) {
-      double x = i * step;
-      double y = midY - (samples[i] * midY * 0.9);
+
+    double xStep = w / data.length;
+    for (int i = 0; i < data.length; i++) {
+      double x = i * xStep;
+      double y = (h / 2.0) - (data[i] * (h / 2.0) * 0.9);
       if (i == 0) gc.moveTo(x, y);
       else gc.lineTo(x, y);
     }
