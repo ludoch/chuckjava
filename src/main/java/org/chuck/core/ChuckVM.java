@@ -59,6 +59,8 @@ public class ChuckVM {
   // Shred management
   private final PriorityQueue<ChuckShred> shreduler = new PriorityQueue<>();
   private final Map<Integer, ChuckShred> activeShreds = new ConcurrentHashMap<>();
+  private final java.util.List<ChuckShred> deadShreds =
+      java.util.Collections.synchronizedList(new java.util.ArrayList<>());
   private final ReentrantLock shredulerLock = new ReentrantLock();
   private final Condition shredulerCondition = shredulerLock.newCondition();
   private int nextShredId = 1;
@@ -489,7 +491,7 @@ public class ChuckVM {
       // 1. Run all shreds scheduled for this time (allow 0-yield chaining)
       int safety = 0;
       while (safety++ < 1000) {
-        java.util.List<ChuckShred> ready = new java.util.ArrayList<>();
+        List<ChuckShred> ready = new ArrayList<>();
         shredulerLock.lock();
         try {
           while (!shreduler.isEmpty() && shreduler.peek().getWakeTime() <= currentTime) {

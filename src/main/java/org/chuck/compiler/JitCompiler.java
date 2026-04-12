@@ -132,6 +132,10 @@ public class JitCompiler implements Opcodes {
       mv.visitFieldInsn(GETFIELD, "org/chuck/core/ChuckShred", "isDone", "Z");
       mv.visitJumpInsn(IFNE, labels[instrs.size()]);
 
+      mv.visitVarInsn(ALOAD, 2);
+      mv.visitFieldInsn(GETFIELD, "org/chuck/core/ChuckShred", "isRunning", "Z");
+      mv.visitJumpInsn(IFEQ, labels[instrs.size()]);
+
       // Advance PC manually for next instruction within JIT fragment
       mv.visitVarInsn(ALOAD, 2);
       mv.visitLdcInsn(i + 1);

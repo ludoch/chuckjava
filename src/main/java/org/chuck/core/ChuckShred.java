@@ -19,10 +19,11 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
   private int id;
   private long wakeTime = 0;
   public volatile boolean isDone = false;
-  private boolean isRunning = false;
+  public boolean isRunning = false;
   private boolean isWaiting = false; // Waiting on an event
   private String name = "";
   private String[] args = new String[0];
+  private String lastExceptionMessage = null;
 
   // Virtual Machine stacks
   public final ChuckStack reg = new ChuckStack(1024 * 1024);
@@ -60,6 +61,10 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
   private ChuckCode code;
   public int pc = 0;
   private int framePointer = 0; // Index in mem stack where current frame starts
+
+  public String getLastExceptionMessage() {
+    return lastExceptionMessage;
+  }
 
   public ChuckCode getCode() {
     return code;
@@ -120,6 +125,22 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
   }
 
   private ChuckEvent eventWaitingOn = null;
+  private final java.util.List<Runnable> parkListeners =
+      java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+
+  public void onNextPark(Runnable r) {
+    parkListeners.add(r);
+  }
+
+  private void notifyParked() {
+    java.util.List<Runnable> copy;
+    synchronized (parkListeners) {
+      if (parkListeners.isEmpty()) return;
+      copy = new java.util.ArrayList<>(parkListeners);
+      parkListeners.clear();
+    }
+    for (Runnable r : copy) r.run();
+  }
 
   public ChuckEvent getEventWaitingOn() {
     return eventWaitingOn;
@@ -289,12 +310,7 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
       isRunning = true;
       isWaiting = false;
       condition.signal();
-      while (isRunning && !isDone) {
-        condition.await();
-      }
-    } catch (InterruptedException e) {
-      isDone = true;
-      isRunning = false;
+      // Return immediately so advanceTime can continue to other shreds
     } finally {
       lock.unlock();
     }
@@ -308,6 +324,7 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
       this.wakeTime += samples;
       this.isRunning = false;
       condition.signal(); // Signal execute() loop that we are done for now
+      notifyParked();
       // Self-reschedule with the updated wakeTime before sleeping.
       // advanceTime() no longer reschedules after resume() to avoid stale-wakeTime races.
       ChuckVM currentVm = ChuckVM.CURRENT_VM.isBound() ? ChuckVM.CURRENT_VM.get() : null;
@@ -333,6 +350,7 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
       this.isRunning = false;
       this.isWaiting = true;
       condition.signal(); // Signal execute() loop that we are parking
+      notifyParked();
       while (!isRunning && !isDone) {
         condition.await();
       }
@@ -452,6 +470,7 @@ public class ChuckShred extends ChuckEvent implements Comparable<ChuckShred> {
       isDone = true;
       isRunning = false;
       condition.signal();
+      notifyParked();
       lock.unlock();
     }
   }
