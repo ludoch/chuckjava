@@ -70,6 +70,7 @@ import org.chuck.core.ChuckCode;
 import org.chuck.core.ChuckDSL;
 import org.chuck.core.ChuckShred;
 import org.chuck.core.ChuckVM;
+import org.chuck.core.doc;
 import org.chuck.hid.HidMsg;
 import org.fxmisc.richtext.CodeArea;
 import org.fxmisc.richtext.LineNumberFactory;
