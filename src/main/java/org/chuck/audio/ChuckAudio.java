@@ -25,7 +25,11 @@ public class ChuckAudio {
   private SourceDataLine outputLine;
   private TargetDataLine inputLine; // null if no mic available
   private boolean running = false;
-  private float masterGain = 0.8f;
+  // Zipper-noise prevention: UI sets targetGain; audio thread smooths toward it each sample.
+  // Alpha ≈ 1 − exp(−1 / (44100 × 0.02)) gives ~20 ms ramp; good for any typical sample rate.
+  private volatile float targetGain = 0.8f;
+  private float smoothedGain = 0.8f;
+  private float gainSmoothAlpha = 0.00113f; // recomputed in initJavaSound if SR differs
   private Gain masterGainUGen;
   private int verbose = 1;
 
@@ -59,10 +63,12 @@ public class ChuckAudio {
   }
 
   public void setMasterGain(float gain) {
-    this.masterGain = gain;
+    this.targetGain = gain;
   }
 
   private void initJavaSound() {
+    // Recompute alpha for actual sample rate: 1 − exp(−1/(sr × rampSeconds))
+    gainSmoothAlpha = (float) (1.0 - Math.exp(-1.0 / (sampleRate * 0.02)));
     AudioFormat format = new AudioFormat(sampleRate, 16, numChannels, true, false);
     // Output
     try {
@@ -162,13 +168,16 @@ public class ChuckAudio {
                     // getDacChannel(c).getLastOut() gives the computed sample for each channel.
                     vm.advanceTime(samplesToProcess);
 
+                    // Smooth gain toward target to prevent zipper noise on rapid slider changes.
+                    smoothedGain += gainSmoothAlpha * (targetGain - smoothedGain);
+
                     // Interleave Left/Right for stereo output
                     for (int c = 0; c < numChannels; c++) {
                       // Always read directly from the DAC channel — the VM already ticked it.
                       // masterGainUGen is intentionally NOT used here: it is never ticked by
                       // advanceTime() (it is a sink of the DAC, not a source), so getLastOut()
-                      // would always return 0.  Volume is controlled by the masterGain scalar.
-                      float sample = vm.getDacChannel(c).getLastOut() * masterGain;
+                      // would always return 0.  Volume is controlled by the smoothed gain scalar.
+                      float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
 
                       sumSq += (double) sample * sample;
                       short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
