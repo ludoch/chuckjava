@@ -51,37 +51,52 @@ public class Gain extends ChuckUGen {
       blockCache = new float[length];
     }
 
+    float[] input;
+    int inputOffset = 0;
+    if (buffer == null) {
+      input = new float[length];
+      for (org.chuck.audio.ChuckUGen src : sources) {
+        float[] temp = new float[length];
+        src.tick(temp, 0, length, systemTime);
+        for (int j = 0; j < length; j++) input[j] += temp[j];
+      }
+    } else {
+      input = buffer;
+      inputOffset = offset;
+    }
+
     int i = 0;
-    if (buffer != null) {
-      int upperBound = SPECIES.loopBound(length);
+    int upperBound = SPECIES.loopBound(length);
 
-      // Multiplier vector
-      FloatVector vGain = FloatVector.broadcast(SPECIES, this.gain);
+    // Multiplier vector
+    FloatVector vGain = FloatVector.broadcast(SPECIES, this.gain);
 
-      // Vectorized loop
-      for (; i < upperBound; i += SPECIES.length()) {
-        // Load block from buffer
-        var vIn = FloatVector.fromArray(SPECIES, buffer, offset + i);
-        // Apply gain
-        var vOut = vIn.mul(vGain);
-        // Store back
+    // Vectorized loop
+    for (; i < upperBound; i += SPECIES.length()) {
+      // Load block from input
+      var vIn = FloatVector.fromArray(SPECIES, input, inputOffset + i);
+      // Apply gain
+      var vOut = vIn.mul(vGain);
+      // Store to cache
+      vOut.intoArray(blockCache, i);
+      // Store back to buffer if provided
+      if (buffer != null) {
         vOut.intoArray(buffer, offset + i);
       }
+    }
 
-      // Tail loop for remaining elements
-      for (; i < length; i++) {
-        buffer[offset + i] *= this.gain;
-      }
-
-      // Update lastOut for potential scalar callers
-      if (length > 0) {
-        lastOut = buffer[offset + length - 1];
+    // Tail loop for remaining elements
+    for (; i < length; i++) {
+      float out = input[inputOffset + i] * this.gain;
+      blockCache[i] = out;
+      if (buffer != null) {
+        buffer[offset + i] = out;
       }
     }
 
-    if (buffer != null) {
-      System.arraycopy(buffer, offset, blockCache, 0, length);
-    }
     lastTickTime = systemTime;
+    if (length > 0) {
+      lastOut = blockCache[length - 1];
+    }
   }
 }

@@ -105,6 +105,8 @@ public class DacChannel extends ChuckUGen {
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
+    if (blockCache == null || blockCache.length < length) blockCache = new float[length];
+    java.util.Arrays.fill(blockCache, 0, length, 0.0f);
 
     // Vectorized summing from all sources
     for (ChuckUGen src : sources) {
@@ -120,43 +122,34 @@ public class DacChannel extends ChuckUGen {
         src.tick(temp, 0, length, systemTime);
       }
 
-      // SIMD Addition: buffer += temp
+      // SIMD Addition: blockCache += temp
       int i = 0;
       int bound = SPECIES.loopBound(length);
-      if (buffer != null) {
-        for (; i < bound; i += SPECIES.length()) {
-          FloatVector vSum = FloatVector.fromArray(SPECIES, buffer, offset + i);
-          FloatVector vSrc = FloatVector.fromArray(SPECIES, temp, i);
-          vSum.add(vSrc).intoArray(buffer, offset + i);
-        }
-        // Fallback
-        for (; i < length; i++) {
-          buffer[offset + i] += temp[i];
-        }
+      for (; i < bound; i += SPECIES.length()) {
+        FloatVector vSum = FloatVector.fromArray(SPECIES, blockCache, i);
+        FloatVector vSrc = FloatVector.fromArray(SPECIES, temp, i);
+        vSum.add(vSrc).intoArray(blockCache, i);
+      }
+      // Fallback
+      for (; i < length; i++) {
+        blockCache[i] += temp[i];
       }
     }
 
     // Apply gain and write to output buffer
     for (int i = 0; i < length; i++) {
-      float sampleSum = (buffer != null) ? buffer[offset + i] : 0.0f;
-      float sample = sampleSum * gain;
+      float sample = blockCache[i] * gain;
+      blockCache[i] = sample;
       if (buffer != null) buffer[offset + i] = sample;
 
       // Fill visualization buffer
       visBuffer[visWriteIdx] = sample;
       visWriteIdx = (visWriteIdx + 1) % visBuffer.length;
-
-      // Update blockCache for graph-sorting Fast Path
-      if (blockCache == null || blockCache.length < length) blockCache = new float[length];
-      blockCache[i] = sample;
     }
-    // Cache lastOut for scalar callers
-    if (length > 0 && buffer != null) {
-      lastOut = buffer[offset + length - 1];
-      lastTickTime = systemTime + length - 1;
-    } else if (length > 0 && blockCache != null) {
+
+    if (length > 0) {
       lastOut = blockCache[length - 1];
-      lastTickTime = systemTime; // Block start time
+      lastTickTime = systemTime;
     }
   }
 }

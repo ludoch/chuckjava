@@ -96,8 +96,10 @@ public class PulseOsc extends Osc {
 
       vOut = vOut.sub(vPolyBlep(vP2, vInc));
 
+      FloatVector vGainOut = vOut.mul(gain);
+      vGainOut.intoArray(blockCache, i);
       if (buffer != null) {
-        vOut.mul(gain).intoArray(buffer, offset + i);
+        vGainOut.intoArray(buffer, offset + i);
       }
 
       f_phase = (f_phase + f_inc * SPECIES.length()) % 1.0f;
@@ -108,14 +110,15 @@ public class PulseOsc extends Osc {
     this.phase = f_phase;
     for (; i < length; i++) {
       float t = tick(systemTime == -1 ? -1 : systemTime + i);
+      blockCache[i] = t;
       if (buffer != null) {
         buffer[offset + i] = t;
       }
     }
 
-    if (buffer != null) {
-      System.arraycopy(buffer, offset, blockCache, 0, length);
-    }
     lastTickTime = systemTime;
+    if (length > 0) {
+      lastOut = blockCache[length - 1];
+    }
   }
 }

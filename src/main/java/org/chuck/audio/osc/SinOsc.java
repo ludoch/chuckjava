@@ -63,8 +63,9 @@ public class SinOsc extends Osc {
       vP = vP.sub(vFloorP);
 
       // Convert [0, 1] to [-pi, pi] for sine computation
-      // x = (vP - 0.5) * 2 * pi
-      FloatVector vX = vP.sub(0.5f).mul((float) (2.0 * Math.PI));
+      // sin(2*pi*p) = sin(2*pi*(p-0.5) + pi) = -sin(2*pi*(p-0.5))
+      // So we use (0.5 - p) * 2 * pi to get the correct phase.
+      FloatVector vX = vP.sub(0.5f).mul((float) (-2.0 * Math.PI));
 
       // SIMD Sine Approximation (9th order minimax polynomial for better accuracy)
       // sin(x) approx x * (1 + x^2 * (c1 + x^2 * (c2 + x^2 * (c3 + x^2 * c4))))
@@ -78,8 +79,10 @@ public class SinOsc extends Osc {
       FloatVector vMod = FloatVector.fromArray(SPECIES, inputSum, i);
       vSin = vSin.add(vMod);
 
+      FloatVector vOut = vSin.mul(gain);
+      vOut.intoArray(blockCache, i);
       if (buffer != null) {
-        vSin.mul(gain).intoArray(buffer, offset + i);
+        vOut.intoArray(buffer, offset + i);
       }
 
       f_phase = (f_phase + f_inc * SPECIES.length()) % 1.0f;
@@ -90,14 +93,13 @@ public class SinOsc extends Osc {
     this.phase = f_phase;
     for (; i < length; i++) {
       float out = tick(systemTime == -1 ? -1 : systemTime + i);
+      blockCache[i] = out;
       if (buffer != null) buffer[offset + i] = out;
     }
 
-    if (buffer != null) {
-      System.arraycopy(buffer, offset, blockCache, 0, length);
-    } else {
-      // should not happen in pull-based but for safety
-    }
     lastTickTime = systemTime;
+    if (length > 0) {
+      lastOut = blockCache[length - 1];
+    }
   }
 }

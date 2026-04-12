@@ -159,21 +159,44 @@ public class Adsr extends ChuckUGen {
     // Optimization: if we are in SUSTAIN or DONE, the gain is constant
     if (state == State.SUSTAIN_ENUM || state == State.DONE_ENUM) {
       float gainVal = (state == State.SUSTAIN_ENUM) ? sustainLevel : 0.0f;
-      if (buffer != null) {
-        int i = 0;
-        int bound = SPECIES.loopBound(length);
-        FloatVector vGain = FloatVector.broadcast(SPECIES, gainVal);
-        for (; i < bound; i += SPECIES.length()) {
-          var vIn = FloatVector.fromArray(SPECIES, buffer, offset + i);
-          vIn.mul(vGain).intoArray(buffer, offset + i);
+
+      float[] input;
+      int inputOffset = 0;
+      if (buffer == null) {
+        input = new float[length];
+        for (org.chuck.audio.ChuckUGen src : sources) {
+          float[] temp = new float[length];
+          src.tick(temp, 0, length, systemTime);
+          for (int j = 0; j < length; j++) input[j] += temp[j];
         }
-        for (; i < length; i++) buffer[offset + i] *= gainVal;
+      } else {
+        input = buffer;
+        inputOffset = offset;
+      }
+
+      int i = 0;
+      int bound = SPECIES.loopBound(length);
+      FloatVector vGain = FloatVector.broadcast(SPECIES, gainVal);
+      for (; i < bound; i += SPECIES.length()) {
+        var vIn = FloatVector.fromArray(SPECIES, input, inputOffset + i);
+        var vOut = vIn.mul(vGain);
+        vOut.intoArray(blockCache, i);
+        if (buffer != null) {
+          vOut.intoArray(buffer, offset + i);
+        }
+      }
+      for (; i < length; i++) {
+        float out = input[inputOffset + i] * gainVal;
+        blockCache[i] = out;
+        if (buffer != null) {
+          buffer[offset + i] = out;
+        }
       }
       currentLevel = gainVal;
       lastTickTime = systemTime;
-      for (int i = 0; i < length; i++)
-        blockCache[i] = (buffer != null) ? buffer[offset + i] : gainVal; // simplified
-      lastOut = blockCache[length - 1];
+      if (length > 0) {
+        lastOut = blockCache[length - 1];
+      }
       return;
     }
 
