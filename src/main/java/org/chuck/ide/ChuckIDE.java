@@ -403,6 +403,15 @@ public class ChuckIDE extends Application {
   // OTF: track which shred was sporked from each tab (last one wins)
   private final Map<Tab, Integer> tabToShredId = new java.util.HashMap<>();
 
+  // Script arguments text field per tab (feeds me.arg(0), me.args(), etc.)
+  private final Map<Tab, javafx.scene.control.TextField> tabToArgs = new java.util.HashMap<>();
+
+  // Editor preferences (live values, persisted via java.util.prefs.Preferences)
+  private int prefFontSize = 13;
+  private boolean prefSmartIndent = true;
+  private boolean prefUseSpaces = true;
+  private int prefTabWidth = 4;
+
   // Toolbar button refs (needed for lockdown disable/enable)
   private Button addShredBtnRef;
   private Button replaceBtnRef;
@@ -443,6 +452,12 @@ public class ChuckIDE extends Application {
   @Override
   public void start(Stage primaryStage) {
     this.stage = primaryStage;
+
+    // Load persisted editor preferences
+    prefFontSize = prefs.getInt("editor.fontSize", 13);
+    prefSmartIndent = prefs.getBoolean("editor.smartIndent", true);
+    prefUseSpaces = prefs.getBoolean("editor.useSpaces", true);
+    prefTabWidth = prefs.getInt("editor.tabWidth", 4);
 
     int sampleRate = 44100;
     vm = new ChuckVM(sampleRate);
@@ -777,7 +792,7 @@ public class ChuckIDE extends Application {
   private void addNewTab(String title, String content) {
     CodeArea editor = new CodeArea();
     editor.setParagraphGraphicFactory(LineNumberFactory.get(editor));
-    editor.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 13;");
+    editor.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: " + prefFontSize + ";");
     editor.replaceText(0, 0, content);
 
     editor
@@ -845,6 +860,22 @@ public class ChuckIDE extends Application {
           hideDocHoverPopup();
         });
 
+    // Smart indentation (mirrors miniAudicle's enable_smart_indentation / magic_words logic)
+    editor.addEventFilter(
+        KeyEvent.KEY_PRESSED,
+        e -> {
+          if (e.getCode() == KeyCode.ENTER && !e.isControlDown() && !e.isAltDown()) {
+            if (prefSmartIndent) {
+              applySmartIndent(editor);
+              e.consume();
+            }
+          } else if (e.getCode() == KeyCode.TAB && !e.isControlDown()) {
+            e.consume();
+            String ins = prefUseSpaces ? " ".repeat(prefTabWidth) : "\t";
+            editor.insertText(editor.getCaretPosition(), ins);
+          }
+        });
+
     // Wrap editor in a StackPane so we can overlay a flash rectangle for OTF visual feedback
     javafx.scene.shape.Rectangle flashRect = new javafx.scene.shape.Rectangle();
     flashRect.setMouseTransparent(true);
@@ -855,8 +886,25 @@ public class ChuckIDE extends Application {
     StackPane editorWrapper = new StackPane(editor, flashRect);
     editorWrapper.getProperties().put("flashRect", flashRect);
 
-    Tab tab = new Tab(title, editorWrapper);
+    // ── Args bar (miniAudicle's argument_view) ─────────────────────────────
+    javafx.scene.control.TextField argsField = new javafx.scene.control.TextField();
+    argsField.setPromptText("script arguments  (space-separated, accessible via me.arg(0)…)");
+    argsField.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 11;");
+    Label argsLabel = new Label(" Args:");
+    argsLabel.setStyle("-fx-font-size: 11; -fx-text-fill: #555;");
+    HBox argsBar = new HBox(4, argsLabel, argsField);
+    argsBar.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+    argsBar.setPadding(new Insets(2, 6, 2, 4));
+    argsBar.setStyle(
+        "-fx-background-color: #f5f5f5; -fx-border-color: #ccc; -fx-border-width: 1 0 0 0;");
+    HBox.setHgrow(argsField, Priority.ALWAYS);
+
+    VBox tabContent = new VBox(editorWrapper, argsBar);
+    VBox.setVgrow(editorWrapper, Priority.ALWAYS);
+
+    Tab tab = new Tab(title, tabContent);
     tabToWrapper.put(tab, editorWrapper);
+    tabToArgs.put(tab, argsField);
     tabPane.getTabs().add(tab);
     tabPane.getSelectionModel().select(tab);
   }
@@ -1374,8 +1422,21 @@ public class ChuckIDE extends Application {
   }
 
   private CodeArea getCurrentEditor() {
-    Tab tab = tabPane.getSelectionModel().getSelectedItem();
+    return editorFromTab(tabPane.getSelectionModel().getSelectedItem());
+  }
+
+  private CodeArea editorFromTab(Tab tab) {
     if (tab == null) return null;
+    // VBox(editorWrapper StackPane, argsBar HBox) → StackPane → CodeArea
+    if (tab.getContent() instanceof VBox vb && !vb.getChildren().isEmpty()) {
+      javafx.scene.Node first = vb.getChildren().get(0);
+      if (first instanceof StackPane sp
+          && !sp.getChildren().isEmpty()
+          && sp.getChildren().get(0) instanceof CodeArea area) {
+        return area;
+      }
+    }
+    // Fallback: direct StackPane or bare CodeArea (legacy)
     if (tab.getContent() instanceof StackPane sp
         && !sp.getChildren().isEmpty()
         && sp.getChildren().get(0) instanceof CodeArea area) {
@@ -1519,6 +1580,10 @@ public class ChuckIDE extends Application {
 
     // Options
     Menu optionsMenu = new Menu("_Options");
+    MenuItem prefsItem = new MenuItem("Preferences…");
+    prefsItem.setAccelerator(new KeyCodeCombination(KeyCode.COMMA, KeyCombination.CONTROL_DOWN));
+    prefsItem.setOnAction(e -> showPreferencesDialog());
+    optionsMenu.getItems().add(prefsItem);
 
     // Examples
     Menu examplesMenu = new Menu("_Examples");
@@ -1823,6 +1888,14 @@ public class ChuckIDE extends Application {
     String path = currentFile != null ? currentFile.getName() : "Untitled.ck";
     statusLabel.setText("  Compiling…");
 
+    // Parse args field for this tab
+    String[] scriptArgs = new String[0];
+    javafx.scene.control.TextField argsField = tabToArgs.get(currentTab);
+    if (argsField != null && !argsField.getText().isBlank()) {
+      scriptArgs = argsField.getText().trim().split("\\s+");
+    }
+    final String[] finalArgs = scriptArgs;
+
     try {
       if (path.endsWith(".java")) {
         if (currentFile == null) {
@@ -1837,6 +1910,7 @@ public class ChuckIDE extends Application {
         ChuckShred shredObj = vm.getShred(id);
         if (shredObj != null) {
           shredObj.setName(currentFile.getName());
+          shredObj.setArgs(finalArgs);
         }
         ShredInfo info = new ShredInfo(id, currentFile.getName(), shredObj);
         shredListView.getItems().add(info);
@@ -1863,6 +1937,7 @@ public class ChuckIDE extends Application {
       ChuckCode code = emitter.emit(ast, path);
 
       ChuckShred shred = new ChuckShred(code);
+      shred.setArgs(finalArgs);
       vm.spork(shred);
 
       String name = currentFile != null ? currentFile.getName() : "User";
@@ -2116,6 +2191,36 @@ public class ChuckIDE extends Application {
     }
   }
 
+  // ── Smart indentation (mirrors miniAudicle's enable_smart_indentation logic) ──
+
+  /**
+   * Called on Enter: copies the indentation of the current line and adds one extra level if the
+   * line ends with '{'. On a line that is only whitespace followed by '}', reduces by one level.
+   */
+  private void applySmartIndent(CodeArea editor) {
+    int caretPos = editor.getCaretPosition();
+    int paraIdx = editor.getCurrentParagraph();
+    String currentLine = editor.getParagraph(paraIdx).getText();
+
+    // Leading whitespace of the current line
+    int wsEnd = 0;
+    while (wsEnd < currentLine.length()
+        && (currentLine.charAt(wsEnd) == ' ' || currentLine.charAt(wsEnd) == '\t')) {
+      wsEnd++;
+    }
+    String indent = currentLine.substring(0, wsEnd);
+
+    // If the trimmed text before the caret ends with '{', add one indent level
+    String trimmedBefore =
+        currentLine.substring(0, caretPos - editor.position(paraIdx, 0).toOffset()).stripTrailing();
+    String oneLevel = prefUseSpaces ? " ".repeat(prefTabWidth) : "\t";
+    if (!trimmedBefore.isEmpty() && trimmedBefore.charAt(trimmedBefore.length() - 1) == '{') {
+      indent += oneLevel;
+    }
+
+    editor.insertText(caretPos, "\n" + indent);
+  }
+
   // ── OTF Visual feedback (flash) ────────────────────────────────────────────
 
   /**
@@ -2222,6 +2327,97 @@ public class ChuckIDE extends Application {
 
   private void clearConsole() {
     outputArea.clear();
+  }
+
+  // ── Preferences dialog (mirrors miniAudicle's preferences panel) ───────────
+
+  private void showPreferencesDialog() {
+    javafx.scene.control.Dialog<ButtonType> dialog = new javafx.scene.control.Dialog<>();
+    dialog.setTitle("Preferences");
+    dialog.setHeaderText(null);
+    dialog.setResultConverter(bt -> bt);
+    dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
+
+    // ── Editor tab ─────────────────────────────────────────────────────────
+    javafx.scene.control.Spinner<Integer> fontSizeSpinner =
+        new javafx.scene.control.Spinner<>(8, 32, prefFontSize);
+    fontSizeSpinner.setEditable(true);
+    fontSizeSpinner.setPrefWidth(80);
+
+    javafx.scene.control.Spinner<Integer> tabWidthSpinner =
+        new javafx.scene.control.Spinner<>(1, 16, prefTabWidth);
+    tabWidthSpinner.setEditable(true);
+    tabWidthSpinner.setPrefWidth(80);
+
+    javafx.scene.control.CheckBox useSpacesCb =
+        new javafx.scene.control.CheckBox("Use spaces (uncheck for tabs)");
+    useSpacesCb.setSelected(prefUseSpaces);
+
+    javafx.scene.control.CheckBox smartIndentCb =
+        new javafx.scene.control.CheckBox("Enable smart indentation");
+    smartIndentCb.setSelected(prefSmartIndent);
+
+    javafx.scene.layout.GridPane editorGrid = new javafx.scene.layout.GridPane();
+    editorGrid.setHgap(12);
+    editorGrid.setVgap(10);
+    editorGrid.setPadding(new Insets(12));
+    editorGrid.add(new Label("Font size:"), 0, 0);
+    editorGrid.add(fontSizeSpinner, 1, 0);
+    editorGrid.add(new Label("Indent width:"), 0, 1);
+    editorGrid.add(tabWidthSpinner, 1, 1);
+    editorGrid.add(useSpacesCb, 0, 2, 2, 1);
+    editorGrid.add(smartIndentCb, 0, 3, 2, 1);
+
+    Tab editorTab = new Tab("Editor", editorGrid);
+    editorTab.setClosable(false);
+
+    // ── Audio tab ──────────────────────────────────────────────────────────
+    Label srLabel = new Label("Sample rate: 44100 Hz (restart IDE to change)");
+    Label bufLabel = new Label("Buffer size: 512 samples (restart IDE to change)");
+    VBox audioBox = new VBox(8, srLabel, bufLabel);
+    audioBox.setPadding(new Insets(12));
+    Tab audioTab = new Tab("Audio", audioBox);
+    audioTab.setClosable(false);
+
+    // ── About tab ─────────────────────────────────────────────────────────
+    Label aboutLbl =
+        new Label(
+            "ChucK-Java  —  JDK 25 port\n\nOriginal ChucK: https://chuck.stanford.edu/\nminiAudicle IDE: https://audicle.cs.princeton.edu/mini/");
+    aboutLbl.setWrapText(true);
+    VBox aboutBox = new VBox(aboutLbl);
+    aboutBox.setPadding(new Insets(12));
+    Tab aboutTab = new Tab("About", aboutBox);
+    aboutTab.setClosable(false);
+
+    TabPane prefTabs = new TabPane(editorTab, audioTab, aboutTab);
+    prefTabs.setPrefWidth(400);
+    prefTabs.setPrefHeight(220);
+    dialog.getDialogPane().setContent(prefTabs);
+
+    dialog
+        .showAndWait()
+        .filter(bt -> bt == ButtonType.OK)
+        .ifPresent(
+            result -> {
+              // Apply and persist
+              prefFontSize = fontSizeSpinner.getValue();
+              prefTabWidth = tabWidthSpinner.getValue();
+              prefUseSpaces = useSpacesCb.isSelected();
+              prefSmartIndent = smartIndentCb.isSelected();
+
+              prefs.putInt("editor.fontSize", prefFontSize);
+              prefs.putInt("editor.tabWidth", prefTabWidth);
+              prefs.putBoolean("editor.useSpaces", prefUseSpaces);
+              prefs.putBoolean("editor.smartIndent", prefSmartIndent);
+
+              // Apply font size to all open editors immediately
+              String fontStyle =
+                  "-fx-font-family: 'Monospaced'; -fx-font-size: " + prefFontSize + ";";
+              for (Tab t : tabPane.getTabs()) {
+                CodeArea ed = editorFromTab(t);
+                if (ed != null) ed.setStyle(fontStyle);
+              }
+            });
   }
 
   @Override
