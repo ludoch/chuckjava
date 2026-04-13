@@ -4,8 +4,8 @@ import org.chuck.audio.ChuckUGen;
 import org.chuck.core.doc;
 
 /**
- * Audio Device Controller (input) — the ADC UGen.
- * Provides multi-channel access to the hardware input buffer.
+ * Audio Device Controller (input) — the ADC UGen. Provides multi-channel access to the hardware
+ * input buffer.
  */
 @doc("Audio Device Controller (hardware input).")
 public class Adc extends ChuckUGen {

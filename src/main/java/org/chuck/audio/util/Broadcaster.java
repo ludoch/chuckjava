@@ -4,15 +4,13 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.core.doc;
 
 /**
- * Broadcaster: Real-time HTTP Audio Streamer.
- * Exposes a live WAV/PCM stream at http://localhost:PORT/stream.wav
+ * Broadcaster: Real-time HTTP Audio Streamer. Exposes a live WAV/PCM stream at
+ * http://localhost:PORT/stream.wav
  */
 @doc("Broadcasts audio over the network via HTTP.")
 public class Broadcaster extends ChuckUGen implements AutoCloseable {
@@ -38,24 +36,28 @@ public class Broadcaster extends ChuckUGen implements AutoCloseable {
   public void start() throws IOException {
     if (active) return;
     server = HttpServer.create(new InetSocketAddress(port), 0);
-    server.createContext("/stream.wav", exchange -> {
-      exchange.getResponseHeaders().add("Content-Type", "audio/x-wav");
-      exchange.sendResponseHeaders(200, 0); // Chunked transfer encoding
+    server.createContext(
+        "/stream.wav",
+        exchange -> {
+          exchange.getResponseHeaders().add("Content-Type", "audio/x-wav");
+          exchange.sendResponseHeaders(200, 0); // Chunked transfer encoding
 
-      try (OutputStream os = exchange.getResponseBody()) {
-        // Simple infinite WAV-like stream (skipping header for raw PCM simplicity in some players, 
-        // or add a dummy long header)
-        while (active) {
-          byte[] chunk = audioQueue.poll();
-          if (chunk != null) {
-            os.write(chunk);
-            os.flush();
-          } else {
-            Thread.sleep(10);
+          try (OutputStream os = exchange.getResponseBody()) {
+            // Simple infinite WAV-like stream (skipping header for raw PCM simplicity in some
+            // players,
+            // or add a dummy long header)
+            while (active) {
+              byte[] chunk = audioQueue.poll();
+              if (chunk != null) {
+                os.write(chunk);
+                os.flush();
+              } else {
+                Thread.sleep(10);
+              }
+            }
+          } catch (Exception ignored) {
           }
-        }
-      } catch (Exception ignored) {}
-    });
+        });
     server.setExecutor(null);
     server.start();
     active = true;
