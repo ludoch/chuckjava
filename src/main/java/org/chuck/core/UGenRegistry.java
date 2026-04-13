@@ -8,6 +8,9 @@ import org.chuck.audio.analysis.*;
 import org.chuck.audio.chugins.*;
 import org.chuck.audio.filter.*;
 import org.chuck.audio.fx.*;
+import org.chuck.audio.fx.Distortion;
+import org.chuck.audio.fx.FreeVerb;
+import org.chuck.audio.fx.LentPitShift;
 import org.chuck.audio.osc.*;
 import org.chuck.audio.stk.*;
 import org.chuck.audio.util.*;
@@ -73,7 +76,10 @@ public class UGenRegistry {
     register("NRev", (sr, args) -> new NRev(sr));
     register("PRCRev", (sr, args) -> new PRCRev(sr));
     register("GVerb", (sr, args) -> new GVerb(sr));
+    register("FreeVerb", (sr, args) -> new FreeVerb());
     register("PitShift", (sr, args) -> new PitShift());
+    register("LentPitShift", (sr, args) -> new LentPitShift());
+    register("Distortion", (sr, args) -> new Distortion());
     register("Dyno", (sr, args) -> new Dyno(sr));
     register("Modulate", (sr, args) -> new Modulate(sr));
     register("FullRect", (sr, args) -> new FullRect());
@@ -103,7 +109,7 @@ public class UGenRegistry {
     register("AmbisonicDecoder", (sr, args) -> new org.chuck.audio.util.Ambisonics.Decoder());
     register("Identity2", (sr, args) -> new Identity2());
 
-    // --- Sampling & I/O ---
+    // --- Sampling / Utilities ---
     register("SndBuf", (sr, args) -> new SndBuf(sr));
     register("SndBuf2", (sr, args) -> new SndBuf2(sr));
     register("WvIn", (sr, args) -> new WvIn(sr));
@@ -117,6 +123,7 @@ public class UGenRegistry {
     register("LiSa8", (sr, args) -> new LiSaN(8, sr));
     register("LiSa10", (sr, args) -> new LiSaN(10, sr));
     register("LiSa16", (sr, args) -> new LiSaN(16, sr));
+    register("Granulator", (sr, args) -> new org.chuck.audio.util.Granulator(sr));
 
     // --- STK Instruments ---
     register("Clarinet", (sr, args) -> new Clarinet(10.0f, sr));
