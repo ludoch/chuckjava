@@ -242,6 +242,9 @@ public class PreferencesTab extends ScrollPane {
     grid.add(new Label("Operators:"), 0, 9);
     grid.add(createColorPicker("color.chuckop", "#d4d4d4"), 1, 9);
 
+    grid.add(new Label("Editor Background:"), 0, 10);
+    grid.add(createColorPicker("color.background", "#FFFFFF"), 1, 10);
+
     TitledPane pane = new TitledPane("Syntax Colors", grid);
     pane.setCollapsible(false);
     return pane;

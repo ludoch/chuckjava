@@ -873,21 +873,23 @@ public class ChuckIDE extends Application {
             + ".ck-annotation { -fx-fill: %s; -fx-font-style: italic; }"
             + ".ck-keyword    { -fx-fill: %s; -fx-font-weight: bold; }"
             + ".ck-type       { -fx-fill: %s; -fx-font-weight: bold; }"
-            + ".ck-builtin    { -fx-fill: %s; }"
+            + ".ck-builtin    { -fx-fill: %s; -fx-font-weight: bold; }"
             + ".ck-boolean    { -fx-fill: %s; -fx-font-weight: bold; }"
             + ".ck-string     { -fx-fill: %s; }"
             + ".ck-number     { -fx-fill: %s; }"
-            + ".ck-chuckop    { -fx-fill: %s; -fx-font-weight: bold; }",
-        prefs.get("color.doc", "#6a9955"),
-        prefs.get("color.comment", "#6a9955"),
-        prefs.get("color.annotation", "#c792ea"),
-        prefs.get("color.keyword", "#c586c0"),
-        prefs.get("color.type", "#4ec9b0"),
-        prefs.get("color.builtin", "#9cdcfe"),
-        prefs.get("color.boolean", "#569cd6"),
-        prefs.get("color.string", "#ce9178"),
-        prefs.get("color.number", "#b5cea8"),
-        prefs.get("color.chuckop", "#d4d4d4"));
+            + ".ck-chuckop    { -fx-fill: %s; -fx-font-weight: bold; }"
+            + ".code-area, .virtual-indexed-cell { -fx-background-color: %s; }",
+        prefs.get("color.doc", "#008000"), // Darker Green
+        prefs.get("color.comment", "#008000"),
+        prefs.get("color.annotation", "#800080"), // Purple
+        prefs.get("color.keyword", "#0000FF"), // Blue
+        prefs.get("color.type", "#2B91AF"), // Teal
+        prefs.get("color.builtin", "#000080"), // Navy (Now much darker)
+        prefs.get("color.boolean", "#A52A2A"), // Brown
+        prefs.get("color.string", "#A31515"), // Dark Red
+        prefs.get("color.number", "#098658"), // Darkish Green
+        prefs.get("color.chuckop", "#000000"), // Black
+        prefs.get("color.background", "#FFFFFF")); // Default White
   }
 
   private void addNewTab(String title, String content) {
