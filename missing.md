@@ -309,9 +309,9 @@ These features are from the latest upstream STK repository and represent "beyond
 
 | Feature | Category | Description | Status |
 |---------|----------|-------------|--------|
-| `Guitar` | Instrument | 🎸 Advanced multi-string physical model with fret noise and coupling. | 🏗️ In Progress |
-| `LentPitShift` | Effect | 🎤 Formant-preserving pitch shifter. | ❌ Planned |
-| `Granular` | Synthesis | 🌌 Dedicated granular synthesis engine with scatter/density control. | ❌ Planned |
-| `Distortion` | Effect | 🎛️ Saturation suite (Bitcrusher, Overdrive, Fuzz). | ❌ Planned |
-| `FreeVerb` | Reverb | ⛪ Lush Schroeder-Moorer algorithmic reverb. | ❌ Planned |
+| `Guitar` | Instrument | 🎸 Advanced multi-string physical model with fret noise and coupling. | ✅ Done |
+| `LentPitShift` | Effect | 🎤 Formant-preserving pitch shifter. | ✅ Done |
+| `Granular` | Synthesis | 🌌 Dedicated granular synthesis engine with scatter/density control. | ✅ Done |
+| `Distortion` | Effect | 🎛️ Saturation suite (Bitcrusher, Overdrive, Fuzz). | ✅ Done |
+| `FreeVerb` | Reverb | ⛪ Lush Schroeder-Moorer algorithmic reverb. | ✅ Done |
 
