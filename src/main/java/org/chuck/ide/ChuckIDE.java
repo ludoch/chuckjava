@@ -1742,13 +1742,6 @@ public class ChuckIDE extends Application {
             new SeparatorMenuItem(),
             selAllItem);
 
-    // Options
-    Menu optionsMenu = new Menu("_Options");
-    MenuItem prefsItem = new MenuItem("Preferences");
-    prefsItem.setAccelerator(new KeyCodeCombination(KeyCode.COMMA, KeyCombination.CONTROL_DOWN));
-    prefsItem.setOnAction(e -> leftTabPane.getSelectionModel().select(2));
-    optionsMenu.getItems().add(prefsItem);
-
     // Examples
     Menu examplesMenu = new Menu("_Examples");
     loadExamples(examplesMenu);
@@ -1772,7 +1765,7 @@ public class ChuckIDE extends Application {
         });
     helpMenu.getItems().add(aboutItem);
 
-    mb.getMenus().addAll(fileMenu, editMenu, optionsMenu, examplesMenu, helpMenu);
+    mb.getMenus().addAll(fileMenu, editMenu, examplesMenu, helpMenu);
     return mb;
   }
 
