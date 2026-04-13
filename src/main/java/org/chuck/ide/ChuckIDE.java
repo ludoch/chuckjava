@@ -755,12 +755,6 @@ public class ChuckIDE extends Application {
     root.setCenter(vSplit);
 
     Scene scene = new Scene(root, 1250, 820);
-    scene
-        .getStylesheets()
-        .add(
-            getClass().getResource("/chuck-ide.css") != null
-                ? getClass().getResource("/chuck-ide.css").toExternalForm()
-                : "");
     applyInlineStyles(scene);
 
     setupHidFilters(scene);
@@ -860,17 +854,16 @@ public class ChuckIDE extends Application {
 
   /** Apply highlight colours as inline JavaFX CSS (avoids needing an external file). */
   private void applyInlineStyles(Scene scene) {
+    if (scene == null) return;
     String css = generateSyntaxCss();
-    scene.getRoot().setStyle(css);
     // Inject into scene stylesheets so RichTextFX picks them up
-    scene
-        .getStylesheets()
-        .removeIf(s -> s.startsWith("data:text/css")); // Remove old dynamic stylesheet
+    scene.getStylesheets().removeIf(s -> s.startsWith("data:text/css"));
     scene
         .getStylesheets()
         .add(
-            "data:text/css,"
-                + java.net.URLEncoder.encode(css, java.nio.charset.StandardCharsets.UTF_8));
+            "data:text/css;base64,"
+                + java.util.Base64.getEncoder()
+                    .encodeToString(css.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
   }
 
   private String generateSyntaxCss() {
