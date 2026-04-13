@@ -19,6 +19,20 @@ public class OnePole extends ChuckUGen {
     this.a1 = a1;
   }
 
+  private float sampleRate = 44100.0f;
+
+  public OnePole() {}
+
+  public OnePole(float sampleRate) {
+    this.sampleRate = sampleRate;
+  }
+
+  public double freq(double f) {
+    float pole = (float) Math.exp(-2.0 * Math.PI * f / sampleRate);
+    setPole(pole);
+    return f;
+  }
+
   public void setPole(float pole) {
     if (pole > 0.0f) b0 = 1.0f - pole;
     else b0 = 1.0f + pole;

@@ -30,6 +30,11 @@ public class Delay extends ChuckUGen {
     setDelay((int) samples);
   }
 
+  public double delay(double samples) {
+    setDelay(samples);
+    return samples;
+  }
+
   public double delay() {
     return (double) delaySamples;
   }

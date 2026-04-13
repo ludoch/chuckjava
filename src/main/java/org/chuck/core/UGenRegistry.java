@@ -98,6 +98,9 @@ public class UGenRegistry {
         (sr, args) ->
             args.length > 0 && args[0] instanceof Number n ? new MixN(n.intValue()) : new MixN(2));
     register("Broadcaster", (sr, args) -> new Broadcaster());
+    register("Spatial3D", (sr, args) -> new org.chuck.audio.util.Spatial3D(sr));
+    register("AmbisonicEncoder", (sr, args) -> new org.chuck.audio.util.Ambisonics.Encoder());
+    register("AmbisonicDecoder", (sr, args) -> new org.chuck.audio.util.Ambisonics.Decoder());
     register("Identity2", (sr, args) -> new Identity2());
 
     // --- Sampling & I/O ---
