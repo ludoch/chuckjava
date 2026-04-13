@@ -12,7 +12,17 @@ public class AllPass extends ChuckUGen {
   private float coefficient = 0.7f;
 
   public AllPass(int delaySamples) {
-    this.delayLine = new Delay(delaySamples);
+    this(delaySamples, true);
+  }
+
+  public AllPass(int delaySamples, boolean autoRegister) {
+    super(autoRegister);
+    this.delayLine = new Delay(delaySamples, 44100.0f, false);
+    this.delayLine.delay(delaySamples);
+  }
+
+  public void delay(double samples) {
+    delayLine.delay(samples);
   }
 
   public void setCoefficient(float c) {

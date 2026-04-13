@@ -10,6 +10,11 @@ public class Envelope extends ChuckUGen {
   private final float sampleRate;
 
   public Envelope(float sampleRate) {
+    this(sampleRate, true);
+  }
+
+  public Envelope(float sampleRate, boolean autoRegister) {
+    super(autoRegister);
     this.sampleRate = sampleRate;
   }
 

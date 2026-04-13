@@ -20,7 +20,11 @@ public abstract class Osc extends ChuckUGen {
   protected final float sampleRate;
 
   public Osc(float sampleRate) {
-    super(new ChuckType("Osc", ChuckType.OBJECT, 8, 0));
+    this(sampleRate, true);
+  }
+
+  public Osc(float sampleRate, boolean autoRegister) {
+    super(new ChuckType("Osc", ChuckType.OBJECT, 8, 0), autoRegister);
     this.sampleRate = sampleRate;
     // Default freq = 220.0 (index 0)
     setData(0, 220.0);

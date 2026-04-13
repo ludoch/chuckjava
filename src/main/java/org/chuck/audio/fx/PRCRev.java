@@ -11,10 +11,15 @@ public class PRCRev extends StereoUGen {
 
   public PRCRev(float sampleRate) {
     super();
-    allpass[0] = new AllPass(353);
-    allpass[1] = new AllPass(1097);
-    comb[0] = new Comb(1777);
-    comb[1] = new Comb(2137);
+    allpass[0] = new AllPass(353, false);
+    allpass[1] = new AllPass(1097, false);
+    comb[0] = new Comb(1777, false);
+    comb[1] = new Comb(2137, false);
+
+    allpass[0].delay(353);
+    allpass[1].delay(1097);
+    comb[0].delay(1777);
+    comb[1].delay(2137);
 
     allpass[0].setCoefficient(0.7f);
     allpass[1].setCoefficient(0.7f);

@@ -27,7 +27,7 @@ public class Guitar extends ChuckUGen {
     this.strings = new Twang[6];
     this.pluckGains = new float[6];
     for (int i = 0; i < 6; i++) {
-      strings[i] = new Twang(sampleRate);
+      strings[i] = new Twang(sampleRate, false);
     }
 
     // Default excitation: white noise burst
@@ -38,10 +38,10 @@ public class Guitar extends ChuckUGen {
       excitation[i] *= Math.pow(1.0 - (double) i / excitation.length, 2.0);
     }
 
-    this.pickFilter = new OnePole(sampleRate);
+    this.pickFilter = new OnePole(sampleRate, false);
     this.pickFilter.setPole(0.95f); // Soft pick default
 
-    this.couplingFilter = new OnePole(sampleRate);
+    this.couplingFilter = new OnePole(sampleRate, false);
     this.couplingFilter.setPole(0.9f);
 
     this.numOutputs = 2; // Stereo coupling out

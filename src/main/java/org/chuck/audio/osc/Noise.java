@@ -7,6 +7,14 @@ import org.chuck.audio.ChuckUGen;
 public class Noise extends ChuckUGen {
   private final Random random = new Random();
 
+  public Noise() {
+    this(true);
+  }
+
+  public Noise(boolean autoRegister) {
+    super(autoRegister);
+  }
+
   @Override
   protected float compute(float input, long systemTime) {
     // Generate a random float between -1.0 and 1.0

@@ -8,7 +8,17 @@ public class Comb extends ChuckUGen {
   private float coefficient = 0.7f;
 
   public Comb(int delaySamples) {
-    this.delayLine = new Delay(delaySamples);
+    this(delaySamples, true);
+  }
+
+  public Comb(int delaySamples, boolean autoRegister) {
+    super(autoRegister);
+    this.delayLine = new Delay(delaySamples, 44100.0f, false);
+    this.delayLine.delay(delaySamples);
+  }
+
+  public void delay(double samples) {
+    delayLine.delay(samples);
   }
 
   public void setCoefficient(float c) {

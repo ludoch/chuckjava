@@ -12,10 +12,15 @@ public class DelayL extends ChuckUGen {
   private final float sampleRate;
 
   public DelayL(int maxDelaySamples) {
-    this(maxDelaySamples, 44100.0f);
+    this(maxDelaySamples, 44100.0f, true);
   }
 
   public DelayL(int maxDelaySamples, float sampleRate) {
+    this(maxDelaySamples, sampleRate, true);
+  }
+
+  public DelayL(int maxDelaySamples, float sampleRate, boolean autoRegister) {
+    super(autoRegister);
     this.buffer = new float[maxDelaySamples + 2]; // Extra space for interpolation
     this.delaySamples = maxDelaySamples - 1;
     this.sampleRate = sampleRate;

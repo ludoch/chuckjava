@@ -25,15 +25,15 @@ public class Brass extends ChuckUGen {
   public Brass(float sampleRate) {
     this.sampleRate = sampleRate;
     int maxDelay = (int) (sampleRate / 20.0);
-    delayLine = new DelayL(maxDelay, sampleRate);
+    delayLine = new DelayL(maxDelay, sampleRate, false);
 
-    lipFilter = new BiQuad(sampleRate);
+    lipFilter = new BiQuad(sampleRate, false);
     lipFilter.gain(0.03); // STK default gain
 
-    bellFilter = new OnePole(sampleRate);
+    bellFilter = new OnePole(sampleRate, false);
     bellFilter.setPole(0.7f);
 
-    adsr = new Adsr(sampleRate);
+    adsr = new Adsr(sampleRate, false);
     adsr.set(0.05f, 0.05f, 0.9f, 0.1f);
 
     setFreq(440.0);

@@ -25,6 +25,11 @@ public class BiQuad extends ChuckUGen {
   private final float sampleRate;
 
   public BiQuad(float sampleRate) {
+    this(sampleRate, true);
+  }
+
+  public BiQuad(float sampleRate, boolean autoRegister) {
+    super(autoRegister);
     this.sampleRate = sampleRate;
   }
 

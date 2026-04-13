@@ -31,15 +31,15 @@ public class Clarinet extends ChuckUGen {
     this.sampleRate = sampleRate;
     // Length for half-wavelength (stopped pipe)
     int length = (int) (0.5 * sampleRate / lowestFrequency + 1);
-    this.delayLine = new DelayL(length);
-    this.reedTable = new ReedTable();
+    this.delayLine = new DelayL(length, sampleRate, false);
+    this.reedTable = new ReedTable(false);
     this.reedTable.setOffset(0.7f); // STK default
     this.reedTable.setSlope(-0.3f); // STK default
 
-    this.filter = new OneZero();
-    this.envelope = new Envelope(sampleRate);
-    this.noise = new Noise();
-    this.vibrato = new SinOsc(sampleRate);
+    this.filter = new OneZero(false);
+    this.envelope = new Envelope(sampleRate, false);
+    this.noise = new Noise(false);
+    this.vibrato = new SinOsc(sampleRate, false);
     this.vibrato.setFreq(5.735);
 
     filter.setB0(0.5f);

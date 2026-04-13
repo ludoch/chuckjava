@@ -19,10 +19,10 @@ public class Mandolin extends ChuckUGen {
 
   public Mandolin(float lowestFrequency, float sampleRate) {
     this.sampleRate = sampleRate;
-    strings[0] = new Twang(sampleRate);
-    strings[1] = new Twang(sampleRate);
+    strings[0] = new Twang(sampleRate, false);
+    strings[1] = new Twang(sampleRate, false);
 
-    excitation = new Wavetable();
+    excitation = new Wavetable(false);
     excitation.setTable(WavetableRegistry.getPluckExcitation(1024));
     excitation.loop(0); // single shot pluck
 

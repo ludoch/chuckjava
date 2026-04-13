@@ -11,6 +11,14 @@ public class OneZero extends ChuckUGen {
   private float b1 = 0.0f;
   private float lastInput = 0.0f;
 
+  public OneZero() {
+    this(true);
+  }
+
+  public OneZero(boolean autoRegister) {
+    super(autoRegister);
+  }
+
   public void setB0(float b0) {
     this.b0 = b0;
   }

@@ -12,7 +12,11 @@ import org.chuck.core.doc;
 @doc("A sine wave oscillator.")
 public class SinOsc extends Osc {
   public SinOsc(float sampleRate) {
-    super(sampleRate);
+    this(sampleRate, true);
+  }
+
+  public SinOsc(float sampleRate, boolean autoRegister) {
+    super(sampleRate, autoRegister);
   }
 
   @Override

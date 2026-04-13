@@ -23,10 +23,15 @@ public class Twang extends ChuckUGen {
   private double pluckPosition = 0.5;
 
   public Twang(float sampleRate) {
+    this(sampleRate, true);
+  }
+
+  public Twang(float sampleRate, boolean autoRegister) {
+    super(autoRegister);
     this.sampleRate = sampleRate;
-    this.delayLine = new DelayL(2048, sampleRate);
-    this.combDelay = new DelayL(1024, sampleRate);
-    this.loopFilter = new OneZero();
+    this.delayLine = new DelayL(2048, sampleRate, false);
+    this.combDelay = new DelayL(1024, sampleRate, false);
+    this.loopFilter = new OneZero(false);
     this.loopFilter.setZero(0.5f); // Standard lowpass for KS
 
     updateParameters();

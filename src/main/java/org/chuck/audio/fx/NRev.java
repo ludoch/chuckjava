@@ -10,16 +10,30 @@ public class NRev extends StereoUGen {
 
   public NRev(float sampleRate) {
     super();
-    allpass[0] = new AllPass(143);
-    allpass[1] = new AllPass(241);
-    allpass[2] = new AllPass(391);
-    allpass[3] = new AllPass(511);
-    allpass[4] = new AllPass(1021);
-    allpass[5] = new AllPass(1733);
-    allpass[6] = new AllPass(2511);
-    allpass[7] = new AllPass(3539);
+    allpass[0] = new AllPass(143, false);
+    allpass[1] = new AllPass(241, false);
+    allpass[2] = new AllPass(391, false);
+    allpass[3] = new AllPass(511, false);
+    allpass[4] = new AllPass(1021, false);
+    allpass[5] = new AllPass(1733, false);
+    allpass[6] = new AllPass(2511, false);
+    allpass[7] = new AllPass(3539, false);
 
-    for (int i = 0; i < 8; i++) allpass[i].setCoefficient(0.7f);
+    for (int i = 0; i < 8; i++) {
+      allpass[i].setCoefficient(0.7f);
+      allpass[i].delay(
+          allpass[i].getBlockCache() != null
+              ? 0
+              : 0); // dummy to trigger init if needed? No, just call delay
+    }
+    allpass[0].delay(143);
+    allpass[1].delay(241);
+    allpass[2].delay(391);
+    allpass[3].delay(511);
+    allpass[4].delay(1021);
+    allpass[5].delay(1733);
+    allpass[6].delay(2511);
+    allpass[7].delay(3539);
   }
 
   public void mix(float m) {

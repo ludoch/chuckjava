@@ -47,6 +47,11 @@ public class Adsr extends ChuckUGen {
   private float releaseInc;
 
   public Adsr(float sampleRate) {
+    this(sampleRate, true);
+  }
+
+  public Adsr(float sampleRate, boolean autoRegister) {
+    super(autoRegister);
     this.sampleRate = sampleRate;
     updateIncrements();
   }

@@ -13,6 +13,11 @@ public class Wavetable extends ChuckUGen {
   private boolean playing = true;
 
   public Wavetable() {
+    this(true);
+  }
+
+  public Wavetable(boolean autoRegister) {
+    super(autoRegister);
     this.table = new float[256];
   }
 

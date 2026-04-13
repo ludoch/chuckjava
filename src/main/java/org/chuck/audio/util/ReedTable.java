@@ -7,6 +7,14 @@ public class ReedTable extends ChuckUGen {
   private float offset = 0.6f;
   private float slope = -0.8f;
 
+  public ReedTable() {
+    this(true);
+  }
+
+  public ReedTable(boolean autoRegister) {
+    super(autoRegister);
+  }
+
   public void setOffset(float offset) {
     this.offset = offset;
   }

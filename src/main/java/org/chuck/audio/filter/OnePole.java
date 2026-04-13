@@ -21,9 +21,16 @@ public class OnePole extends ChuckUGen {
 
   private float sampleRate = 44100.0f;
 
-  public OnePole() {}
+  public OnePole() {
+    this(44100.0f, true);
+  }
 
   public OnePole(float sampleRate) {
+    this(sampleRate, true);
+  }
+
+  public OnePole(float sampleRate, boolean autoRegister) {
+    super(autoRegister);
     this.sampleRate = sampleRate;
   }
 

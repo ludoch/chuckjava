@@ -30,27 +30,38 @@ public abstract class ChuckUGen extends ChuckObject {
   protected ChuckUGen[] inputChannels;
   protected ChuckUGen[] outputChannels;
 
-  public ChuckUGen(ChuckType type) {
-    super(type);
-    // Auto-register with current shred if running in a VM context
-    try {
-      org.chuck.core.ChuckShred current = org.chuck.core.ChuckShred.CURRENT_SHRED.get();
-      if (current != null) {
-        current.registerUGen(this);
+  public ChuckUGen() {
+    this(true);
+  }
+
+  public ChuckUGen(boolean autoRegister) {
+    super(new ChuckType("UGen", ChuckType.OBJECT, 0, 0));
+    if (autoRegister) {
+      // Auto-register with current shred if running in a VM context
+      try {
+        org.chuck.core.ChuckShred current = org.chuck.core.ChuckShred.CURRENT_SHRED.get();
+        if (current != null) {
+          current.registerUGen(this);
+        }
+      } catch (Exception ignored) {
       }
-    } catch (Exception ignored) {
     }
   }
 
-  public ChuckUGen() {
-    super(new ChuckType("UGen", ChuckType.OBJECT, 0, 0));
-    // Auto-register with current shred if running in a VM context
-    try {
-      org.chuck.core.ChuckShred current = org.chuck.core.ChuckShred.CURRENT_SHRED.get();
-      if (current != null) {
-        current.registerUGen(this);
+  public ChuckUGen(ChuckType type) {
+    this(type, true);
+  }
+
+  public ChuckUGen(ChuckType type, boolean autoRegister) {
+    super(type);
+    if (autoRegister) {
+      try {
+        org.chuck.core.ChuckShred current = org.chuck.core.ChuckShred.CURRENT_SHRED.get();
+        if (current != null) {
+          current.registerUGen(this);
+        }
+      } catch (Exception ignored) {
       }
-    } catch (Exception ignored) {
     }
   }
 

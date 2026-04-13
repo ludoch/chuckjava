@@ -12,10 +12,15 @@ public class Delay extends ChuckUGen {
   private final float sampleRate;
 
   public Delay(int maxDelaySamples) {
-    this(maxDelaySamples, 44100.0f);
+    this(maxDelaySamples, 44100.0f, true);
   }
 
   public Delay(int maxDelaySamples, float sampleRate) {
+    this(maxDelaySamples, sampleRate, true);
+  }
+
+  public Delay(int maxDelaySamples, float sampleRate, boolean autoRegister) {
+    super(autoRegister);
     this.buffer = new float[maxDelaySamples];
     this.delaySamples = 0; // Default to 0 delay
     this.sampleRate = sampleRate;
