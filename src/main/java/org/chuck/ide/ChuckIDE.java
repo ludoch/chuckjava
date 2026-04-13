@@ -25,7 +25,6 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
-import javafx.scene.control.ChoiceDialog;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
@@ -358,6 +357,7 @@ public class ChuckIDE extends Application {
   private ChuckVM vm;
   private ChuckAudio audio;
   private TabPane tabPane;
+  private TabPane leftTabPane;
   private TextArea outputArea;
 
   // Model for active shreds
@@ -504,8 +504,8 @@ public class ChuckIDE extends Application {
     audio.start();
 
     // Setup hidden analyzers for visualizers (mono)
-    analyzer = new FFT(512);
-    scope = new Scope(512);
+    analyzer = new FFT(prefs.getInt("vis.fftSize", 512));
+    scope = new Scope(prefs.getInt("vis.scopeWindow", 512));
 
     vm.getDacChannel(0).chuckTo(analyzer);
     vm.getDacChannel(0).chuckTo(scope);
@@ -551,11 +551,34 @@ public class ChuckIDE extends Application {
         });
 
     TabPane leftTabPane = new TabPane();
+    this.leftTabPane = leftTabPane;
     Tab projectTab = new Tab("Project", projectBox);
     projectTab.setClosable(false);
     Tab ugenTab = new Tab("UGens", ugenBrowser);
     ugenTab.setClosable(false);
-    leftTabPane.getTabs().addAll(projectTab, ugenTab);
+
+    PreferencesTab prefsTabContent = new PreferencesTab(prefs);
+    prefsTabContent.setOnAudioRestart((sr, buf, out, in) -> restartAudioEngine(sr, buf, out, in));
+    prefsTabContent.setOnFFTSizeChanged(size -> analyzer.setSize(size));
+    prefsTabContent.setOnScopeWindowChanged(size -> scope.setWindowSize(size));
+    prefsTabContent.setOnEditorSettingsChanged(
+        () -> {
+          prefFontSize = prefs.getInt("editor.fontSize", 13);
+          prefTabWidth = prefs.getInt("editor.tabWidth", 4);
+          prefUseSpaces = prefs.getBoolean("editor.useSpaces", true);
+          prefSmartIndent = prefs.getBoolean("editor.smartIndent", true);
+
+          String fontStyle = "-fx-font-family: 'Monospaced'; -fx-font-size: " + prefFontSize + ";";
+          for (Tab t : tabPane.getTabs()) {
+            CodeArea ed = editorFromTab(t);
+            if (ed != null) ed.setStyle(fontStyle);
+          }
+        });
+
+    Tab prefsTab = new Tab("Prefs", prefsTabContent);
+    prefsTab.setClosable(false);
+
+    leftTabPane.getTabs().addAll(projectTab, ugenTab, prefsTab);
 
     VBox leftPanel = new VBox(leftTabPane);
     VBox.setVgrow(leftTabPane, Priority.ALWAYS);
@@ -1721,9 +1744,9 @@ public class ChuckIDE extends Application {
 
     // Options
     Menu optionsMenu = new Menu("_Options");
-    MenuItem prefsItem = new MenuItem("Preferences…");
+    MenuItem prefsItem = new MenuItem("Preferences");
     prefsItem.setAccelerator(new KeyCodeCombination(KeyCode.COMMA, KeyCombination.CONTROL_DOWN));
-    prefsItem.setOnAction(e -> showPreferencesDialog());
+    prefsItem.setOnAction(e -> leftTabPane.getSelectionModel().select(2));
     optionsMenu.getItems().add(prefsItem);
 
     // Examples
@@ -1749,35 +1772,7 @@ public class ChuckIDE extends Application {
         });
     helpMenu.getItems().add(aboutItem);
 
-    Menu vizMenu = new Menu("Visualizer");
-    MenuItem fftSize = new MenuItem("FFT Size...");
-    fftSize.setOnAction(
-        e -> {
-          List<Integer> choices = List.of(256, 512, 1024, 2048, 4096);
-          ChoiceDialog<Integer> dialog = new ChoiceDialog<>(analyzer.getSize(), choices);
-          dialog.setTitle("FFT Size");
-          dialog.setHeaderText("Select FFT analysis size");
-          dialog.showAndWait().ifPresent(size -> analyzer.setSize(size));
-        });
-    MenuItem scopeSize = new MenuItem("Oscilloscope Window...");
-    scopeSize.setOnAction(
-        e -> {
-          TextInputDialog dialog = new TextInputDialog(String.valueOf(scope.getWindowSize()));
-          dialog.setTitle("Scope Window");
-          dialog.setHeaderText("Enter window size in samples");
-          dialog
-              .showAndWait()
-              .ifPresent(
-                  s -> {
-                    try {
-                      scope.setWindowSize(Integer.parseInt(s));
-                    } catch (NumberFormatException ignored) {
-                    }
-                  });
-        });
-    vizMenu.getItems().addAll(fftSize, scopeSize);
-
-    mb.getMenus().addAll(fileMenu, editMenu, optionsMenu, vizMenu, examplesMenu, helpMenu);
+    mb.getMenus().addAll(fileMenu, editMenu, optionsMenu, examplesMenu, helpMenu);
     return mb;
   }
 
@@ -2597,147 +2592,63 @@ public class ChuckIDE extends Application {
     Platform.runLater(() -> outputArea.appendText(text + "\n"));
   }
 
-  private void clearConsole() {
-    outputArea.clear();
+  private void restartAudioEngine(
+      int sampleRate, int bufferSize, String outDevice, String inDevice) {
+    print("Restarting audio engine (SR=" + sampleRate + ", Buf=" + bufferSize + ")...");
+
+    // 1. Stop current audio
+    if (audio != null) {
+      audio.stop();
+    }
+
+    // 2. Clear VM and shreds
+    if (vm != null) {
+      vm.clear();
+    }
+
+    // 3. Update preferences
+    prefSampleRate = sampleRate;
+    prefBufferSize = bufferSize;
+    prefOutputDevice = outDevice;
+    prefInputDevice = inDevice;
+
+    prefs.putInt("audio.sampleRate", prefSampleRate);
+    prefs.putInt("audio.bufferSize", prefBufferSize);
+    prefs.put("audio.outputDevice", prefOutputDevice);
+    prefs.put("audio.inputDevice", prefInputDevice);
+
+    // 4. Re-create VM and Audio
+    vm = new ChuckVM(prefSampleRate);
+    vm.addPrintListener(this::print);
+
+    audio = new ChuckAudio(vm, prefBufferSize, 2, prefSampleRate);
+    audio.setOutputDeviceName(prefOutputDevice);
+    audio.setInputDeviceName(prefInputDevice);
+    audio.setMasterGain((float) masterGainSlider.getValue());
+    audio.start();
+
+    // 5. Re-setup visualizer hookups
+    if (analyzer != null) {
+      vm.getDacChannel(0).chuckTo(analyzer);
+      vm.blackhole.addSource(analyzer);
+    }
+    if (scope != null) {
+      vm.getDacChannel(0).chuckTo(scope);
+      vm.blackhole.addSource(scope);
+    }
+
+    // 6. UI cleanup
+    javafx.application.Platform.runLater(
+        () -> {
+          shredListView.getItems().clear();
+          tabToShredId.clear();
+          updateStatus();
+          print("Audio engine restarted.");
+        });
   }
 
-  // ── Preferences dialog (mirrors miniAudicle's preferences panel) ───────────
-
-  private void showPreferencesDialog() {
-    javafx.scene.control.Dialog<ButtonType> dialog = new javafx.scene.control.Dialog<>();
-    dialog.setTitle("Preferences");
-    dialog.setHeaderText(null);
-    dialog.setResultConverter(bt -> bt);
-    dialog.getDialogPane().getButtonTypes().addAll(ButtonType.OK, ButtonType.CANCEL);
-
-    // ── Editor tab ─────────────────────────────────────────────────────────
-    javafx.scene.control.Spinner<Integer> fontSizeSpinner =
-        new javafx.scene.control.Spinner<>(8, 32, prefFontSize);
-    fontSizeSpinner.setEditable(true);
-    fontSizeSpinner.setPrefWidth(80);
-
-    javafx.scene.control.Spinner<Integer> tabWidthSpinner =
-        new javafx.scene.control.Spinner<>(1, 16, prefTabWidth);
-    tabWidthSpinner.setEditable(true);
-    tabWidthSpinner.setPrefWidth(80);
-
-    javafx.scene.control.CheckBox useSpacesCb =
-        new javafx.scene.control.CheckBox("Use spaces (uncheck for tabs)");
-    useSpacesCb.setSelected(prefUseSpaces);
-
-    javafx.scene.control.CheckBox smartIndentCb =
-        new javafx.scene.control.CheckBox("Enable smart indentation");
-    smartIndentCb.setSelected(prefSmartIndent);
-
-    javafx.scene.layout.GridPane editorGrid = new javafx.scene.layout.GridPane();
-    editorGrid.setHgap(12);
-    editorGrid.setVgap(10);
-    editorGrid.setPadding(new Insets(12));
-    editorGrid.add(new Label("Font size:"), 0, 0);
-    editorGrid.add(fontSizeSpinner, 1, 0);
-    editorGrid.add(new Label("Indent width:"), 0, 1);
-    editorGrid.add(tabWidthSpinner, 1, 1);
-    editorGrid.add(useSpacesCb, 0, 2, 2, 1);
-    editorGrid.add(smartIndentCb, 0, 3, 2, 1);
-
-    Tab editorTab = new Tab("Editor", editorGrid);
-    editorTab.setClosable(false);
-
-    // ── Audio tab ──────────────────────────────────────────────────────────
-    javafx.scene.control.ChoiceBox<Integer> srBox =
-        new javafx.scene.control.ChoiceBox<>(
-            javafx.collections.FXCollections.observableArrayList(
-                22050, 44100, 48000, 88200, 96000));
-    srBox.setValue(prefSampleRate);
-
-    javafx.scene.control.ChoiceBox<Integer> bufBox =
-        new javafx.scene.control.ChoiceBox<>(
-            javafx.collections.FXCollections.observableArrayList(128, 256, 512, 1024, 2048));
-    bufBox.setValue(prefBufferSize);
-
-    // Device lists (probed at dialog open time)
-    java.util.List<String> outDevices = ChuckAudio.getOutputDeviceNames();
-    java.util.List<String> inDevices = ChuckAudio.getInputDeviceNames();
-
-    javafx.scene.control.ChoiceBox<String> outDevBox =
-        new javafx.scene.control.ChoiceBox<>(
-            javafx.collections.FXCollections.observableArrayList(outDevices));
-    outDevBox.setValue(outDevices.contains(prefOutputDevice) ? prefOutputDevice : "");
-
-    javafx.scene.control.ChoiceBox<String> inDevBox =
-        new javafx.scene.control.ChoiceBox<>(
-            javafx.collections.FXCollections.observableArrayList(inDevices));
-    inDevBox.setValue(inDevices.contains(prefInputDevice) ? prefInputDevice : "");
-
-    Label restartNote = new Label("⚠ Changes take effect after restarting the IDE.");
-    restartNote.setStyle("-fx-text-fill: #884400; -fx-font-style: italic;");
-
-    javafx.scene.layout.GridPane audioGrid = new javafx.scene.layout.GridPane();
-    audioGrid.setHgap(12);
-    audioGrid.setVgap(10);
-    audioGrid.setPadding(new Insets(12));
-    audioGrid.add(new Label("Sample rate (Hz):"), 0, 0);
-    audioGrid.add(srBox, 1, 0);
-    audioGrid.add(new Label("Buffer size (samples):"), 0, 1);
-    audioGrid.add(bufBox, 1, 1);
-    audioGrid.add(new Label("Output device:"), 0, 2);
-    audioGrid.add(outDevBox, 1, 2);
-    audioGrid.add(new Label("Input device:"), 0, 3);
-    audioGrid.add(inDevBox, 1, 3);
-    audioGrid.add(restartNote, 0, 4, 2, 1);
-
-    Tab audioTab = new Tab("Audio", audioGrid);
-    audioTab.setClosable(false);
-
-    // ── About tab ─────────────────────────────────────────────────────────
-    Label aboutLbl =
-        new Label(
-            "ChucK-Java  —  JDK 25 port\n\nOriginal ChucK: https://chuck.stanford.edu/\nminiAudicle IDE: https://audicle.cs.princeton.edu/mini/");
-    aboutLbl.setWrapText(true);
-    VBox aboutBox = new VBox(aboutLbl);
-    aboutBox.setPadding(new Insets(12));
-    Tab aboutTab = new Tab("About", aboutBox);
-    aboutTab.setClosable(false);
-
-    TabPane prefTabs = new TabPane(editorTab, audioTab, aboutTab);
-    prefTabs.setPrefWidth(400);
-    prefTabs.setPrefHeight(220);
-    dialog.getDialogPane().setContent(prefTabs);
-
-    dialog
-        .showAndWait()
-        .filter(bt -> bt == ButtonType.OK)
-        .ifPresent(
-            result -> {
-              // Apply and persist
-              prefFontSize = fontSizeSpinner.getValue();
-              prefTabWidth = tabWidthSpinner.getValue();
-              prefUseSpaces = useSpacesCb.isSelected();
-              prefSmartIndent = smartIndentCb.isSelected();
-
-              prefs.putInt("editor.fontSize", prefFontSize);
-              prefs.putInt("editor.tabWidth", prefTabWidth);
-              prefs.putBoolean("editor.useSpaces", prefUseSpaces);
-              prefs.putBoolean("editor.smartIndent", prefSmartIndent);
-
-              // Audio — persist for next launch
-              prefSampleRate = srBox.getValue();
-              prefBufferSize = bufBox.getValue();
-              prefOutputDevice = outDevBox.getValue() != null ? outDevBox.getValue() : "";
-              prefInputDevice = inDevBox.getValue() != null ? inDevBox.getValue() : "";
-              prefs.putInt("audio.sampleRate", prefSampleRate);
-              prefs.putInt("audio.bufferSize", prefBufferSize);
-              prefs.put("audio.outputDevice", prefOutputDevice);
-              prefs.put("audio.inputDevice", prefInputDevice);
-
-              // Apply font size to all open editors immediately
-              String fontStyle =
-                  "-fx-font-family: 'Monospaced'; -fx-font-size: " + prefFontSize + ";";
-              for (Tab t : tabPane.getTabs()) {
-                CodeArea ed = editorFromTab(t);
-                if (ed != null) ed.setStyle(fontStyle);
-              }
-            });
+  private void clearConsole() {
+    outputArea.clear();
   }
 
   @Override
