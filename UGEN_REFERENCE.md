@@ -505,6 +505,7 @@ Class: `org.chuck.audio.fx.DelayL`
 - `setDelay(double)` -> void
 - `getDelay()` -> double
 - `init(double, double)` -> void
+- `delay(double)` -> double
 - `delay()` -> double
 
 ## DelayP
@@ -527,6 +528,25 @@ Class: `org.chuck.audio.fx.DelayP`
 - `delay(double)` -> void
 - `shift(double)` -> void
 - `shift()` -> double
+
+## Distortion
+Description: Saturation effect suite: Overdrive, Fuzz, and Bitcrusher.
+
+Class: `org.chuck.audio.fx.Distortion`
+
+### Parameters
+- `mode` (int)
+- `drive` (float)
+- `bits` (int)
+- `downsample` (int)
+- `downsampleCounter` (int)
+- `lastDownsampledValue` (float)
+
+### Methods
+- `drive(float)` -> void : Set drive/gain factor.
+- `downsample(int)` -> void : Set downsampling factor for Bitcrusher (1 = none).
+- `mode(int)` -> void : Set distortion mode (0: Overdrive, 1: Fuzz, 2: Bitcrusher).
+- `bits(int)` -> void : Set bit depth for Bitcrusher (1 to 16).
 
 ## Dyno
 Class: `org.chuck.audio.fx.Dyno`
@@ -717,6 +737,25 @@ Class: `org.chuck.audio.analysis.Flux`
 ## FoldbackSaturator
 Category: Built-in Unit Generator
 
+## FreeVerb
+Description: Lush Schroeder-Moorer algorithmic reverb.
+
+Class: `org.chuck.audio.fx.FreeVerb`
+
+### Parameters
+- `combL` (CombFilter[])
+- `combR` (CombFilter[])
+- `allPassL` (AllPassFilter[])
+- `allPassR` (AllPassFilter[])
+- `roomSize` (float)
+- `damp` (float)
+- `mix` (float)
+
+### Methods
+- `roomSize(float)` -> void : Set room size (0.0 to 1.0).
+- `damp(float)` -> void : Set damping factor (0.0 to 1.0).
+- `mix(float)` -> void : Set dry/wet mix (0.0 to 1.0).
+
 ## FrencHrn
 Class: `org.chuck.audio.stk.FrencHrn`
 
@@ -773,6 +812,54 @@ Class: `org.chuck.audio.util.GainDB`
 - `setDb(double)` -> void
 - `db(float)` -> float
 - `db()` -> float
+
+## Granulator
+Description: Real-time granular synthesis engine. Captures audio and generates randomized grains.
+
+Class: `org.chuck.audio.util.Granulator`
+
+### Parameters
+- `buffer` (float[])
+- `writePos` (int)
+- `grainSizeMs` (float)
+- `grainSizeJitterMs` (float)
+- `positionJitterMs` (float)
+- `pitchJitter` (float)
+- `density` (float)
+- `activeGrains` (List)
+- `samplesUntilNextGrain` (double)
+- `lastL` (float)
+- `lastR` (float)
+
+### Methods
+- `getChannelLastOut(int)` -> float
+- `pitchJitter(float)` -> void : Set randomization of pitch (0.0 to 1.0).
+- `density(float)` -> void : Set grain density (grains per second).
+- `grainSize(float)` -> void : Set grain size in milliseconds.
+- `grainSizeJitter(float)` -> void : Set randomization of grain size in ms.
+- `posJitter(float)` -> void : Set randomization of playback position in ms.
+
+## Guitar
+Description: Multi-string guitar physical model with bridge coupling.
+
+Class: `org.chuck.audio.stk.Guitar`
+
+### Parameters
+- `strings` (Twang[])
+- `excitation` (float[])
+- `filePointer` (int)
+- `stringState` (int)
+- `pickFilter` (OnePole)
+- `couplingFilter` (OnePole)
+- `couplingGain` (float)
+- `pluckGains` (float[])
+
+### Methods
+- `getChannelLastOut(int)` -> float
+- `noteOn(int, double, double)` -> void : Pluck a string (0-5) with given frequency and amplitude.
+- `noteOff(int, double)` -> void : Damp a string (0-5).
+- `pickHardness(double)` -> void : Set the 'hardness' of the pick (0.0 to 1.0).
+- `coupling(double)` -> void : Set bridge coupling gain.
 
 ## HPF
 Class: `org.chuck.audio.filter.HPF`
@@ -906,6 +993,26 @@ Class: `org.chuck.audio.filter.Lpf`
 - `freq(double)` -> double
 - `freq()` -> double
 - `setCutoff(float)` -> void
+
+## LentPitShift
+Description: Formant-preserving pitch shifter (Lent algorithm). Best for monophonic signals.
+
+Class: `org.chuck.audio.fx.LentPitShift`
+
+### Parameters
+- `inputLine` (float[])
+- `outputLine` (float[])
+- `window` (float[])
+- `inputPtr` (int)
+- `outputPtr` (int)
+- `tMax` (int)
+- `shift` (double)
+- `period` (int)
+- `samplesSinceLastAnalysis` (int)
+
+### Methods
+- `shift()` -> double
+- `shift(double)` -> double : Set the pitch shift factor. 1.0 is no shift, 2.0 is an octave up.
 
 ## LiSa
 Class: `org.chuck.audio.util.LiSa`
@@ -1131,9 +1238,9 @@ Class: `org.chuck.audio.filter.OneZero`
 - `lastInput` (float)
 
 ### Methods
+- `setZero(float)` -> void
 - `setB0(float)` -> void
 - `setB1(float)` -> void
-- `setZero(float)` -> void
 
 ## Overdrive
 Category: Built-in Unit Generator
@@ -1173,9 +1280,9 @@ Class: `org.chuck.audio.util.Pan2`
 - `multiBlockCache` (float[][])
 
 ### Methods
+- `getChannelLastOut(int, long)` -> float
 - `pan(float)` -> float
 - `pan()` -> float
-- `getChannelLastOut(int, long)` -> float
 - `panType(int)` -> int
 - `setPan(float)` -> void
 - `getPan()` -> float
@@ -1651,6 +1758,27 @@ Class: `org.chuck.audio.stk.TubeBell`
 - `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
+
+## Twang
+Description: Enhanced plucked-string physical model with pluck position control.
+
+Class: `org.chuck.audio.stk.Twang`
+
+### Parameters
+- `delayLine` (DelayL)
+- `combDelay` (DelayL)
+- `loopFilter` (OneZero)
+- `freq` (double)
+- `loopGain` (double)
+- `pluckPosition` (double)
+
+### Methods
+- `freq(double)` -> double : Set string frequency in Hz.
+- `freq()` -> double
+- `loopGain()` -> double
+- `loopGain(double)` -> double : Set loop gain (0.0 to 1.0). Controls sustain.
+- `pluckPos()` -> double
+- `pluckPos(double)` -> double : Set pluck position (0.0 to 1.0). 0.5 is center.
 
 ## TwoPole
 Class: `org.chuck.audio.filter.TwoPole`

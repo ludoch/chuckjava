@@ -7,8 +7,13 @@ import org.chuck.audio.osc.Noise;
 import org.chuck.audio.osc.SinOsc;
 import org.chuck.audio.util.Envelope;
 import org.chuck.audio.util.ReedTable;
+import org.chuck.core.doc;
 
-/** A clarinet physical model. */
+/**
+ * Clarinet: A multi-mode clarinet physical model.
+ * Based on the Synthesis ToolKit (STK) C++ implementation.
+ */
+@doc("Clarinet physical model based on STK. Ported to Java 25.")
 public class Clarinet extends ChuckUGen {
   private final DelayL delayLine;
   private final ReedTable reedTable;
@@ -24,9 +29,13 @@ public class Clarinet extends ChuckUGen {
 
   public Clarinet(float lowestFrequency, float sampleRate) {
     this.sampleRate = sampleRate;
-    int length = (int) (sampleRate / lowestFrequency + 1);
+    // Length for half-wavelength (stopped pipe)
+    int length = (int) (0.5 * sampleRate / lowestFrequency + 1);
     this.delayLine = new DelayL(length);
     this.reedTable = new ReedTable();
+    this.reedTable.setOffset(0.7f); // STK default
+    this.reedTable.setSlope(-0.3f);  // STK default
+    
     this.filter = new OneZero();
     this.envelope = new Envelope(sampleRate);
     this.noise = new Noise();
@@ -37,34 +46,50 @@ public class Clarinet extends ChuckUGen {
     filter.setB1(0.5f);
   }
 
-  public void setFreq(double frequency) {
-    double delay = sampleRate / frequency - 1.0;
+  @doc("Set the clarinet frequency in Hz.")
+  public void freq(double frequency) {
+    // Stopped pipe: fundamental is 4 * length, but feedback loop is 2 * length.
+    // We use 0.5 factor to match STK tuning.
+    double delay = (0.5 * sampleRate / frequency) - 1.0;
     delayLine.setDelay(delay);
   }
 
+  public void setFreq(double frequency) {
+    freq(frequency);
+  }
+
+  @doc("Start a note with given volume/velocity.")
   public void noteOn(float velocity) {
-    envelope.setTarget(velocity);
+    envelope.setRate(0.005f); // STK default attack rate
+    envelope.setTarget(0.55f + (velocity * 0.30f)); // STK default mapping
     envelope.keyOn();
   }
 
+  @doc("Stop the note.")
   public void noteOff(float velocity) {
+    envelope.setRate(0.01f); // STK default release rate
     envelope.keyOff();
   }
 
   @Override
   protected float compute(float input, long systemTime) {
-    // Advance envelope ramp state; read value directly (envelope has no audio source,
-    // so tick() returns 0 — we need getValue() to get the actual ramp level).
     envelope.tick(systemTime);
     float breathPressure = envelope.getValue();
+    
+    // Add noise and vibrato to breath
     breathPressure += breathPressure * noiseGain * noise.tick(systemTime);
     breathPressure += breathPressure * vibratoGain * vibrato.tick(systemTime);
 
-    float pressureDiff = -0.95f * filter.tick(delayLine.getLastOut(), systemTime);
-    pressureDiff = pressureDiff - breathPressure;
+    // Calculate pressure difference across reed
+    // STK uses -1.0 reflection at bell, plus low-pass filter
+    float boreOutput = -delayLine.getLastOut();
+    float filteredBore = filter.tick(boreOutput, systemTime);
+    float pressureDiff = filteredBore - breathPressure;
 
-    float out =
-        delayLine.tick(breathPressure + pressureDiff * reedTable.tick(pressureDiff), systemTime);
-    return out * outputGain;
+    // Use reed table to calculate new bore input
+    float out = delayLine.tick(breathPressure + pressureDiff * reedTable.tick(pressureDiff), systemTime);
+    
+    lastOut = out * outputGain;
+    return lastOut;
   }
 }
