@@ -341,6 +341,10 @@ public abstract class ChuckUGen extends ChuckObject {
   }
 
   public void tick(float[] buffer, int offset, int length, long systemTime) {
+    tick(buffer, offset, length, systemTime, null);
+  }
+
+  public void tick(float[] buffer, int offset, int length, long systemTime, float[] manualInput) {
     // If we've already ticked this block for this exact time, copy from cache
     if (systemTime != -1
         && systemTime == blockStartTime
@@ -357,10 +361,15 @@ public abstract class ChuckUGen extends ChuckObject {
       blockCache = new float[length];
     }
 
-    // Default implementation: pull from sources and compute sample-by-sample
-    // Subclasses like SinOsc or Gain will override this with vectorized logic.
+    // Default implementation: compute sample-by-sample
     for (int i = 0; i < length; i++) {
-      float out = tick(systemTime == -1 ? -1 : systemTime + i);
+      float in = (manualInput != null) ? manualInput[i] : 0.0f;
+      float out;
+      if (manualInput != null) {
+        out = tick(in, systemTime == -1 ? -1 : systemTime + i);
+      } else {
+        out = tick(systemTime == -1 ? -1 : systemTime + i);
+      }
       blockCache[i] = out;
       if (buffer != null) {
         buffer[offset + i] = out;

@@ -17,9 +17,6 @@ public class Mandolin extends ChuckUGen {
   private double detuning = 0.995;
   private final float sampleRate;
 
-  private float[] temp0;
-  private float[] temp1;
-
   public Mandolin(float lowestFrequency, float sampleRate) {
     this.sampleRate = sampleRate;
     strings[0] = new Twang(sampleRate);
@@ -28,10 +25,6 @@ public class Mandolin extends ChuckUGen {
     excitation = new Wavetable();
     excitation.setTable(WavetableRegistry.getPluckExcitation(1024));
     excitation.loop(0); // single shot pluck
-
-    // Connect excitation to strings for block processing
-    strings[0].addSource(excitation);
-    strings[1].addSource(excitation);
 
     // Default mandolin parameters
     for (Twang s : strings) {
@@ -97,22 +90,20 @@ public class Mandolin extends ChuckUGen {
     if (blockCache == null || blockCache.length < length) {
       blockCache = new float[length];
     }
-    if (temp0 == null || temp0.length < length) {
-      temp0 = new float[length];
-    }
-    if (temp1 == null || temp1.length < length) {
-      temp1 = new float[length];
-    }
 
-    // Tick the strings. Since excitation is a source of both, it will be ticked by the first one.
-    strings[0].tick(temp0, 0, length, systemTime);
-    strings[1].tick(temp1, 0, length, systemTime);
+    // 1. Tick excitation wavetable
+    float[] pluckBuf = new float[length];
+    excitation.tick(pluckBuf, 0, length, systemTime);
 
+    // 2. Tick strings using the excitation buffer
+    float[] temp0 = new float[length];
+    float[] temp1 = new float[length];
+    strings[0].tick(temp0, 0, length, systemTime, pluckBuf);
+    strings[1].tick(temp1, 0, length, systemTime, pluckBuf);
+
+    // 3. Mix and store
     for (int i = 0; i < length; i++) {
-      float out0 = temp0[i];
-      float out1 = temp1[i];
-
-      float out = (out0 + out1) * 0.5f * gain;
+      float out = (temp0[i] + temp1[i]) * 0.5f * gain;
       blockCache[i] = out;
       if (buffer != null) buffer[offset + i] = out;
     }
@@ -129,15 +120,18 @@ public class Mandolin extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
-    float out0 = strings[0].tick(systemTime);
-    float out1 = strings[1].tick(systemTime);
+    float pluckSignal = excitation.tick(systemTime);
 
-    // Return value will be multiplied by gain in ChuckUGen.tick
-    float out = (out0 + out1) * 0.5f;
+    // Explicitly pass pluck signal to internal strings
+    float out0 = strings[0].tick(pluckSignal, systemTime);
+    float out1 = strings[1].tick(pluckSignal, systemTime);
+
+    // Update stereo cache
     this.lastL = out0 * gain;
     this.lastR = out1 * gain;
 
-    return out;
+    // Mixed mono out (multiplied by gain in parent tick)
+    return (out0 + out1) * 0.5f;
   }
 
   private float lastL = 0, lastR = 0;
