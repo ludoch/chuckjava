@@ -319,12 +319,16 @@ public class ChuckIDE extends Application {
       "@(doc|operator|construct|destruct|this|return)\\b";
   private static final String NUMBER_PATTERN = "\\b\\d+(\\.\\d+)?\\b";
   private static final String STRING_PATTERN = "\"[^\"\\\\]*(\\\\.[^\"\\\\]*)*\"";
-  private static final String COMMENT_PATTERN = "//[^\n]*|/\\*.*?\\*/";
+  private static final String COMMENT_PATTERN = "//[^\n]*|/\\*(?!\\*).*?\\*/";
+  private static final String DOC_PATTERN = "/\\*\\*.*?\\*/";
   private static final String CHUCK_OP_PATTERN = "=>|@=>|::|<=>|!=>";
 
   private static final Pattern HIGHLIGHT_PATTERN =
       Pattern.compile(
-          "(?<COMMENT>"
+          "(?<DOC>"
+              + DOC_PATTERN
+              + ")"
+              + "|(?<COMMENT>"
               + COMMENT_PATTERN
               + ")"
               + "|(?<ANNOTATION>"
@@ -574,6 +578,7 @@ public class ChuckIDE extends Application {
             if (ed != null) ed.setStyle(fontStyle);
           }
         });
+    prefsTabContent.setOnColorsChanged(() -> applyInlineStyles(stage.getScene()));
 
     Tab prefsTab = new Tab("Prefs", prefsTabContent);
     prefsTab.setClosable(false);
@@ -846,23 +851,25 @@ public class ChuckIDE extends Application {
     int lastEnd = 0;
     while (m.find()) {
       String styleClass =
-          m.group("COMMENT") != null
-              ? "ck-comment"
-              : m.group("ANNOTATION") != null
-                  ? "ck-annotation"
-                  : m.group("KEYWORD") != null
-                      ? "ck-keyword"
-                      : m.group("TYPE") != null
-                          ? "ck-type"
-                          : m.group("BUILTIN") != null
-                              ? "ck-builtin"
-                              : m.group("BOOLEAN") != null
-                                  ? "ck-boolean"
-                                  : m.group("STRING") != null
-                                      ? "ck-string"
-                                      : m.group("NUMBER") != null
-                                          ? "ck-number"
-                                          : m.group("CHUCKOP") != null ? "ck-chuckop" : null;
+          m.group("DOC") != null
+              ? "ck-doc"
+              : m.group("COMMENT") != null
+                  ? "ck-comment"
+                  : m.group("ANNOTATION") != null
+                      ? "ck-annotation"
+                      : m.group("KEYWORD") != null
+                          ? "ck-keyword"
+                          : m.group("TYPE") != null
+                              ? "ck-type"
+                              : m.group("BUILTIN") != null
+                                  ? "ck-builtin"
+                                  : m.group("BOOLEAN") != null
+                                      ? "ck-boolean"
+                                      : m.group("STRING") != null
+                                          ? "ck-string"
+                                          : m.group("NUMBER") != null
+                                              ? "ck-number"
+                                              : m.group("CHUCKOP") != null ? "ck-chuckop" : null;
       spansBuilder.add(Collections.emptyList(), m.start() - lastEnd);
       spansBuilder.add(
           styleClass != null ? Collections.singleton(styleClass) : Collections.emptyList(),
@@ -875,23 +882,41 @@ public class ChuckIDE extends Application {
 
   /** Apply highlight colours as inline JavaFX CSS (avoids needing an external file). */
   private void applyInlineStyles(Scene scene) {
-    String css =
-        ".ck-comment    { -rtfx-background-color: transparent; -fx-fill: #6a9955; }"
-            + ".ck-annotation { -fx-fill: #c792ea; -fx-font-style: italic; }"
-            + ".ck-keyword    { -fx-fill: #c586c0; -fx-font-weight: bold; }"
-            + ".ck-type       { -fx-fill: #4ec9b0; -fx-font-weight: bold; }"
-            + ".ck-builtin    { -fx-fill: #9cdcfe; }"
-            + ".ck-boolean    { -fx-fill: #569cd6; -fx-font-weight: bold; }"
-            + ".ck-string     { -fx-fill: #ce9178; }"
-            + ".ck-number     { -fx-fill: #b5cea8; }"
-            + ".ck-chuckop    { -fx-fill: #d4d4d4; -fx-font-weight: bold; }";
+    String css = generateSyntaxCss();
     scene.getRoot().setStyle(css);
     // Inject into scene stylesheets so RichTextFX picks them up
+    scene
+        .getStylesheets()
+        .removeIf(s -> s.startsWith("data:text/css")); // Remove old dynamic stylesheet
     scene
         .getStylesheets()
         .add(
             "data:text/css,"
                 + java.net.URLEncoder.encode(css, java.nio.charset.StandardCharsets.UTF_8));
+  }
+
+  private String generateSyntaxCss() {
+    return String.format(
+        ".ck-doc       { -fx-fill: %s; -fx-font-style: italic; }"
+            + ".ck-comment    { -fx-fill: %s; }"
+            + ".ck-annotation { -fx-fill: %s; -fx-font-style: italic; }"
+            + ".ck-keyword    { -fx-fill: %s; -fx-font-weight: bold; }"
+            + ".ck-type       { -fx-fill: %s; -fx-font-weight: bold; }"
+            + ".ck-builtin    { -fx-fill: %s; }"
+            + ".ck-boolean    { -fx-fill: %s; -fx-font-weight: bold; }"
+            + ".ck-string     { -fx-fill: %s; }"
+            + ".ck-number     { -fx-fill: %s; }"
+            + ".ck-chuckop    { -fx-fill: %s; -fx-font-weight: bold; }",
+        prefs.get("color.doc", "#6a9955"),
+        prefs.get("color.comment", "#6a9955"),
+        prefs.get("color.annotation", "#c792ea"),
+        prefs.get("color.keyword", "#c586c0"),
+        prefs.get("color.type", "#4ec9b0"),
+        prefs.get("color.builtin", "#9cdcfe"),
+        prefs.get("color.boolean", "#569cd6"),
+        prefs.get("color.string", "#ce9178"),
+        prefs.get("color.number", "#b5cea8"),
+        prefs.get("color.chuckop", "#d4d4d4"));
   }
 
   private void addNewTab(String title, String content) {

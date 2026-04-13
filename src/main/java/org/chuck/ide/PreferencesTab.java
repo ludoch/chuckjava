@@ -7,6 +7,7 @@ import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
 import org.chuck.audio.ChuckAudio;
 
 /**
@@ -29,6 +30,9 @@ public class PreferencesTab extends ScrollPane {
   private java.util.function.Consumer<Integer> onFFTSizeChanged;
   private java.util.function.Consumer<Integer> onScopeWindowChanged;
 
+  // Theme Callbacks
+  private Runnable onColorsChanged;
+
   public PreferencesTab(Preferences prefs) {
     this.prefs = prefs;
     setFitToWidth(true);
@@ -46,7 +50,10 @@ public class PreferencesTab extends ScrollPane {
     // --- Editor Section ---
     TitledPane editorSection = createEditorSection();
 
-    container.getChildren().addAll(audioSection, visSection, editorSection);
+    // --- Syntax Colors Section ---
+    TitledPane colorSection = createColorSection();
+
+    container.getChildren().addAll(audioSection, visSection, editorSection, colorSection);
     setContent(container);
   }
 
@@ -199,6 +206,64 @@ public class PreferencesTab extends ScrollPane {
     return pane;
   }
 
+  private TitledPane createColorSection() {
+    GridPane grid = new GridPane();
+    grid.setHgap(10);
+    grid.setVgap(8);
+    grid.setPadding(new Insets(10));
+
+    grid.add(new Label("Doc Comments:"), 0, 0);
+    grid.add(createColorPicker("color.doc", "#6a9955"), 1, 0);
+
+    grid.add(new Label("Comments:"), 0, 1);
+    grid.add(createColorPicker("color.comment", "#6a9955"), 1, 1);
+
+    grid.add(new Label("Annotations:"), 0, 2);
+    grid.add(createColorPicker("color.annotation", "#c792ea"), 1, 2);
+
+    grid.add(new Label("Keywords:"), 0, 3);
+    grid.add(createColorPicker("color.keyword", "#c586c0"), 1, 3);
+
+    grid.add(new Label("Types (UGens):"), 0, 4);
+    grid.add(createColorPicker("color.type", "#4ec9b0"), 1, 4);
+
+    grid.add(new Label("Built-ins:"), 0, 5);
+    grid.add(createColorPicker("color.builtin", "#9cdcfe"), 1, 5);
+
+    grid.add(new Label("Literals:"), 0, 6);
+    grid.add(createColorPicker("color.boolean", "#569cd6"), 1, 6);
+
+    grid.add(new Label("Strings:"), 0, 7);
+    grid.add(createColorPicker("color.string", "#ce9178"), 1, 7);
+
+    grid.add(new Label("Numbers:"), 0, 8);
+    grid.add(createColorPicker("color.number", "#b5cea8"), 1, 8);
+
+    grid.add(new Label("Operators:"), 0, 9);
+    grid.add(createColorPicker("color.chuckop", "#d4d4d4"), 1, 9);
+
+    TitledPane pane = new TitledPane("Syntax Colors", grid);
+    pane.setCollapsible(false);
+    return pane;
+  }
+
+  private ColorPicker createColorPicker(String key, String def) {
+    ColorPicker cp = new ColorPicker(Color.web(prefs.get(key, def)));
+    cp.valueProperty()
+        .addListener(
+            (obs, oldV, newV) -> {
+              prefs.put(key, toHex(newV));
+              if (onColorsChanged != null) onColorsChanged.run();
+            });
+    return cp;
+  }
+
+  private String toHex(Color c) {
+    return String.format(
+        "#%02x%02x%02x",
+        (int) (c.getRed() * 255), (int) (c.getGreen() * 255), (int) (c.getBlue() * 255));
+  }
+
   public void setOnAudioRestart(AudioRestartHandler handler) {
     this.audioRestartHandler = handler;
   }
@@ -213,5 +278,9 @@ public class PreferencesTab extends ScrollPane {
 
   public void setOnScopeWindowChanged(java.util.function.Consumer<Integer> handler) {
     this.onScopeWindowChanged = handler;
+  }
+
+  public void setOnColorsChanged(Runnable handler) {
+    this.onColorsChanged = handler;
   }
 }
