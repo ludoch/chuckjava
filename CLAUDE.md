@@ -12,7 +12,7 @@ A Java implementation of the [ChucK](https://chuck.stanford.edu/) strongly-timed
 # Build
 mvn compile
 
-# Run all tests (130 JVM tests)
+# Run all tests (177 JVM tests)
 mvn test
 
 # Run a single test class
@@ -329,6 +329,35 @@ All registered in `ChuckFactory`; each extends `ChuckObject` with `super(ChuckTy
 - Removed `EXE [N]` trace `System.out.println` from `ChuckShred.execute()`
 - `mvn package` fix: AI/ML classes were missing `super(ChuckType.OBJECT)` constructors — incremental `mvn test` masked this; clean build exposed it
 - `FilterStk.gain(double)` return type changed from `void` to `double` to match `ChuckUGen` override
+
+### Chugins Java Port (2026-04-12)
+
+Pure-Java ports of C++ chugins from `../chugins`, all in `org.chuck.audio.chugins` and registered in `UGenRegistry`:
+
+| Class | ChucK name | Category | Algorithm |
+|-------|-----------|----------|-----------|
+| `Bitcrusher` | `Bitcrusher` | effect | Bit-depth reduction + integer downsampling hold |
+| `FoldbackSaturator` | `FoldbackSaturator` | effect | Foldback distortion via modulo arithmetic |
+| `Overdrive` | `Overdrive` | effect | Power-law soft clipping: `1-(1-x)^drive` |
+| `MagicSine` | `MagicSine` | oscillator | Magic circle sine: `x+=ε·y; y-=ε·x` (no table) |
+| `ExpEnv` | `ExpEnv` | envelope | Exponential decay: `value *= radius` per sample |
+| `PowerADSR` | `PowerADSR` | envelope | ADSR with per-stage power curve shaping |
+| `WPDiodeLadder` | `WPDiodeLadder` | filter | VA diode ladder LP (Pirkle AN-6), 4 trapezoidal one-poles |
+| `WPKorg35` | `WPKorg35` | filter | VA Korg35 LP (Pirkle AN-5), 2 LPF + 1 HPF one-poles |
+| `ChuginRange` | `Range` | utility | Linear rescale [inMin,inMax] → [outMin,outMax] with optional clip |
+
+**Chugins NOT ported** (require native libs or are too complex):
+- `Binaural` — HRTF data files needed
+- `ConvRev` — FFT-based convolution reverb
+- `Elliptic` — elliptic filter coefficient design
+- `FluidSynth` / `Ladspa` / `Faust` — native plugin host
+- `NHHall`, `GVerb` — complex reverb (GVerb already exists in Java)
+- `PitchTrack` / `Sigmund` / `Spectacle` — complex analysis
+- `WarpBuf` / `Wavetable` — complex time-stretching / wavetable
+- `ABSaturator` — requires upsampling antialiasing filter chain
+- `AmbPan` / `MIAP` — ambisonics / manifold panning math
+
+**Possibly portable in future:** `Perlin` (noise oscillator), `WinFuncEnv` (windowed envelope), `ExpDelay` (exponential tap delay), `Multicomb` (multi comb filter), `Line` (multi-stage linear ramp), `FIR` (general FIR filter), `KasFilter` (analog-style resonant LP).
 
 ### Key Design Patterns
 

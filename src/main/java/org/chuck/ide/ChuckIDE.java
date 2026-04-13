@@ -311,6 +311,8 @@ public class ChuckIDE extends Application {
           + "OscIn|OscOut|OscMsg|OscEvent|Hid|HidMsg|HidOut|"
           + "IO|FileIO|StringTokenizer|ConsoleInput|KBHit|SerialIO|"
           + "KNN|KNN2|SVM|MLP|HMM|PCA|"
+          + "Bitcrusher|FoldbackSaturator|Overdrive|MagicSine|ExpEnv|PowerADSR|WPDiodeLadder|WPKorg35|"
+          + "Range|FIR|KasFilter|WinFuncEnv|ExpDelay|Perlin|"
           + "Event|Object|UGen|UAna)\\b";
   private static final String BUILTIN_PATTERN =
       "\\b(dac|adc|blackhole|now|second|ms|samp|minute|hour|day|week|"
@@ -1202,7 +1204,20 @@ public class ChuckIDE extends Application {
           "Pan2",
           "Gain" ->
           "fx";
-      case "ADSR", "Adsr", "Envelope" -> "env";
+      case "ADSR", "Adsr", "Envelope", "ExpEnv", "PowerADSR" -> "env";
+      case "Bitcrusher",
+          "FoldbackSaturator",
+          "Overdrive",
+          "MagicSine",
+          "WPDiodeLadder",
+          "WPKorg35",
+          "Range",
+          "FIR",
+          "KasFilter",
+          "WinFuncEnv",
+          "ExpDelay",
+          "Perlin" ->
+          "chugin";
       case "Mandolin",
           "Clarinet",
           "Plucked",

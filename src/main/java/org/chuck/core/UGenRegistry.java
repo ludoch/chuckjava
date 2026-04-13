@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Set;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.analysis.*;
+import org.chuck.audio.chugins.*;
 import org.chuck.audio.filter.*;
 import org.chuck.audio.fx.*;
 import org.chuck.audio.osc.*;
@@ -173,6 +174,22 @@ public class UGenRegistry {
     register("Envelope", (sr, args) -> new Envelope(sr));
     register("ADSR", (sr, args) -> new Adsr(sr));
     register("Adsr", (sr, args) -> new Adsr(sr));
+
+    // --- Chugins (Java ports of C++ chugins) ---
+    register("Bitcrusher", (sr, args) -> new Bitcrusher());
+    register("FoldbackSaturator", (sr, args) -> new FoldbackSaturator());
+    register("Overdrive", (sr, args) -> new Overdrive());
+    register("MagicSine", (sr, args) -> new MagicSine(sr));
+    register("ExpEnv", (sr, args) -> new ExpEnv(sr));
+    register("PowerADSR", (sr, args) -> new PowerADSR(sr));
+    register("WPDiodeLadder", (sr, args) -> new WPDiodeLadder(sr));
+    register("WPKorg35", (sr, args) -> new WPKorg35(sr));
+    register("Range", (sr, args) -> new ChuginRange());
+    register("FIR", (sr, args) -> new FIR(sr));
+    register("KasFilter", (sr, args) -> new KasFilter(sr));
+    register("WinFuncEnv", (sr, args) -> new WinFuncEnv());
+    register("ExpDelay", (sr, args) -> new ExpDelay(sr));
+    register("Perlin", (sr, args) -> new Perlin(sr));
   }
 
   private static void register(String name, UGenFactory factory) {

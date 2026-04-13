@@ -154,7 +154,6 @@ public class DacChannel extends ChuckUGen {
         FloatVector vSrc = FloatVector.fromArray(SPECIES, temp, i);
         vSum.add(vSrc).intoArray(blockCache, i);
       }
-      // Fallback
       for (; i < length; i++) {
         blockCache[i] += temp[i];
       }
