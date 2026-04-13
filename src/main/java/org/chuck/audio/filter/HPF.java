@@ -59,6 +59,15 @@ public class HPF extends ChuckUGen {
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
+    if (systemTime != -1
+        && systemTime == blockStartTime
+        && blockCache != null
+        && blockLength >= length) {
+      if (buffer != null) System.arraycopy(blockCache, 0, buffer, offset, length);
+      return;
+    }
+    if (blockCache == null || blockCache.length < length) blockCache = new float[length];
+
     // 1. Sum inputs using SIMD
     float[] inputSum = new float[length];
     if (getNumSources() > 0) {
@@ -76,7 +85,7 @@ public class HPF extends ChuckUGen {
         for (; i < length; i++) inputSum[i] += temp[i];
       }
     } else {
-      System.arraycopy(buffer, offset, inputSum, 0, length);
+      if (buffer != null) System.arraycopy(buffer, offset, inputSum, 0, length);
     }
 
     // 2. Apply filter (recursive, scalar)
@@ -87,11 +96,14 @@ public class HPF extends ChuckUGen {
       x1 = x0;
       y2 = y1;
       y1 = y0;
-      buffer[offset + i] = (float) y0;
+      blockCache[i] = (float) y0;
+      if (buffer != null) buffer[offset + i] = blockCache[i];
     }
 
-    lastOut = buffer[offset + length - 1];
+    blockStartTime = systemTime;
+    blockLength = length;
     lastTickTime = (systemTime == -1) ? -1 : systemTime + length - 1;
+    if (length > 0) lastOut = blockCache[length - 1];
   }
 
   @Override

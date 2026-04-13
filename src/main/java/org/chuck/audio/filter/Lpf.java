@@ -4,21 +4,16 @@ import static org.chuck.audio.VectorAudio.SPECIES;
 
 import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
+import org.chuck.core.doc;
 
-/** A simple Low Pass Filter. */
+/** A simple Low Pass Filter (One-pole). */
+@doc("Low Pass Filter (1-pole).")
 public class Lpf extends ChuckUGen {
   private float cutoff = 1000.0f;
-
-  @SuppressWarnings("unused")
-  private float resonance = 1.0f;
-
   private float sampleRate;
 
   // Filter state
   private float v0 = 0.0f;
-
-  @SuppressWarnings("unused")
-  private float v1 = 0.0f;
 
   public Lpf(float sampleRate) {
     this.sampleRate = sampleRate;
@@ -28,8 +23,26 @@ public class Lpf extends ChuckUGen {
     this.cutoff = cutoff;
   }
 
+  public double freq(double f) {
+    setCutoff((float) f);
+    return f;
+  }
+
+  public double freq() {
+    return cutoff;
+  }
+
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
+    if (systemTime != -1
+        && systemTime == blockStartTime
+        && blockCache != null
+        && blockLength >= length) {
+      if (buffer != null) System.arraycopy(blockCache, 0, buffer, offset, length);
+      return;
+    }
+    if (blockCache == null || blockCache.length < length) blockCache = new float[length];
+
     // 1. Sum inputs using SIMD
     float[] inputSum = new float[length];
     if (getNumSources() > 0) {
@@ -47,8 +60,7 @@ public class Lpf extends ChuckUGen {
         for (; i < length; i++) inputSum[i] += temp[i];
       }
     } else {
-      // If no sources, copy from input buffer (which might have direct chuckTo data)
-      System.arraycopy(buffer, offset, inputSum, 0, length);
+      if (buffer != null) System.arraycopy(buffer, offset, inputSum, 0, length);
     }
 
     // 2. Apply filter
@@ -59,20 +71,21 @@ public class Lpf extends ChuckUGen {
     float localV0 = v0;
     for (int i = 0; i < length; i++) {
       localV0 = alpha * inputSum[i] + beta * localV0;
-      buffer[offset + i] = localV0;
+      blockCache[i] = localV0 * gain;
+      if (buffer != null) buffer[offset + i] = blockCache[i];
     }
     v0 = localV0;
 
-    lastOut = v0;
+    blockStartTime = systemTime;
+    blockLength = length;
     lastTickTime = (systemTime == -1) ? -1 : systemTime + length - 1;
+    if (length > 0) lastOut = blockCache[length - 1];
   }
 
   @Override
   protected float compute(float input, long systemTime) {
-    // Simple 1-pole low pass for demonstration
     float alpha = (float) (2.0 * Math.PI * cutoff / sampleRate);
     alpha = Math.min(Math.max(alpha, 0.0f), 1.0f);
-
     v0 = v0 + alpha * (input - v0);
     return v0;
   }

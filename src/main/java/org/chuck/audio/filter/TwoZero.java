@@ -1,5 +1,8 @@
 package org.chuck.audio.filter;
 
+import static org.chuck.audio.VectorAudio.SPECIES;
+
+import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 
 /**
@@ -64,16 +67,64 @@ public class TwoZero extends ChuckUGen {
   }
 
   // Raw coefficient setters
-  public void setB0(double v) {
-    b0 = v;
-  }
-
-  public void setB1(double v) {
-    b1 = v;
-  }
-
   public void setB2(double v) {
     b2 = v;
+  }
+
+  @Override
+  public void tick(float[] buffer, int offset, int length, long systemTime) {
+    if (systemTime != -1
+        && systemTime == blockStartTime
+        && blockCache != null
+        && blockLength >= length) {
+      if (buffer != null) System.arraycopy(blockCache, 0, buffer, offset, length);
+      return;
+    }
+    if (blockCache == null || blockCache.length < length) blockCache = new float[length];
+
+    // 1. Sum inputs using SIMD
+    float[] inputSum = new float[length];
+    if (getNumSources() > 0) {
+      for (ChuckUGen src : sources) {
+        float[] temp = new float[length];
+        src.tick(temp, 0, length, systemTime);
+
+        int i = 0;
+        int bound = SPECIES.loopBound(length);
+        for (; i < bound; i += SPECIES.length()) {
+          FloatVector v1 = FloatVector.fromArray(SPECIES, inputSum, i);
+          FloatVector v2 = FloatVector.fromArray(SPECIES, temp, i);
+          v1.add(v2).intoArray(inputSum, i);
+        }
+        for (; i < length; i++) inputSum[i] += temp[i];
+      }
+    } else {
+      if (buffer != null) System.arraycopy(buffer, offset, inputSum, 0, length);
+    }
+
+    // 2. Apply filter
+    double localB0 = b0;
+    double localB1 = b1;
+    double localB2 = b2;
+    double localIn1 = in1;
+    double localIn2 = in2;
+    float localGain = gain;
+
+    for (int i = 0; i < length; i++) {
+      double currentInput = inputSum[i];
+      double y = localB0 * currentInput + localB1 * localIn1 + localB2 * localIn2;
+      localIn2 = localIn1;
+      localIn1 = currentInput;
+      blockCache[i] = (float) (y * localGain);
+      if (buffer != null) buffer[offset + i] = blockCache[i];
+    }
+    in1 = localIn1;
+    in2 = localIn2;
+
+    blockStartTime = systemTime;
+    blockLength = length;
+    lastTickTime = (systemTime == -1) ? -1 : systemTime + length - 1;
+    if (length > 0) lastOut = blockCache[length - 1];
   }
 
   @Override
