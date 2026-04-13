@@ -298,5 +298,20 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | ~~`Machine.refcount`, `sp_reg`, `sp_mem`~~ | ✅ Stubs returning 0 |
 | ~~`Machine.operatorsPush/Pop`~~ | ✅ Stubs |
 | ~~`HidOut`~~ | ✅ Implemented (stub) |
-| ~~`Std.system()`~~ | ✅ Implemented |
+| ~~Std.system()~~ | ✅ Implemented |
 | ~~Fast math approximations (`ssin`, `scos`, etc.)~~ | ✅ Implemented (delegate to java.lang.Math) |
+
+---
+
+## 12. Planned STK Extensions (Modern STK)
+
+These features are from the latest upstream STK repository and represent "beyond classic ChucK" additions.
+
+| Feature | Category | Description | Status |
+|---------|----------|-------------|--------|
+| `Guitar` | Instrument | 🎸 Advanced multi-string physical model with fret noise and coupling. | 🏗️ In Progress |
+| `LentPitShift` | Effect | 🎤 Formant-preserving pitch shifter. | ❌ Planned |
+| `Granular` | Synthesis | 🌌 Dedicated granular synthesis engine with scatter/density control. | ❌ Planned |
+| `Distortion` | Effect | 🎛️ Saturation suite (Bitcrusher, Overdrive, Fuzz). | ❌ Planned |
+| `FreeVerb` | Reverb | ⛪ Lush Schroeder-Moorer algorithmic reverb. | ❌ Planned |
+

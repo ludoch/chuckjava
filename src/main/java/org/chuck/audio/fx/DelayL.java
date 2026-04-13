@@ -27,6 +27,11 @@ public class DelayL extends ChuckUGen {
     this.delaySamples = samples;
   }
 
+  public double delay(double samples) {
+    setDelay(samples);
+    return samples;
+  }
+
   public double delay() {
     return delaySamples;
   }

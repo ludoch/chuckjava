@@ -126,7 +126,7 @@ public class UGenBrowser extends VBox {
     if (containsAny(name, "Filter", "LPF", "HPF", "BPF", "BRF", "ResonZ", "Pole", "Zero", "BiQuad"))
       return "Filters";
     if (containsAny(name, "FFT", "IFFT", "RMS", "Flux", "Centroid", "Rolloff")) return "Analyzers";
-    if (containsAny(name, "Echo", "Delay", "Chorus", "Rev", "PitShift", "Dyno", "Pan2", "Gain"))
+    if (containsAny(name, "Echo", "Delay", "Chorus", "Rev", "FreeVerb", "PitShift", "Pan2", "Gain"))
       return "Effects";
 
     // STK - heuristic: common STK instrument names
@@ -135,6 +135,8 @@ public class UGenBrowser extends VBox {
         "Clarinet",
         "Mandolin",
         "Plucked",
+        "Guitar",
+        "Twang",
         "Rhodey",
         "Wurley",
         "TubeBell",

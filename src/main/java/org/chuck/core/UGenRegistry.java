@@ -135,6 +135,8 @@ public class UGenRegistry {
     register("Brass", (sr, args) -> new Brass(sr));
     register("Sitar", (sr, args) -> new Sitar(sr));
     register("StifKarp", (sr, args) -> new StifKarp(sr));
+    register("Twang", (sr, args) -> new org.chuck.audio.stk.Twang(sr));
+    register("Guitar", (sr, args) -> new org.chuck.audio.stk.Guitar(sr));
     register("Shakers", (sr, args) -> new Shakers(sr));
     register("VoicForm", (sr, args) -> new VoicForm(sr));
     register("ModalBar", (sr, args) -> new ModalBar(sr));
