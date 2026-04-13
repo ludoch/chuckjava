@@ -66,7 +66,7 @@ public class LiSaN extends MultiChannelUGen {
       // Get inputs from sources
       for (int c = 0; c < n; c++) {
         float in = 0;
-        for (ChuckUGen src : sources) {
+        for (ChuckUGen src : getSources()) {
           in += src.getChannelLastOut(c);
         }
         buffer[c][recPos] = in;

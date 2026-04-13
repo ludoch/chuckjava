@@ -22,7 +22,7 @@ public class Rolloff extends UAna {
   @Override
   protected void computeUAna() {
     UAnaBlob input = null;
-    for (ChuckUGen src : sources) {
+    for (ChuckUGen src : getSources()) {
       if (src instanceof UAna u) {
         input = u.getLastBlob();
         break;

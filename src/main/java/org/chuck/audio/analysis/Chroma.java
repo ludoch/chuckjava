@@ -37,7 +37,7 @@ public class Chroma extends UAna {
     // Pull magnitude spectrum from upstream FFT/UAna
     float[] mag = null;
     int fftSize = 2048;
-    for (ChuckUGen src : sources) {
+    for (ChuckUGen src : getSources()) {
       if (src instanceof FFT fft) {
         fftSize = fft.getSize();
         mag = fft.lastBlob.getFvals();

@@ -18,7 +18,7 @@ public class Centroid extends UAna {
     float sumMag = 0;
     float weightedSum = 0;
 
-    for (ChuckUGen src : sources) {
+    for (ChuckUGen src : getSources()) {
       if (src instanceof UAna u) {
         float[] mags = u.getLastBlob().getFvals();
         if (mags.length > 0) {

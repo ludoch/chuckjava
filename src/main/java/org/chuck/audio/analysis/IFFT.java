@@ -46,7 +46,7 @@ public class IFFT extends UAna {
   protected void computeUAna() {
     // Find an upstream UAna to get spectral data from
     UAnaBlob inputBlob = null;
-    for (ChuckUGen src : sources) {
+    for (ChuckUGen src : getSources()) {
       if (src instanceof UAna u) {
         inputBlob = u.getLastBlob();
         break;

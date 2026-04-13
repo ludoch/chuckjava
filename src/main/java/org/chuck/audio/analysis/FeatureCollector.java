@@ -24,7 +24,7 @@ public class FeatureCollector extends UAna {
   protected void computeUAna() {
     List<float[]> parts = new ArrayList<>();
     int total = 0;
-    for (ChuckUGen src : sources) {
+    for (ChuckUGen src : getSources()) {
       if (src instanceof UAna u) {
         float[] fv = u.lastBlob.getFvals();
         if (fv != null && fv.length > 0) {

@@ -64,7 +64,7 @@ public class LiSa2 extends StereoUGen {
     if (isRecording && buffer[0].length > 0) {
       // Get inputs from sources
       float inL = 0, inR = 0;
-      for (ChuckUGen src : sources) {
+      for (ChuckUGen src : getSources()) {
         inL += src.getChannelLastOut(0);
         inR += src.getChannelLastOut(1);
       }

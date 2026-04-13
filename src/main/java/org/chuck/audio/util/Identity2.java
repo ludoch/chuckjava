@@ -9,7 +9,7 @@ public class Identity2 extends StereoUGen {
     // StereoUGen.tick sums all sources into 'input'.
     // To be a true Identity2, we should pull from sources directly.
     float inL = 0, inR = 0;
-    for (ChuckUGen src : sources) {
+    for (ChuckUGen src : getSources()) {
       inL += src.getChannelLastOut(0);
       inR += src.getChannelLastOut(1);
     }

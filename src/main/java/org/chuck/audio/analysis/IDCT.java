@@ -21,7 +21,7 @@ public class IDCT extends UAna {
   protected void computeUAna() {
     // Pull coefficients from upstream DCT (or any UAna with fvals)
     float[] X = null;
-    for (ChuckUGen src : sources) {
+    for (ChuckUGen src : getSources()) {
       if (src instanceof UAna u) {
         X = u.lastBlob.getFvals();
         break;

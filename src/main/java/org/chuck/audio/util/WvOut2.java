@@ -25,7 +25,7 @@ public class WvOut2 extends StereoUGen {
     // If we want real stereo recording of stereo sources, we should look at the sources.
 
     float left = 0, right = 0;
-    for (ChuckUGen src : sources) {
+    for (ChuckUGen src : getSources()) {
       // Sources are already ticked by StereoUGen.tick
       left += src.getChannelLastOut(0);
       right += src.getChannelLastOut(1);

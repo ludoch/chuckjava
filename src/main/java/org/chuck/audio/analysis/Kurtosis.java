@@ -30,7 +30,7 @@ public class Kurtosis extends UAna {
     float[] mags = null;
 
     // Get magnitude spectrum from upstream FFT/UAna
-    for (ChuckUGen src : sources) {
+    for (ChuckUGen src : getSources()) {
       if (src instanceof UAna u) {
         float[] fvals = u.getLastBlob().getFvals();
         if (fvals != null && fvals.length > 0) {

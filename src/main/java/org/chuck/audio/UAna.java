@@ -6,7 +6,7 @@ public abstract class UAna extends ChuckUGen {
 
   public UAnaBlob upchuck() {
     // Recursively trigger analysis on upstream UAnas
-    for (ChuckUGen src : sources) {
+    for (ChuckUGen src : getSources()) {
       if (src instanceof UAna u) {
         u.upchuck();
       }

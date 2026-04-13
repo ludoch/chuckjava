@@ -53,7 +53,7 @@ public class OnePole extends ChuckUGen {
     // 1. Sum inputs using SIMD
     float[] inputSum = new float[length];
     if (getNumSources() > 0) {
-      for (ChuckUGen src : sources) {
+      for (ChuckUGen src : getSources()) {
         float[] temp = new float[length];
         src.tick(temp, 0, length, systemTime);
 

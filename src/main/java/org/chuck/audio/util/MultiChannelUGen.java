@@ -58,7 +58,8 @@ public abstract class MultiChannelUGen extends ChuckUGen {
 
     try {
       float sum = 0.0f;
-      for (ChuckUGen src : sources) {
+      java.util.List<ChuckUGen> srcs = getSources();
+      for (ChuckUGen src : srcs) {
         sum += src.tick(systemTime);
       }
 
