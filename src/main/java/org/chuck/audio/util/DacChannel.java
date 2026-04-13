@@ -49,7 +49,15 @@ public class DacChannel extends ChuckUGen {
       java.util.List<ChuckUGen> srcs = getSources();
       for (ChuckUGen src : srcs) {
         src.tick(systemTime);
-        sum += src.getChannelLastOut(channelIndex);
+        // Pull the specific channel, but if src is mono, getChannelLastOut returns lastOut.
+        // If src is multi-channel and we are mono channel 0, we sum all channels to be safe.
+        if (src.getNumOutputs() > 1) {
+          for (int c = 0; c < src.getNumOutputs(); c++) {
+            sum += src.getChannelLastOut(c, systemTime);
+          }
+        } else {
+          sum += src.getChannelLastOut(channelIndex, systemTime);
+        }
       }
 
       lastOut = sum * gain;

@@ -41,8 +41,12 @@ public class JCRev extends StereoUGen {
     outRight.delay(157);
   }
 
-  public void setMix(float mix) {
+  public void mix(float mix) {
     this.mix = mix;
+  }
+
+  public float mix() {
+    return mix;
   }
 
   @Override
@@ -56,7 +60,7 @@ public class JCRev extends StereoUGen {
     for (int i = 0; i < 4; i++) {
       filtout += comb[i].tick(temp, systemTime);
     }
-    filtout *= 0.25f; // Normalise gain of parallel comb filters
+    filtout *= 0.5f; // Normalise gain of parallel comb filters (increased from 0.25)
 
     float dry = input;
     float wetL = outLeft.tick(filtout, systemTime);

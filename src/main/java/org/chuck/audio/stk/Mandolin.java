@@ -103,6 +103,7 @@ public class Mandolin extends ChuckUGen {
 
     // 3. Mix and store
     for (int i = 0; i < length; i++) {
+      // Average the strings for sane gain levels
       float out = (temp0[i] + temp1[i]) * 0.5f * gain;
       blockCache[i] = out;
       if (buffer != null) buffer[offset + i] = out;
@@ -126,11 +127,11 @@ public class Mandolin extends ChuckUGen {
     float out0 = strings[0].tick(pluckSignal, systemTime);
     float out1 = strings[1].tick(pluckSignal, systemTime);
 
-    // Update stereo cache
+    // Update stereo cache (without boost)
     this.lastL = out0 * gain;
     this.lastR = out1 * gain;
 
-    // Mixed mono out (multiplied by gain in parent tick)
+    // Mixed mono out (sane gain)
     return (out0 + out1) * 0.5f;
   }
 

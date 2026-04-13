@@ -16,6 +16,7 @@ public class WavetableRegistry {
       } else {
         table[i] = 0.0f;
       }
+      table[i] *= 2.0f; // Sane boost
     }
     return table;
   }
@@ -27,6 +28,7 @@ public class WavetableRegistry {
       table[i] = (float) (Math.random() * 2.0 - 1.0);
       // Linear decay
       table[i] *= (1.0f - (float) i / size);
+      table[i] *= 2.0f; // Sane boost
     }
     return table;
   }
