@@ -561,29 +561,7 @@ public class ChuckIDE extends Application {
     Tab ugenTab = new Tab("UGens", ugenBrowser);
     ugenTab.setClosable(false);
 
-    PreferencesTab prefsTabContent = new PreferencesTab(prefs);
-    prefsTabContent.setOnAudioRestart((sr, buf, out, in) -> restartAudioEngine(sr, buf, out, in));
-    prefsTabContent.setOnFFTSizeChanged(size -> analyzer.setSize(size));
-    prefsTabContent.setOnScopeWindowChanged(size -> scope.setWindowSize(size));
-    prefsTabContent.setOnEditorSettingsChanged(
-        () -> {
-          prefFontSize = prefs.getInt("editor.fontSize", 13);
-          prefTabWidth = prefs.getInt("editor.tabWidth", 4);
-          prefUseSpaces = prefs.getBoolean("editor.useSpaces", true);
-          prefSmartIndent = prefs.getBoolean("editor.smartIndent", true);
-
-          String fontStyle = "-fx-font-family: 'Monospaced'; -fx-font-size: " + prefFontSize + ";";
-          for (Tab t : tabPane.getTabs()) {
-            CodeArea ed = editorFromTab(t);
-            if (ed != null) ed.setStyle(fontStyle);
-          }
-        });
-    prefsTabContent.setOnColorsChanged(() -> applyInlineStyles(stage.getScene()));
-
-    Tab prefsTab = new Tab("Prefs", prefsTabContent);
-    prefsTab.setClosable(false);
-
-    leftTabPane.getTabs().addAll(projectTab, ugenTab, prefsTab);
+    leftTabPane.getTabs().addAll(projectTab, ugenTab);
 
     VBox leftPanel = new VBox(leftTabPane);
     VBox.setVgrow(leftTabPane, Priority.ALWAYS);
@@ -1767,6 +1745,13 @@ public class ChuckIDE extends Application {
             new SeparatorMenuItem(),
             selAllItem);
 
+    // Options
+    Menu optionsMenu = new Menu("_Options");
+    MenuItem prefsItem = new MenuItem("Preferences");
+    prefsItem.setAccelerator(new KeyCodeCombination(KeyCode.COMMA, KeyCombination.CONTROL_DOWN));
+    prefsItem.setOnAction(e -> showPreferencesDialog());
+    optionsMenu.getItems().add(prefsItem);
+
     // Examples
     Menu examplesMenu = new Menu("_Examples");
     loadExamples(examplesMenu);
@@ -1790,7 +1775,7 @@ public class ChuckIDE extends Application {
         });
     helpMenu.getItems().add(aboutItem);
 
-    mb.getMenus().addAll(fileMenu, editMenu, examplesMenu, helpMenu);
+    mb.getMenus().addAll(fileMenu, editMenu, optionsMenu, examplesMenu, helpMenu);
     return mb;
   }
 
@@ -2895,6 +2880,37 @@ public class ChuckIDE extends Application {
     }
 
     return symbols;
+  }
+
+  private void showPreferencesDialog() {
+    javafx.scene.control.Dialog<ButtonType> dialog = new javafx.scene.control.Dialog<>();
+    dialog.setTitle("Preferences");
+    dialog.setHeaderText(null);
+    dialog.getDialogPane().getButtonTypes().addAll(ButtonType.CLOSE);
+
+    PreferencesTab content = new PreferencesTab(prefs);
+    content.setOnAudioRestart((sr, buf, out, in) -> restartAudioEngine(sr, buf, out, in));
+    content.setOnFFTSizeChanged(size -> analyzer.setSize(size));
+    content.setOnScopeWindowChanged(size -> scope.setWindowSize(size));
+    content.setOnEditorSettingsChanged(
+        () -> {
+          prefFontSize = prefs.getInt("editor.fontSize", 13);
+          prefTabWidth = prefs.getInt("editor.tabWidth", 4);
+          prefUseSpaces = prefs.getBoolean("editor.useSpaces", true);
+          prefSmartIndent = prefs.getBoolean("editor.smartIndent", true);
+
+          String fontStyle = "-fx-font-family: 'Monospaced'; -fx-font-size: " + prefFontSize + ";";
+          for (Tab t : tabPane.getTabs()) {
+            CodeArea ed = editorFromTab(t);
+            if (ed != null) ed.setStyle(fontStyle);
+          }
+        });
+    content.setOnColorsChanged(() -> applyInlineStyles(stage.getScene()));
+
+    dialog.getDialogPane().setContent(content);
+    dialog.getDialogPane().setPrefWidth(450);
+    dialog.getDialogPane().setPrefHeight(500);
+    dialog.showAndWait();
   }
 
   // ── Word extraction helper ─────────────────────────────────────────────────
