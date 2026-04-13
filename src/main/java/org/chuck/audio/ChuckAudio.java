@@ -41,6 +41,7 @@ public class ChuckAudio {
       new java.util.concurrent.atomic.AtomicLong(0);
   private final java.util.concurrent.atomic.AtomicLong maxDriftNanos =
       new java.util.concurrent.atomic.AtomicLong(0);
+  private volatile double cpuLoad = 0.0;
 
   // Optional recorder
   private WvOut recorder;
@@ -283,6 +284,10 @@ public class ChuckAudio {
                   // Transfer from off-heap to byte array for JavaSound write
                   MemorySegment.copy(outSeg, ValueLayout.JAVA_BYTE, 0, outBuf, 0, bytesPerBuffer);
                   outputLine.write(outBuf, 0, outBuf.length);
+
+                  long endTime = System.nanoTime();
+                  long processingTime = endTime - startTime;
+                  cpuLoad = (double) processingTime / expectedBufferNanos;
                 }
               } catch (Throwable t) {
                 logger.log(Level.SEVERE, "CRITICAL: Audio Engine Thread Crashed!", t);
@@ -311,6 +316,10 @@ public class ChuckAudio {
   public double getAverageDriftMs() {
     long count = driftCount.get();
     return count == 0 ? 0.0 : (totalDriftNanos.get() / (double) count) / 1_000_000.0;
+  }
+
+  public double getCpuLoad() {
+    return cpuLoad;
   }
 
   public double getMaxDriftMs() {

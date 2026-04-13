@@ -285,6 +285,20 @@ public class ChuckVM {
     return globalFunctionDocs.keySet();
   }
 
+  public Set<String> getGlobalIntKeys() {
+    return globalIsInt.entrySet().stream()
+        .filter(java.util.Map.Entry::getValue)
+        .map(java.util.Map.Entry::getKey)
+        .collect(java.util.stream.Collectors.toSet());
+  }
+
+  public Set<String> getGlobalFloatKeys() {
+    return globalIsDouble.entrySet().stream()
+        .filter(java.util.Map.Entry::getValue)
+        .map(java.util.Map.Entry::getKey)
+        .collect(java.util.stream.Collectors.toSet());
+  }
+
   public Map<String, UserClassDescriptor> getUserClassRegistry() {
     return userClassRegistry;
   }

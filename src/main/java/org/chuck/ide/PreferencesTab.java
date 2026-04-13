@@ -31,6 +31,7 @@ public class PreferencesTab extends ScrollPane {
   private java.util.function.Consumer<Integer> onScopeWindowChanged;
 
   // Theme Callbacks
+  private java.util.function.Consumer<String> onThemeChanged;
   private Runnable onColorsChanged;
 
   public PreferencesTab(Preferences prefs) {
@@ -223,38 +224,55 @@ public class PreferencesTab extends ScrollPane {
     grid.setVgap(8);
     grid.setPadding(new Insets(10));
 
-    grid.add(new Label("Doc Comments:"), 0, 0);
-    grid.add(createColorPicker("color.doc", "#6a9955"), 1, 0);
+    ChoiceBox<String> themeBox =
+        new ChoiceBox<>(
+            FXCollections.observableArrayList(
+                "Default Light", "Dark (VS Code)", "Classic ChucK", "Monokai"));
+    themeBox.setValue(prefs.get("color.theme", "Default Light"));
+    themeBox
+        .getSelectionModel()
+        .selectedItemProperty()
+        .addListener(
+            (obs, oldV, newV) -> {
+              prefs.put("color.theme", newV);
+              if (onThemeChanged != null) onThemeChanged.accept(newV);
+            });
 
-    grid.add(new Label("Comments:"), 0, 1);
-    grid.add(createColorPicker("color.comment", "#6a9955"), 1, 1);
+    grid.add(new Label("Theme Preset:"), 0, 0);
+    grid.add(themeBox, 1, 0);
 
-    grid.add(new Label("Annotations:"), 0, 2);
-    grid.add(createColorPicker("color.annotation", "#c792ea"), 1, 2);
+    grid.add(new Label("Doc Comments:"), 0, 1);
+    grid.add(createColorPicker("color.doc", "#6a9955"), 1, 1);
 
-    grid.add(new Label("Keywords:"), 0, 3);
-    grid.add(createColorPicker("color.keyword", "#c586c0"), 1, 3);
+    grid.add(new Label("Comments:"), 0, 2);
+    grid.add(createColorPicker("color.comment", "#6a9955"), 1, 2);
 
-    grid.add(new Label("Types (UGens):"), 0, 4);
-    grid.add(createColorPicker("color.type", "#4ec9b0"), 1, 4);
+    grid.add(new Label("Annotations:"), 0, 3);
+    grid.add(createColorPicker("color.annotation", "#c792ea"), 1, 3);
 
-    grid.add(new Label("Built-ins:"), 0, 5);
-    grid.add(createColorPicker("color.builtin", "#9cdcfe"), 1, 5);
+    grid.add(new Label("Keywords:"), 0, 4);
+    grid.add(createColorPicker("color.keyword", "#c586c0"), 1, 4);
 
-    grid.add(new Label("Literals:"), 0, 6);
-    grid.add(createColorPicker("color.boolean", "#569cd6"), 1, 6);
+    grid.add(new Label("Types (UGens):"), 0, 5);
+    grid.add(createColorPicker("color.type", "#4ec9b0"), 1, 5);
 
-    grid.add(new Label("Strings:"), 0, 7);
-    grid.add(createColorPicker("color.string", "#ce9178"), 1, 7);
+    grid.add(new Label("Built-ins:"), 0, 6);
+    grid.add(createColorPicker("color.builtin", "#9cdcfe"), 1, 6);
 
-    grid.add(new Label("Numbers:"), 0, 8);
-    grid.add(createColorPicker("color.number", "#b5cea8"), 1, 8);
+    grid.add(new Label("Literals:"), 0, 7);
+    grid.add(createColorPicker("color.boolean", "#569cd6"), 1, 7);
 
-    grid.add(new Label("Operators:"), 0, 9);
-    grid.add(createColorPicker("color.chuckop", "#d4d4d4"), 1, 9);
+    grid.add(new Label("Strings:"), 0, 8);
+    grid.add(createColorPicker("color.string", "#ce9178"), 1, 8);
 
-    grid.add(new Label("Editor Background:"), 0, 10);
-    grid.add(createColorPicker("color.background", "#FFFFFF"), 1, 10);
+    grid.add(new Label("Numbers:"), 0, 9);
+    grid.add(createColorPicker("color.number", "#b5cea8"), 1, 9);
+
+    grid.add(new Label("Operators:"), 0, 10);
+    grid.add(createColorPicker("color.chuckop", "#d4d4d4"), 1, 10);
+
+    grid.add(new Label("Editor Background:"), 0, 11);
+    grid.add(createColorPicker("color.background", "#FFFFFF"), 1, 11);
 
     TitledPane pane = new TitledPane("Syntax Colors", grid);
     pane.setCollapsible(false);
@@ -296,5 +314,9 @@ public class PreferencesTab extends ScrollPane {
 
   public void setOnColorsChanged(Runnable handler) {
     this.onColorsChanged = handler;
+  }
+
+  public void setOnThemeChanged(java.util.function.Consumer<String> handler) {
+    this.onThemeChanged = handler;
   }
 }

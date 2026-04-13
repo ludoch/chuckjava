@@ -394,7 +394,13 @@ public class ChuckIDE extends Application {
   private record UserSymbol(String name, String type, String signature) {}
 
   private ListView<ShredInfo> shredListView;
+  private ControlSurface controlSurface;
   private Label statusLabel;
+
+  private Label lineColLabel;
+  private Label cpuLabel;
+  private Label sampleRateLabel;
+  private Label fileNameLabel;
   private TreeView<File> fileBrowser;
   private Stage stage;
 
@@ -525,6 +531,21 @@ public class ChuckIDE extends Application {
 
     // ── Tabbed editor ──
     tabPane = new TabPane();
+    tabPane
+        .getSelectionModel()
+        .selectedItemProperty()
+        .addListener(
+            (obs, oldTab, newTab) -> {
+              if (newTab != null) {
+                fileNameLabel.setText(newTab.getText().replaceFirst("^\\* ?", ""));
+                CodeArea ed = editorFromTab(newTab);
+                if (ed != null) {
+                  int line = ed.getCurrentParagraph() + 1;
+                  int col = ed.getCaretColumn() + 1;
+                  lineColLabel.setText("Ln " + line + ", Col " + col);
+                }
+              }
+            });
 
     boolean loadedAny = false;
     for (String arg : rawArgs) {
@@ -563,7 +584,12 @@ public class ChuckIDE extends Application {
     Tab ugenTab = new Tab("UGens", ugenBrowser);
     ugenTab.setClosable(false);
 
-    leftTabPane.getTabs().addAll(projectTab, ugenTab);
+    controlSurface = new ControlSurface();
+    controlSurface.setVm(vm);
+    Tab controlTab = new Tab("Control", controlSurface);
+    controlTab.setClosable(false);
+
+    leftTabPane.getTabs().addAll(projectTab, ugenTab, controlTab);
 
     VBox leftPanel = new VBox(leftTabPane);
     VBox.setVgrow(leftTabPane, Priority.ALWAYS);
@@ -741,7 +767,32 @@ public class ChuckIDE extends Application {
     clearConsoleBtn.setOnAction(e -> clearConsole());
 
     statusLabel = new Label("  Ready");
-    HBox statusBar = new HBox(5, clearConsoleBtn, new Separator(Orientation.VERTICAL), statusLabel);
+    lineColLabel = new Label("Ln 1, Col 1");
+    cpuLabel = new Label("CPU: 0.0%");
+    sampleRateLabel = new Label(prefSampleRate + " Hz");
+    fileNameLabel = new Label("Untitled.ck");
+
+    for (Label l : List.of(statusLabel, lineColLabel, cpuLabel, sampleRateLabel, fileNameLabel)) {
+      l.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 11;");
+    }
+
+    Region statusSpacer = new Region();
+    HBox.setHgrow(statusSpacer, Priority.ALWAYS);
+
+    HBox statusBar =
+        new HBox(
+            5,
+            clearConsoleBtn,
+            new Separator(Orientation.VERTICAL),
+            statusLabel,
+            statusSpacer,
+            fileNameLabel,
+            new Separator(Orientation.VERTICAL),
+            lineColLabel,
+            new Separator(Orientation.VERTICAL),
+            sampleRateLabel,
+            new Separator(Orientation.VERTICAL),
+            cpuLabel);
     statusBar.setStyle("-fx-background-color: #ddd; -fx-padding: 2;");
     VBox bottomPanel = new VBox(outputArea, statusBar);
 
@@ -906,6 +957,19 @@ public class ChuckIDE extends Application {
         .successionEnds(Duration.ofMillis(50))
         .subscribe(ignore -> editor.setStyleSpans(0, computeHighlighting(editor.getText())));
     editor.setStyleSpans(0, computeHighlighting(editor.getText()));
+
+    // Status bar updates: caret position
+    editor
+        .caretPositionProperty()
+        .addListener(
+            (obs, oldPos, newPos) -> {
+              if (tabPane.getSelectionModel().getSelectedItem() != null
+                  && editorFromTab(tabPane.getSelectionModel().getSelectedItem()) == editor) {
+                int line = editor.getCurrentParagraph() + 1;
+                int col = editor.getCaretColumn() + 1;
+                lineColLabel.setText("Ln " + line + ", Col " + col);
+              }
+            });
 
     // Code Completion Trigger — manual (Ctrl+Space) and auto (. and ::)
     editor.addEventHandler(
@@ -2209,8 +2273,10 @@ public class ChuckIDE extends Application {
             renderPhaseScope();
             updateVMTime();
             updateShredList();
+            updateCpuLoad();
           }
         };
+
     visTimer.start();
   }
 
@@ -2228,6 +2294,11 @@ public class ChuckIDE extends Application {
       updateStatus();
     }
     // Removed shredListView.refresh() to keep buttons responsive
+  }
+
+  private void updateCpuLoad() {
+    double load = audio.getCpuLoad() * 100.0;
+    cpuLabel.setText(String.format("CPU: %.1f%%", load));
   }
 
   // ── Stall / lockdown ───────────────────────────────────────────────────────
@@ -2638,6 +2709,9 @@ public class ChuckIDE extends Application {
     // 4. Re-create VM and Audio
     vm = new ChuckVM(prefSampleRate);
     vm.addPrintListener(this::print);
+    if (controlSurface != null) {
+      controlSurface.setVm(vm);
+    }
 
     audio = new ChuckAudio(vm, prefBufferSize, 2, prefSampleRate);
     audio.setOutputDeviceName(prefOutputDevice);
@@ -2975,11 +3049,73 @@ public class ChuckIDE extends Application {
           }
         });
     content.setOnColorsChanged(() -> applyInlineStyles(stage.getScene()));
+    content.setOnThemeChanged(this::applyTheme);
 
     dialog.getDialogPane().setContent(content);
     dialog.getDialogPane().setPrefWidth(450);
     dialog.getDialogPane().setPrefHeight(500);
     dialog.showAndWait();
+  }
+
+  private void applyTheme(String themeName) {
+    Map<String, String> colors = new java.util.HashMap<>();
+    switch (themeName) {
+      case "Default Light" -> {
+        colors.put("color.background", "#FFFFFF");
+        colors.put("color.doc", "#008000");
+        colors.put("color.comment", "#008000");
+        colors.put("color.annotation", "#800080");
+        colors.put("color.keyword", "#0000FF");
+        colors.put("color.type", "#2B91AF");
+        colors.put("color.builtin", "#000080");
+        colors.put("color.boolean", "#A52A2A");
+        colors.put("color.string", "#A31515");
+        colors.put("color.number", "#098658");
+        colors.put("color.chuckop", "#000000");
+      }
+      case "Dark (VS Code)" -> {
+        colors.put("color.background", "#1E1E1E");
+        colors.put("color.doc", "#6A9955");
+        colors.put("color.comment", "#6A9955");
+        colors.put("color.annotation", "#C792EA");
+        colors.put("color.keyword", "#C586C0");
+        colors.put("color.type", "#4EC9B0");
+        colors.put("color.builtin", "#9CDCFE");
+        colors.put("color.boolean", "#569CD6");
+        colors.put("color.string", "#CE9178");
+        colors.put("color.number", "#B5CEA8");
+        colors.put("color.chuckop", "#D4D4D4");
+      }
+      case "Classic ChucK" -> {
+        colors.put("color.background", "#F0F0F0");
+        colors.put("color.doc", "#008800");
+        colors.put("color.comment", "#008800");
+        colors.put("color.annotation", "#0000FF");
+        colors.put("color.keyword", "#0000FF");
+        colors.put("color.type", "#880000");
+        colors.put("color.builtin", "#000088");
+        colors.put("color.boolean", "#000000");
+        colors.put("color.string", "#884400");
+        colors.put("color.number", "#000000");
+        colors.put("color.chuckop", "#000000");
+      }
+      case "Monokai" -> {
+        colors.put("color.background", "#272822");
+        colors.put("color.doc", "#75715E");
+        colors.put("color.comment", "#75715E");
+        colors.put("color.annotation", "#A6E22E");
+        colors.put("color.keyword", "#F92672");
+        colors.put("color.type", "#66D9EF");
+        colors.put("color.builtin", "#AE81FF");
+        colors.put("color.boolean", "#AE81FF");
+        colors.put("color.string", "#E6DB74");
+        colors.put("color.number", "#AE81FF");
+        colors.put("color.chuckop", "#F8F8F2");
+      }
+    }
+
+    colors.forEach(prefs::put);
+    applyInlineStyles(stage.getScene());
   }
 
   // ── Word extraction helper ─────────────────────────────────────────────────
