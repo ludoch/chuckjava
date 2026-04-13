@@ -121,7 +121,7 @@ public class UGenBrowser extends VBox {
   }
 
   private String categorize(String name) {
-    if (containsAny(name, "Osc", "Phasor", "Blit", "Noise", "Impulse", "Step"))
+    if (containsAny(name, "Osc", "Phasor", "Blit", "Wavetable", "Noise", "Impulse", "Step"))
       return "Oscillators";
     if (containsAny(name, "Filter", "LPF", "HPF", "BPF", "BRF", "ResonZ", "Pole", "Zero", "BiQuad"))
       return "Filters";

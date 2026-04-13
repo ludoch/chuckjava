@@ -10,8 +10,8 @@ import org.chuck.audio.util.ReedTable;
 import org.chuck.core.doc;
 
 /**
- * Clarinet: A multi-mode clarinet physical model.
- * Based on the Synthesis ToolKit (STK) C++ implementation.
+ * Clarinet: A multi-mode clarinet physical model. Based on the Synthesis ToolKit (STK) C++
+ * implementation.
  */
 @doc("Clarinet physical model based on STK. Ported to Java 25.")
 public class Clarinet extends ChuckUGen {
@@ -34,8 +34,8 @@ public class Clarinet extends ChuckUGen {
     this.delayLine = new DelayL(length);
     this.reedTable = new ReedTable();
     this.reedTable.setOffset(0.7f); // STK default
-    this.reedTable.setSlope(-0.3f);  // STK default
-    
+    this.reedTable.setSlope(-0.3f); // STK default
+
     this.filter = new OneZero();
     this.envelope = new Envelope(sampleRate);
     this.noise = new Noise();
@@ -75,7 +75,7 @@ public class Clarinet extends ChuckUGen {
   protected float compute(float input, long systemTime) {
     envelope.tick(systemTime);
     float breathPressure = envelope.getValue();
-    
+
     // Add noise and vibrato to breath
     breathPressure += breathPressure * noiseGain * noise.tick(systemTime);
     breathPressure += breathPressure * vibratoGain * vibrato.tick(systemTime);
@@ -87,8 +87,9 @@ public class Clarinet extends ChuckUGen {
     float pressureDiff = filteredBore - breathPressure;
 
     // Use reed table to calculate new bore input
-    float out = delayLine.tick(breathPressure + pressureDiff * reedTable.tick(pressureDiff), systemTime);
-    
+    float out =
+        delayLine.tick(breathPressure + pressureDiff * reedTable.tick(pressureDiff), systemTime);
+
     lastOut = out * outputGain;
     return lastOut;
   }

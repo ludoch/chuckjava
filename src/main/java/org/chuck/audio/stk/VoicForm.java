@@ -2,16 +2,19 @@ package org.chuck.audio.stk;
 
 import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.filter.BPF;
+import org.chuck.audio.filter.OnePole;
+import org.chuck.audio.osc.Noise;
 import org.chuck.audio.osc.SinOsc;
 import org.chuck.audio.util.Adsr;
+import org.chuck.audio.util.Wavetable;
+import org.chuck.audio.util.WavetableRegistry;
+import org.chuck.core.doc;
 
 /**
- * VoicForm — 4-formant singing voice synthesizer. A buzz (pulsed glottal wave) drives 4 bandpass
- * resonators tuned to formant frequencies that define the vowel quality.
- *
- * <p>Formant presets (phoneme index via phoneme()): 0="eee", 1="ihh", 2="ehh", 3="aaa", 4="ahh",
- * 5="aww", 6="ohh", 7="uhh"
+ * VoicForm — 4-formant singing voice synthesizer. Based on STK VoicForm class. Uses a glottal pulse
+ * excitation (wavetable) driving 4 bandpass resonators.
  */
+@doc("Singing voice physical model using glottal pulse wavetable and formant filters.")
 public class VoicForm extends ChuckUGen {
   // 4 formant frequencies (Hz) per vowel: [F1, F2, F3, F4]
   private static final double[][] FORMANTS = {
@@ -25,20 +28,27 @@ public class VoicForm extends ChuckUGen {
     {490, 1350, 1690, 3500}, // uhh
   };
   private static final double[][] FORMANT_GAINS = {
-    {0.9, 0.5, 0.3, 0.1},
-    {0.9, 0.5, 0.3, 0.1},
-    {0.9, 0.5, 0.3, 0.1},
-    {0.9, 0.6, 0.3, 0.1},
-    {0.9, 0.6, 0.3, 0.1},
-    {0.9, 0.5, 0.3, 0.1},
-    {0.9, 0.5, 0.3, 0.1},
-    {0.9, 0.5, 0.2, 0.1},
+    {1.0, 0.5, 0.2, 0.1},
+    {1.0, 0.5, 0.2, 0.1},
+    {1.0, 0.5, 0.2, 0.1},
+    {1.0, 0.6, 0.2, 0.1},
+    {1.0, 0.6, 0.2, 0.1},
+    {1.0, 0.5, 0.2, 0.1},
+    {1.0, 0.5, 0.2, 0.1},
+    {1.0, 0.5, 0.2, 0.1},
   };
 
   private final BPF[] filters = new BPF[4];
+  private final OnePole tiltFilter;
   private final Adsr env;
-  private final SinOsc buzz;
+  private final Wavetable glottis;
+  private final Noise breath;
+  private final SinOsc vibrato;
+
   private double freq = 220.0;
+  private float voicedMix = 1.0f;
+  private float unvoicedMix = 0.1f;
+  private float vibratoDepth = 0.05f;
   private int phonemeIdx = 0;
   private final float sampleRate;
 
@@ -46,25 +56,52 @@ public class VoicForm extends ChuckUGen {
     this.sampleRate = sr;
     for (int i = 0; i < 4; i++) {
       filters[i] = new BPF(sr);
-      filters[i].Q(20.0); // narrow resonance
+      filters[i].Q(20.0);
     }
-    buzz = new SinOsc(sr);
+
+    tiltFilter = new OnePole(sr);
+    tiltFilter.setPole(0.9f);
+
+    glottis = new Wavetable();
+    glottis.setTable(WavetableRegistry.getGlottalPulse());
+    glottis.loop(1);
+
+    breath = new Noise();
+    vibrato = new SinOsc(sr);
+    vibrato.setFreq(6.0);
+
     env = new Adsr(sr);
     env.set(0.05f, 0.02f, 0.9f, 0.1f);
+
     setFreq(220.0);
     phoneme(0);
   }
 
-  public void setFreq(double f) {
+  @doc("Set the fundamental frequency (pitch) of the voice.")
+  public void freq(double f) {
     freq = f;
-    buzz.setFreq(f);
+    glottis.rate(f * 256.0 / sampleRate);
   }
 
-  /** Set vowel by index 0–7. */
+  public void setFreq(double f) {
+    freq(f);
+  }
+
+  @doc("Set vowel by index (0-7). 0:eee, 4:ahh, 6:ohh.")
   public void phoneme(int idx) {
     phonemeIdx = Math.max(0, Math.min(7, idx));
     double[] ff = FORMANTS[phonemeIdx];
     for (int i = 0; i < 4; i++) filters[i].freq(ff[i]);
+  }
+
+  @doc("Set the amount of voiced (vocal cord) signal.")
+  public void voiced(float v) {
+    this.voicedMix = v;
+  }
+
+  @doc("Set the amount of unvoiced (breath) signal.")
+  public void unvoiced(float v) {
+    this.unvoicedMix = v;
   }
 
   public void noteOn(float v) {
@@ -78,15 +115,27 @@ public class VoicForm extends ChuckUGen {
   @Override
   protected float compute(float input, long t) {
     float e = env.tick(t);
-    // Glottal excitation: buzz signal (simplified pulsed source)
-    float src = buzz.tick(t) * e;
-    double[] gains = FORMANT_GAINS[phonemeIdx];
+
+    // Vibrato
+    float vib = (float) (1.0 + vibrato.tick(t) * vibratoDepth);
+    glottis.rate(freq * vib * 256.0 / sampleRate);
+
+    // Excitation = Voiced + Unvoiced
+    float voicedPart = glottis.tick(t) * voicedMix;
+    float unvoicedPart = breath.tick(t) * unvoicedMix;
+    float src = (voicedPart + unvoicedPart) * e;
+
+    // Spectral tilt (dynamic lowpass)
+    tiltFilter.setPole(0.97f - (e * 0.2f));
+    src = tiltFilter.tick(src, t);
+
     float out = 0;
+    double[] gains = FORMANT_GAINS[phonemeIdx];
     for (int i = 0; i < 4; i++) {
       out += filters[i].tick(src, t) * (float) gains[i];
     }
-    out *= gain;
-    lastOut = out;
-    return out;
+
+    lastOut = out * gain;
+    return lastOut;
   }
 }

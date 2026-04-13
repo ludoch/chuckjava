@@ -17,6 +17,10 @@ public class Envelope extends ChuckUGen {
     this.target = target;
   }
 
+  public void setRate(float rate) {
+    this.rate = rate;
+  }
+
   public void setTime(float seconds) {
     if (seconds <= 0) {
       this.rate = 1.0f;
