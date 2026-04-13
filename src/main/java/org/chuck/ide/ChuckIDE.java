@@ -1779,6 +1779,11 @@ public class ChuckIDE extends Application {
         });
     helpMenu.getItems().add(aboutItem);
 
+    MenuItem githubItem = new MenuItem("GitHub Repository");
+    githubItem.setOnAction(
+        e -> getHostServices().showDocument("https://github.com/ludoch/chuckjava"));
+    helpMenu.getItems().add(githubItem);
+
     mb.getMenus().addAll(fileMenu, editMenu, optionsMenu, examplesMenu, helpMenu);
     return mb;
   }
