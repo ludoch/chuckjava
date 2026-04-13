@@ -2,6 +2,7 @@ package org.chuck.audio.util;
 
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -9,15 +10,16 @@ import org.chuck.audio.ChuckUGen;
 import org.chuck.core.doc;
 
 /**
- * Broadcaster: Real-time HTTP Audio Streamer. Exposes a live WAV/PCM stream at
- * http://localhost:PORT/stream.wav
+ * Broadcaster: Real-time HTTP Audio Streamer. Exposes a live WAV/PCM or MP3 stream at
+ * http://localhost:PORT/stream
  */
-@doc("Broadcasts audio over the network via HTTP.")
+@doc("Broadcasts audio over the network via HTTP. Supports raw WAV or compressed MP3.")
 public class Broadcaster extends ChuckUGen implements AutoCloseable {
   private HttpServer server;
   private final ConcurrentLinkedQueue<byte[]> audioQueue = new ConcurrentLinkedQueue<>();
   private final int port;
   private boolean active = false;
+  private String format = "wav";
 
   private final byte[] pcmBuffer;
   private int pcmIdx = 0;
@@ -33,35 +35,109 @@ public class Broadcaster extends ChuckUGen implements AutoCloseable {
     this.numInputs = 2;
   }
 
+  @doc("Set the output format ('wav' or 'mp3'). Requires ffmpeg installed for MP3.")
+  public String format(String f) {
+    this.format = f.toLowerCase();
+    return this.format;
+  }
+
+  @doc("Get the current output format.")
+  public String format() {
+    return format;
+  }
+
   public void start() throws IOException {
     if (active) return;
     server = HttpServer.create(new InetSocketAddress(port), 0);
+
     server.createContext(
-        "/stream.wav",
+        "/stream",
         exchange -> {
-          exchange.getResponseHeaders().add("Content-Type", "audio/x-wav");
+          boolean isMp3 = format.equals("mp3");
+          exchange.getResponseHeaders().add("Content-Type", isMp3 ? "audio/mpeg" : "audio/x-wav");
           exchange.sendResponseHeaders(200, 0); // Chunked transfer encoding
 
           try (OutputStream os = exchange.getResponseBody()) {
-            // Simple infinite WAV-like stream (skipping header for raw PCM simplicity in some
-            // players,
-            // or add a dummy long header)
-            while (active) {
-              byte[] chunk = audioQueue.poll();
-              if (chunk != null) {
-                os.write(chunk);
-                os.flush();
-              } else {
-                Thread.sleep(10);
+            if (isMp3) {
+              // Pipe through ffmpeg
+              ProcessBuilder pb =
+                  new ProcessBuilder(
+                      "ffmpeg",
+                      "-hide_banner",
+                      "-loglevel",
+                      "error",
+                      "-f",
+                      "s16le",
+                      "-ar",
+                      "44100",
+                      "-ac",
+                      "2",
+                      "-i",
+                      "pipe:0",
+                      "-f",
+                      "mp3",
+                      "-b:a",
+                      "192k",
+                      "pipe:1");
+              Process p = pb.start();
+
+              // Thread to feed ffmpeg
+              Thread writerThread =
+                  new Thread(
+                      () -> {
+                        try (OutputStream ffmpegIn = p.getOutputStream()) {
+                          while (active) {
+                            byte[] chunk = audioQueue.poll();
+                            if (chunk != null) {
+                              ffmpegIn.write(chunk);
+                              ffmpegIn.flush();
+                            } else {
+                              Thread.sleep(10);
+                            }
+                          }
+                        } catch (Exception ignored) {
+                        }
+                      });
+              writerThread.setDaemon(true);
+              writerThread.start();
+
+              // Read from ffmpeg and send to HTTP client
+              try (InputStream ffmpegOut = p.getInputStream()) {
+                byte[] buf = new byte[4096];
+                int read;
+                while (active && (read = ffmpegOut.read(buf)) != -1) {
+                  os.write(buf, 0, read);
+                  os.flush();
+                }
+              } catch (Exception ignored) {
+              }
+              p.destroy();
+
+            } else {
+              // Raw WAV/PCM stream
+              while (active) {
+                byte[] chunk = audioQueue.poll();
+                if (chunk != null) {
+                  os.write(chunk);
+                  os.flush();
+                } else {
+                  Thread.sleep(10);
+                }
               }
             }
           } catch (Exception ignored) {
           }
         });
+
     server.setExecutor(null);
     server.start();
     active = true;
-    System.out.println("[Broadcaster] Started stream at http://localhost:" + port + "/stream.wav");
+    System.out.println(
+        "[Broadcaster] Started "
+            + format.toUpperCase()
+            + " stream at http://localhost:"
+            + port
+            + "/stream");
   }
 
   @Override
