@@ -39,17 +39,12 @@ public class PulseOsc extends Osc {
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
     if (systemTime != -1
-        && systemTime == lastTickTime
+        && systemTime == blockStartTime
         && blockCache != null
-        && blockCache.length >= length) {
+        && blockLength >= length) {
       if (buffer != null) {
         System.arraycopy(blockCache, 0, buffer, offset, length);
       }
-      return;
-    }
-
-    if (getNumSources() > 0) {
-      super.tick(buffer, offset, length, systemTime);
       return;
     }
 
@@ -57,57 +52,59 @@ public class PulseOsc extends Osc {
       blockCache = new float[length];
     }
 
-    float f_freq = (float) freq;
-    float f_phase = (float) phase;
-    float f_inc = f_freq / sampleRate;
-    float f_width = (float) width;
-
     int i = 0;
-    int bound = SPECIES.loopBound(length);
-    FloatVector vOffsets = FloatVector.fromArray(SPECIES, OFFSETS, 0);
-    FloatVector vInc = FloatVector.broadcast(SPECIES, f_inc);
-    FloatVector vWidth = FloatVector.broadcast(SPECIES, f_width);
-    FloatVector vOne = FloatVector.broadcast(SPECIES, 1.0f);
-    FloatVector vMinusOne = FloatVector.broadcast(SPECIES, -1.0f);
+    if (getNumSources() == 0) {
+      float f_freq = (float) freq;
+      float f_phase = (float) phase;
+      float f_inc = f_freq / sampleRate;
+      float f_width = (float) width;
 
-    for (; i < bound; i += SPECIES.length()) {
-      // Raw phase
-      FloatVector vPRaw = vOffsets.mul(vInc).add(f_phase);
+      int bound = SPECIES.loopBound(length);
+      FloatVector vOffsets = FloatVector.fromArray(SPECIES, OFFSETS, 0);
+      FloatVector vInc = FloatVector.broadcast(SPECIES, f_inc);
+      FloatVector vWidth = FloatVector.broadcast(SPECIES, f_width);
+      FloatVector vOne = FloatVector.broadcast(SPECIES, 1.0f);
+      FloatVector vMinusOne = FloatVector.broadcast(SPECIES, -1.0f);
 
-      // p % 1.0
-      var intSpecies = jdk.incubator.vector.VectorSpecies.of(int.class, SPECIES.vectorShape());
-      var vIntP = vPRaw.castShape(intSpecies, 0);
-      var vFloorP = vIntP.castShape(SPECIES, 0);
-      FloatVector vP = vPRaw.sub(vFloorP);
+      for (; i < bound; i += SPECIES.length()) {
+        // Raw phase
+        FloatVector vPRaw = vOffsets.add(1.0f).mul(vInc).add(f_phase);
 
-      VectorMask<Float> mask = vP.compare(jdk.incubator.vector.VectorOperators.LT, vWidth);
+        // p % 1.0
+        var intSpecies = jdk.incubator.vector.VectorSpecies.of(int.class, SPECIES.vectorShape());
+        var vIntP = vPRaw.castShape(intSpecies, 0);
+        var vFloorP = vIntP.castShape(SPECIES, 0);
+        FloatVector vP = vPRaw.sub(vFloorP);
 
-      // Naive pulse (SIMD)
-      FloatVector vOut = vMinusOne.blend(vOne, mask);
+        VectorMask<Float> mask = vP.compare(jdk.incubator.vector.VectorOperators.LT, vWidth);
 
-      // Rising edge at phase 0
-      vOut = vOut.add(vPolyBlep(vP, vInc));
+        // Naive pulse (SIMD)
+        FloatVector vOut = vMinusOne.blend(vOne, mask);
 
-      // Falling edge at phase width
-      FloatVector vP2 = vP.sub(vWidth);
-      // Wrap vP2 to [0, 1]
-      VectorMask<Float> maskNeg = vP2.compare(jdk.incubator.vector.VectorOperators.LT, 0.0f);
-      vP2 = vP2.add(vOne.blend(FloatVector.zero(SPECIES), maskNeg));
+        // Rising edge at phase 0
+        vOut = vOut.add(vPolyBlep(vP, vInc));
 
-      vOut = vOut.sub(vPolyBlep(vP2, vInc));
+        // Falling edge at phase width
+        FloatVector vP2 = vP.sub(vWidth);
+        // Wrap vP2 to [0, 1]
+        VectorMask<Float> maskNeg = vP2.compare(jdk.incubator.vector.VectorOperators.LT, 0.0f);
+        vP2 = vP2.add(vOne.blend(FloatVector.zero(SPECIES), maskNeg));
 
-      FloatVector vGainOut = vOut.mul(gain);
-      vGainOut.intoArray(blockCache, i);
-      if (buffer != null) {
-        vGainOut.intoArray(buffer, offset + i);
+        vOut = vOut.sub(vPolyBlep(vP2, vInc));
+
+        FloatVector vGainOut = vOut.mul(gain);
+        vGainOut.intoArray(blockCache, i);
+        if (buffer != null) {
+          vGainOut.intoArray(buffer, offset + i);
+        }
+
+        f_phase = (f_phase + f_inc * SPECIES.length()) % 1.0f;
+        if (f_phase < 0) f_phase += 1.0f;
       }
-
-      f_phase = (f_phase + f_inc * SPECIES.length()) % 1.0f;
-      if (f_phase < 0) f_phase += 1.0f;
+      this.phase = f_phase;
     }
 
-    // Scalar fallback for remainder
-    this.phase = f_phase;
+    // Scalar fallback for remainder or if we have sources
     for (; i < length; i++) {
       float t = tick(systemTime == -1 ? -1 : systemTime + i);
       blockCache[i] = t;
@@ -116,7 +113,9 @@ public class PulseOsc extends Osc {
       }
     }
 
-    lastTickTime = systemTime;
+    blockStartTime = systemTime;
+    blockLength = length;
+    lastTickTime = systemTime + length - 1;
     if (length > 0) {
       lastOut = blockCache[length - 1];
     }

@@ -6,6 +6,12 @@ import org.chuck.audio.ChuckUGen;
 public class Step extends ChuckUGen {
   private float nextValue = 1.0f;
 
+  public Step() {}
+
+  public Step(float initial) {
+    this.nextValue = initial;
+  }
+
   public void setNext(float val) {
     this.nextValue = val;
   }

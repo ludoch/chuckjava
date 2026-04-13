@@ -26,20 +26,44 @@ public class DacChannel extends ChuckUGen {
 
   @Override
   public float tick(long systemTime) {
-    float sum = 0.0f;
-    for (ChuckUGen src : sources) {
-      src.tick(systemTime);
-      sum += src.getChannelLastOut(channelIndex);
+    if (systemTime != -1 && systemTime == lastTickTime) {
+      return lastOut;
     }
 
-    lastOut = sum * gain;
-    lastTickTime = systemTime;
+    // Check if this sample is already in our block cache
+    if (systemTime != -1
+        && blockLength > 0
+        && systemTime >= blockStartTime
+        && systemTime < blockStartTime + blockLength) {
+      int idx = (int) (systemTime - blockStartTime);
+      lastOut = blockCache[idx];
+      lastTickTime = systemTime;
+      return lastOut;
+    }
 
-    // Fill visualization buffer
-    visBuffer[visWriteIdx] = lastOut;
-    visWriteIdx = (visWriteIdx + 1) % visBuffer.length;
+    if (isTicking) return lastOut;
+    isTicking = true;
 
-    return lastOut;
+    try {
+      float sum = 0.0f;
+      for (ChuckUGen src : sources) {
+        src.tick(systemTime);
+        sum += src.getChannelLastOut(channelIndex);
+      }
+
+      lastOut = sum * gain;
+      lastTickTime = systemTime;
+      blockStartTime = systemTime;
+      blockLength = 0; // Scalar tick resets block window
+
+      // Fill visualization buffer
+      visBuffer[visWriteIdx] = lastOut;
+      visWriteIdx = (visWriteIdx + 1) % visBuffer.length;
+
+      return lastOut;
+    } finally {
+      isTicking = false;
+    }
   }
 
   public void tick(
@@ -75,7 +99,6 @@ public class DacChannel extends ChuckUGen {
       visWriteIdx = (visWriteIdx + 1) % visBuffer.length;
 
       // Write interleaved
-      // Total offset: (bufferIndex + i) * numChannels * 2 + (channelIndex * 2)
       // Assuming 2 channels for now as per ChuckAudio hardcoding
       long offset = (long) ((bufferIndex + i) * 2 + channelIndex) * 2;
       outSeg.set(
@@ -105,22 +128,23 @@ public class DacChannel extends ChuckUGen {
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
+    if (systemTime != -1
+        && systemTime == blockStartTime
+        && blockCache != null
+        && blockLength >= length) {
+      if (buffer != null) {
+        System.arraycopy(blockCache, 0, buffer, offset, length);
+      }
+      return;
+    }
+
     if (blockCache == null || blockCache.length < length) blockCache = new float[length];
     java.util.Arrays.fill(blockCache, 0, length, 0.0f);
 
     // Vectorized summing from all sources
     for (ChuckUGen src : sources) {
       float[] temp = new float[length];
-
-      // Only the first channel triggers the tick on sources
-      if (channelIndex == 0) {
-        src.tick(temp, 0, length, systemTime);
-      } else {
-        // Other channels must use the cached data if source is multi-channel,
-        // or just re-read if it was already ticked.
-        // For simplicity in this demo, we'll let each channel tick if it wasn't ticked yet
-        src.tick(temp, 0, length, systemTime);
-      }
+      src.tick(temp, 0, length, systemTime);
 
       // SIMD Addition: blockCache += temp
       int i = 0;
@@ -147,9 +171,11 @@ public class DacChannel extends ChuckUGen {
       visWriteIdx = (visWriteIdx + 1) % visBuffer.length;
     }
 
+    blockStartTime = systemTime;
+    blockLength = length;
+    lastTickTime = systemTime + length - 1;
     if (length > 0) {
       lastOut = blockCache[length - 1];
-      lastTickTime = systemTime;
     }
   }
 }

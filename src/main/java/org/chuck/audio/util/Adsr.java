@@ -148,37 +148,40 @@ public class Adsr extends ChuckUGen {
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
     if (systemTime != -1
-        && systemTime == lastTickTime
+        && systemTime == blockStartTime
         && blockCache != null
-        && blockCache.length >= length) {
+        && blockLength >= length) {
       if (buffer != null) System.arraycopy(blockCache, 0, buffer, offset, length);
       return;
     }
     if (blockCache == null || blockCache.length < length) blockCache = new float[length];
 
+    int i = 0;
     // Optimization: if we are in SUSTAIN or DONE, the gain is constant
     if (state == State.SUSTAIN_ENUM || state == State.DONE_ENUM) {
       float gainVal = (state == State.SUSTAIN_ENUM) ? sustainLevel : 0.0f;
+      java.util.Arrays.fill(blockCache, 0, length, 0.0f);
 
-      float[] input;
-      int inputOffset = 0;
-      if (buffer == null) {
-        input = new float[length];
-        for (org.chuck.audio.ChuckUGen src : sources) {
-          float[] temp = new float[length];
-          src.tick(temp, 0, length, systemTime);
-          for (int j = 0; j < length; j++) input[j] += temp[j];
+      // Vectorized summing from all sources
+      for (org.chuck.audio.ChuckUGen src : sources) {
+        float[] temp = new float[length];
+        src.tick(temp, 0, length, systemTime);
+
+        // SIMD Addition: blockCache += temp
+        int j = 0;
+        int bound = SPECIES.loopBound(length);
+        for (; j < bound; j += SPECIES.length()) {
+          FloatVector vSum = FloatVector.fromArray(SPECIES, blockCache, j);
+          FloatVector vSrc = FloatVector.fromArray(SPECIES, temp, j);
+          vSum.add(vSrc).intoArray(blockCache, j);
         }
-      } else {
-        input = buffer;
-        inputOffset = offset;
+        for (; j < length; j++) blockCache[j] += temp[j];
       }
 
-      int i = 0;
       int bound = SPECIES.loopBound(length);
       FloatVector vGain = FloatVector.broadcast(SPECIES, gainVal);
       for (; i < bound; i += SPECIES.length()) {
-        var vIn = FloatVector.fromArray(SPECIES, input, inputOffset + i);
+        var vIn = FloatVector.fromArray(SPECIES, blockCache, i);
         var vOut = vIn.mul(vGain);
         vOut.intoArray(blockCache, i);
         if (buffer != null) {
@@ -186,22 +189,30 @@ public class Adsr extends ChuckUGen {
         }
       }
       for (; i < length; i++) {
-        float out = input[inputOffset + i] * gainVal;
+        float out = blockCache[i] * gainVal;
         blockCache[i] = out;
         if (buffer != null) {
           buffer[offset + i] = out;
         }
       }
       currentLevel = gainVal;
-      lastTickTime = systemTime;
-      if (length > 0) {
-        lastOut = blockCache[length - 1];
+    } else {
+      // Otherwise, fallback to scalar for state-transition accuracy
+      for (; i < length; i++) {
+        float out = tick(systemTime == -1 ? -1 : systemTime + i);
+        blockCache[i] = out;
+        if (buffer != null) {
+          buffer[offset + i] = out;
+        }
       }
-      return;
     }
 
-    // Otherwise, fallback to scalar for state-transition accuracy
-    super.tick(buffer, offset, length, systemTime);
+    blockStartTime = systemTime;
+    blockLength = length;
+    lastTickTime = systemTime + length - 1;
+    if (length > 0) {
+      lastOut = blockCache[length - 1];
+    }
   }
 
   private void update(long systemTime) {

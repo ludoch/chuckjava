@@ -34,17 +34,12 @@ public class SawOsc extends Osc {
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
     if (systemTime != -1
-        && systemTime == lastTickTime
+        && systemTime == blockStartTime
         && blockCache != null
-        && blockCache.length >= length) {
+        && blockLength >= length) {
       if (buffer != null) {
         System.arraycopy(blockCache, 0, buffer, offset, length);
       }
-      return;
-    }
-
-    if (getNumSources() > 0) {
-      super.tick(buffer, offset, length, systemTime);
       return;
     }
 
@@ -52,44 +47,46 @@ public class SawOsc extends Osc {
       blockCache = new float[length];
     }
 
-    float f_freq = (float) freq;
-    float f_phase = (float) phase;
-    float f_inc = f_freq / sampleRate;
-
     int i = 0;
-    int bound = SPECIES.loopBound(length);
-    FloatVector vOffsets = FloatVector.fromArray(SPECIES, OFFSETS, 0);
-    FloatVector vInc = FloatVector.broadcast(SPECIES, f_inc);
-    FloatVector vTwo = FloatVector.broadcast(SPECIES, 2.0f);
-    FloatVector vOne = FloatVector.broadcast(SPECIES, 1.0f);
+    if (getNumSources() == 0) {
+      float f_freq = (float) freq;
+      float f_phase = (float) phase;
+      float f_inc = f_freq / sampleRate;
 
-    for (; i < bound; i += SPECIES.length()) {
-      // vPhases = (phase + offsets * inc)
-      FloatVector vPhases = vOffsets.mul(vInc).add(f_phase);
+      int bound = SPECIES.loopBound(length);
+      FloatVector vOffsets = FloatVector.fromArray(SPECIES, OFFSETS, 0);
+      FloatVector vInc = FloatVector.broadcast(SPECIES, f_inc);
+      FloatVector vTwo = FloatVector.broadcast(SPECIES, 2.0f);
+      FloatVector vOne = FloatVector.broadcast(SPECIES, 1.0f);
 
-      // Wrap phases to [0, 1]
-      var intSpecies = jdk.incubator.vector.VectorSpecies.of(int.class, SPECIES.vectorShape());
-      var vIntP = vPhases.castShape(intSpecies, 0);
-      var vFloorP = vIntP.castShape(SPECIES, 0);
-      vPhases = vPhases.sub(vFloorP);
+      for (; i < bound; i += SPECIES.length()) {
+        // vPhases = (phase + (offsets + 1) * inc)
+        FloatVector vPhases = vOffsets.add(1.0f).mul(vInc).add(f_phase);
 
-      // vSaw = 2 * vPhases - 1 (naive)
-      FloatVector vSaw = vPhases.mul(vTwo).sub(vOne);
+        // Wrap phases to [0, 1]
+        var intSpecies = jdk.incubator.vector.VectorSpecies.of(int.class, SPECIES.vectorShape());
+        var vIntP = vPhases.castShape(intSpecies, 0);
+        var vFloorP = vIntP.castShape(SPECIES, 0);
+        vPhases = vPhases.sub(vFloorP);
 
-      // Correct with PolyBLEP
-      vSaw = vSaw.sub(vPolyBlep(vPhases, vInc));
+        // vSaw = 2 * vPhases - 1 (naive)
+        FloatVector vSaw = vPhases.mul(vTwo).sub(vOne);
 
-      FloatVector vOut = vSaw.mul(gain);
-      vOut.intoArray(blockCache, i);
-      if (buffer != null) {
-        vOut.intoArray(buffer, offset + i);
+        // Correct with PolyBLEP
+        vSaw = vSaw.sub(vPolyBlep(vPhases, vInc));
+
+        FloatVector vOut = vSaw.mul(gain);
+        vOut.intoArray(blockCache, i);
+        if (buffer != null) {
+          vOut.intoArray(buffer, offset + i);
+        }
+
+        f_phase = (f_phase + f_inc * SPECIES.length()) % 1.0f;
       }
-
-      f_phase = (f_phase + f_inc * SPECIES.length()) % 1.0f;
+      this.phase = f_phase;
     }
 
-    // Scalar fallback for remainder
-    this.phase = f_phase;
+    // Scalar fallback for remainder or if we have sources
     for (; i < length; i++) {
       float t = tick(systemTime == -1 ? -1 : systemTime + i);
       blockCache[i] = t;
@@ -98,7 +95,9 @@ public class SawOsc extends Osc {
       }
     }
 
-    lastTickTime = systemTime;
+    blockStartTime = systemTime;
+    blockLength = length;
+    lastTickTime = systemTime + length - 1;
     if (length > 0) {
       lastOut = blockCache[length - 1];
     }

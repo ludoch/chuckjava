@@ -38,9 +38,9 @@ public class Gain extends ChuckUGen {
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
     if (systemTime != -1
-        && systemTime == lastTickTime
+        && systemTime == blockStartTime
         && blockCache != null
-        && blockCache.length >= length) {
+        && blockLength >= length) {
       if (buffer != null) {
         System.arraycopy(blockCache, 0, buffer, offset, length);
       }
@@ -50,19 +50,25 @@ public class Gain extends ChuckUGen {
     if (blockCache == null || blockCache.length < length) {
       blockCache = new float[length];
     }
+    java.util.Arrays.fill(blockCache, 0, length, 0.0f);
 
-    float[] input;
-    int inputOffset = 0;
-    if (buffer == null) {
-      input = new float[length];
-      for (org.chuck.audio.ChuckUGen src : sources) {
-        float[] temp = new float[length];
-        src.tick(temp, 0, length, systemTime);
-        for (int j = 0; j < length; j++) input[j] += temp[j];
+    // Vectorized summing from all sources
+    for (org.chuck.audio.ChuckUGen src : sources) {
+      float[] temp = new float[length];
+      src.tick(temp, 0, length, systemTime);
+
+      // SIMD Addition: blockCache += temp
+      int i = 0;
+      int bound = SPECIES.loopBound(length);
+      for (; i < bound; i += SPECIES.length()) {
+        FloatVector vSum = FloatVector.fromArray(SPECIES, blockCache, i);
+        FloatVector vSrc = FloatVector.fromArray(SPECIES, temp, i);
+        vSum.add(vSrc).intoArray(blockCache, i);
       }
-    } else {
-      input = buffer;
-      inputOffset = offset;
+      // Fallback
+      for (; i < length; i++) {
+        blockCache[i] += temp[i];
+      }
     }
 
     int i = 0;
@@ -71,15 +77,11 @@ public class Gain extends ChuckUGen {
     // Multiplier vector
     FloatVector vGain = FloatVector.broadcast(SPECIES, this.gain);
 
-    // Vectorized loop
+    // Vectorized multiplication loop
     for (; i < upperBound; i += SPECIES.length()) {
-      // Load block from input
-      var vIn = FloatVector.fromArray(SPECIES, input, inputOffset + i);
-      // Apply gain
+      var vIn = FloatVector.fromArray(SPECIES, blockCache, i);
       var vOut = vIn.mul(vGain);
-      // Store to cache
       vOut.intoArray(blockCache, i);
-      // Store back to buffer if provided
       if (buffer != null) {
         vOut.intoArray(buffer, offset + i);
       }
@@ -87,14 +89,16 @@ public class Gain extends ChuckUGen {
 
     // Tail loop for remaining elements
     for (; i < length; i++) {
-      float out = input[inputOffset + i] * this.gain;
+      float out = blockCache[i] * this.gain;
       blockCache[i] = out;
       if (buffer != null) {
         buffer[offset + i] = out;
       }
     }
 
-    lastTickTime = systemTime;
+    blockStartTime = systemTime;
+    blockLength = length;
+    lastTickTime = systemTime + length - 1;
     if (length > 0) {
       lastOut = blockCache[length - 1];
     }

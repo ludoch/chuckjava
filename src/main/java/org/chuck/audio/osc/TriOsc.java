@@ -34,17 +34,12 @@ public class TriOsc extends Osc {
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
     if (systemTime != -1
-        && systemTime == lastTickTime
+        && systemTime == blockStartTime
         && blockCache != null
-        && blockCache.length >= length) {
+        && blockLength >= length) {
       if (buffer != null) {
         System.arraycopy(blockCache, 0, buffer, offset, length);
       }
-      return;
-    }
-
-    if (getNumSources() > 0) {
-      super.tick(buffer, offset, length, systemTime);
       return;
     }
 
@@ -52,66 +47,62 @@ public class TriOsc extends Osc {
       blockCache = new float[length];
     }
 
-    float f_freq = (float) freq;
-    float f_phase = (float) phase;
-    float f_inc = f_freq / sampleRate;
-    float f_width = (float) width;
-
     int i = 0;
-    int bound = SPECIES.loopBound(length);
-    FloatVector vOffsets = FloatVector.fromArray(SPECIES, OFFSETS, 0);
-    FloatVector vInc = FloatVector.broadcast(SPECIES, f_inc);
-    FloatVector vWidth = FloatVector.broadcast(SPECIES, f_width);
-    FloatVector vOne = FloatVector.broadcast(SPECIES, 1.0f);
-    @SuppressWarnings("unused")
-    FloatVector vTwo = FloatVector.broadcast(SPECIES, 2.0f);
-    FloatVector vZero = FloatVector.zero(SPECIES);
+    if (getNumSources() == 0) {
+      float f_freq = (float) freq;
+      float f_phase = (float) phase;
+      float f_inc = f_freq / sampleRate;
+      float f_width = (float) width;
 
-    float widthFactor1 = (f_width == 0.0f) ? 0.0f : 2.0f / f_width;
-    float widthFactor2 = (f_width == 1.0f) ? 0.0f : 2.0f / (1.0f - f_width);
-    FloatVector vWidthFactor1 = FloatVector.broadcast(SPECIES, widthFactor1);
-    FloatVector vWidthFactor2 = FloatVector.broadcast(SPECIES, widthFactor2);
+      int bound = SPECIES.loopBound(length);
+      FloatVector vOffsets = FloatVector.fromArray(SPECIES, OFFSETS, 0);
+      FloatVector vInc = FloatVector.broadcast(SPECIES, f_inc);
+      FloatVector vWidth = FloatVector.broadcast(SPECIES, f_width);
+      FloatVector vOne = FloatVector.broadcast(SPECIES, 1.0f);
+      @SuppressWarnings("unused")
+      FloatVector vTwo = FloatVector.broadcast(SPECIES, 2.0f);
+      FloatVector vZero = FloatVector.zero(SPECIES);
 
-    for (; i < bound; i += SPECIES.length()) {
-      // Raw phase
-      FloatVector vPRaw = vOffsets.mul(vInc).add(f_phase).add(0.25f);
+      float widthFactor1 = (f_width == 0.0f) ? 0.0f : 2.0f / f_width;
+      float widthFactor2 = (f_width == 1.0f) ? 0.0f : 2.0f / (1.0f - f_width);
+      FloatVector vWidthFactor1 = FloatVector.broadcast(SPECIES, widthFactor1);
+      FloatVector vWidthFactor2 = FloatVector.broadcast(SPECIES, widthFactor2);
 
-      // p % 1.0 (approximated for positive phases)
-      // For proper modulo, we'd subtract the floor.
-      // In Java Vector API, there isn't a direct floor for floats in all architectures without
-      // casts,
-      // but we can do a quick wrap if we assume phases are generally positive and we keep them in
-      // [0,1].
-      // Let's cast to int and back to subtract.
-      var intSpecies = jdk.incubator.vector.VectorSpecies.of(int.class, SPECIES.vectorShape());
-      var vIntP = vPRaw.castShape(intSpecies, 0);
-      var vFloorP = vIntP.castShape(SPECIES, 0);
-      FloatVector vP = vPRaw.sub(vFloorP);
+      for (; i < bound; i += SPECIES.length()) {
+        // Raw phase
+        FloatVector vPRaw = vOffsets.add(1.0f).mul(vInc).add(f_phase).add(0.25f);
 
-      VectorMask<Float> mask = vP.compare(jdk.incubator.vector.VectorOperators.LT, vWidth);
+        // p % 1.0 (approximated for positive phases)
+        var intSpecies = jdk.incubator.vector.VectorSpecies.of(int.class, SPECIES.vectorShape());
+        var vIntP = vPRaw.castShape(intSpecies, 0);
+        var vFloorP = vIntP.castShape(SPECIES, 0);
+        FloatVector vP = vPRaw.sub(vFloorP);
 
-      // True branch: -1.0 + 2.0 * p / width  ->  p * widthFactor1 - 1.0
-      FloatVector vTrue = vP.mul(vWidthFactor1).sub(vOne);
-      // Edge case width == 0
-      if (f_width == 0.0f) vTrue = vOne;
+        VectorMask<Float> mask = vP.compare(jdk.incubator.vector.VectorOperators.LT, vWidth);
 
-      // False branch: 1.0 - 2.0 * (p - width) / (1.0 - width) -> 1.0 - (p - width) * widthFactor2
-      FloatVector vFalse = vOne.sub(vP.sub(vWidth).mul(vWidthFactor2));
-      if (f_width == 1.0f) vFalse = vZero;
+        // True branch: -1.0 + 2.0 * p / width  ->  p * widthFactor1 - 1.0
+        FloatVector vTrue = vP.mul(vWidthFactor1).sub(vOne);
+        // Edge case width == 0
+        if (f_width == 0.0f) vTrue = vOne;
 
-      FloatVector vOut = vFalse.blend(vTrue, mask).mul(gain);
-      vOut.intoArray(blockCache, i);
+        // False branch: 1.0 - 2.0 * (p - width) / (1.0 - width) -> 1.0 - (p - width) * widthFactor2
+        FloatVector vFalse = vOne.sub(vP.sub(vWidth).mul(vWidthFactor2));
+        if (f_width == 1.0f) vFalse = vZero;
 
-      if (buffer != null) {
-        vOut.intoArray(buffer, offset + i);
+        FloatVector vOut = vFalse.blend(vTrue, mask).mul(gain);
+        vOut.intoArray(blockCache, i);
+
+        if (buffer != null) {
+          vOut.intoArray(buffer, offset + i);
+        }
+
+        f_phase = (f_phase + f_inc * SPECIES.length()) % 1.0f;
+        if (f_phase < 0) f_phase += 1.0f;
       }
-
-      f_phase = (f_phase + f_inc * SPECIES.length()) % 1.0f;
-      if (f_phase < 0) f_phase += 1.0f;
+      this.phase = f_phase;
     }
 
-    // Scalar fallback for remainder
-    this.phase = f_phase;
+    // Scalar fallback for remainder or if we have sources
     for (; i < length; i++) {
       float t = tick(systemTime == -1 ? -1 : systemTime + i);
       blockCache[i] = t;
@@ -120,7 +111,9 @@ public class TriOsc extends Osc {
       }
     }
 
-    lastTickTime = systemTime;
+    blockStartTime = systemTime;
+    blockLength = length;
+    lastTickTime = systemTime + length - 1;
     if (length > 0) {
       lastOut = blockCache[length - 1];
     }

@@ -531,15 +531,22 @@ public class ChuckIDE extends Application {
 
     // ── Tabbed editor ──
     tabPane = new TabPane();
+
+    // Initialize status bar labels early to avoid NPE during tab selection
+    lineColLabel = new Label("Ln 1, Col 1");
+    cpuLabel = new Label("CPU: 0.0%");
+    sampleRateLabel = new Label(prefSampleRate + " Hz");
+    fileNameLabel = new Label("Untitled.ck");
+
     tabPane
         .getSelectionModel()
         .selectedItemProperty()
         .addListener(
             (obs, oldTab, newTab) -> {
-              if (newTab != null) {
+              if (newTab != null && fileNameLabel != null) {
                 fileNameLabel.setText(newTab.getText().replaceFirst("^\\* ?", ""));
                 CodeArea ed = editorFromTab(newTab);
-                if (ed != null) {
+                if (ed != null && lineColLabel != null) {
                   int line = ed.getCurrentParagraph() + 1;
                   int col = ed.getCaretColumn() + 1;
                   lineColLabel.setText("Ln " + line + ", Col " + col);
@@ -767,10 +774,6 @@ public class ChuckIDE extends Application {
     clearConsoleBtn.setOnAction(e -> clearConsole());
 
     statusLabel = new Label("  Ready");
-    lineColLabel = new Label("Ln 1, Col 1");
-    cpuLabel = new Label("CPU: 0.0%");
-    sampleRateLabel = new Label(prefSampleRate + " Hz");
-    fileNameLabel = new Label("Untitled.ck");
 
     for (Label l : List.of(statusLabel, lineColLabel, cpuLabel, sampleRateLabel, fileNameLabel)) {
       l.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 11;");
@@ -2734,6 +2737,7 @@ public class ChuckIDE extends Application {
         () -> {
           shredListView.getItems().clear();
           tabToShredId.clear();
+          sampleRateLabel.setText(sampleRate + " Hz");
           updateStatus();
           print("Audio engine restarted.");
         });

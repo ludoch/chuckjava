@@ -72,7 +72,7 @@ public class ControlSurface extends VBox {
     // Add or update rows
     for (String key : intKeys) {
       if (!rows.containsKey(key)) {
-        ControlRow row = new ControlRow(key, true);
+        ControlRow row = new ControlRow(key, true, vm.getGlobalInt(key));
         rows.put(key, row);
         rowContainer.getChildren().add(row.getNode());
       }
@@ -81,7 +81,7 @@ public class ControlSurface extends VBox {
 
     for (String key : floatKeys) {
       if (!rows.containsKey(key)) {
-        ControlRow row = new ControlRow(key, false);
+        ControlRow row = new ControlRow(key, false, vm.getGlobalFloat(key));
         rows.put(key, row);
         rowContainer.getChildren().add(row.getNode());
       }
@@ -97,14 +97,30 @@ public class ControlSurface extends VBox {
     private final Label valueLabel;
     private boolean isDragging = false;
 
-    public ControlRow(String key, boolean isInt) {
+    public ControlRow(String key, boolean isInt, double initialValue) {
       this.key = key;
       this.isInt = isInt;
 
       Label nameLabel = new Label(key);
       nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 11;");
 
-      slider = new Slider(0, isInt ? 127 : 1.0, 0);
+      double min = 0;
+      double max = 1.0;
+
+      if (isInt) {
+        max = Math.max(127, initialValue * 2);
+      } else {
+        String lower = key.toLowerCase();
+        if (lower.contains("freq") || lower.contains("pitch") || initialValue > 20.0) {
+          max = 20000.0; // Audio frequency range
+        } else if (initialValue > 1.0) {
+          max = initialValue * 2.0;
+        } else {
+          max = 1.0; // Standard gain range
+        }
+      }
+
+      slider = new Slider(min, max, initialValue);
       HBox.setHgrow(slider, Priority.ALWAYS);
 
       valueLabel = new Label("0");

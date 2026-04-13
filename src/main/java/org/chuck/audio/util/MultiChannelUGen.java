@@ -32,6 +32,21 @@ public abstract class MultiChannelUGen extends ChuckUGen {
     return 0.0f;
   }
 
+  /**
+   * New method to support bit-exact multi-channel block caching. Overridden by subclasses that
+   * manage multi-channel block caches (like Pan2).
+   */
+  public float getChannelLastOut(int i, long systemTime) {
+    // Default implementation: check if parent's unified block cache contains the sample.
+    // If systemTime matches the current state, just return it.
+    if (systemTime == lastTickTime) {
+      return getChannelLastOut(i);
+    }
+    // Fallback: if it's in the block window but not exactly lastTickTime,
+    // it depends on whether the subclass has a multi-channel block cache.
+    return getChannelLastOut(i);
+  }
+
   @Override
   public float tick(long systemTime) {
     if (systemTime != -1 && systemTime == lastTickTime) {
@@ -58,6 +73,8 @@ public abstract class MultiChannelUGen extends ChuckUGen {
       lastOut = lastOutChannels.length > 0 ? lastOutChannels[0] : 0.0f;
 
       lastTickTime = systemTime;
+      blockStartTime = systemTime;
+      blockLength = 0;
       return lastOut;
     } finally {
       isTicking = false;
@@ -75,9 +92,6 @@ public abstract class MultiChannelUGen extends ChuckUGen {
 
   @Override
   public ChuckUGen getOutputChannel(int i) {
-    // If someone wants a specific channel output, we can't easily return a UGen proxy
-    // without more complexity (like Pan2.left/right).
-    // For now, we return this, and DacChannel/MultiChannelDac handle the indexing.
     return this;
   }
 }

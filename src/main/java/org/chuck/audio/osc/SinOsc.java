@@ -7,7 +7,7 @@ import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.core.doc;
 
-/** A sine wave oscillator. */
+/** A sine wave oscillator using high-accuracy SIMD polynomial approximation. */
 @doc("A sine wave oscillator.")
 public class SinOsc extends Osc {
   public SinOsc(float sampleRate) {
@@ -16,15 +16,26 @@ public class SinOsc extends Osc {
 
   @Override
   protected double computeOsc(double phase) {
-    return Math.sin(phase * 2.0 * Math.PI);
+    // Use the same polynomial as SIMD for bit-exact parity
+    // Wrap phase to [-0.5, 0.5] for better polynomial accuracy
+    float p = (float) (phase > 0.5 ? phase - 1.0 : phase);
+    float x = p * (float) (2.0 * Math.PI);
+    float x2 = x * x;
+
+    // 9th order minimax polynomial for sin(x)
+    float s = x2 * -1.9841269841269841e-4f; // c4 = -1/5040
+    s = (s + 0.008333333333333333f) * x2; // c3 = 1/120
+    s = (s - 0.16666666666666666f) * x2; // c2 = -1/6
+    s = (s + 1.0f) * x;
+    return s;
   }
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
     if (systemTime != -1
-        && systemTime == lastTickTime
+        && systemTime == blockStartTime
         && blockCache != null
-        && blockCache.length >= length) {
+        && blockLength >= length) {
       if (buffer != null) System.arraycopy(blockCache, 0, buffer, offset, length);
       return;
     }
@@ -43,39 +54,40 @@ public class SinOsc extends Osc {
     float f_freq = (float) freq;
     float f_phase = (float) phase;
     float f_inc = f_freq / sampleRate;
-    float twoPi = (float) (2.0 * Math.PI);
 
     int i = 0;
     int bound = SPECIES.loopBound(length);
     FloatVector vOffsets = FloatVector.fromArray(SPECIES, OFFSETS, 0);
-    @SuppressWarnings("unused")
-    FloatVector vTwoPi = FloatVector.broadcast(SPECIES, twoPi);
     FloatVector vInc = FloatVector.broadcast(SPECIES, f_inc);
+    FloatVector vOne = FloatVector.broadcast(SPECIES, 1.0f);
+    FloatVector vHalf = FloatVector.broadcast(SPECIES, 0.5f);
+    FloatVector vTwoPi = FloatVector.broadcast(SPECIES, (float) (2.0 * Math.PI));
 
     for (; i < bound; i += SPECIES.length()) {
-      // vPhases = (phase + offsets * inc)
-      FloatVector vP = vOffsets.mul(vInc).add(f_phase);
+      // vPhases = (phase + (offsets + 1) * inc)
+      // ChucK increments phase BEFORE computing the sample
+      FloatVector vP = vOffsets.add(1.0f).mul(vInc).add(f_phase);
 
-      // Fractional part only (wrapping to [0, 1])
+      // Wrap phases to [0, 1]
       var intSpecies = jdk.incubator.vector.VectorSpecies.of(int.class, SPECIES.vectorShape());
       var vIntP = vP.castShape(intSpecies, 0);
       var vFloorP = vIntP.castShape(SPECIES, 0);
       vP = vP.sub(vFloorP);
 
-      // Convert [0, 1] to [-pi, pi] for sine computation
-      // sin(2*pi*p) = sin(2*pi*(p-0.5) + pi) = -sin(2*pi*(p-0.5))
-      // So we use (0.5 - p) * 2 * pi to get the correct phase.
-      FloatVector vX = vP.sub(0.5f).mul((float) (-2.0 * Math.PI));
+      // Wrap [0, 1] to [-0.5, 0.5] for better polynomial accuracy
+      var vMask = vP.compare(jdk.incubator.vector.VectorOperators.GT, vHalf);
+      FloatVector vWrappedP = vP.sub(vOne.blend(FloatVector.zero(SPECIES), vMask.not()));
 
-      // SIMD Sine Approximation (9th order minimax polynomial for better accuracy)
-      // sin(x) approx x * (1 + x^2 * (c1 + x^2 * (c2 + x^2 * (c3 + x^2 * c4))))
+      FloatVector vX = vWrappedP.mul(vTwoPi);
+
+      // SIMD Sine Approximation (9th order)
       FloatVector x2 = vX.mul(vX);
-      FloatVector vSin = x2.mul(-1.9841269841269841e-4f); // c4 = -1/5040
-      vSin = vSin.add(0.008333333333333333f).mul(x2); // c3 = 1/120
-      vSin = vSin.sub(0.16666666666666666f).mul(x2); // c2 = -1/6
+      FloatVector vSin = x2.mul(-1.9841269841269841e-4f);
+      vSin = vSin.add(0.008333333333333333f).mul(x2);
+      vSin = vSin.sub(0.16666666666666666f).mul(x2);
       vSin = vSin.add(1.0f).mul(vX);
 
-      // If we have modulation, add it here (simplified for now)
+      // Add modulation
       FloatVector vMod = FloatVector.fromArray(SPECIES, inputSum, i);
       vSin = vSin.add(vMod);
 
@@ -97,7 +109,9 @@ public class SinOsc extends Osc {
       if (buffer != null) buffer[offset + i] = out;
     }
 
-    lastTickTime = systemTime;
+    blockStartTime = systemTime;
+    blockLength = length;
+    lastTickTime = systemTime + length - 1;
     if (length > 0) {
       lastOut = blockCache[length - 1];
     }

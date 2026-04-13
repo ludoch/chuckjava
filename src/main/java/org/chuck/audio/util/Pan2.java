@@ -16,6 +16,8 @@ public class Pan2 extends StereoUGen {
   private float gL = 0.707f;
   private float gR = 0.707f;
 
+  private float[][] multiBlockCache;
+
   public Pan2() {
     this.numInputs = 2;
     this.numOutputs = 2;
@@ -78,47 +80,76 @@ public class Pan2 extends StereoUGen {
   }
 
   @Override
-  public void tick(float[] buffer, int offset, int length, long systemTime) {
-    // Multi-channel tick is complex because we produce two outputs from one input stream
-    // in the standard ChuckUGen.tick(float[]) model.
-    // However, Pan2 is usually used mono-to-stereo.
+  public float getChannelLastOut(int i, long systemTime) {
+    if (systemTime != -1
+        && blockLength > 0
+        && systemTime >= blockStartTime
+        && systemTime < blockStartTime + blockLength) {
+      int idx = (int) (systemTime - blockStartTime);
+      if (i >= 0 && i < 2 && multiBlockCache != null) {
+        return multiBlockCache[i][idx];
+      }
+    }
+    return getChannelLastOut(i);
+  }
 
-    // For this SIMD implementation, we'll process the buffer in-place for left,
-    // and copy to right.
+  @Override
+  public void tick(float[] buffer, int offset, int length, long systemTime) {
+    if (systemTime != -1
+        && systemTime == blockStartTime
+        && blockLength >= length
+        && multiBlockCache != null) {
+      if (buffer != null) {
+        System.arraycopy(multiBlockCache[0], 0, buffer, offset, length);
+      }
+      return;
+    }
+
+    if (multiBlockCache == null || multiBlockCache[0].length < length) {
+      multiBlockCache = new float[2][length];
+    }
+
+    // Pull audio from sources
+    float[] inBuf = new float[length];
+    if (getNumSources() > 0) {
+      sources.get(0).tick(inBuf, 0, length, systemTime);
+    }
 
     int i = 0;
     int bound = SPECIES.loopBound(length);
     FloatVector vGL = FloatVector.broadcast(SPECIES, gL);
     FloatVector vGR = FloatVector.broadcast(SPECIES, gR);
 
-    float[] rightBuf = new float[length];
-
     for (; i < bound; i += SPECIES.length()) {
-      var vIn = FloatVector.fromArray(SPECIES, buffer, offset + i);
+      var vIn = FloatVector.fromArray(SPECIES, inBuf, i);
 
-      // Left output (in-place)
+      // Left output
       var vOutL = vIn.mul(vGL);
-      vOutL.intoArray(buffer, offset + i);
+      vOutL.intoArray(multiBlockCache[0], i);
+      if (buffer != null) vOutL.intoArray(buffer, offset + i);
 
       // Right output
       var vOutR = vIn.mul(vGR);
-      vOutR.intoArray(rightBuf, i);
+      vOutR.intoArray(multiBlockCache[1], i);
     }
 
     // Tail
     for (; i < length; i++) {
-      float in = buffer[offset + i];
-      buffer[offset + i] = in * gL;
-      rightBuf[i] = in * gR;
+      float val = inBuf[i];
+      multiBlockCache[0][i] = val * gL;
+      multiBlockCache[1][i] = val * gR;
+      if (buffer != null) buffer[offset + i] = multiBlockCache[0][i];
     }
 
-    // Update proxies
-    lastOutChannels[0] = buffer[offset + length - 1];
-    lastOutChannels[1] = rightBuf[length - 1];
+    // Update state
+    blockStartTime = systemTime;
+    blockLength = length;
+    lastTickTime = systemTime + length - 1;
+    lastOutChannels[0] = multiBlockCache[0][length - 1];
+    lastOutChannels[1] = multiBlockCache[1][length - 1];
+    lastOut = lastOutChannels[0];
     left.lastOut = lastOutChannels[0];
     right.lastOut = lastOutChannels[1];
-
-    // Note: in a full multi-channel system, rightBuf would be sent to the second channel
   }
 
   @Override

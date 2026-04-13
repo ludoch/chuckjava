@@ -19,7 +19,9 @@ public abstract class ChuckUGen extends ChuckObject {
   protected long lastTickTime = -1;
   protected boolean isTicking = false;
 
-  protected float[] blockCache; // Used by sorted block processing to avoid double-ticks
+  protected float[] blockCache;
+  protected long blockStartTime = -1;
+  protected int blockLength = 0;
 
   protected int numInputs = 1;
   protected int numOutputs = 1;
@@ -108,6 +110,17 @@ public abstract class ChuckUGen extends ChuckObject {
       return lastOut;
     }
 
+    // Check if this sample is already in our block cache
+    if (systemTime != -1
+        && blockLength > 0
+        && systemTime >= blockStartTime
+        && systemTime < blockStartTime + blockLength) {
+      int idx = (int) (systemTime - blockStartTime);
+      lastOut = blockCache[idx];
+      lastTickTime = systemTime;
+      return lastOut;
+    }
+
     if (isTicking) {
       return lastOut;
     }
@@ -121,7 +134,10 @@ public abstract class ChuckUGen extends ChuckObject {
 
       lastOut = compute(sum, systemTime) * gain;
       lastTickTime = systemTime;
+      blockStartTime = systemTime;
+      blockLength = 0; // When computing scalar, reset block window to prevent stale cache hits
       return lastOut;
+
     } finally {
       isTicking = false;
     }
@@ -139,8 +155,22 @@ public abstract class ChuckUGen extends ChuckObject {
     if (systemTime != -1 && systemTime == lastTickTime) {
       return lastOut;
     }
+
+    // Check if this sample is already in our block cache
+    if (systemTime != -1
+        && blockLength > 0
+        && systemTime >= blockStartTime
+        && systemTime < blockStartTime + blockLength) {
+      int idx = (int) (systemTime - blockStartTime);
+      lastOut = blockCache[idx];
+      lastTickTime = systemTime;
+      return lastOut;
+    }
+
     lastOut = compute(manualInput, systemTime) * gain;
     lastTickTime = systemTime;
+    blockStartTime = systemTime;
+    blockLength = 0;
     return lastOut;
   }
 
@@ -249,9 +279,9 @@ public abstract class ChuckUGen extends ChuckObject {
   public void tick(float[] buffer, int offset, int length, long systemTime) {
     // If we've already ticked this block for this exact time, copy from cache
     if (systemTime != -1
-        && systemTime == lastTickTime
+        && systemTime == blockStartTime
         && blockCache != null
-        && blockCache.length >= length) {
+        && blockLength >= length) {
       if (buffer != null) {
         System.arraycopy(blockCache, 0, buffer, offset, length);
       }
@@ -266,8 +296,6 @@ public abstract class ChuckUGen extends ChuckObject {
     // Default implementation: pull from sources and compute sample-by-sample
     // Subclasses like SinOsc or Gain will override this with vectorized logic.
     for (int i = 0; i < length; i++) {
-      // In scalar mode, advanceTime(1) ticks at currentTime.
-      // So here we must tick at systemTime + i.
       float out = tick(systemTime == -1 ? -1 : systemTime + i);
       blockCache[i] = out;
       if (buffer != null) {
@@ -275,9 +303,12 @@ public abstract class ChuckUGen extends ChuckObject {
       }
     }
 
-    // lastTickTime was already updated by the scalar tick loop for the last sample,
-    // but let's be explicit that this UGen is now up to date for the START of the block.
-    lastTickTime = systemTime;
+    blockStartTime = systemTime;
+    blockLength = length;
+    if (length > 0) {
+      lastOut = blockCache[length - 1];
+      lastTickTime = systemTime + length - 1;
+    }
   }
 
   public int getNumInputs() {

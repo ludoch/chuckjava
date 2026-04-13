@@ -50,11 +50,10 @@ public class ChuckUGenTest {
     Gain gain = new Gain();
     gain.setGain(0.5f);
 
-    float[] buffer = new float[256];
-    for (int i = 0; i < buffer.length; i++) {
-      buffer[i] = 1.0f;
-    }
+    // Add a source that produces 1.0
+    gain.addSource(new org.chuck.audio.util.Step(1.0f));
 
+    float[] buffer = new float[256];
     // Process the block
     gain.tick(buffer);
 
