@@ -96,6 +96,7 @@ public class UGenRegistry {
         "MixN",
         (sr, args) ->
             args.length > 0 && args[0] instanceof Number n ? new MixN(n.intValue()) : new MixN(2));
+    register("Broadcaster", (sr, args) -> new Broadcaster());
     register("Identity2", (sr, args) -> new Identity2());
 
     // --- Sampling & I/O ---
