@@ -194,12 +194,23 @@ public class PreferencesTab extends ScrollPane {
               if (onEditorSettingsChanged != null) onEditorSettingsChanged.run();
             });
 
+    CheckBox autoSaveCb = new CheckBox("Auto-save on Run");
+    autoSaveCb.setSelected(prefs.getBoolean("editor.autoSave", false));
+    autoSaveCb
+        .selectedProperty()
+        .addListener(
+            (obs, oldV, newV) -> {
+              prefs.putBoolean("editor.autoSave", newV);
+              if (onEditorSettingsChanged != null) onEditorSettingsChanged.run();
+            });
+
     grid.add(new Label("Font Size:"), 0, 0);
     grid.add(fontSpinner, 1, 0);
     grid.add(new Label("Tab Width:"), 0, 1);
     grid.add(tabSpinner, 1, 1);
     grid.add(useSpacesCb, 0, 2, 2, 1);
     grid.add(smartIndentCb, 0, 3, 2, 1);
+    grid.add(autoSaveCb, 0, 4, 2, 1);
 
     TitledPane pane = new TitledPane("Editor", grid);
     pane.setCollapsible(false);

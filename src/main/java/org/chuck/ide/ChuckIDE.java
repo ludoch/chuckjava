@@ -26,6 +26,7 @@ import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
 import javafx.scene.control.ButtonType;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.IndexRange;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -414,6 +415,7 @@ public class ChuckIDE extends Application {
   private boolean prefSmartIndent = true;
   private boolean prefUseSpaces = true;
   private int prefTabWidth = 4;
+  private boolean prefAutoSave = false;
 
   // Audio preferences (take effect on next IDE launch)
   private int prefSampleRate = 44100;
@@ -758,6 +760,7 @@ public class ChuckIDE extends Application {
     applyInlineStyles(scene);
 
     setupHidFilters(scene);
+    setupDragAndDrop(scene);
 
     primaryStage.setScene(scene);
     primaryStage.show();
@@ -911,6 +914,12 @@ public class ChuckIDE extends Application {
           if (e.getCode() == KeyCode.SPACE && e.isControlDown()) {
             e.consume();
             showCompletionPopup(editor);
+          } else if (e.getCode() == KeyCode.D && e.isControlDown()) {
+            e.consume();
+            duplicateLineOrSelection(editor);
+          } else if (e.getCode() == KeyCode.K && e.isControlDown() && e.isShiftDown()) {
+            e.consume();
+            deleteCurrentLine(editor);
           }
         });
 
@@ -2031,6 +2040,12 @@ public class ChuckIDE extends Application {
     final String[] finalArgs = scriptArgs;
 
     try {
+      if (prefAutoSave && currentFile != null) {
+        Files.writeString(currentFile.toPath(), editor.getText());
+        tabSavedText.put(currentTab, editor.getText());
+        currentTab.setText(currentFile.getName());
+      }
+
       if (path.endsWith(".java")) {
         if (currentFile == null) {
           throw new RuntimeException("Please save the .java file before sporking.");
@@ -2846,6 +2861,59 @@ public class ChuckIDE extends Application {
 
   // ── User-symbol scanner ────────────────────────────────────────────────────
 
+  private void setupDragAndDrop(Scene scene) {
+    scene.setOnDragOver(
+        e -> {
+          if (e.getDragboard().hasFiles()) {
+            e.acceptTransferModes(javafx.scene.input.TransferMode.COPY);
+          }
+          e.consume();
+        });
+
+    scene.setOnDragDropped(
+        e -> {
+          javafx.scene.input.Dragboard db = e.getDragboard();
+          boolean success = false;
+          if (db.hasFiles()) {
+            success = true;
+            for (File file : db.getFiles()) {
+              if (file.getName().endsWith(".ck") || file.getName().endsWith(".java")) {
+                loadFileIntoEditor(file);
+              }
+            }
+          }
+          e.setDropCompleted(success);
+          e.consume();
+        });
+  }
+
+  private void duplicateLineOrSelection(CodeArea editor) {
+    IndexRange selection = editor.getSelection();
+    if (selection.getLength() > 0) {
+      String text = editor.getSelectedText();
+      editor.insertText(selection.getEnd(), text);
+    } else {
+      int caret = editor.getCaretPosition();
+      int lineIdx = editor.getCurrentParagraph();
+      String lineText = editor.getParagraph(lineIdx).getText();
+      editor.insertText(
+          editor.getAbsolutePosition(lineIdx, editor.getParagraphLength(lineIdx)), "\n" + lineText);
+    }
+  }
+
+  private void deleteCurrentLine(CodeArea editor) {
+    int lineIdx = editor.getCurrentParagraph();
+    int start = editor.getAbsolutePosition(lineIdx, 0);
+    int end = editor.getAbsolutePosition(lineIdx, editor.getParagraphLength(lineIdx));
+    // Include the newline if possible
+    if (lineIdx < editor.getParagraphs().size() - 1) {
+      end = editor.getAbsolutePosition(lineIdx + 1, 0);
+    } else if (lineIdx > 0) {
+      start = editor.getAbsolutePosition(lineIdx - 1, editor.getParagraphLength(lineIdx - 1));
+    }
+    editor.deleteText(start, end);
+  }
+
   /**
    * Scans the editor text for user-declared variables (Type varName) and functions (fun retType
    * name(...)) to include them in global completion.
@@ -2893,6 +2961,7 @@ public class ChuckIDE extends Application {
           prefTabWidth = prefs.getInt("editor.tabWidth", 4);
           prefUseSpaces = prefs.getBoolean("editor.useSpaces", true);
           prefSmartIndent = prefs.getBoolean("editor.smartIndent", true);
+          prefAutoSave = prefs.getBoolean("editor.autoSave", false);
 
           String fontStyle = "-fx-font-family: 'Monospaced'; -fx-font-size: " + prefFontSize + ";";
           for (Tab t : tabPane.getTabs()) {
