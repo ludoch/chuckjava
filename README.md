@@ -97,7 +97,21 @@
 | 72 | **Doc Comment Extraction** — Added support for `/** ... */` comments; extracted and linked to classes, methods, and globals. | ✅ Fixed |
 | 73 | **Real Hardware `SerialIO`** — Replaced the serial stub with a full implementation using `jSerialComm`; supports port listing, baud rates, and asynchronous data events. | ✅ Fixed |
 
+| 74 | **Live Network Broadcasting** | ✅ Fixed — Added `Broadcaster` UGen to stream live audio over HTTP (raw WAV or compressed MP3 via ffmpeg). |
+| 75 | **Multi-channel ADC** | ✅ Fixed — Upgraded `Adc` to support multi-channel hardware inputs. |
+| 76 | **3D Audio & Spatialization** | ✅ Fixed — Added `Spatial3D` (binaural ITD/ILD panner) and `AmbisonicEncoder`/`AmbisonicDecoder` (B-format). |
+| 77 | **Advanced LiSa** | ✅ Fixed — `LiSa` live sampling now supports 256 voices, cubic interpolation, and stereo panning. |
+| 78 | **Vectorized Core Engine** | ✅ Fixed — `SinOsc`, `SawOsc`, `PulseOsc`, and all core IIR filters (`LPF`, `ResonZ`, etc.) now use SIMD vectorization and block caching. |
+| 79 | **IDE: Control Surface** | ✅ Fixed — Auto-generates UI sliders for any `global` variables in your ChucK scripts. |
+| 80 | **IDE: Advanced Visualizers** | ✅ Fixed — Added scrolling Waterfall Spectrogram and Stereo Phase (Vectorscope) to the UI. |
+| 81 | **IDE: Preferences & Workflow** | ✅ Fixed — Dedicated Prefs tab, live audio engine restart, customizable syntax colors, drag-and-drop files, and auto-save on run. |
+
 ### New Features
+
+#### 🌐 Network Audio & 3D Spatialization
+- **`Broadcaster`**: Stream your ChucK session live over the network. Run `adc => Broadcaster b => dac; b.format("mp3"); b.start();` and tune in via VLC or browser at `http://localhost:8080/stream`.
+- **`Spatial3D`**: Binaural panner for headphones, utilizing Head-Related Time/Level Differences (ITD/ILD) and distance attenuation.
+- **Ambisonics**: First-order B-format spatial encoding (`AmbisonicEncoder`) and decoding (`AmbisonicDecoder`) to stereo or quadraphonic speaker layouts.
 
 #### 🎹 Advanced Audio Analysis (UAna)
 - **`RMS`**: Root Mean Square power analyzer.

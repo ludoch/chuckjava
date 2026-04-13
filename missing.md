@@ -20,6 +20,10 @@ Effects: `Echo`, `Delay`, `DelayL`, `DelayA`, `Chorus`, `JCRev`, `NRev`, `PRCRev
 
 Multichannel: `Pan2/4/8/16/N`, `Mix2/4/8/16/N`, `Identity2`, `UGen_Multi`, `UGen_Stereo`
 
+Spatial & 3D: `Spatial3D`, `AmbisonicEncoder`, `AmbisonicDecoder`
+
+Network & I/O: `Broadcaster`, `Adc` (multi-channel)
+
 Envelopes: `Envelope`, `Adsr`
 
 Instruments (STK): `Clarinet`, `Mandolin`, `Plucked`, `Rhodey`, `Wurley`, `TubeBell`, `BeeThree`, `FMVoices`, `HevyMetl`, `PercFlut`, `Moog`, `Saxofony`, `Flute`, `Brass`, `Sitar`, `StifKarp`, `Shakers`, `Bowed`

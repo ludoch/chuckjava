@@ -17,14 +17,14 @@ Class: `org.chuck.audio.util.Adsr`
 - `releaseInc` (float)
 
 ### Methods
-- `attackTime()` -> double
-- `decayTime()` -> double
-- `sustainLevel()` -> double
-- `releaseTime()` -> double
-- `keyOn(int)` -> void
 - `keyOn()` -> void
+- `keyOn(int)` -> void
 - `keyOff()` -> void
 - `keyOff(int)` -> void
+- `sustainLevel()` -> double
+- `attackTime()` -> double
+- `decayTime()` -> double
+- `releaseTime()` -> double
 - `getAttackTime()` -> double
 - `getDecayTime()` -> double
 - `getSustainLevel()` -> double
@@ -36,16 +36,17 @@ Class: `org.chuck.audio.util.Adsr`
 - `getState()` -> int
 
 ## Adc
+Description: Audio Device Controller (hardware input).
+
 Class: `org.chuck.audio.util.Adc`
 
 ### Parameters
-- `inputL` (float)
-- `inputR` (float)
+- `currentInput` (float[])
 
 ### Methods
+- `getChannelLastOut(int)` -> float
 - `setInputSample(int, float)` -> void
-- `getInputLeft()` -> float
-- `getInputRight()` -> float
+- `getInput(int)` -> float
 
 ## Adsr
 Class: `org.chuck.audio.util.Adsr`
@@ -62,14 +63,14 @@ Class: `org.chuck.audio.util.Adsr`
 - `releaseInc` (float)
 
 ### Methods
-- `attackTime()` -> double
-- `decayTime()` -> double
-- `sustainLevel()` -> double
-- `releaseTime()` -> double
-- `keyOn(int)` -> void
 - `keyOn()` -> void
+- `keyOn(int)` -> void
 - `keyOff()` -> void
 - `keyOff(int)` -> void
+- `sustainLevel()` -> double
+- `attackTime()` -> double
+- `decayTime()` -> double
+- `releaseTime()` -> double
 - `getAttackTime()` -> double
 - `getDecayTime()` -> double
 - `getSustainLevel()` -> double
@@ -79,6 +80,12 @@ Class: `org.chuck.audio.util.Adsr`
 - `set(double, double, double, double)` -> void
 - `state()` -> int
 - `getState()` -> int
+
+## AmbisonicDecoder
+Category: Built-in Unit Generator
+
+## AmbisonicEncoder
+Category: Built-in Unit Generator
 
 ## AutoCorr
 Class: `org.chuck.audio.analysis.AutoCorr`
@@ -150,9 +157,9 @@ Class: `org.chuck.audio.stk.BandedWG`
 - `bowVelocity` (float)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## BeeThree
 Class: `org.chuck.audio.stk.BeeThree`
@@ -164,9 +171,9 @@ Class: `org.chuck.audio.stk.BeeThree`
 - `env` (Adsr)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## BiQuad
 Class: `org.chuck.audio.filter.BiQuad`
@@ -225,6 +232,9 @@ Class: `org.chuck.audio.filter.BiQuadStk`
 - `freq(double)` -> void
 - `set(double, double)` -> void
 
+## Bitcrusher
+Category: Built-in Unit Generator
+
 ## Blackhole
 Class: `org.chuck.audio.util.Blackhole`
 
@@ -265,8 +275,8 @@ Class: `org.chuck.audio.osc.BlitSaw`
 - `getSync()` -> int
 - `last()` -> float
 - `init(double)` -> void
-- `sync(int)` -> int
 - `sync()` -> int
+- `sync(int)` -> int
 - `width()` -> double
 - `width(double)` -> double
 - `phase(double)` -> double
@@ -289,8 +299,8 @@ Class: `org.chuck.audio.osc.BlitSquare`
 - `getSync()` -> int
 - `last()` -> float
 - `init(double)` -> void
-- `sync(int)` -> int
 - `sync()` -> int
+- `sync(int)` -> int
 - `width()` -> double
 - `width(double)` -> double
 - `phase(double)` -> double
@@ -310,9 +320,9 @@ Class: `org.chuck.audio.stk.BlowBotl`
 - `freq` (double)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## BlowHole
 Class: `org.chuck.audio.stk.BlowHole`
@@ -330,9 +340,9 @@ Class: `org.chuck.audio.stk.BlowHole`
 - `freq` (double)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 - `tonehole(double)` -> void
 - `vent(double)` -> void
 
@@ -347,10 +357,30 @@ Class: `org.chuck.audio.stk.Brass`
 - `pressure` (float)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 - `lip(float)` -> void
+
+## Broadcaster
+Description: Broadcasts audio over the network via HTTP. Supports raw WAV or compressed MP3.
+
+Class: `org.chuck.audio.util.Broadcaster`
+
+### Parameters
+- `server` (HttpServer)
+- `audioQueue` (ConcurrentLinkedQueue)
+- `port` (int)
+- `active` (boolean)
+- `format` (String)
+- `pcmBuffer` (byte[])
+- `pcmIdx` (int)
+
+### Methods
+- `format()` -> String : Get the current output format.
+- `format(String)` -> String : Set the output format ('wav' or 'mp3'). Requires ffmpeg installed for MP3.
+- `start()` -> void
+- `close()` -> void
 
 ## CNoise
 Class: `org.chuck.audio.osc.CNoise`
@@ -410,9 +440,9 @@ Class: `org.chuck.audio.stk.Clarinet`
 - `outputGain` (float)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## DCT
 Class: `org.chuck.audio.analysis.DCT`
@@ -439,6 +469,7 @@ Class: `org.chuck.audio.fx.Delay`
 - `setDelay(double)` -> void
 - `getDelay()` -> double
 - `init(double, double)` -> void
+- `delay(double)` -> double
 - `delay()` -> double
 
 ## DelayA
@@ -566,6 +597,12 @@ Class: `org.chuck.audio.util.Envelope`
 - `setTarget(float)` -> void
 - `setTime(float)` -> void
 
+## ExpDelay
+Category: Built-in Unit Generator
+
+## ExpEnv
+Category: Built-in Unit Generator
+
 ## FFT
 Class: `org.chuck.audio.analysis.FFT`
 
@@ -575,12 +612,18 @@ Class: `org.chuck.audio.analysis.FFT`
 - `ring` (float[])
 - `writePos` (int)
 - `win` (double[])
+- `latestMags` (float[])
+- `samplesSinceLastFFT` (int)
 
 ### Methods
 - `setWindow(int)` -> void
 - `getWindow()` -> int
+- `getLatestMags()` -> float[]
 - `getSize()` -> int
 - `setSize(int)` -> void
+
+## FIR
+Category: Built-in Unit Generator
 
 ## FMVoices
 Class: `org.chuck.audio.stk.FMVoices`
@@ -596,9 +639,9 @@ Class: `org.chuck.audio.stk.FMVoices`
 - `vibratoDepth` (float)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 - `setVibratoDepth(double)` -> void
 
 ## FeatureCollector
@@ -661,15 +704,18 @@ Class: `org.chuck.audio.stk.Flute`
 - `pressure` (float)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## Flux
 Class: `org.chuck.audio.analysis.Flux`
 
 ### Parameters
 - `prevMagnitudes` (float[])
+
+## FoldbackSaturator
+Category: Built-in Unit Generator
 
 ## FrencHrn
 Class: `org.chuck.audio.stk.FrencHrn`
@@ -683,9 +729,9 @@ Class: `org.chuck.audio.stk.FrencHrn`
 - `modIndex` (double)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## FullRect
 Class: `org.chuck.audio.util.FullRect`
@@ -766,9 +812,9 @@ Class: `org.chuck.audio.stk.HevyMetl`
 - `baseFreq` (double)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## HnkyTonk
 Class: `org.chuck.audio.stk.HnkyTonk`
@@ -783,9 +829,9 @@ Class: `org.chuck.audio.stk.HnkyTonk`
 - `modIndex` (double)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## IDCT
 Class: `org.chuck.audio.analysis.IDCT`
@@ -829,6 +875,9 @@ Class: `org.chuck.audio.fx.JCRev`
 ## JetTabl
 Class: `org.chuck.audio.util.JetTabl`
 
+## KasFilter
+Category: Built-in Unit Generator
+
 ## KrstlChr
 Class: `org.chuck.audio.stk.KrstlChr`
 
@@ -840,20 +889,22 @@ Class: `org.chuck.audio.stk.KrstlChr`
 - `modIndex` (double)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## LPF
+Description: Low Pass Filter (1-pole).
+
 Class: `org.chuck.audio.filter.Lpf`
 
 ### Parameters
 - `cutoff` (float)
-- `resonance` (float)
 - `v0` (float)
-- `v1` (float)
 
 ### Methods
+- `freq(double)` -> double
+- `freq()` -> double
 - `setCutoff(float)` -> void
 
 ## LiSa
@@ -863,20 +914,30 @@ Class: `org.chuck.audio.util.LiSa`
 - `buffer` (float[])
 - `recPos` (int)
 - `isRecording` (boolean)
+- `feedback` (float)
 - `voices` (Voice[])
+- `lastL` (float)
+- `lastR` (float)
 
 ### Methods
+- `getChannelLastOut(int)` -> float
+- `feedback(float)` -> void
+- `rate(float)` -> void
 - `rate(int, float)` -> void
-- `playPos()` -> double
-- `play(int)` -> void
+- `recPos(long)` -> void
 - `play(int, int)` -> void
-- `loop0(int)` -> void
+- `play(int)` -> void
+- `voiceGain(int, float)` -> void
+- `voicePan(int, float)` -> void
 - `record(int)` -> void
+- `duration(ChuckDuration)` -> void
 - `duration(long)` -> void
-- `pos(int, long)` -> void
+- `pos(int, double)` -> void
+- `pos(double)` -> void
 - `loop(int, int)` -> void
 - `loop(int)` -> void
 - `bi(int)` -> void
+- `bi(int, int)` -> void
 
 ## LiSa10
 Category: Built-in Unit Generator
@@ -914,16 +975,21 @@ Category: Built-in Unit Generator
 Category: Built-in Unit Generator
 
 ## Lpf
+Description: Low Pass Filter (1-pole).
+
 Class: `org.chuck.audio.filter.Lpf`
 
 ### Parameters
 - `cutoff` (float)
-- `resonance` (float)
 - `v0` (float)
-- `v1` (float)
 
 ### Methods
+- `freq(double)` -> double
+- `freq()` -> double
 - `setCutoff(float)` -> void
+
+## MagicSine
+Category: Built-in Unit Generator
 
 ## Mandolin
 Class: `org.chuck.audio.stk.Mandolin`
@@ -989,9 +1055,9 @@ Class: `org.chuck.audio.stk.ModalBar`
 - `freq` (double)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## Modulate
 Class: `org.chuck.audio.util.Modulate`
@@ -1019,9 +1085,9 @@ Class: `org.chuck.audio.stk.Moog`
 - `freq` (double)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 - `filterQ(float)` -> void
 - `filterSweep(float)` -> void
 
@@ -1051,6 +1117,7 @@ Class: `org.chuck.audio.filter.OnePole`
 - `lastOutput` (float)
 
 ### Methods
+- `freq(double)` -> double
 - `setPole(float)` -> void
 - `setB0(float)` -> void
 - `setA1(float)` -> void
@@ -1067,6 +1134,9 @@ Class: `org.chuck.audio.filter.OneZero`
 - `setB0(float)` -> void
 - `setB1(float)` -> void
 - `setZero(float)` -> void
+
+## Overdrive
+Category: Built-in Unit Generator
 
 ## PRCRev
 Class: `org.chuck.audio.fx.PRCRev`
@@ -1100,10 +1170,12 @@ Class: `org.chuck.audio.util.Pan2`
 - `panType` (int)
 - `gL` (float)
 - `gR` (float)
+- `multiBlockCache` (float[][])
 
 ### Methods
-- `pan()` -> float
 - `pan(float)` -> float
+- `pan()` -> float
+- `getChannelLastOut(int, long)` -> float
 - `panType(int)` -> int
 - `setPan(float)` -> void
 - `getPan()` -> float
@@ -1152,9 +1224,12 @@ Class: `org.chuck.audio.stk.PercFlut`
 - `baseFreq` (double)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
+
+## Perlin
+Category: Built-in Unit Generator
 
 ## Phasor
 Class: `org.chuck.audio.osc.Phasor`
@@ -1173,8 +1248,8 @@ Class: `org.chuck.audio.osc.Phasor`
 - `getSync()` -> int
 - `last()` -> float
 - `init(double)` -> void
-- `sync(int)` -> int
 - `sync()` -> int
+- `sync(int)` -> int
 - `width()` -> double
 - `width(double)` -> double
 - `phase(double)` -> double
@@ -1204,8 +1279,8 @@ Class: `org.chuck.audio.stk.Plucked`
 
 ### Methods
 - `setData(int, long)` -> void
-- `noteOn(float)` -> void
 - `setFreq(double)` -> void
+- `noteOn(float)` -> void
 
 ## PoleZero
 Class: `org.chuck.audio.filter.PoleZero`
@@ -1224,6 +1299,9 @@ Class: `org.chuck.audio.filter.PoleZero`
 - `setAllpass(double)` -> void
 - `setBlockZero(double)` -> void
 
+## PowerADSR
+Category: Built-in Unit Generator
+
 ## PulseOsc
 Class: `org.chuck.audio.osc.PulseOsc`
 
@@ -1241,8 +1319,8 @@ Class: `org.chuck.audio.osc.PulseOsc`
 - `getSync()` -> int
 - `last()` -> float
 - `init(double)` -> void
-- `sync(int)` -> int
 - `sync()` -> int
+- `sync(int)` -> int
 - `width()` -> double
 - `width(double)` -> double
 - `phase(double)` -> double
@@ -1258,6 +1336,9 @@ Class: `org.chuck.audio.analysis.RMS`
 
 ### Methods
 - `setSize(int)` -> void
+
+## Range
+Category: Built-in Unit Generator
 
 ## ResonZ
 Class: `org.chuck.audio.filter.ResonZ`
@@ -1288,9 +1369,9 @@ Class: `org.chuck.audio.stk.Rhodey`
 - `modIndex` (float)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## Rolloff
 Class: `org.chuck.audio.analysis.Rolloff`
@@ -1320,8 +1401,8 @@ Class: `org.chuck.audio.osc.SawOsc`
 - `getSync()` -> int
 - `last()` -> float
 - `init(double)` -> void
-- `sync(int)` -> int
 - `sync()` -> int
+- `sync(int)` -> int
 - `width()` -> double
 - `width(double)` -> double
 - `phase(double)` -> double
@@ -1338,9 +1419,9 @@ Class: `org.chuck.audio.stk.Saxofony`
 - `pressure` (float)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## Shakers
 Class: `org.chuck.audio.stk.Shakers`
@@ -1379,8 +1460,8 @@ Class: `org.chuck.audio.osc.SinOsc`
 - `getSync()` -> int
 - `last()` -> float
 - `init(double)` -> void
-- `sync(int)` -> int
 - `sync()` -> int
+- `sync(int)` -> int
 - `width()` -> double
 - `width(double)` -> double
 - `phase(double)` -> double
@@ -1397,8 +1478,8 @@ Class: `org.chuck.audio.stk.Sitar`
 - `ampmult` (float)
 
 ### Methods
-- `noteOn(float)` -> void
 - `setFreq(double)` -> void
+- `noteOn(float)` -> void
 
 ## SndBuf
 Class: `org.chuck.audio.util.SndBuf`
@@ -1441,6 +1522,25 @@ Class: `org.chuck.audio.util.SndBuf2`
 - `loop(int)` -> void
 - `read(String)` -> void
 
+## Spatial3D
+Description: Binaural 3D panner for headphones. Uses ITD and ILD models.
+
+Class: `org.chuck.audio.util.Spatial3D`
+
+### Parameters
+- `azimuth` (float)
+- `elevation` (float)
+- `distance` (float)
+- `delayL` (Delay)
+- `delayR` (Delay)
+- `shadowL` (OnePole)
+- `shadowR` (OnePole)
+
+### Methods
+- `azimuth(float)` -> void : Set azimuth in degrees (-180 to 180). 0 is front, 90 is right.
+- `elevation(float)` -> void : Set elevation in degrees (-90 to 90).
+- `distance(float)` -> void : Set distance (normalized). 1.0 is default.
+
 ## SqrOsc
 Class: `org.chuck.audio.osc.SqrOsc`
 
@@ -1458,8 +1558,8 @@ Class: `org.chuck.audio.osc.SqrOsc`
 - `getSync()` -> int
 - `last()` -> float
 - `init(double)` -> void
-- `sync(int)` -> int
 - `sync()` -> int
+- `sync(int)` -> int
 - `width()` -> double
 - `width(double)` -> double
 - `phase(double)` -> double
@@ -1484,9 +1584,9 @@ Class: `org.chuck.audio.stk.StifKarp`
 - `lastInput` (float)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 - `pickupPos(float)` -> void
 
 ## SubNoise
@@ -1528,8 +1628,8 @@ Class: `org.chuck.audio.osc.TriOsc`
 - `getSync()` -> int
 - `last()` -> float
 - `init(double)` -> void
-- `sync(int)` -> int
 - `sync()` -> int
+- `sync(int)` -> int
 - `width()` -> double
 - `width(double)` -> double
 - `phase(double)` -> double
@@ -1548,9 +1648,9 @@ Class: `org.chuck.audio.stk.TubeBell`
 - `baseFreq` (double)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## TwoPole
 Class: `org.chuck.audio.filter.TwoPole`
@@ -1569,13 +1669,11 @@ Class: `org.chuck.audio.filter.TwoPole`
 - `freq()` -> double
 - `freq(double)` -> double
 - `norm(double)` -> double
-- `setB0(double)` -> void
-- `setA1(double)` -> void
-- `setA2(double)` -> void
-- `radius()` -> double
 - `radius(double)` -> double
-- `setResonance(double, double)` -> void
+- `radius()` -> double
+- `setA2(double)` -> void
 - `setResonance(double, double, boolean)` -> void
+- `setResonance(double, double)` -> void
 
 ## TwoZero
 Class: `org.chuck.audio.filter.TwoZero`
@@ -1590,14 +1688,12 @@ Class: `org.chuck.audio.filter.TwoZero`
 - `notchRad` (double)
 
 ### Methods
-- `freq()` -> double
 - `freq(double)` -> double
-- `setB0(double)` -> void
-- `setB1(double)` -> void
-- `setB2(double)` -> void
-- `setNotch(double, double)` -> void
+- `freq()` -> double
 - `radius()` -> double
 - `radius(double)` -> double
+- `setB2(double)` -> void
+- `setNotch(double, double)` -> void
 
 ## UnFlip
 Class: `org.chuck.audio.analysis.UnFlip`
@@ -1617,13 +1713,22 @@ Class: `org.chuck.audio.stk.VoicForm`
 - `phonemeIdx` (int)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 - `phoneme(int)` -> void
+
+## WPDiodeLadder
+Category: Built-in Unit Generator
+
+## WPKorg35
+Category: Built-in Unit Generator
 
 ## WaveLoop
 Class: `org.chuck.audio.osc.WaveLoop`
+
+## WinFuncEnv
+Category: Built-in Unit Generator
 
 ## Wurley
 Class: `org.chuck.audio.stk.Wurley`
@@ -1637,9 +1742,9 @@ Class: `org.chuck.audio.stk.Wurley`
 - `modIndex` (float)
 
 ### Methods
+- `setFreq(double)` -> void
 - `noteOn(float)` -> void
 - `noteOff(float)` -> void
-- `setFreq(double)` -> void
 
 ## WvIn
 Class: `org.chuck.audio.util.WvIn`
