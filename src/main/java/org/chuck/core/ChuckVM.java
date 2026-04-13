@@ -8,11 +8,13 @@ import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.prefs.Preferences;
 import org.antlr.v4.runtime.*;
 import org.chuck.audio.util.Adc;
 import org.chuck.audio.util.Blackhole;
@@ -568,6 +570,10 @@ public class ChuckVM {
 
   public void advanceTime(long samples) {
     long targetTime = now.get() + samples;
+    boolean parallel =
+        Preferences.userNodeForPackage(org.chuck.ide.ChuckIDE.class)
+            .getBoolean("engine.parallel", false);
+
     while (now.get() < targetTime) {
       long currentTime = now.get();
 
@@ -602,14 +608,23 @@ public class ChuckVM {
 
         if (ready.isEmpty()) break;
 
-        for (ChuckShred nextShred : ready) {
-          long jitter = currentTime - nextShred.getWakeTime();
-          totalJitter.addAndGet(jitter);
-          wakeCount.incrementAndGet();
-          if (jitter > maxJitter.get()) maxJitter.set(jitter);
-
-          // Synchronous resume: waits for the shred to reach its next yield point.
-          nextShred.resume(this);
+        if (parallel && ready.size() > 1) {
+          // PARALLEL MODE: Resume all at once and wait
+          final Phaser phaser = new Phaser(1); // 1 for the current thread
+          for (ChuckShred nextShred : ready) {
+            updateJitter(currentTime, nextShred);
+            phaser.register();
+            nextShred.onNextPark(phaser::arriveAndDeregister);
+            nextShred.resume(this, false); // Asynchronous resume
+          }
+          // Wait for all shreds to park (yield or suspend)
+          phaser.arriveAndAwaitAdvance();
+        } else {
+          // SCALAR MODE: Resume one by one
+          for (ChuckShred nextShred : ready) {
+            updateJitter(currentTime, nextShred);
+            nextShred.resume(this, true); // Synchronous resume
+          }
         }
       }
 
@@ -623,6 +638,13 @@ public class ChuckVM {
 
       now.incrementAndGet();
     }
+  }
+
+  private void updateJitter(long currentTime, ChuckShred shred) {
+    long jitter = currentTime - shred.getWakeTime();
+    totalJitter.addAndGet(jitter);
+    wakeCount.incrementAndGet();
+    if (jitter > maxJitter.get()) maxJitter.set(jitter);
   }
 
   /** Optimized advancement that can process blocks using SIMD if no shreds wake up. */
@@ -656,7 +678,7 @@ public class ChuckVM {
         processed += blockSize;
       } else {
         // SLOW PATH: A shred is waking up. Fall back to sample-by-sample.
-        // advanceTime(1) increments 'now' at the end of its loop.
+        // advanceTime(1) will handle parallel execution if enabled.
         advanceTime(1);
         for (int c = 0; c < numChannels; c++) {
           dacBuffers[c][offset + processed] = dacChannels[c].getLastOut();

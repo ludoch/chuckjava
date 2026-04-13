@@ -85,10 +85,17 @@ public class WaveformGoldenTest {
     vm.run(code, "test");
 
     float[] buffer = new float[samples];
-    // Use scalar mode for stable, bit-exact verification
-    for (int i = 0; i < samples; i++) {
-      vm.advanceTime(1);
-      buffer[i] = vm.getChannelLastOut(0);
+    boolean useBlock = Boolean.getBoolean("test.useBlock");
+
+    if (!useBlock) {
+      for (int i = 0; i < samples; i++) {
+        vm.advanceTime(1);
+        buffer[i] = vm.getChannelLastOut(0);
+      }
+    } else {
+      float[][] dacBufs = new float[2][samples];
+      vm.advanceTime(dacBufs, 0, samples);
+      System.arraycopy(dacBufs[0], 0, buffer, 0, samples);
     }
     return buffer;
   }

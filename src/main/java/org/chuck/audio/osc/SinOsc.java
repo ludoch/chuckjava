@@ -3,6 +3,7 @@ package org.chuck.audio.osc;
 import static org.chuck.audio.VectorAudio.OFFSETS;
 import static org.chuck.audio.VectorAudio.SPECIES;
 
+import java.util.List;
 import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.core.doc;
@@ -43,8 +44,9 @@ public class SinOsc extends Osc {
 
     // If we have sources (modulation), we must sum them first
     float[] inputSum = new float[length];
-    if (getNumSources() > 0) {
-      for (ChuckUGen src : sources) {
+    List<ChuckUGen> srcs = getSources();
+    if (!srcs.isEmpty()) {
+      for (ChuckUGen src : srcs) {
         float[] temp = new float[length];
         src.tick(temp, 0, length, systemTime);
         for (int j = 0; j < length; j++) inputSum[j] += temp[j];

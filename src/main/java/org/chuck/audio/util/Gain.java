@@ -2,6 +2,7 @@
 // In JDK 25, this is still the standard location for Vector API.
 package org.chuck.audio.util;
 
+import java.util.List;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorSpecies;
 import org.chuck.audio.ChuckUGen;
@@ -53,21 +54,24 @@ public class Gain extends ChuckUGen {
     java.util.Arrays.fill(blockCache, 0, length, 0.0f);
 
     // Vectorized summing from all sources
-    for (org.chuck.audio.ChuckUGen src : sources) {
-      float[] temp = new float[length];
-      src.tick(temp, 0, length, systemTime);
+    List<ChuckUGen> srcs = getSources();
+    if (!srcs.isEmpty()) {
+      for (ChuckUGen src : srcs) {
+        float[] temp = new float[length];
+        src.tick(temp, 0, length, systemTime);
 
-      // SIMD Addition: blockCache += temp
-      int i = 0;
-      int bound = SPECIES.loopBound(length);
-      for (; i < bound; i += SPECIES.length()) {
-        FloatVector vSum = FloatVector.fromArray(SPECIES, blockCache, i);
-        FloatVector vSrc = FloatVector.fromArray(SPECIES, temp, i);
-        vSum.add(vSrc).intoArray(blockCache, i);
-      }
-      // Fallback
-      for (; i < length; i++) {
-        blockCache[i] += temp[i];
+        // SIMD Addition: blockCache += temp
+        int i = 0;
+        int bound = SPECIES.loopBound(length);
+        for (; i < bound; i += SPECIES.length()) {
+          FloatVector vSum = FloatVector.fromArray(SPECIES, blockCache, i);
+          FloatVector vSrc = FloatVector.fromArray(SPECIES, temp, i);
+          vSum.add(vSrc).intoArray(blockCache, i);
+        }
+        // Fallback
+        for (; i < length; i++) {
+          blockCache[i] += temp[i];
+        }
       }
     }
 

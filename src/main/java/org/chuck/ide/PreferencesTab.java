@@ -96,6 +96,15 @@ public class PreferencesTab extends ScrollPane {
           }
         });
 
+    CheckBox parallelCb = new CheckBox("Parallel Shred Execution");
+    parallelCb.setSelected(prefs.getBoolean("engine.parallel", false));
+    parallelCb
+        .selectedProperty()
+        .addListener(
+            (obs, oldV, newV) -> {
+              prefs.putBoolean("engine.parallel", newV);
+            });
+
     grid.add(new Label("Sample Rate:"), 0, 0);
     grid.add(srBox, 1, 0);
     grid.add(new Label("Buffer Size:"), 0, 1);
@@ -104,7 +113,8 @@ public class PreferencesTab extends ScrollPane {
     grid.add(outDevBox, 1, 2);
     grid.add(new Label("Input Device:"), 0, 3);
     grid.add(inDevBox, 1, 3);
-    grid.add(applyBtn, 0, 4, 2, 1);
+    grid.add(parallelCb, 0, 4, 2, 1);
+    grid.add(applyBtn, 0, 5, 2, 1);
 
     TitledPane pane = new TitledPane("Audio Engine", grid);
     pane.setCollapsible(false);

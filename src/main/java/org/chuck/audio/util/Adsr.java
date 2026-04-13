@@ -2,6 +2,7 @@ package org.chuck.audio.util;
 
 import static org.chuck.audio.VectorAudio.SPECIES;
 
+import java.util.List;
 import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 
@@ -163,19 +164,22 @@ public class Adsr extends ChuckUGen {
       java.util.Arrays.fill(blockCache, 0, length, 0.0f);
 
       // Vectorized summing from all sources
-      for (org.chuck.audio.ChuckUGen src : sources) {
-        float[] temp = new float[length];
-        src.tick(temp, 0, length, systemTime);
+      List<ChuckUGen> srcs = getSources();
+      if (!srcs.isEmpty()) {
+        for (ChuckUGen src : srcs) {
+          float[] temp = new float[length];
+          src.tick(temp, 0, length, systemTime);
 
-        // SIMD Addition: blockCache += temp
-        int j = 0;
-        int bound = SPECIES.loopBound(length);
-        for (; j < bound; j += SPECIES.length()) {
-          FloatVector vSum = FloatVector.fromArray(SPECIES, blockCache, j);
-          FloatVector vSrc = FloatVector.fromArray(SPECIES, temp, j);
-          vSum.add(vSrc).intoArray(blockCache, j);
+          // SIMD Addition: blockCache += temp
+          int j = 0;
+          int bound = SPECIES.loopBound(length);
+          for (; j < bound; j += SPECIES.length()) {
+            FloatVector vSum = FloatVector.fromArray(SPECIES, blockCache, j);
+            FloatVector vSrc = FloatVector.fromArray(SPECIES, temp, j);
+            vSum.add(vSrc).intoArray(blockCache, j);
+          }
+          for (; j < length; j++) blockCache[j] += temp[j];
         }
-        for (; j < length; j++) blockCache[j] += temp[j];
       }
 
       int bound = SPECIES.loopBound(length);

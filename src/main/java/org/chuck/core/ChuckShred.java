@@ -49,6 +49,22 @@ public class ChuckShred implements Comparable<ChuckShred> {
   private ChuckEvent eventWaitingOn = null;
   private ChuckShred parentShred = null;
 
+  private final List<Runnable> parkedListeners = Collections.synchronizedList(new ArrayList<>());
+
+  public void onNextPark(Runnable r) {
+    parkedListeners.add(r);
+  }
+
+  private void notifyParked() {
+    List<Runnable> copy;
+    synchronized (parkedListeners) {
+      if (parkedListeners.isEmpty()) return;
+      copy = new ArrayList<>(parkedListeners);
+      parkedListeners.clear();
+    }
+    for (Runnable r : copy) r.run();
+  }
+
   // Execution state
   private ChuckCode code;
   public int pc = 0;
@@ -291,6 +307,7 @@ public class ChuckShred implements Comparable<ChuckShred> {
       this.isRunning = false;
       this.isWaiting = true;
       condition.signal();
+      notifyParked();
       while (isWaiting && !isDone) condition.await();
     } catch (InterruptedException e) {
       isDone = true;
@@ -317,13 +334,19 @@ public class ChuckShred implements Comparable<ChuckShred> {
 
   // VM Control: Synchronous Resume/Yield Logic
   public void resume(ChuckVM vm) {
+    resume(vm, true);
+  }
+
+  public void resume(ChuckVM vm, boolean synchronous) {
     lock.lock();
     try {
       isRunning = true;
       isWaiting = false;
       condition.signal();
-      while (isRunning && !isDone) {
-        condition.await();
+      if (synchronous) {
+        while (isRunning && !isDone) {
+          condition.await();
+        }
       }
     } catch (InterruptedException e) {
       isDone = true;
@@ -351,6 +374,7 @@ public class ChuckShred implements Comparable<ChuckShred> {
       this.wakeTime += samples;
       this.isRunning = false;
       condition.signal();
+      notifyParked();
     } finally {
       lock.unlock();
     }
@@ -462,6 +486,7 @@ public class ChuckShred implements Comparable<ChuckShred> {
       isDone = true;
       isRunning = false;
       condition.signal();
+      notifyParked();
       lock.unlock();
     }
   }

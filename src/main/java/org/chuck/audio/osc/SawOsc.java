@@ -3,6 +3,7 @@ package org.chuck.audio.osc;
 import static org.chuck.audio.VectorAudio.OFFSETS;
 import static org.chuck.audio.VectorAudio.SPECIES;
 
+import java.util.List;
 import jdk.incubator.vector.FloatVector;
 
 /**
@@ -48,7 +49,8 @@ public class SawOsc extends Osc {
     }
 
     int i = 0;
-    if (getNumSources() == 0) {
+    List<org.chuck.audio.ChuckUGen> srcs = getSources();
+    if (srcs.isEmpty()) {
       float f_freq = (float) freq;
       float f_phase = (float) phase;
       float f_inc = f_freq / sampleRate;

@@ -1,14 +1,16 @@
 package org.chuck.audio;
 
+import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.locks.ReentrantLock;
 import org.chuck.core.ChuckObject;
 import org.chuck.core.ChuckType;
 
 /** Base class for Unit Generators. */
 public abstract class ChuckUGen extends ChuckObject {
-  protected final List<ChuckUGen> sources = new CopyOnWriteArrayList<>();
-  protected final List<ChuckUGen> targets = new CopyOnWriteArrayList<>();
+  protected final List<ChuckUGen> sources = new ArrayList<>();
+  protected final List<ChuckUGen> targets = new ArrayList<>();
+  protected final ReentrantLock ugenLock = new ReentrantLock();
 
   @SuppressWarnings("unused") // Used via introspection in ChucK scripts
   public float lastOut = 0.0f;
@@ -53,15 +55,29 @@ public abstract class ChuckUGen extends ChuckObject {
   }
 
   public void addSource(ChuckUGen src) {
-    if (src != null && !sources.contains(src)) {
-      sources.add(src);
-      invalidateVmGraph();
+    if (src != null) {
+      ugenLock.lock();
+      try {
+        if (!sources.contains(src)) {
+          sources.add(src);
+          invalidateVmGraph();
+        }
+      } finally {
+        ugenLock.unlock();
+      }
     }
   }
 
   public void removeSource(ChuckUGen src) {
-    if (sources.remove(src)) {
-      invalidateVmGraph();
+    if (src != null) {
+      ugenLock.lock();
+      try {
+        if (sources.remove(src)) {
+          invalidateVmGraph();
+        }
+      } finally {
+        ugenLock.unlock();
+      }
     }
   }
 
@@ -74,8 +90,13 @@ public abstract class ChuckUGen extends ChuckObject {
   public void chuckTo(ChuckUGen target) {
     if (target != null) {
       target.addSource(this);
-      if (!targets.contains(target)) {
-        targets.add(target);
+      ugenLock.lock();
+      try {
+        if (!targets.contains(target)) {
+          targets.add(target);
+        }
+      } finally {
+        ugenLock.unlock();
       }
     }
   }
@@ -93,16 +114,32 @@ public abstract class ChuckUGen extends ChuckObject {
   public void unchuck(ChuckUGen target) {
     if (target != null) {
       target.removeSource(this);
-      targets.remove(target);
+      ugenLock.lock();
+      try {
+        targets.remove(target);
+      } finally {
+        ugenLock.unlock();
+      }
     }
   }
 
   /** Disconnect from all targets. */
   public void unchuckAll() {
-    for (ChuckUGen target : targets) {
+    List<ChuckUGen> copy;
+    ugenLock.lock();
+    try {
+      copy = new ArrayList<>(targets);
+      targets.clear();
+    } finally {
+      ugenLock.unlock();
+    }
+    for (ChuckUGen target : copy) {
       target.removeSource(this);
     }
-    targets.clear();
+  }
+
+  public void disconnectAll() {
+    unchuckAll();
   }
 
   public float tick(long systemTime) {
@@ -128,7 +165,8 @@ public abstract class ChuckUGen extends ChuckObject {
 
     try {
       float sum = 0.0f;
-      for (ChuckUGen src : sources) {
+      List<ChuckUGen> srcs = getSources();
+      for (ChuckUGen src : srcs) {
         sum += src.tick(systemTime);
       }
 
@@ -223,12 +261,33 @@ public abstract class ChuckUGen extends ChuckObject {
     return 0.0f;
   }
 
+  /** New method to support bit-exact multi-channel block caching. */
+  public float getChannelLastOut(int i, long systemTime) {
+    if (systemTime != -1
+        && blockLength > 0
+        && systemTime >= blockStartTime
+        && systemTime < blockStartTime + blockLength) {
+      return getChannelLastOut(i); // For mono, it's already in lastOut
+    }
+    return getChannelLastOut(i);
+  }
+
   public List<ChuckUGen> getSources() {
-    return sources;
+    ugenLock.lock();
+    try {
+      return new ArrayList<>(sources);
+    } finally {
+      ugenLock.unlock();
+    }
   }
 
   public int getNumSources() {
-    return sources.size();
+    ugenLock.lock();
+    try {
+      return sources.size();
+    } finally {
+      ugenLock.unlock();
+    }
   }
 
   public int isConnectedTo(ChuckUGen target) {
@@ -237,9 +296,16 @@ public abstract class ChuckUGen extends ChuckObject {
 
   private int isConnectedTo(ChuckUGen target, int depth) {
     if (depth > 5) return 0;
-    if (targets.contains(target)) return 1;
+    ugenLock.lock();
+    List<ChuckUGen> targetList;
+    try {
+      if (targets.contains(target)) return 1;
+      targetList = new ArrayList<>(targets);
+    } finally {
+      ugenLock.unlock();
+    }
     // Check if any of our targets connects to the target (recursive)
-    for (ChuckUGen t : targets) {
+    for (ChuckUGen t : targetList) {
       if (t.isConnectedTo(target, depth + 1) == 1) return 1;
     }
     // Also check input channels of target
@@ -251,25 +317,23 @@ public abstract class ChuckUGen extends ChuckObject {
     return 0;
   }
 
-  public void disconnectAll() {
-    for (ChuckUGen target : targets) {
-      target.removeSource(this);
-    }
-    targets.clear();
-
-    // Also check MultiChannelDac special case if we connected to DAC proxy
-    // Since MultiChannelDac isn't a single target in the conventional list
-    // (the ConnectToDac instruction might have bypassed targets list if it used MultiChannelDac
-    // proxy directly)
-    // Wait, ConnectToDac calls vm.getMultiChannelDac().addSource(ugen).
-    // Let's ensure the proxy itself tracks its sources or we handle it here.
-  }
-
   public void clearSources() {
-    for (ChuckUGen src : sources) {
-      src.targets.remove(this);
+    List<ChuckUGen> copy;
+    ugenLock.lock();
+    try {
+      copy = new ArrayList<>(sources);
+      sources.clear();
+    } finally {
+      ugenLock.unlock();
     }
-    sources.clear();
+    for (ChuckUGen src : copy) {
+      src.ugenLock.lock();
+      try {
+        src.targets.remove(this);
+      } finally {
+        src.ugenLock.unlock();
+      }
+    }
   }
 
   public void tick(float[] buffer) {
