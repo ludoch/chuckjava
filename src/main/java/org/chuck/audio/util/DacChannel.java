@@ -48,15 +48,12 @@ public class DacChannel extends ChuckUGen {
       float sum = 0.0f;
       java.util.List<ChuckUGen> srcs = getSources();
       for (ChuckUGen src : srcs) {
-        // Use the systemTime-aware lookup which handles internal ticking correctly
-        if (src.getNumOutputs() > 1 && channelIndex == 0) {
-          // Sum all channels for mono channel 0 pull if it's a stereo source
-          for (int c = 0; c < src.getNumOutputs(); c++) {
-            sum += src.getChannelLastOut(c, systemTime);
-          }
-        } else {
-          sum += src.getChannelLastOut(channelIndex, systemTime);
+        // Tick the source first (pull-based graph), then read channel-specific output
+        float val = src.tick(systemTime);
+        if (src.getNumOutputs() > 1) {
+          val = src.getChannelLastOut(channelIndex);
         }
+        if (Float.isFinite(val)) sum += val;
       }
       // Safety check: prevent NaNs or Infinity from reaching output
       if (!Float.isFinite(sum)) sum = 0.0f;

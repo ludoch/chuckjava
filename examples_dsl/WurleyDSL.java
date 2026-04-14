@@ -27,7 +27,7 @@ public class WurleyDSL implements Shred {
         voc.chuck(r).chuck(dac());
         voc.gain(0.95);
         r.gain(0.8f);
-        r.setMix(0.1f);
+        r.mix(0.1f);
 
         // play 10 notes
         for (int i = 0; i < 10; i++) {

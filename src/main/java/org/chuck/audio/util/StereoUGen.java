@@ -26,18 +26,12 @@ public abstract class StereoUGen extends MultiChannelUGen {
 
   @Override
   protected void computeMulti(float input, long systemTime) {
-    // Determine the true stereo input by checking sources
-    float inL = input;
-    float inR = input;
-
-    java.util.List<org.chuck.audio.ChuckUGen> srcs = getSources();
-    if (srcs.size() > 0) {
-      org.chuck.audio.ChuckUGen firstSrc = srcs.get(0);
-      inL = firstSrc.getChannelLastOut(0, systemTime);
-      inR = firstSrc.getChannelLastOut(1, systemTime);
-    }
-
-    computeStereo(inL, inR, systemTime);
+    // Use the already-summed mono input for stereo processing.
+    // Call the 2-arg version so subclasses that override computeStereo(left, right, t)
+    // (e.g. JCRev, Echo, NRev) are dispatched correctly.
+    // Subclasses that only override computeStereo(float, long) are reached via the
+    // default 2-arg fallback: computeStereo((left+right)*0.5f, t).
+    computeStereo(input, input, systemTime);
   }
 
   /** Subclasses can override this for true stereo processing. */

@@ -24,7 +24,7 @@ public class ClarDSL implements Shred {
 
         clair.chuck(r).chuck(dac());
         r.gain(0.75f);
-        r.setMix(0.1f);
+        r.mix(0.1f);
 
         int[] notes = {61, 63, 65, 66, 68, 66, 65, 63, 61};
 

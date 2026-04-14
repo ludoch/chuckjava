@@ -24,14 +24,6 @@ public class Pan2 extends StereoUGen {
     this.inputChannels = new ChuckUGen[] {new Gain(), new Gain()};
     this.outputChannels = new ChuckUGen[] {left, right};
 
-    // Internal routing for connection tracking
-    inputChannels[0].chuckTo(left);
-    inputChannels[1].chuckTo(right);
-
-    // Also connect to main processing for ticking
-    inputChannels[0].chuckTo(this);
-    inputChannels[1].chuckTo(this);
-
     updateGains();
   }
 

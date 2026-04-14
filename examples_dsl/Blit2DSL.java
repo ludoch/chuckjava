@@ -29,7 +29,7 @@ public class Blit2DSL implements Shred {
 
         s.chuck(e).chuck(r).chuck(dac());
         s.gain(0.5);
-        r.setMix(0.05f);
+        r.mix(0.05f);
         e.set(0.005f, 0.003f, 0.5f, 0.005f); // A=5ms, D=3ms, S=0.5, R=5ms
 
         // play 12 notes

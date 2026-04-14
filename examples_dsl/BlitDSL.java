@@ -33,7 +33,7 @@ public class BlitDSL implements Shred {
 
         s.chuck(r).chuck(dac());
         s.gain(0.5);
-        r.setMix(0.05f);
+        r.mix(0.05f);
 
         // play 8 random notes
         for (int i = 0; i < 8; i++) {
