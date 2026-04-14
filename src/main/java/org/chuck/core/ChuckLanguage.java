@@ -50,7 +50,8 @@ public class ChuckLanguage {
           "MLP",
           "HMM",
           "PCA",
-          "Word2Vec");
+          "Word2Vec",
+          "Wekinator");
 
   public static final Set<String> CORE_UGENS =
       Set.of(
@@ -62,6 +63,7 @@ public class ChuckLanguage {
           "Std",
           "Math",
           "Machine",
+          "AI",
           "UGen",
           "UGen_Multi",
           "UGen_Stereo",

@@ -54,6 +54,30 @@ public class MLP extends ChuckObject {
     return 0L;
   }
 
+  public long learningRate(double v) {
+    learningRate = v;
+    return 0L;
+  }
+
+  public double getLearningRate() {
+    return learningRate;
+  }
+
+  public long inputSize(int n) {
+    inputSize = Math.max(1, n);
+    return inputSize;
+  }
+
+  public long hiddenSize(int n) {
+    hiddenSize = Math.max(1, n);
+    return hiddenSize;
+  }
+
+  public long outputSize(int n) {
+    outputSize = Math.max(1, n);
+    return outputSize;
+  }
+
   public long epochs(long n) {
     maxIter = (int) n;
     return n;
@@ -98,7 +122,8 @@ public class MLP extends ChuckObject {
         double[] out = acts[L];
         deltas[L - 1] = new double[out.length];
         for (int j = 0; j < out.length; j++)
-          deltas[L - 1][j] = (out[j] - (j < y.length ? y[j] : 0)) * actDeriv(out[j]);
+          // Output layer is linear (no activation), so derivative = 1.0
+          deltas[L - 1][j] = (out[j] - (j < y.length ? y[j] : 0));
         // hidden layer deltas
         for (int l = L - 2; l >= 0; l--) {
           deltas[l] = new double[weights[l].length];

@@ -1076,6 +1076,21 @@ public class ExpressionEmitter {
           }
           return;
         }
+        // AI static constants: AI.MLP, AI.KNN, AI.Regression, etc.
+        if (e.base() instanceof ChuckAST.IdExp id && id.name().equals("AI")) {
+          switch (e.member()) {
+            case "MLP" -> code.addInstruction(new PushInstrs.PushInt(0));
+            case "KNN", "kNN" -> code.addInstruction(new PushInstrs.PushInt(1));
+            case "SVM" -> code.addInstruction(new PushInstrs.PushInt(2));
+            case "GMM" -> code.addInstruction(new PushInstrs.PushInt(3));
+            case "HMM" -> code.addInstruction(new PushInstrs.PushInt(4));
+            case "LSTM" -> code.addInstruction(new PushInstrs.PushInt(5));
+            case "Regression" -> code.addInstruction(new PushInstrs.PushInt(0));
+            case "Classification" -> code.addInstruction(new PushInstrs.PushInt(1));
+            default -> code.addInstruction(new PushInstrs.PushInt(0));
+          }
+          return;
+        }
         if (e.member().equals("size")) {
           this.emitExpression(e.base(), code);
           code.addInstruction(new ObjectInstrs.CallMethod("size", 0));

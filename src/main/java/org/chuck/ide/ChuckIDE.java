@@ -229,6 +229,7 @@ public class ChuckIDE extends Application {
           "HMM",
           "PCA",
           "Word2Vec",
+          "Wekinator",
           // Builtins
           "dac",
           "adc",
@@ -1275,7 +1276,7 @@ public class ChuckIDE extends Application {
           "KBHit",
           "SerialIO" ->
           "io";
-      case "KNN", "KNN2", "SVM", "MLP", "HMM", "PCA", "Word2Vec" -> "ai";
+      case "KNN", "KNN2", "SVM", "MLP", "HMM", "PCA", "Word2Vec", "Wekinator" -> "ai";
       case "second", "ms", "samp", "minute", "hour", "day", "week" -> "dur";
       case "true", "false", "null", "maybe", "pi", "e", "sqrt2" -> "lit";
       case "dac",
