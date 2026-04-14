@@ -322,21 +322,21 @@ Based on analysis of `../rtaudio/` and `../rtmidi/` (2026-04-14). Legend: ✅ Do
 | Latency reporting (1-D) | `getStreamLatency()` | ✅ Done | `getOutputLatencyMs/Samples()`, `getInputLatencyMs/Samples()`, `getTotalLatencyMs()` |
 | Underrun/overflow counters (1-E) | `RTAUDIO_OUTPUT_UNDERFLOW` / `INPUT_OVERFLOW` | ✅ Done | `getUnderrunCount()`, `getOverflowCount()`; warns per 100 events |
 
-### Phase 2 — Advanced Audio (Next)
+### Phase 2 — Advanced Audio (Done)
 
 | Feature | Source | Status | Notes |
 |---------|--------|--------|-------|
 | `AudioBackend` interface | `RtApi` base | ❌ Planned | Swappable backends; `JavaSoundBackend` wraps current `ChuckAudio` logic |
-| `setNumBuffers(int)` | `StreamOptions.numberOfBuffers` | ❌ Planned | Currently hardcoded to 2; expose as configurable |
-| `setMinimizeLatency()` | `RTAUDIO_MINIMIZE_LATENCY` | ❌ Planned | Probes smallest buffer the driver accepts (256→128→64 samples) |
-| Non-interleaved block path | `RTAUDIO_NONINTERLEAVED` | ❌ Planned | Connect `advanceTime(float[][], int, int)` end-to-end; avoid interleave copy |
+| `setNumBuffers(int)` | `StreamOptions.numberOfBuffers` | ✅ Done | `ChuckAudio.setNumBuffers(int)`; default 2; used in `openOutputWithFallback` |
+| `setMinimizeLatency()` | `RTAUDIO_MINIMIZE_LATENCY` | ✅ Done | `ChuckAudio.setMinimizeLatency(boolean)`; opens line with driver-default buffer; `effectiveBufferSize` computed from actual latency |
+| Non-interleaved block path | `RTAUDIO_NONINTERLEAVED` | ✅ Done | `ChuckAudio.start()` uses `vm.advanceTime(float[][], 0, effBuf)` block path when no ADC input |
 
 ### Phase 3 — Platform-Specific / FFM
 
 | Feature | Source | Status | Notes |
 |---------|--------|--------|-------|
 | WASAPI Exclusive Mode | `RTAUDIO_HOG_DEVICE` | ❌ Planned | FFM binding to IAudioClient |
-| Real-time thread priority | `RTAUDIO_SCHEDULE_REALTIME` | ❌ Planned | FFM → `pthread_setschedparam(SCHED_RR)` on Linux; `SetThreadPriority(TIME_CRITICAL)` on Windows |
+| Real-time thread priority | `RTAUDIO_SCHEDULE_REALTIME` | ✅ Done | `ChuckAudio.setScheduleRealtime(true)`; raises Java priority to MAX_PRIORITY; Windows: FFM `SetThreadPriority(TIME_CRITICAL)`; Linux/Mac: FFM `pthread_setschedparam(SCHED_RR, pri=99)`; fails gracefully without privileges |
 | JACK audio backend | `RtApiJack` | ❌ Planned | Load `libjack` via FFM; ChucK appears as named JACK client |
 | ALSA direct backend | `RtApiAlsa` | ❌ Planned | FFM → `snd_pcm_open()`; bypasses PulseAudio/PipeWire overhead |
 
