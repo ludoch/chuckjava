@@ -50,7 +50,9 @@ public class JCRev extends StereoUGen {
   }
 
   @Override
-  protected void computeStereo(float input, long systemTime) {
+  protected void computeStereo(float left, float right, long systemTime) {
+    // Mono-sum for the reverb tail (standard Schroeder reverb behavior)
+    float input = (left + right) * 0.5f;
     float temp = input;
     for (int i = 0; i < 3; i++) {
       temp = allpass[i].tick(temp, systemTime);
@@ -60,13 +62,18 @@ public class JCRev extends StereoUGen {
     for (int i = 0; i < 4; i++) {
       filtout += comb[i].tick(temp, systemTime);
     }
-    filtout *= 0.5f; // Normalise gain of parallel comb filters (increased from 0.25)
+    filtout *= 0.5f;
 
-    float dry = input;
+    // Preserve original stereo dry signal
     float wetL = outLeft.tick(filtout, systemTime);
     float wetR = outRight.tick(filtout, systemTime);
 
-    lastOutChannels[0] = dry * (1.0f - mix) + wetL * mix;
-    lastOutChannels[1] = dry * (1.0f - mix) + wetR * mix;
+    lastOutChannels[0] = left * (1.0f - mix) + wetL * mix;
+    lastOutChannels[1] = right * (1.0f - mix) + wetR * mix;
+  }
+
+  @Override
+  protected void computeStereo(float input, long systemTime) {
+    // Handled by 2-arg version
   }
 }

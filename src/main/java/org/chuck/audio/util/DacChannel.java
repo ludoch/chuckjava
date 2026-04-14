@@ -48,10 +48,9 @@ public class DacChannel extends ChuckUGen {
       float sum = 0.0f;
       java.util.List<ChuckUGen> srcs = getSources();
       for (ChuckUGen src : srcs) {
-        src.tick(systemTime);
-        // Pull the specific channel, but if src is mono, getChannelLastOut returns lastOut.
-        // If src is multi-channel and we are mono channel 0, we sum all channels to be safe.
-        if (src.getNumOutputs() > 1) {
+        // Use the systemTime-aware lookup which handles internal ticking correctly
+        if (src.getNumOutputs() > 1 && channelIndex == 0) {
+          // Sum all channels for mono channel 0 pull if it's a stereo source
           for (int c = 0; c < src.getNumOutputs(); c++) {
             sum += src.getChannelLastOut(c, systemTime);
           }
@@ -59,7 +58,6 @@ public class DacChannel extends ChuckUGen {
           sum += src.getChannelLastOut(channelIndex, systemTime);
         }
       }
-
       // Safety check: prevent NaNs or Infinity from reaching output
       if (!Float.isFinite(sum)) sum = 0.0f;
 

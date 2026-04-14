@@ -20,18 +20,17 @@ public class Rhodey extends ChuckUGen {
 
   public Rhodey(float sampleRate) {
     this.sampleRate = sampleRate;
-    this.carrier = new SinOsc(sampleRate);
-    this.modulator = new SinOsc(sampleRate);
-    this.carrierEnv = new Adsr(sampleRate);
-    this.modulatorEnv = new Adsr(sampleRate);
+    // Disable auto-registration for internal parts
+    this.carrier = new SinOsc(sampleRate, false);
+    this.modulator = new SinOsc(sampleRate, false);
+    this.carrierEnv = new Adsr(sampleRate, false);
+    this.modulatorEnv = new Adsr(sampleRate, false);
 
-    // Internal patch:
-    // modulator => (modIndex * modEnv) => carrier (FM) => carrierEnv => output
-    modulator.chuckTo(carrier);
-    carrier.setSync(2); // FM mode
-    // carrier.chuckTo(carrierEnv); // Adsr is 1-to-1 filter-like
+    // Rhodey ratio is 1:1 carrier:modulator for classic bell sound
+    carrier.setFreq(440.0);
+    modulator.setFreq(440.0);
 
-    // Configure envelopes for a bell-like Rhodes sound
+    // Configure envelopes
     carrierEnv.set(0.001f, 1.5f, 0.0f, 0.05f);
     modulatorEnv.set(0.001f, 0.5f, 0.0f, 0.05f);
   }
@@ -39,14 +38,14 @@ public class Rhodey extends ChuckUGen {
   public void setFreq(double freq) {
     this.baseFreq = freq;
     carrier.setFreq(freq);
-    modulator.setFreq(freq * 3.5); // Modulator ratio
+    modulator.setFreq(freq); // 1:1 ratio
   }
 
   public void noteOn(float velocity) {
     carrierEnv.keyOn();
     modulatorEnv.keyOn();
-    // Modulation index proportional to velocity, scaled to freq (like STK Rhodey)
-    modIndex = (float) (baseFreq * velocity * 0.5);
+    // Mod index scales depth
+    modIndex = velocity;
   }
 
   public void noteOff(float velocity) {
@@ -56,16 +55,19 @@ public class Rhodey extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
-    @SuppressWarnings("unused")
     float mEnv = modulatorEnv.tick(systemTime);
-    // Additive mix for robustness: carrier + modulator
+
+    // Modulator drives the phase of carrier (simple FM)
+    float modOut = modulator.tick(systemTime) * modIndex * mEnv;
+
+    // Manual FM: offset carrier frequency by modulator output
+    carrier.setFreq(baseFreq + (modOut * 500.0));
     float carOut = carrier.tick(systemTime);
-    float modOut = modulator.tick(systemTime);
 
     float cEnv = carrierEnv.tick(systemTime);
 
-    // Rhodey is essentially a bell-like sound
-    float out = (carOut + modOut * 0.5f) * cEnv * gain;
-    return out;
+    // Result is carrier enveloped by its own ADSR
+    lastOut = carOut * cEnv * gain;
+    return lastOut;
   }
 }

@@ -36,13 +36,19 @@ public class PRCRev extends StereoUGen {
   }
 
   @Override
-  protected void computeStereo(float input, long systemTime) {
+  protected void computeStereo(float left, float right, long systemTime) {
+    float input = (left + right) * 0.5f;
     float temp = allpass[0].tick(input, systemTime);
     temp = allpass[1].tick(temp, systemTime);
 
     float wet = (comb[0].tick(temp, systemTime) + comb[1].tick(temp, systemTime)) * 0.5f;
 
-    lastOutChannels[0] = input * (1.0f - mix) + wet * mix;
-    lastOutChannels[1] = lastOutChannels[0];
+    lastOutChannels[0] = left * (1.0f - mix) + wet * mix;
+    lastOutChannels[1] = right * (1.0f - mix) + wet * mix;
+  }
+
+  @Override
+  protected void computeStereo(float input, long systemTime) {
+    // Handled by 2-arg version
   }
 }

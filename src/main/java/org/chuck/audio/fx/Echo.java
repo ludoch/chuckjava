@@ -64,22 +64,20 @@ public class Echo extends StereoUGen {
   }
 
   @Override
-  protected void computeStereo(float input, long systemTime) {
-    // In ChucK, when a mono signal enters a stereo UGen,
-    // it is duplicated. When stereo enters, we use both.
-    float inL =
-        getSources().size() > 0 ? getSources().get(0).getChannelLastOut(0, systemTime) : input;
-    float inR =
-        getSources().size() > 0 ? getSources().get(0).getChannelLastOut(1, systemTime) : input;
-
-    // Feedback loop
-    float wetL = delayL.tick(inL + lastWetL * gain, systemTime);
-    float wetR = delayR.tick(inR + lastWetR * gain, systemTime);
+  protected void computeStereo(float left, float right, long systemTime) {
+    // Feedback loop using separate channels
+    float wetL = delayL.tick(left + lastWetL * gain, systemTime);
+    float wetR = delayR.tick(right + lastWetR * gain, systemTime);
 
     lastWetL = wetL;
     lastWetR = wetR;
 
-    lastOutChannels[0] = inL * (1.0f - mix) + wetL * mix;
-    lastOutChannels[1] = inR * (1.0f - mix) + wetR * mix;
+    lastOutChannels[0] = left * (1.0f - mix) + wetL * mix;
+    lastOutChannels[1] = right * (1.0f - mix) + wetR * mix;
+  }
+
+  @Override
+  protected void computeStereo(float input, long systemTime) {
+    // Legacy fallback handled by computeStereo(left, right)
   }
 }

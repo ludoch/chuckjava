@@ -45,14 +45,19 @@ public class NRev extends StereoUGen {
   }
 
   @Override
-  protected void computeStereo(float input, long systemTime) {
+  protected void computeStereo(float left, float right, long systemTime) {
+    float input = (left + right) * 0.5f;
     float temp = input;
     for (int i = 0; i < 8; i++) {
       temp = allpass[i].tick(temp, systemTime);
     }
 
-    lastOutChannels[0] = input * (1.0f - mix) + temp * mix;
-    lastOutChannels[1] =
-        lastOutChannels[0]; // NRev is mono-in, quasi-mono out in this simple version
+    lastOutChannels[0] = left * (1.0f - mix) + temp * mix;
+    lastOutChannels[1] = right * (1.0f - mix) + temp * mix;
+  }
+
+  @Override
+  protected void computeStereo(float input, long systemTime) {
+    // Handled by 2-arg version
   }
 }
