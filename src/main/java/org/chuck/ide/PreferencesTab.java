@@ -6,9 +6,14 @@ import javafx.collections.FXCollections;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import org.chuck.audio.ChuckAudio;
+import org.chuck.midi.MidiIn;
+import org.chuck.midi.MidiOut;
+import org.chuck.midi.RtMidi;
 
 /**
  * A tab component for the ChucK-Java IDE that manages Audio, Visualizer, and Editor preferences.
@@ -45,6 +50,9 @@ public class PreferencesTab extends ScrollPane {
     // --- Audio Engine Section ---
     TitledPane audioSection = createAudioSection();
 
+    // --- MIDI Section ---
+    TitledPane midiSection = createMidiSection();
+
     // --- Visualizers Section ---
     TitledPane visSection = createVisualizerSection();
 
@@ -54,7 +62,9 @@ public class PreferencesTab extends ScrollPane {
     // --- Syntax Colors Section ---
     TitledPane colorSection = createColorSection();
 
-    container.getChildren().addAll(audioSection, visSection, editorSection, colorSection);
+    container
+        .getChildren()
+        .addAll(audioSection, midiSection, visSection, editorSection, colorSection);
     setContent(container);
   }
 
@@ -117,6 +127,77 @@ public class PreferencesTab extends ScrollPane {
     grid.add(applyBtn, 0, 5, 2, 1);
 
     TitledPane pane = new TitledPane("Audio Engine", grid);
+    pane.setCollapsible(false);
+    return pane;
+  }
+
+  private TitledPane createMidiSection() {
+    GridPane grid = new GridPane();
+    grid.setHgap(10);
+    grid.setVgap(8);
+    grid.setPadding(new Insets(10));
+
+    // Status Row
+    boolean nativeOk = RtMidi.isAvailable();
+    Circle statusDot = new Circle(6, nativeOk ? Color.GREEN : Color.RED);
+    Label statusLabel =
+        new Label(
+            nativeOk
+                ? "Native MIDI (RtMidi) Active"
+                : "Native MIDI Not Found (JavaSound Fallback)");
+    HBox statusBox = new HBox(8, statusDot, statusLabel);
+    statusBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
+    // API Selection (Native only)
+    ChoiceBox<RtMidi.Api> apiBox = new ChoiceBox<>();
+    if (nativeOk) {
+      apiBox.setItems(FXCollections.observableArrayList(RtMidi.getCompiledApis()));
+      apiBox.getItems().add(0, RtMidi.Api.UNSPECIFIED);
+      apiBox.setValue(RtMidi.Api.UNSPECIFIED);
+    } else {
+      apiBox.setDisable(true);
+    }
+
+    // Input Device List (Read-only discovery)
+    ListView<String> inList = new ListView<>(FXCollections.observableArrayList(MidiIn.list()));
+    inList.setPrefHeight(100);
+
+    // Output Device List (Read-only discovery)
+    ListView<String> outList = new ListView<>(FXCollections.observableArrayList(MidiOut.list()));
+    outList.setPrefHeight(100);
+
+    Button refreshBtn = new Button("Refresh Devices");
+    refreshBtn.setOnAction(
+        e -> {
+          inList.setItems(FXCollections.observableArrayList(MidiIn.list()));
+          outList.setItems(FXCollections.observableArrayList(MidiOut.list()));
+        });
+
+    // Filters
+    CheckBox sysexCb = new CheckBox("Ignore Sysex");
+    sysexCb.setSelected(prefs.getBoolean("midi.ignoreSysex", false));
+    sysexCb
+        .selectedProperty()
+        .addListener((obs, ov, nv) -> prefs.putBoolean("midi.ignoreSysex", nv));
+
+    CheckBox timeCb = new CheckBox("Ignore Timing");
+    timeCb.setSelected(prefs.getBoolean("midi.ignoreTime", true));
+    timeCb.selectedProperty().addListener((obs, ov, nv) -> prefs.putBoolean("midi.ignoreTime", nv));
+
+    grid.add(statusBox, 0, 0, 2, 1);
+    grid.add(new Label("Preferred API:"), 0, 1);
+    grid.add(apiBox, 1, 1);
+    grid.add(new Label("Input Ports:"), 0, 2);
+    grid.add(inList, 1, 2);
+    grid.add(new Label("Output Ports:"), 0, 3);
+    grid.add(outList, 1, 3);
+    grid.add(refreshBtn, 1, 4);
+
+    HBox filters = new HBox(15, sysexCb, timeCb);
+    grid.add(new Label("Filters:"), 0, 5);
+    grid.add(filters, 1, 5);
+
+    TitledPane pane = new TitledPane("MIDI Settings", grid);
     pane.setCollapsible(false);
     return pane;
   }
