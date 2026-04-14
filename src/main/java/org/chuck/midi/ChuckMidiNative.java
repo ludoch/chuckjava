@@ -2,130 +2,138 @@ package org.chuck.midi;
 
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.chuck.core.ChuckEvent;
 import org.chuck.core.ChuckVM;
 
-/**
- * A cross-platform MIDI input implementation using JDK 25 FFM API (Panama). Binds to RtMidi (.dll,
- * .so, or .dylib) dynamically based on the OS.
- */
+/** Enhanced Native MIDI input using RtMidi callback model via FFM. */
 public class ChuckMidiNative {
+  private static final Logger logger = Logger.getLogger(ChuckMidiNative.class.getName());
+
   private final ChuckVM vm;
   private final ChuckEvent event;
   private final Arena arena;
-
   private final ConcurrentLinkedDeque<MidiMsg> queue;
 
-  private MemorySegment rtmidiIn = MemorySegment.NULL;
+  private MemorySegment midiInPtr = MemorySegment.NULL;
+  private MemorySegment callbackStub = null;
 
-  private MethodHandle createIn;
-  private MethodHandle openPort;
-  private MethodHandle getMessage;
-  private MethodHandle closeIn;
+  // Callback Descriptor: void callback(double timestamp, const unsigned char* message, size_t
+  // messageSize, void* userData)
+  private static final FunctionDescriptor CALLBACK_DESC =
+      FunctionDescriptor.ofVoid(
+          ValueLayout.JAVA_DOUBLE, // timestamp
+          ValueLayout.ADDRESS, // message buffer
+          ValueLayout.JAVA_LONG, // message size
+          ValueLayout.ADDRESS // user data
+          );
 
   public ChuckMidiNative(ChuckVM vm, ChuckEvent event, ConcurrentLinkedDeque<MidiMsg> queue) {
     this.vm = vm;
     this.event = event;
     this.arena = Arena.ofShared();
     this.queue = queue;
-    initBindings();
-  }
-
-  private void initBindings() {
-    String os = System.getProperty("os.name").toLowerCase();
-    String libName =
-        os.contains("win") ? "rtmidi.dll" : os.contains("mac") ? "librtmidi.dylib" : "librtmidi.so";
-
-    try {
-      SymbolLookup rtmidi = SymbolLookup.libraryLookup(libName, arena);
-
-      createIn =
-          lookup(rtmidi, "rtmidi_in_create_default", FunctionDescriptor.of(ValueLayout.ADDRESS));
-
-      openPort =
-          lookup(
-              rtmidi,
-              "rtmidi_open_port",
-              FunctionDescriptor.ofVoid(
-                  ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
-
-      getMessage =
-          lookup(
-              rtmidi,
-              "rtmidi_in_get_message",
-              FunctionDescriptor.of(
-                  ValueLayout.JAVA_DOUBLE,
-                  ValueLayout.ADDRESS,
-                  ValueLayout.ADDRESS,
-                  ValueLayout.ADDRESS));
-
-      closeIn = lookup(rtmidi, "rtmidi_in_free", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
-
-    } catch (Exception e) {
-      // Silently fail to allow IDE to run without native MIDI libraries present
-    }
-  }
-
-  private MethodHandle lookup(SymbolLookup lookup, String name, FunctionDescriptor fd) {
-    return lookup
-        .find(name)
-        .map(addr -> Linker.nativeLinker().downcallHandle(addr, fd))
-        .orElseThrow(() -> new RuntimeException("Symbol not found: " + name));
   }
 
   public void open(int portNumber) {
-    if (createIn == null) return;
+    if (!RtMidi.isAvailable()) return;
+
     try {
-      rtmidiIn = (MemorySegment) createIn.invoke();
-      MemorySegment portName = arena.allocateFrom("ChucK-Java Port");
-      openPort.invoke(rtmidiIn, portNumber, portName);
-      startPolling();
+      midiInPtr = (MemorySegment) RtMidi.in_create_default.invoke();
+      if (midiInPtr.equals(MemorySegment.NULL)) return;
+
+      // Prepare callback stub
+      MethodHandle onMidiHandle =
+          MethodHandles.lookup()
+              .findVirtual(
+                  ChuckMidiNative.class,
+                  "onMidiMessage",
+                  java.lang.invoke.MethodType.methodType(
+                      void.class,
+                      double.class,
+                      MemorySegment.class,
+                      long.class,
+                      MemorySegment.class));
+
+      callbackStub =
+          Linker.nativeLinker().upcallStub(onMidiHandle.bindTo(this), CALLBACK_DESC, arena);
+
+      // Set the callback BEFORE opening the port
+      RtMidi.in_set_callback.invoke(midiInPtr, callbackStub, MemorySegment.NULL);
+
+      MemorySegment portName = arena.allocateFrom("ChucK-Java Input");
+      RtMidi.open_port.invoke(midiInPtr, portNumber, portName);
+
+      logger.info("Native MIDI Input opened port " + portNumber);
     } catch (Throwable t) {
-      throw new RuntimeException("Failed to open MIDI port", t);
+      logger.log(Level.SEVERE, "Failed to open native MIDI input", t);
     }
   }
 
-  private void startPolling() {
-    Thread.ofVirtual()
-        .name("MIDI-Poller")
-        .start(
-            () -> {
-              MemorySegment buffer = arena.allocate(1024);
-              MemorySegment sizePtr = arena.allocate(ValueLayout.JAVA_LONG, 1024L);
+  public void openVirtual(String name) {
+    if (!RtMidi.isAvailable()) return;
+    try {
+      midiInPtr = (MemorySegment) RtMidi.in_create_default.invoke();
+      MemorySegment portName = arena.allocateFrom(name);
 
-              while (!rtmidiIn.equals(MemorySegment.NULL)) {
-                try {
-                  @SuppressWarnings("unused")
-                  double stamp = (double) getMessage.invoke(rtmidiIn, buffer, sizePtr);
-                  long size = sizePtr.get(ValueLayout.JAVA_LONG, 0);
+      // Set callback
+      MethodHandle onMidiHandle =
+          MethodHandles.lookup()
+              .findVirtual(
+                  ChuckMidiNative.class,
+                  "onMidiMessage",
+                  java.lang.invoke.MethodType.methodType(
+                      void.class,
+                      double.class,
+                      MemorySegment.class,
+                      long.class,
+                      MemorySegment.class));
+      callbackStub =
+          Linker.nativeLinker().upcallStub(onMidiHandle.bindTo(this), CALLBACK_DESC, arena);
+      RtMidi.in_set_callback.invoke(midiInPtr, callbackStub, MemorySegment.NULL);
 
-                  if (size > 0) {
-                    MidiMsg msg = new MidiMsg();
-                    msg.data1 = buffer.get(ValueLayout.JAVA_BYTE, 0) & 0xFF;
-                    msg.data2 = size > 1 ? buffer.get(ValueLayout.JAVA_BYTE, 1) & 0xFF : 0;
-                    msg.data3 = size > 2 ? buffer.get(ValueLayout.JAVA_BYTE, 2) & 0xFF : 0;
+      RtMidi.open_virtual_port.invoke(midiInPtr, portName);
+      logger.info("Native Virtual MIDI Input created: " + name);
+    } catch (Throwable t) {
+      logger.log(Level.SEVERE, "Failed to create virtual MIDI input", t);
+    }
+  }
 
-                    queue.addLast(msg);
-                    event.broadcast(vm);
-                  }
-                  Thread.sleep(1);
-                } catch (Throwable t) {
-                  break;
-                }
-              }
-            });
+  /** Native callback invoked by RtMidi when a message arrives. */
+  private void onMidiMessage(
+      double timestamp, MemorySegment message, long size, MemorySegment userData) {
+    if (size <= 0) return;
+
+    MidiMsg msg = new MidiMsg();
+    msg.data1 = message.get(ValueLayout.JAVA_BYTE, 0) & 0xFF;
+    msg.data2 = size > 1 ? message.get(ValueLayout.JAVA_BYTE, 1) & 0xFF : 0;
+    msg.data3 = size > 2 ? message.get(ValueLayout.JAVA_BYTE, 2) & 0xFF : 0;
+
+    queue.addLast(msg);
+    event.broadcast(vm);
+  }
+
+  public void ignoreTypes(boolean midiSysex, boolean midiTime, boolean midiSense) {
+    if (midiInPtr.equals(MemorySegment.NULL)) return;
+    try {
+      RtMidi.in_ignore_types.invoke(midiInPtr, midiSysex, midiTime, midiSense);
+    } catch (Throwable t) {
+    }
   }
 
   public void close() {
-    try (arena) {
-      if (!rtmidiIn.equals(MemorySegment.NULL)) {
-        try {
-          closeIn.invoke(rtmidiIn);
-          rtmidiIn = MemorySegment.NULL;
-        } catch (Throwable t) {
-        }
+    if (!midiInPtr.equals(MemorySegment.NULL)) {
+      try {
+        RtMidi.close_port.invoke(midiInPtr);
+        RtMidi.in_free.invoke(midiInPtr);
+      } catch (Throwable t) {
       }
+      midiInPtr = MemorySegment.NULL;
     }
+    // arena will close via shutdown hooks or manual close if we used ofConfined,
+    // but here we keep it for the life of the driver.
   }
 }

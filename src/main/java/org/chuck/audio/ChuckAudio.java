@@ -3,6 +3,11 @@ package org.chuck.audio;
 import java.io.IOException;
 import java.lang.foreign.*;
 import java.nio.ByteOrder;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.sound.sampled.*;
@@ -11,36 +16,234 @@ import org.chuck.audio.util.WvOut;
 import org.chuck.core.ChuckVM;
 
 /**
- * Handles Audio I/O for the ChuckVM. Output: SourceDataLine (playback). Input: TargetDataLine
- * (microphone/ADC) — opened gracefully; silent if unavailable.
+ * Handles Audio I/O for the ChuckVM.
+ *
+ * <p>Output: SourceDataLine (playback) in INT16/INT24/INT32/FLOAT32 format (Phase 1-A). Input:
+ * TargetDataLine (microphone/ADC) — always INT16; opened gracefully, silent if unavailable.
+ *
+ * <p>Phase 1 features from the RtAudio analysis:
+ *
+ * <ul>
+ *   <li>1-A {@link AudioSampleFormat} — configurable output bit-depth/encoding with INT16 fallback
+ *   <li>1-B {@link DeviceInfo} — per-mixer capability probe (channels, sample-rates, formats)
+ *   <li>1-C Preferred-rate auto-match — warns when requested SR is unavailable; records actual SR
+ *   <li>1-D Latency reporting — {@link #getOutputLatencyMs()}, {@link #getInputLatencyMs()}
+ *   <li>1-E Underrun / overflow counters — {@link #getUnderrunCount()}, {@link #getOverflowCount()}
+ * </ul>
  */
 public class ChuckAudio {
   private static final Logger logger = Logger.getLogger(ChuckAudio.class.getName());
+
+  /** Standard sample rates probed during device enumeration (matches RtAudio's probe list). */
+  private static final int[] STANDARD_RATES = {
+    8000, 11025, 16000, 22050, 32000, 44100, 48000, 88200, 96000, 176400, 192000
+  };
+
+  // ── Phase 1-B: DeviceInfo ────────────────────────────────────────────────
+
+  /**
+   * Snapshot of one audio mixer's capabilities, equivalent to RtAudio's {@code DeviceInfo} struct.
+   */
+  public record DeviceInfo(
+      /** Human-readable mixer name. */
+      String name,
+      /** Maximum output channels (0 if mixer has no output). */
+      int maxOutputChannels,
+      /** Maximum input channels (0 if mixer has no input). */
+      int maxInputChannels,
+      /** Sample rates the mixer reports as supported. */
+      List<Integer> supportedSampleRates,
+      /**
+       * Preferred sample rate — the lowest of {48 kHz, 44.1 kHz} the device supports, or the first
+       * supported rate. Corresponds to {@code preferredSampleRate} in RtAudio.
+       */
+      int preferredSampleRate,
+      /**
+       * Output sample formats supported natively (always includes INT16 as fallback). Corresponds
+       * to {@code nativeFormats} in RtAudio.
+       */
+      List<AudioSampleFormat> nativeOutputFormats,
+      /**
+       * Input sample formats supported natively (always includes INT16 as fallback). May be empty
+       * if there is no input.
+       */
+      List<AudioSampleFormat> nativeInputFormats) {}
+
+  /** Returns capability info for every mixer that exposes a {@link SourceDataLine}. */
+  public static List<DeviceInfo> getOutputDeviceInfo() {
+    List<DeviceInfo> result = new ArrayList<>();
+    for (Mixer.Info info : AudioSystem.getMixerInfo()) {
+      try {
+        Mixer m = AudioSystem.getMixer(info);
+        if (!m.isLineSupported(new DataLine.Info(SourceDataLine.class, null))) continue;
+        DeviceInfo di = probeDevice(m, info.getName());
+        if (di.maxOutputChannels() > 0) result.add(di);
+      } catch (Exception ignored) {
+      }
+    }
+    return result;
+  }
+
+  /** Returns capability info for every mixer that exposes a {@link TargetDataLine}. */
+  public static List<DeviceInfo> getInputDeviceInfo() {
+    List<DeviceInfo> result = new ArrayList<>();
+    for (Mixer.Info info : AudioSystem.getMixerInfo()) {
+      try {
+        Mixer m = AudioSystem.getMixer(info);
+        if (!m.isLineSupported(new DataLine.Info(TargetDataLine.class, null))) continue;
+        DeviceInfo di = probeDevice(m, info.getName());
+        if (di.maxInputChannels() > 0) result.add(di);
+      } catch (Exception ignored) {
+      }
+    }
+    return result;
+  }
+
+  private static DeviceInfo probeDevice(Mixer m, String name) {
+    // Probe output channels
+    int maxOutCh = 0;
+    for (int ch = 8; ch >= 1; ch--) {
+      AudioFormat f = new AudioFormat(44100, 16, ch, true, false);
+      if (m.isLineSupported(new DataLine.Info(SourceDataLine.class, f))) {
+        maxOutCh = ch;
+        break;
+      }
+    }
+    // Probe input channels
+    int maxInCh = 0;
+    for (int ch = 8; ch >= 1; ch--) {
+      AudioFormat f = new AudioFormat(44100, 16, ch, true, false);
+      if (m.isLineSupported(new DataLine.Info(TargetDataLine.class, f))) {
+        maxInCh = ch;
+        break;
+      }
+    }
+
+    int probeCh = Math.max(1, Math.min(2, maxOutCh > 0 ? maxOutCh : maxInCh));
+
+    // Probe supported sample rates
+    List<Integer> rates = new ArrayList<>();
+    for (int r : STANDARD_RATES) {
+      AudioFormat f = new AudioFormat(r, 16, probeCh, true, false);
+      boolean outOk = maxOutCh > 0 && m.isLineSupported(new DataLine.Info(SourceDataLine.class, f));
+      boolean inOk = maxInCh > 0 && m.isLineSupported(new DataLine.Info(TargetDataLine.class, f));
+      if (outOk || inOk) rates.add(r);
+    }
+
+    // Preferred rate: lowest of {48000, 44100} that is supported, else first supported
+    int preferredRate = rates.isEmpty() ? 44100 : rates.get(0);
+    for (int r : new int[] {48000, 44100}) {
+      if (rates.contains(r)) {
+        preferredRate = r;
+        break;
+      }
+    }
+
+    // Probe output formats at preferred rate
+    Set<AudioSampleFormat> outFmts = new LinkedHashSet<>();
+    outFmts.add(AudioSampleFormat.INT16); // always include as fallback
+    if (maxOutCh > 0) {
+      for (AudioSampleFormat sf : AudioSampleFormat.values()) {
+        AudioFormat jf = sf.toJavaAudioFormat(preferredRate, probeCh);
+        if (m.isLineSupported(new DataLine.Info(SourceDataLine.class, jf))) outFmts.add(sf);
+      }
+    }
+
+    // Probe input formats at preferred rate
+    Set<AudioSampleFormat> inFmts = new LinkedHashSet<>();
+    if (maxInCh > 0) {
+      inFmts.add(AudioSampleFormat.INT16);
+      for (AudioSampleFormat sf : AudioSampleFormat.values()) {
+        AudioFormat jf =
+            sf.toJavaAudioFormat(preferredRate, Math.max(1, Math.min(probeCh, maxInCh)));
+        if (m.isLineSupported(new DataLine.Info(TargetDataLine.class, jf))) inFmts.add(sf);
+      }
+    }
+
+    return new DeviceInfo(
+        name,
+        maxOutCh,
+        maxInCh,
+        List.copyOf(rates),
+        preferredRate,
+        List.copyOf(outFmts),
+        List.copyOf(inFmts));
+  }
+
+  // ── Legacy name-only device lists (kept for IDE backward compat) ─────────
+
+  /** Returns all mixer names that support SourceDataLine (playback). */
+  public static List<String> getOutputDeviceNames() {
+    List<String> names = new ArrayList<>();
+    names.add(""); // system default
+    for (Mixer.Info info : AudioSystem.getMixerInfo()) {
+      try {
+        Mixer m = AudioSystem.getMixer(info);
+        if (m.isLineSupported(new DataLine.Info(SourceDataLine.class, null)))
+          names.add(info.getName());
+      } catch (Exception ignored) {
+      }
+    }
+    return names;
+  }
+
+  /** Returns all mixer names that support TargetDataLine (capture). */
+  public static List<String> getInputDeviceNames() {
+    List<String> names = new ArrayList<>();
+    names.add(""); // system default
+    for (Mixer.Info info : AudioSystem.getMixerInfo()) {
+      try {
+        Mixer m = AudioSystem.getMixer(info);
+        if (m.isLineSupported(new DataLine.Info(TargetDataLine.class, null)))
+          names.add(info.getName());
+      } catch (Exception ignored) {
+      }
+    }
+    return names;
+  }
+
+  // ── Instance fields ───────────────────────────────────────────────────────
+
   private final ChuckVM vm;
   private final int bufferSize;
   private int numChannels;
   private int numInputChannels;
   private final float sampleRate;
 
+  // Phase 1-A: sample format
+  private AudioSampleFormat sampleFormat = AudioSampleFormat.INT16;
+  private AudioSampleFormat actualFormat = AudioSampleFormat.INT16; // what was actually opened
+
+  // Phase 1-C: actual sample rate (may differ if preferred-rate fallback kicks in)
+  private float actualSampleRate;
+
+  // Phase 1-D: latency
+  private int outputLatencySamples = 0;
+  private int inputLatencySamples = 0;
+
+  // Phase 1-E: underrun / overflow counters
+  private final AtomicLong underrunCount = new AtomicLong(0);
+  private final AtomicLong overflowCount = new AtomicLong(0);
+  private long underrunLogCount = 0; // throttle logging to 1 per 100 events
+  private long overflowLogCount = 0;
+
   private SourceDataLine outputLine;
   private TargetDataLine inputLine; // null if no mic available
   private boolean running = false;
+
   // Zipper-noise prevention: UI sets targetGain; audio thread smooths toward it each sample.
-  // Alpha ≈ 1 − exp(−1 / (44100 × 0.02)) gives ~20 ms ramp; good for any typical sample rate.
   private volatile float targetGain = 0.8f;
   private float smoothedGain = 0.8f;
-  private float gainSmoothAlpha = 0.00113f; // recomputed in initJavaSound if SR differs
+  private float gainSmoothAlpha = 0.00113f; // recomputed in initJavaSound
+
   private Gain masterGainUGen;
   private int verbose = 1;
 
-  // Drift tracking (Wall Clock)
+  // Drift / timing
   private long lastBufferTimeNanos = 0;
-  private final java.util.concurrent.atomic.AtomicLong totalDriftNanos =
-      new java.util.concurrent.atomic.AtomicLong(0);
-  private final java.util.concurrent.atomic.AtomicLong driftCount =
-      new java.util.concurrent.atomic.AtomicLong(0);
-  private final java.util.concurrent.atomic.AtomicLong maxDriftNanos =
-      new java.util.concurrent.atomic.AtomicLong(0);
+  private final AtomicLong totalDriftNanos = new AtomicLong(0);
+  private final AtomicLong driftCount = new AtomicLong(0);
+  private final AtomicLong maxDriftNanos = new AtomicLong(0);
   private volatile double cpuLoad = 0.0;
 
   // Optional recorder
@@ -52,6 +255,20 @@ public class ChuckAudio {
   /** Name of the preferred input mixer (empty = system default). */
   private String inputDeviceName = "";
 
+  // ── Construction ──────────────────────────────────────────────────────────
+
+  public ChuckAudio(ChuckVM vm, int bufferSize, int numChannels, float sampleRate) {
+    this.vm = vm;
+    this.bufferSize = bufferSize;
+    this.numChannels = numChannels;
+    this.numInputChannels = numChannels;
+    this.sampleRate = sampleRate;
+    this.actualSampleRate = sampleRate;
+    initJavaSound();
+  }
+
+  // ── Configuration setters ─────────────────────────────────────────────────
+
   public void setOutputDeviceName(String name) {
     this.outputDeviceName = name == null ? "" : name;
   }
@@ -60,43 +277,16 @@ public class ChuckAudio {
     this.inputDeviceName = name == null ? "" : name;
   }
 
-  /** Returns all mixer names that support SourceDataLine (playback). */
-  public static java.util.List<String> getOutputDeviceNames() {
-    java.util.List<String> names = new java.util.ArrayList<>();
-    names.add(""); // system default
-    for (javax.sound.sampled.Mixer.Info info : AudioSystem.getMixerInfo()) {
-      try {
-        javax.sound.sampled.Mixer m = AudioSystem.getMixer(info);
-        DataLine.Info dl = new DataLine.Info(SourceDataLine.class, null);
-        if (m.isLineSupported(dl)) names.add(info.getName());
-      } catch (Exception ignored) {
-      }
-    }
-    return names;
+  /**
+   * Request a specific output sample format (Phase 1-A). Must be called before the engine starts.
+   * If the format is unsupported by the driver, initJavaSound falls back to INT16.
+   */
+  public void setSampleFormat(AudioSampleFormat fmt) {
+    this.sampleFormat = fmt == null ? AudioSampleFormat.INT16 : fmt;
   }
 
-  /** Returns all mixer names that support TargetDataLine (capture). */
-  public static java.util.List<String> getInputDeviceNames() {
-    java.util.List<String> names = new java.util.ArrayList<>();
-    names.add(""); // system default
-    for (javax.sound.sampled.Mixer.Info info : AudioSystem.getMixerInfo()) {
-      try {
-        javax.sound.sampled.Mixer m = AudioSystem.getMixer(info);
-        DataLine.Info dl = new DataLine.Info(TargetDataLine.class, null);
-        if (m.isLineSupported(dl)) names.add(info.getName());
-      } catch (Exception ignored) {
-      }
-    }
-    return names;
-  }
-
-  public ChuckAudio(ChuckVM vm, int bufferSize, int numChannels, float sampleRate) {
-    this.vm = vm;
-    this.bufferSize = bufferSize;
-    this.numChannels = numChannels;
-    this.numInputChannels = numChannels; // Default to same as output
-    this.sampleRate = sampleRate;
-    initJavaSound();
+  public AudioSampleFormat getActualFormat() {
+    return actualFormat;
   }
 
   public void setMasterGainUGen(Gain ugen) {
@@ -111,13 +301,67 @@ public class ChuckAudio {
     this.targetGain = gain;
   }
 
+  // ── Phase 1-C: actual sample rate ────────────────────────────────────────
+
+  /** Returns the sample rate actually opened (may equal the requested rate). */
+  public float getActualSampleRate() {
+    return actualSampleRate;
+  }
+
+  // ── Phase 1-D: latency ───────────────────────────────────────────────────
+
+  /** Output latency in samples (computed from the SourceDataLine buffer size after open). */
+  public int getOutputLatencySamples() {
+    return outputLatencySamples;
+  }
+
+  /** Output latency in milliseconds. */
+  public double getOutputLatencyMs() {
+    return outputLatencySamples * 1000.0 / actualSampleRate;
+  }
+
+  /** Input latency in samples, or 0 if no input line is open. */
+  public int getInputLatencySamples() {
+    return inputLatencySamples;
+  }
+
+  /** Input latency in milliseconds. */
+  public double getInputLatencyMs() {
+    return inputLatencySamples * 1000.0 / actualSampleRate;
+  }
+
+  /** Combined round-trip latency (output + input) in milliseconds. */
+  public double getTotalLatencyMs() {
+    return getOutputLatencyMs() + getInputLatencyMs();
+  }
+
+  // ── Phase 1-E: underrun / overflow ───────────────────────────────────────
+
+  /**
+   * Number of output underruns detected since start (late write intervals exceeding one buffer
+   * period). Corresponds to {@code RTAUDIO_OUTPUT_UNDERFLOW} status flag.
+   */
+  public long getUnderrunCount() {
+    return underrunCount.get();
+  }
+
+  /**
+   * Number of input overflows detected since start (ADC buffer had more than 2× the needed data
+   * queued before read). Corresponds to {@code RTAUDIO_INPUT_OVERFLOW} status flag.
+   */
+  public long getOverflowCount() {
+    return overflowCount.get();
+  }
+
+  // ── Internal helpers ──────────────────────────────────────────────────────
+
   /** Opens a SourceDataLine on the named mixer, falling back to system default. */
   private SourceDataLine openOutputLine(AudioFormat fmt) throws LineUnavailableException {
     if (!outputDeviceName.isEmpty()) {
-      for (javax.sound.sampled.Mixer.Info info : AudioSystem.getMixerInfo()) {
+      for (Mixer.Info info : AudioSystem.getMixerInfo()) {
         if (info.getName().equals(outputDeviceName)) {
           try {
-            javax.sound.sampled.Mixer m = AudioSystem.getMixer(info);
+            Mixer m = AudioSystem.getMixer(info);
             DataLine.Info dl = new DataLine.Info(SourceDataLine.class, fmt);
             SourceDataLine line = (SourceDataLine) m.getLine(dl);
             logger.log(Level.INFO, "[Audio] Output device: " + info.getName());
@@ -138,10 +382,10 @@ public class ChuckAudio {
   /** Opens a TargetDataLine on the named mixer, falling back to system default. */
   private TargetDataLine openInputLine(AudioFormat fmt) throws LineUnavailableException {
     if (!inputDeviceName.isEmpty()) {
-      for (javax.sound.sampled.Mixer.Info info : AudioSystem.getMixerInfo()) {
+      for (Mixer.Info info : AudioSystem.getMixerInfo()) {
         if (info.getName().equals(inputDeviceName)) {
           try {
-            javax.sound.sampled.Mixer m = AudioSystem.getMixer(info);
+            Mixer m = AudioSystem.getMixer(info);
             DataLine.Info dl = new DataLine.Info(TargetDataLine.class, fmt);
             TargetDataLine line = (TargetDataLine) m.getLine(dl);
             logger.log(Level.INFO, "[Audio] Input device: " + info.getName());
@@ -159,32 +403,99 @@ public class ChuckAudio {
     return (TargetDataLine) AudioSystem.getLine(new DataLine.Info(TargetDataLine.class, fmt));
   }
 
-  private void initJavaSound() {
-    // Recompute alpha for actual sample rate: 1 − exp(−1/(sr × rampSeconds))
-    gainSmoothAlpha = (float) (1.0 - Math.exp(-1.0 / (sampleRate * 0.02)));
-    AudioFormat format = new AudioFormat(sampleRate, 16, numChannels, true, false);
-    // Output
-    try {
-      outputLine = openOutputLine(format);
-      outputLine.open(format, bufferSize * numChannels * 4);
-    } catch (LineUnavailableException e) {
-      logger.log(Level.SEVERE, "Audio output unavailable: " + e.getMessage());
-    }
-    // Input (microphone) — optional
-    try {
-      if (!AudioSystem.isLineSupported(new DataLine.Info(TargetDataLine.class, format))) {
-        // Try mono if stereo not supported
-        AudioFormat monoFormat = new AudioFormat(sampleRate, 16, 1, true, false);
-        if (AudioSystem.isLineSupported(new DataLine.Info(TargetDataLine.class, monoFormat))) {
-          inputLine = openInputLine(monoFormat);
-          inputLine.open(monoFormat, bufferSize * 4);
-          numInputChannels = 1;
-          logger.log(Level.INFO, "[Audio] Microphone input line opened (MONO): " + monoFormat);
+  /**
+   * Try to open a SourceDataLine with {@code fmt}. Falls back to INT16 on failure. Updates {@link
+   * #actualFormat} and {@link #actualSampleRate} to reflect what was actually opened.
+   */
+  private SourceDataLine openOutputWithFallback(
+      AudioSampleFormat targetFmt, float rate, int channels) {
+    // Phase 1-C: try preferred rate, then common alternatives if that fails
+    int[] rateOrder = rateOrder(rate);
+    for (int r : rateOrder) {
+      for (AudioSampleFormat sf : new AudioSampleFormat[] {targetFmt, AudioSampleFormat.INT16}) {
+        AudioFormat jf = sf.toJavaAudioFormat(r, channels);
+        try {
+          SourceDataLine line = openOutputLine(jf);
+          // open() with 2× buffer (numBuffers=2) for double-buffering
+          line.open(jf, bufferSize * channels * sf.bytesPerSample * 2);
+          actualFormat = sf;
+          actualSampleRate = r;
+          if (r != (int) rate) {
+            logger.log(
+                Level.WARNING,
+                String.format("[Audio] Requested %.0f Hz not available; opened at %d Hz", rate, r));
+          }
+          if (sf != targetFmt) {
+            logger.log(
+                Level.WARNING,
+                "[Audio] Requested format " + targetFmt + " not available; fell back to " + sf);
+          }
+          logger.log(
+              Level.INFO,
+              String.format("[Audio] Output opened: %s, %d Hz, %d ch", sf, r, channels));
+          return line;
+        } catch (LineUnavailableException | IllegalArgumentException ignored) {
+          // try next combination
         }
-      } else {
-        inputLine = openInputLine(format);
-        inputLine.open(format, bufferSize * numChannels * 4);
-        logger.log(Level.INFO, "[Audio] Microphone input line opened: " + format);
+      }
+    }
+    return null; // nothing worked
+  }
+
+  /** Rate priority order: requested first, then 48 kHz, 44.1 kHz, then the rest. */
+  private int[] rateOrder(float requested) {
+    List<Integer> order = new ArrayList<>();
+    int req = (int) requested;
+    order.add(req);
+    for (int r : new int[] {48000, 44100, 22050, 96000}) {
+      if (r != req) order.add(r);
+    }
+    return order.stream().mapToInt(Integer::intValue).toArray();
+  }
+
+  private void initJavaSound() {
+    gainSmoothAlpha = (float) (1.0 - Math.exp(-1.0 / (sampleRate * 0.02)));
+
+    // ── Output ───────────────────────────────────────────────────────────────
+    outputLine = openOutputWithFallback(sampleFormat, sampleRate, numChannels);
+    if (outputLine == null) {
+      logger.log(Level.SEVERE, "[Audio] Could not open any output line.");
+      return;
+    }
+
+    // Phase 1-D: compute output latency from actual buffer size
+    outputLatencySamples = outputLine.getBufferSize() / (numChannels * actualFormat.bytesPerSample);
+    logger.log(
+        Level.INFO,
+        String.format(
+            "[Audio] Output latency: %d samples (%.1f ms)",
+            outputLatencySamples, getOutputLatencyMs()));
+
+    // ── Input (microphone) — optional ────────────────────────────────────────
+    // Input is always INT16 for simplicity; no format negotiation needed on the input path.
+    AudioFormat inFmt16 = AudioSampleFormat.INT16.toJavaAudioFormat(actualSampleRate, numChannels);
+    AudioFormat inFmt16mono = AudioSampleFormat.INT16.toJavaAudioFormat(actualSampleRate, 1);
+    try {
+      if (AudioSystem.isLineSupported(new DataLine.Info(TargetDataLine.class, inFmt16))) {
+        inputLine = openInputLine(inFmt16);
+        inputLine.open(inFmt16, bufferSize * numChannels * 2 * 2);
+        numInputChannels = numChannels;
+        logger.log(Level.INFO, "[Audio] Microphone input line opened: " + inFmt16);
+      } else if (AudioSystem.isLineSupported(
+          new DataLine.Info(TargetDataLine.class, inFmt16mono))) {
+        inputLine = openInputLine(inFmt16mono);
+        inputLine.open(inFmt16mono, bufferSize * 1 * 2 * 2);
+        numInputChannels = 1;
+        logger.log(Level.INFO, "[Audio] Microphone input line opened (MONO): " + inFmt16mono);
+      }
+      if (inputLine != null) {
+        // Phase 1-D: compute input latency
+        inputLatencySamples = inputLine.getBufferSize() / (numInputChannels * 2);
+        logger.log(
+            Level.INFO,
+            String.format(
+                "[Audio] Input latency: %d samples (%.1f ms)",
+                inputLatencySamples, getInputLatencyMs()));
       }
     } catch (LineUnavailableException | SecurityException e) {
       logger.log(Level.INFO, "[Audio] Microphone access failed: " + e.getMessage());
@@ -192,52 +503,79 @@ public class ChuckAudio {
     }
   }
 
+  // ── Audio engine thread ───────────────────────────────────────────────────
+
   public void start() {
     if (running || outputLine == null) return;
     running = true;
     outputLine.start();
     if (inputLine != null) inputLine.start();
 
+    final AudioSampleFormat fmt = actualFormat; // capture for lambda
+    final int bps = fmt.bytesPerSample;
+
     Thread.ofPlatform()
         .name("ChucK-Audio-Engine")
         .start(
             () -> {
               try (Arena arena = Arena.ofShared()) {
-                int bytesPerBuffer = bufferSize * numChannels * 2; // 16-bit PCM
+                int bytesPerBuffer = bufferSize * numChannels * bps;
+                int inBytesPerBuffer = bufferSize * numInputChannels * 2; // input is always INT16
                 MemorySegment outSeg = arena.allocate(bytesPerBuffer);
                 byte[] outBuf = new byte[bytesPerBuffer];
-                byte[] inBuf = inputLine != null ? new byte[bytesPerBuffer] : null;
+                byte[] inBuf = inputLine != null ? new byte[inBytesPerBuffer] : null;
 
-                long expectedBufferNanos = (long) (bufferSize * 1_000_000_000.0 / sampleRate);
+                long expectedBufferNanos = (long) (bufferSize * 1_000_000_000.0 / actualSampleRate);
                 lastBufferTimeNanos = System.nanoTime();
 
                 while (running) {
                   long startTime = System.nanoTime();
-                  long elapsedSinceLast = startTime - lastBufferTimeNanos;
-                  long drift = elapsedSinceLast - expectedBufferNanos;
+                  long elapsed = startTime - lastBufferTimeNanos;
+                  long drift = elapsed - expectedBufferNanos;
                   if (drift > 0) {
                     totalDriftNanos.addAndGet(drift);
                     driftCount.incrementAndGet();
                     if (drift > maxDriftNanos.get()) maxDriftNanos.set(drift);
+
+                    // Phase 1-E: underrun detection — late by more than one buffer period
+                    if (drift > expectedBufferNanos) {
+                      long u = underrunCount.incrementAndGet();
+                      if (u - underrunLogCount >= 100) {
+                        underrunLogCount = u;
+                        logger.log(
+                            Level.WARNING,
+                            String.format(
+                                "[Audio] Output underrun #%d (drift %.1f ms)", u, drift / 1e6));
+                      }
+                    }
                   }
                   lastBufferTimeNanos = startTime;
 
-                  // ── Capture: read only if available to avoid blocking output
+                  // ── Capture ──────────────────────────────────────────────
                   if (inputLine != null && inBuf != null) {
                     int available = inputLine.available();
-                    int bytesNeeded = bufferSize * numInputChannels * 2;
-                    if (available >= bytesNeeded) {
-                      inputLine.read(inBuf, 0, bytesNeeded);
+                    // Phase 1-E: overflow detection — more than 2× buffer queued
+                    if (available > inBytesPerBuffer * 2) {
+                      long o = overflowCount.incrementAndGet();
+                      if (o - overflowLogCount >= 100) {
+                        overflowLogCount = o;
+                        logger.log(
+                            Level.WARNING,
+                            String.format(
+                                "[Audio] Input overflow #%d (%d bytes queued)", o, available));
+                      }
+                    }
+                    if (available >= inBytesPerBuffer) {
+                      inputLine.read(inBuf, 0, inBytesPerBuffer);
                     }
                   }
 
                   double sumSq = 0;
-                  // Reset per-buffer peak accumulators
                   float[] bufPeak = new float[numChannels];
 
-                  // ── Per-sample processing ─────────────────────────────────────
+                  // ── Per-sample processing ─────────────────────────────────
                   for (int i = 0; i < bufferSize; i++) {
-                    // Feed ADC
+                    // Feed ADC (always INT16 from input)
                     if (inBuf != null) {
                       for (int c = 0; c < numChannels; c++) {
                         int inputChan = Math.min(c, numInputChannels - 1);
@@ -247,47 +585,68 @@ public class ChuckAudio {
                       }
                     }
 
-                    // Advance time by 1 sample
                     vm.advanceTime(1);
 
-                    // Smooth gain toward target to prevent zipper noise on rapid slider changes.
                     smoothedGain += gainSmoothAlpha * (targetGain - smoothedGain);
 
-                    // Interleave Left/Right for stereo output
+                    // ── Write output sample (Phase 1-A: format-dispatched) ──
                     for (int c = 0; c < numChannels; c++) {
                       float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
-
                       sumSq += (double) sample * sample;
                       float abs = Math.abs(sample);
                       if (abs > bufPeak[c]) bufPeak[c] = abs;
-                      short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
 
-                      // Write directly to off-heap MemorySegment
-                      long offset = (long) (i * numChannels + c) * 2;
-                      outSeg.set(
-                          ValueLayout.JAVA_SHORT.withOrder(ByteOrder.LITTLE_ENDIAN), offset, s16);
+                      float clamp = Math.max(-1f, Math.min(1f, sample));
+                      long base = (long) (i * numChannels + c);
+                      switch (fmt) {
+                        case INT16 -> {
+                          outSeg.set(
+                              ValueLayout.JAVA_SHORT.withOrder(ByteOrder.LITTLE_ENDIAN),
+                              base * 2,
+                              (short) (clamp * 32767f));
+                        }
+                        case INT24 -> {
+                          int s24 = (int) (clamp * 8388607f);
+                          long off = base * 3;
+                          outSeg.set(ValueLayout.JAVA_BYTE, off, (byte) (s24 & 0xFF));
+                          outSeg.set(ValueLayout.JAVA_BYTE, off + 1, (byte) ((s24 >> 8) & 0xFF));
+                          outSeg.set(ValueLayout.JAVA_BYTE, off + 2, (byte) ((s24 >> 16) & 0xFF));
+                        }
+                        case INT32 -> {
+                          outSeg.set(
+                              ValueLayout.JAVA_INT.withOrder(ByteOrder.LITTLE_ENDIAN),
+                              base * 4,
+                              (int) (clamp * (float) Integer.MAX_VALUE));
+                        }
+                        case FLOAT32 -> {
+                          outSeg.set(
+                              ValueLayout.JAVA_FLOAT.withOrder(ByteOrder.LITTLE_ENDIAN),
+                              base * 4,
+                              sample); // no clamping — float output can carry headroom
+                        }
+                      }
                     }
                   }
 
-                  if (verbose > 1 || (verbose > 0 && vm.getCurrentTime() % (sampleRate * 2) == 0)) {
+                  if (verbose > 1
+                      || (verbose > 0 && vm.getCurrentTime() % (actualSampleRate * 2) == 0)) {
                     double rms = Math.sqrt(sumSq / (bufferSize * numChannels));
                     if (rms > 1e-9) {
                       vm.print(String.format("[Audio] Engine RMS: %.6f\n", rms));
                     }
                   }
 
-                  // Publish peak levels for VU meters (with ~10ms decay per buffer)
+                  // Publish peak levels for VU meters (~10 ms decay per buffer)
                   for (int c = 0; c < numChannels && c < peakOut.length; c++) {
                     peakOut[c] = Math.max(bufPeak[c], peakOut[c] * 0.97f);
                   }
 
-                  // Transfer from off-heap to byte array for JavaSound write
+                  // Transfer off-heap → byte array → JavaSound
                   MemorySegment.copy(outSeg, ValueLayout.JAVA_BYTE, 0, outBuf, 0, bytesPerBuffer);
                   outputLine.write(outBuf, 0, outBuf.length);
 
                   long endTime = System.nanoTime();
-                  long processingTime = endTime - startTime;
-                  cpuLoad = (double) processingTime / expectedBufferNanos;
+                  cpuLoad = (double) (endTime - startTime) / expectedBufferNanos;
                 }
               } catch (Throwable t) {
                 logger.log(Level.SEVERE, "CRITICAL: Audio Engine Thread Crashed!", t);
@@ -295,6 +654,8 @@ public class ChuckAudio {
               }
             });
   }
+
+  // ── Recorder ─────────────────────────────────────────────────────────────
 
   public void startRecording(String filename) throws IOException {
     if (recorder == null) {
@@ -313,6 +674,8 @@ public class ChuckAudio {
     return recorder != null && recorder.isRecording();
   }
 
+  // ── Performance metrics ───────────────────────────────────────────────────
+
   public double getAverageDriftMs() {
     long count = driftCount.get();
     return count == 0 ? 0.0 : (totalDriftNanos.get() / (double) count) / 1_000_000.0;
@@ -326,18 +689,21 @@ public class ChuckAudio {
     return maxDriftNanos.get() / 1_000_000.0;
   }
 
-  /** Peak amplitude [0,1] for each output channel — updated every buffer for the VU meters. */
+  /** Peak amplitude [0,1] per output channel — updated every buffer for VU meters. */
   private final float[] peakOut = new float[8];
 
   public float getPeakOut(int channel) {
     return channel < peakOut.length ? peakOut[channel] : 0f;
   }
 
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
   public void stop() {
     running = false;
     try {
       stopRecording();
     } catch (IOException e) {
+      // ignore on shutdown
     }
     if (inputLine != null) {
       inputLine.stop();

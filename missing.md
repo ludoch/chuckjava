@@ -217,12 +217,12 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | Class | Status |
 |-------|--------|
 | `FileIO` (ASCII + binary) | ✅ Done |
-| `MidiIn` / `MidiOut` / `MidiMsg` | ✅ Done |
-| `OscIn` / `OscOut` / `OscMsg` / `OscBundle` | ✅ Done |
-| `Hid` / `HidMsg` | ✅ Done |
-| `SerialIO` | ✅ Done |
-| `MidiFileIn` | ✅ Done — `open(string)`, `read(MidiMsg)`, `more()`, `rewind()`, `close()`, `size()`, `numTracks()`, `resolution()` |
-| `HidOut` | ✅ Done (stub) — `open(num)`, `send(HidMsg)`, `close()`, `name()`, `num()` — always returns 0 (native HID output requires platform libs) |
+| `MidiIn` / `MidiOut` / `MidiMsg` | ✅ Done | Enhanced with native RtMidi bindings (Callback-driven input, Virtual ports, Native output) |
+| `OscIn` / `OscOut` / `OscMsg` / `OscBundle` | ✅ Done | |
+| `Hid` / `HidMsg` | ✅ Done | |
+| `SerialIO` | ✅ Done | |
+| `MidiFileIn` | ✅ Done — `open(string)`, `read(MidiMsg)`, `more()`, `rewind()`, `close()`, `size()`, `numTracks()`, `resolution()` | |
+| `HidOut` | ✅ Done (stub) — `open(num)`, `send(HidMsg)`, `close()`, `name()`, `num()` — always returns 0 (native HID output requires platform libs) | |
 
 ---
 
@@ -303,7 +303,42 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 
 ---
 
-## 12. Planned STK Extensions (Modern STK)
+## 12. Audio & MIDI Engine Improvements (RtAudio/RtMidi-Inspired)
+
+Based on analysis of `../rtaudio/` and `../rtmidi/` (2026-04-14). Legend: ✅ Done · 🔄 In Progress · ❌ Planned
+
+### Phase 1 — Native Drivers & Core API (RtMidi Done)
+
+| Feature | Source | Status | Notes |
+|---------|--------|--------|-------|
+| Callback-driven MIDI Input | `rtmidi_set_callback` | ✅ Done | Replaced 1ms polling with native upcall stubs |
+| Native MIDI Output | `rtmidi_out_send_message` | ✅ Done | Low-latency output via Panama; JavaSound fallback |
+| Virtual MIDI Ports | `rtmidi_open_virtual_port` | ✅ Done | Supported on macOS (CoreMIDI) and Linux (ALSA/JACK) |
+| MIDI Message Filtering | `rtmidi_in_ignore_types` | ✅ Done | `min.ignoreTypes(sysex, time, sense)` |
+| Audio Sample Formats | `RtAudio::SampleFormat` | ✅ Done | INT16/INT24/INT32/FLOAT32 support in JavaSound |
+| Audio Device Probing | `RtAudio::getDeviceInfo` | ✅ Done | Channel counts, sample rates, and native formats |
+
+### Phase 2 — Advanced Audio (In Progress by Claude)
+
+| Feature | Source | Status | Notes |
+|---------|--------|--------|-------|
+| `AudioBackend` interface | `RtApi` base | 🔄 In Progress | Swappable backends (WASAPI, CoreAudio, ALSA, JACK) |
+| `setMinimizeLatency()` | `RTAUDIO_MINIMIZE_LATENCY` | ❌ Planned | Automatic buffer size optimization |
+| Non-interleaved processing | `RTAUDIO_NONINTERLEAVED` | ❌ Planned | Block-based processing for better cache locality |
+| `numberOfBuffers` control | `StreamOptions.numberOfBuffers` | ❌ Planned | `ChuckAudio.setNumBuffers(int)` |
+
+### Phase 3 — Platform-Specific / FFM
+
+| Feature | Source | Status | Notes |
+|---------|--------|--------|-------|
+| WASAPI Exclusive Mode | `RTAUDIO_HOG_DEVICE` | ❌ Planned | FFM binding to IAudioClient |
+| Real-time thread priority | `RTAUDIO_SCHEDULE_REALTIME` | ❌ Planned | FFM → `pthread_setschedparam(SCHED_RR)` on Linux; `SetThreadPriority(TIME_CRITICAL)` on Windows |
+| JACK audio backend | `RtApiJack` | ❌ Planned | Load `libjack` via FFM; ChucK appears as named JACK client |
+| ALSA direct backend | `RtApiAlsa` | ❌ Planned | FFM → `snd_pcm_open()`; bypasses PulseAudio/PipeWire overhead |
+
+---
+
+## 13. Planned STK Extensions (Modern STK)
 
 These features are from the latest upstream STK repository and represent "beyond classic ChucK" additions.
 

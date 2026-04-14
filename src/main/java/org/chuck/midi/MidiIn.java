@@ -4,7 +4,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 import org.chuck.core.ChuckEvent;
 import org.chuck.core.ChuckVM;
 
-/** The ChucK MidiIn object. */
+/** The ChucK MidiIn object. Support native RtMidi via ChuckMidiNative. */
 public class MidiIn extends ChuckEvent {
   private final ChuckMidiNative driver;
   private final ConcurrentLinkedDeque<MidiMsg> queue = new ConcurrentLinkedDeque<>();
@@ -15,6 +15,14 @@ public class MidiIn extends ChuckEvent {
 
   public void open(int port) {
     driver.open(port);
+  }
+
+  public void openVirtual(String name) {
+    driver.openVirtual(name);
+  }
+
+  public void ignoreTypes(boolean midiSysex, boolean midiTime, boolean midiSense) {
+    driver.ignoreTypes(midiSysex, midiTime, midiSense);
   }
 
   public boolean recv(MidiMsg msg) {
@@ -30,6 +38,10 @@ public class MidiIn extends ChuckEvent {
 
   public void close() {
     driver.close();
+  }
+
+  public boolean isNative() {
+    return RtMidi.isAvailable();
   }
 
   // Expose the event for 'min => now'

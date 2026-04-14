@@ -4,16 +4,29 @@ import javax.sound.midi.*;
 import org.chuck.core.ChuckObject;
 import org.chuck.core.ChuckType;
 
-/** MidiOut: Support for sending MIDI messages using javax.sound.midi. */
+/**
+ * MidiOut: Support for sending MIDI messages. Uses native RtMidi if available, falls back to
+ * javax.sound.midi.
+ */
 public class MidiOut extends ChuckObject {
-  private Receiver receiver;
-  private MidiDevice device;
+  private Receiver receiver; // javax.sound.midi fallback
+  private MidiDevice device; // javax.sound.midi fallback
+
+  private ChuckMidiOutNative nativeDriver;
 
   public MidiOut() {
     super(ChuckType.OBJECT);
+    if (RtMidi.isAvailable()) {
+      nativeDriver = new ChuckMidiOutNative();
+    }
   }
 
   public int open(int port) {
+    if (nativeDriver != null) {
+      return nativeDriver.open(port) ? 1 : 0;
+    }
+
+    // Fallback to JavaSound
     try {
       MidiDevice.Info[] infos = MidiSystem.getMidiDeviceInfo();
       if (port < 0 || port >= infos.length) return 0;
@@ -28,7 +41,20 @@ public class MidiOut extends ChuckObject {
     }
   }
 
+  /** Virtual ports are only supported by the native driver (macOS/Linux). */
+  public int openVirtual(String name) {
+    if (nativeDriver != null) {
+      return nativeDriver.openVirtual(name) ? 1 : 0;
+    }
+    return 0;
+  }
+
   public void send(MidiMsg msg) {
+    if (nativeDriver != null) {
+      nativeDriver.send(msg);
+      return;
+    }
+
     if (receiver == null) return;
     try {
       ShortMessage sm = new ShortMessage();
@@ -40,9 +66,18 @@ public class MidiOut extends ChuckObject {
   }
 
   public void close() {
+    if (nativeDriver != null) {
+      nativeDriver.close();
+      return;
+    }
+
     if (receiver != null) receiver.close();
     if (device != null && device.isOpen()) device.close();
     receiver = null;
     device = null;
+  }
+
+  public boolean isNative() {
+    return nativeDriver != null;
   }
 }
