@@ -1,6 +1,7 @@
 package org.chuck.midi;
 
 import java.lang.foreign.*;
+import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.logging.Level;
 import java.util.logging.Logger;
