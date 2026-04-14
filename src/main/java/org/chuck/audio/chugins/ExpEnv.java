@@ -22,20 +22,6 @@ public class ExpEnv extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
-    if (systemTime >= 0 && systemTime <= 2) {
-      System.err.println(
-          "DEBUG ExpEnv.compute(input="
-              + input
-              + ", t="
-              + systemTime
-              + ", value="
-              + value
-              + ", radius="
-              + radius
-              + ", id="
-              + System.identityHashCode(this)
-              + ")");
-    }
     value *= radius;
     return (float) (input * value);
   }
@@ -80,7 +66,6 @@ public class ExpEnv extends ChuckUGen {
 
   /** Trigger: sets envelope value to 1.0. */
   public int keyOn() {
-    System.err.println("DEBUG ExpEnv.keyOn() called, identity=" + System.identityHashCode(this));
     this.value = 1.0;
     return 1;
   }

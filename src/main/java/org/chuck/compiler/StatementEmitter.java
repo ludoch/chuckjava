@@ -374,11 +374,6 @@ public class StatementEmitter {
             argCount = s.arraySizes().size();
           }
 
-          if (isObject && !s.isReference() && argCount == 0) {
-            code.addInstruction(new PushInstrs.PushInt(0)); // dummy size for instantiation
-            argCount = 1;
-          }
-
           boolean isArrayDecl = !s.arraySizes().isEmpty();
           if (parent.isInPreCtor()) {
             code.addInstruction(new StackInstrs.PushThis());
