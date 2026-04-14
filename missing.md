@@ -307,7 +307,7 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 
 Based on analysis of `../rtaudio/` and `../rtmidi/` (2026-04-14). Legend: ✅ Done · 🔄 In Progress · ❌ Planned
 
-### Phase 1 — Native Drivers & Core API (RtMidi Done)
+### Phase 1 — Native Drivers & Core API (Complete)
 
 | Feature | Source | Status | Notes |
 |---------|--------|--------|-------|
@@ -315,17 +315,21 @@ Based on analysis of `../rtaudio/` and `../rtmidi/` (2026-04-14). Legend: ✅ Do
 | Native MIDI Output | `rtmidi_out_send_message` | ✅ Done | Low-latency output via Panama; JavaSound fallback |
 | Virtual MIDI Ports | `rtmidi_open_virtual_port` | ✅ Done | Supported on macOS (CoreMIDI) and Linux (ALSA/JACK) |
 | MIDI Message Filtering | `rtmidi_in_ignore_types` | ✅ Done | `min.ignoreTypes(sysex, time, sense)` |
-| Audio Sample Formats | `RtAudio::SampleFormat` | ✅ Done | INT16/INT24/INT32/FLOAT32 support in JavaSound |
-| Audio Device Probing | `RtAudio::getDeviceInfo` | ✅ Done | Channel counts, sample rates, and native formats |
+| MIDI port open by name | `rtmidi_open_port` | ✅ Done | `min.open("IAC")` matches by substring; `MidiIn.open(String)` / `MidiOut.open(String)` |
+| Audio Sample Formats (1-A) | `RTAUDIO_SINT16/24/32/FLOAT32` | ✅ Done | `ChuckAudio.setSampleFormat()`; INT16 fallback |
+| Audio Device Probing (1-B) | `RtAudio::getDeviceInfo` | ✅ Done | `getOutputDeviceInfo()` / `getInputDeviceInfo()` probe channels, rates, formats |
+| Preferred-rate auto-match (1-C) | `DeviceInfo.preferredSampleRate` | ✅ Done | Falls back through 48k→44.1k→22k; records actual SR |
+| Latency reporting (1-D) | `getStreamLatency()` | ✅ Done | `getOutputLatencyMs/Samples()`, `getInputLatencyMs/Samples()`, `getTotalLatencyMs()` |
+| Underrun/overflow counters (1-E) | `RTAUDIO_OUTPUT_UNDERFLOW` / `INPUT_OVERFLOW` | ✅ Done | `getUnderrunCount()`, `getOverflowCount()`; warns per 100 events |
 
-### Phase 2 — Advanced Audio (In Progress by Claude)
+### Phase 2 — Advanced Audio (Next)
 
 | Feature | Source | Status | Notes |
 |---------|--------|--------|-------|
-| `AudioBackend` interface | `RtApi` base | 🔄 In Progress | Swappable backends (WASAPI, CoreAudio, ALSA, JACK) |
-| `setMinimizeLatency()` | `RTAUDIO_MINIMIZE_LATENCY` | ❌ Planned | Automatic buffer size optimization |
-| Non-interleaved processing | `RTAUDIO_NONINTERLEAVED` | ❌ Planned | Block-based processing for better cache locality |
-| `numberOfBuffers` control | `StreamOptions.numberOfBuffers` | ❌ Planned | `ChuckAudio.setNumBuffers(int)` |
+| `AudioBackend` interface | `RtApi` base | ❌ Planned | Swappable backends; `JavaSoundBackend` wraps current `ChuckAudio` logic |
+| `setNumBuffers(int)` | `StreamOptions.numberOfBuffers` | ❌ Planned | Currently hardcoded to 2; expose as configurable |
+| `setMinimizeLatency()` | `RTAUDIO_MINIMIZE_LATENCY` | ❌ Planned | Probes smallest buffer the driver accepts (256→128→64 samples) |
+| Non-interleaved block path | `RTAUDIO_NONINTERLEAVED` | ❌ Planned | Connect `advanceTime(float[][], int, int)` end-to-end; avoid interleave copy |
 
 ### Phase 3 — Platform-Specific / FFM
 

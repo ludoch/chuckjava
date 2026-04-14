@@ -47,6 +47,20 @@ public class MidiOut extends ChuckObject {
     }
   }
 
+  /**
+   * Opens the first MIDI output port whose name contains the given substring (case-insensitive).
+   */
+  public int open(String name) {
+    String[] ports = list();
+    String lowerTarget = name.toLowerCase();
+    for (int i = 0; i < ports.length; i++) {
+      if (ports[i].toLowerCase().contains(lowerTarget)) {
+        return open(i);
+      }
+    }
+    return 0;
+  }
+
   /** Lists all available MIDI output port names. */
   public static String[] list() {
     if (RtMidi.isAvailable()) {

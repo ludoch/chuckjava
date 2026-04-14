@@ -28,6 +28,23 @@ public class MidiIn extends ChuckEvent {
     driver.open(port, api);
   }
 
+  /**
+   * Opens the first native MIDI input port whose name contains the given substring
+   * (case-insensitive).
+   */
+  public boolean open(String name) {
+    if (!RtMidi.isAvailable()) return false;
+    String[] ports = list();
+    String lowerTarget = name.toLowerCase();
+    for (int i = 0; i < ports.length; i++) {
+      if (ports[i].toLowerCase().contains(lowerTarget)) {
+        open(i);
+        return true;
+      }
+    }
+    return false;
+  }
+
   /** Lists all available native MIDI input port names. */
   public static String[] list() {
     if (!RtMidi.isAvailable()) return new String[0];
