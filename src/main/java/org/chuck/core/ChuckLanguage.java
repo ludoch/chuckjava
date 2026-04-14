@@ -42,7 +42,15 @@ public class ChuckLanguage {
           "Hid",
           "StringTokenizer",
           "RegEx",
-          "Reflect");
+          "Reflect",
+          // AI / ML
+          "KNN",
+          "KNN2",
+          "SVM",
+          "MLP",
+          "HMM",
+          "PCA",
+          "Word2Vec");
 
   public static final Set<String> CORE_UGENS =
       Set.of(

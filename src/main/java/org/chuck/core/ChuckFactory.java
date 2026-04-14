@@ -131,6 +131,7 @@ public class ChuckFactory {
           case "MLP" -> new org.chuck.core.ai.MLP();
           case "HMM" -> new org.chuck.core.ai.HMM();
           case "PCA" -> new org.chuck.core.ai.PCA();
+          case "Word2Vec" -> new org.chuck.core.ai.Word2Vec();
           default -> null;
         };
     return res;

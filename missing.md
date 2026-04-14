@@ -96,6 +96,7 @@ All six classes implemented in `org.chuck.core.ai`:
 | `HMM` | Hidden Markov Model (Baum-Welch EM) | ✅ Implemented — `train`, `generate`, `logLikelihood` |
 | `MLP` | Multi-Layer Perceptron (backprop SGD) | ✅ Implemented — `input/hidden/output`, `train`, `predict`, `activation` |
 | `PCA` | Principal Component Analysis (power iteration) | ✅ Implemented — `train`, `transform`, `explainedVariance`, `numComponents` |
+| `Word2Vec` | Word embedding model (GloVe / word2vec format) | ✅ Implemented — `load(path)`, `getVector(word, float[])`, `getSimilar(word, k, string[])`, `getSimilar(float[], k, string[])`, `size()`, `dim()`, `minMax()`, `useKDTree()` — linear-scan cosine similarity; model cache keyed by canonical path |
 
 The typical ChucK AI workflow is: `Flip → FeatureCollector → KNN/MLP` for real-time machine learning on audio.
 
