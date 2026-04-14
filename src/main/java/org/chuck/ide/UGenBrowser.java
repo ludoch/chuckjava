@@ -90,9 +90,10 @@ public class UGenBrowser extends VBox {
     TreeItem<String> effectNode = new TreeItem<>("Effects");
     TreeItem<String> stkNode = new TreeItem<>("STK Instruments");
     TreeItem<String> anaNode = new TreeItem<>("Analyzers");
+    TreeItem<String> ioNode = new TreeItem<>("Sampling & I/O");
     TreeItem<String> utilNode = new TreeItem<>("Utilities");
 
-    root.getChildren().addAll(oscNode, filterNode, effectNode, stkNode, anaNode, utilNode);
+    root.getChildren().addAll(oscNode, filterNode, effectNode, stkNode, anaNode, ioNode, utilNode);
 
     Set<String> names = UGenRegistry.getRegisteredNames();
     List<String> sortedNames = new ArrayList<>(names);
@@ -107,6 +108,7 @@ public class UGenBrowser extends VBox {
         case "Effects" -> effectNode.getChildren().add(item);
         case "STK Instruments" -> stkNode.getChildren().add(item);
         case "Analyzers" -> anaNode.getChildren().add(item);
+        case "Sampling & I/O" -> ioNode.getChildren().add(item);
         default -> utilNode.getChildren().add(item);
       }
     }
@@ -126,8 +128,18 @@ public class UGenBrowser extends VBox {
     if (containsAny(name, "Filter", "LPF", "HPF", "BPF", "BRF", "ResonZ", "Pole", "Zero", "BiQuad"))
       return "Filters";
     if (containsAny(name, "FFT", "IFFT", "RMS", "Flux", "Centroid", "Rolloff")) return "Analyzers";
-    if (containsAny(name, "Echo", "Delay", "Chorus", "Rev", "FreeVerb", "PitShift", "Pan2", "Gain"))
-      return "Effects";
+    if (containsAny(
+        name,
+        "Echo",
+        "Delay",
+        "Chorus",
+        "Rev",
+        "FreeVerb",
+        "PitShift",
+        "Pan2",
+        "Gain",
+        "LentPitShift",
+        "Distortion")) return "Effects";
 
     // STK - heuristic: common STK instrument names
     if (containsAny(
@@ -156,6 +168,9 @@ public class UGenBrowser extends VBox {
         "BandedWG",
         "BlowBotl",
         "BlowHole")) return "STK Instruments";
+
+    if (containsAny(name, "LiSa", "WvIn", "WvOut", "Granulator", "Broadcaster"))
+      return "Sampling & I/O";
 
     return "Utilities";
   }
