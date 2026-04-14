@@ -17,6 +17,26 @@ public class MidiIn extends ChuckEvent {
     driver.open(port);
   }
 
+  /** Lists all available native MIDI input port names. */
+  public static String[] list() {
+    if (!RtMidi.isAvailable()) return new String[0];
+    try (java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofConfined()) {
+      java.lang.foreign.MemorySegment in =
+          (java.lang.foreign.MemorySegment) RtMidi.in_create_default.invoke();
+      if (in.equals(java.lang.foreign.MemorySegment.NULL)) return new String[0];
+
+      int count = (int) RtMidi.get_port_count.invoke(in);
+      String[] names = new String[count];
+      for (int i = 0; i < count; i++) {
+        names[i] = RtMidi.getPortName(in, i);
+      }
+      RtMidi.in_free.invoke(in);
+      return names;
+    } catch (Throwable t) {
+      return new String[0];
+    }
+  }
+
   public void openVirtual(String name) {
     driver.openVirtual(name);
   }

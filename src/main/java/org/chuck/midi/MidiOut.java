@@ -41,6 +41,34 @@ public class MidiOut extends ChuckObject {
     }
   }
 
+  /** Lists all available MIDI output port names. */
+  public static String[] list() {
+    if (RtMidi.isAvailable()) {
+      try (java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofConfined()) {
+        java.lang.foreign.MemorySegment out =
+            (java.lang.foreign.MemorySegment) RtMidi.out_create_default.invoke();
+        if (out.equals(java.lang.foreign.MemorySegment.NULL)) return new String[0];
+
+        int count = (int) RtMidi.get_port_count.invoke(out);
+        String[] names = new String[count];
+        for (int i = 0; i < count; i++) {
+          names[i] = RtMidi.getPortName(out, i);
+        }
+        RtMidi.out_free.invoke(out);
+        return names;
+      } catch (Throwable t) {
+      }
+    }
+
+    // Fallback: list JavaSound devices
+    MidiDevice.Info[] infos = MidiSystem.getMidiDeviceInfo();
+    String[] names = new String[infos.length];
+    for (int i = 0; i < infos.length; i++) {
+      names[i] = infos[i].getName();
+    }
+    return names;
+  }
+
   /** Virtual ports are only supported by the native driver (macOS/Linux). */
   public int openVirtual(String name) {
     if (nativeDriver != null) {

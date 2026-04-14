@@ -14,6 +14,17 @@ public class MidiNativeTest {
   }
 
   @Test
+  public void testListPorts() {
+    String[] inNames = MidiIn.list();
+    System.out.println("Native MIDI Input Ports (" + inNames.length + "):");
+    for (String n : inNames) System.out.println("  - " + n);
+
+    String[] outNames = MidiOut.list();
+    System.out.println("MIDI Output Ports (" + outNames.length + "):");
+    for (String n : outNames) System.out.println("  - " + n);
+  }
+
+  @Test
   public void testMidiInNative() {
     if (!RtMidi.isAvailable()) return;
 

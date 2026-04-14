@@ -151,4 +151,24 @@ public class RtMidi {
   public static boolean isAvailable() {
     return available;
   }
+
+  /** Helper to get a port name from a native RtMidi device pointer. */
+  public static String getPortName(MemorySegment devicePtr, int portIndex) {
+    if (!available || devicePtr.equals(MemorySegment.NULL)) return "Unknown";
+
+    try (Arena arena = Arena.ofConfined()) {
+      // First call with NULL buffer to get size
+      MemorySegment sizePtr = arena.allocate(ValueLayout.JAVA_INT, 1024);
+      MemorySegment buf = arena.allocate(1024);
+
+      // rtmidi_get_port_name(device, index, buf, sizePtr)
+      int result = (int) get_port_name.invoke(devicePtr, portIndex, buf, sizePtr);
+      if (result > 0) {
+        return buf.getString(0);
+      }
+    } catch (Throwable t) {
+      logger.log(Level.WARNING, "Error getting port name", t);
+    }
+    return "Port " + portIndex;
+  }
 }
