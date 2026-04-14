@@ -105,13 +105,39 @@ public class RtMidi {
     init();
   }
 
+  public static void reinit() {
+    if (!available) init();
+  }
+
   private static void init() {
     String os = System.getProperty("os.name").toLowerCase();
     String libName =
         os.contains("win") ? "rtmidi.dll" : os.contains("mac") ? "librtmidi.dylib" : "librtmidi.so";
 
     try {
-      SymbolLookup rtmidi = SymbolLookup.libraryLookup(libName, globalArena);
+      // 1. Try preference path first
+      java.util.prefs.Preferences prefs =
+          java.util.prefs.Preferences.userNodeForPackage(RtMidi.class);
+      String customPath = prefs.get("midi.libPath", "");
+      SymbolLookup rtmidi = null;
+
+      if (!customPath.isEmpty()) {
+        java.nio.file.Path p = java.nio.file.Path.of(customPath, libName);
+        if (java.nio.file.Files.exists(p)) {
+          try {
+            rtmidi = SymbolLookup.libraryLookup(p, globalArena);
+            logger.info("RtMidi loaded from custom path: " + p);
+          } catch (Exception e) {
+          }
+        }
+      }
+
+      // 2. Fallback to system lookup
+      if (rtmidi == null) {
+        rtmidi = SymbolLookup.libraryLookup(libName, globalArena);
+        logger.info("RtMidi loaded from system path: " + libName);
+      }
+
       Linker linker = Linker.nativeLinker();
 
       // Port Management

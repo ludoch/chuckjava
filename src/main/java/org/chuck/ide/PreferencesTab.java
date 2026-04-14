@@ -148,6 +148,24 @@ public class PreferencesTab extends ScrollPane {
     HBox statusBox = new HBox(8, statusDot, statusLabel);
     statusBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
+    // Library Path Row
+    TextField libPathField = new TextField(prefs.get("midi.libPath", ""));
+    libPathField.setPromptText("Path to rtmidi.dll / .so / .dylib");
+    Button browseBtn = new Button("...");
+    browseBtn.setOnAction(
+        e -> {
+          javafx.stage.DirectoryChooser dc = new javafx.stage.DirectoryChooser();
+          dc.setTitle("Select RtMidi Library Directory");
+          java.io.File folder = dc.showDialog(getScene().getWindow());
+          if (folder != null) {
+            libPathField.setText(folder.getAbsolutePath());
+            prefs.put("midi.libPath", folder.getAbsolutePath());
+          }
+        });
+    libPathField.textProperty().addListener((obs, ov, nv) -> prefs.put("midi.libPath", nv));
+    HBox pathBox = new HBox(5, libPathField, browseBtn);
+    javafx.scene.layout.HBox.setHgrow(libPathField, javafx.scene.layout.Priority.ALWAYS);
+
     // API Selection (Native only)
     ChoiceBox<RtMidi.Api> apiBox = new ChoiceBox<>();
     if (nativeOk) {
@@ -169,8 +187,21 @@ public class PreferencesTab extends ScrollPane {
     Button refreshBtn = new Button("Refresh Devices");
     refreshBtn.setOnAction(
         e -> {
+          RtMidi.reinit();
           inList.setItems(FXCollections.observableArrayList(MidiIn.list()));
           outList.setItems(FXCollections.observableArrayList(MidiOut.list()));
+
+          // Update status label/dot if it changed
+          boolean nowOk = RtMidi.isAvailable();
+          statusDot.setFill(nowOk ? Color.GREEN : Color.RED);
+          statusLabel.setText(
+              nowOk ? "Native MIDI (RtMidi) Active" : "Native MIDI Not Found (JavaSound Fallback)");
+          if (nowOk && apiBox.isDisabled()) {
+            apiBox.setDisable(false);
+            apiBox.setItems(FXCollections.observableArrayList(RtMidi.getCompiledApis()));
+            apiBox.getItems().add(0, RtMidi.Api.UNSPECIFIED);
+            apiBox.setValue(RtMidi.Api.UNSPECIFIED);
+          }
         });
 
     // Filters
@@ -185,17 +216,19 @@ public class PreferencesTab extends ScrollPane {
     timeCb.selectedProperty().addListener((obs, ov, nv) -> prefs.putBoolean("midi.ignoreTime", nv));
 
     grid.add(statusBox, 0, 0, 2, 1);
-    grid.add(new Label("Preferred API:"), 0, 1);
-    grid.add(apiBox, 1, 1);
-    grid.add(new Label("Input Ports:"), 0, 2);
-    grid.add(inList, 1, 2);
-    grid.add(new Label("Output Ports:"), 0, 3);
-    grid.add(outList, 1, 3);
-    grid.add(refreshBtn, 1, 4);
+    grid.add(new Label("Native Lib Path:"), 0, 1);
+    grid.add(pathBox, 1, 1);
+    grid.add(new Label("Preferred API:"), 0, 2);
+    grid.add(apiBox, 1, 2);
+    grid.add(new Label("Input Ports:"), 0, 3);
+    grid.add(inList, 1, 3);
+    grid.add(new Label("Output Ports:"), 0, 4);
+    grid.add(outList, 1, 4);
+    grid.add(refreshBtn, 1, 5);
 
     HBox filters = new HBox(15, sysexCb, timeCb);
-    grid.add(new Label("Filters:"), 0, 5);
-    grid.add(filters, 1, 5);
+    grid.add(new Label("Filters:"), 0, 6);
+    grid.add(filters, 1, 6);
 
     TitledPane pane = new TitledPane("MIDI Settings", grid);
     pane.setCollapsible(false);

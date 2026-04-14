@@ -11,6 +11,13 @@ public class MidiIn extends ChuckEvent {
 
   public MidiIn(ChuckVM vm) {
     this.driver = new ChuckMidiNative(vm, this, this.queue);
+
+    // Auto-apply preferences from IDE
+    java.util.prefs.Preferences prefs =
+        java.util.prefs.Preferences.userNodeForPackage(RtMidi.class);
+    boolean ignoreSysex = prefs.getBoolean("midi.ignoreSysex", false);
+    boolean ignoreTime = prefs.getBoolean("midi.ignoreTime", true);
+    driver.ignoreTypes(ignoreSysex, ignoreTime, true); // sense=true by default
   }
 
   public void open(int port) {
