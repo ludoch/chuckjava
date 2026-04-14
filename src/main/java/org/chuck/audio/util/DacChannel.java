@@ -60,6 +60,9 @@ public class DacChannel extends ChuckUGen {
         }
       }
 
+      // Safety check: prevent NaNs or Infinity from reaching output
+      if (!Float.isFinite(sum)) sum = 0.0f;
+
       lastOut = sum * gain;
       lastTickTime = systemTime;
       blockStartTime = systemTime;

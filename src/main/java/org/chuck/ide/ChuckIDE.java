@@ -517,6 +517,24 @@ public class ChuckIDE extends Application {
 
     audio.start();
 
+    // Setup auto-run if file argument provided
+    if (!rawArgs.isEmpty()) {
+      String lastArg = rawArgs.get(rawArgs.size() - 1);
+      if (lastArg.endsWith(".ck")) {
+        Platform.runLater(
+            () -> {
+              try {
+                File f = new File(lastArg);
+                if (f.exists()) {
+                  loadFileIntoEditor(f);
+                  addShred();
+                }
+              } catch (Exception ignored) {
+              }
+            });
+      }
+    }
+
     // Setup hidden analyzers for visualizers (mono)
     analyzer = new FFT(prefs.getInt("vis.fftSize", 512));
     scope = new Scope(prefs.getInt("vis.scopeWindow", 512));

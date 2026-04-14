@@ -123,7 +123,17 @@ public class Twang extends ChuckUGen {
   protected float compute(float input, long systemTime) {
     // Waveguide loop
     float feedback = loopFilter.tick(delayLine.last(), systemTime);
-    float val = input + (float) (feedback * (loopGain + freq * 0.000005));
+
+    // Safety: ensure loop gain never exceeds 1.0 to prevent explosion
+    double effectiveLoopGain = loopGain + (freq * 0.000005);
+    if (effectiveLoopGain > 0.999) effectiveLoopGain = 0.999;
+
+    float val = input + (float) (feedback * effectiveLoopGain);
+
+    // Soft clamp internal state
+    if (val > 5.0f) val = 5.0f;
+    if (val < -5.0f) val = -5.0f;
+
     delayLine.tick(val, systemTime);
 
     // Pluck position comb filter: y = x[n] - x[n - pluckDelay]
