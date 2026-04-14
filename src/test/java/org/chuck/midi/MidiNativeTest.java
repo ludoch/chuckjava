@@ -14,14 +14,17 @@ public class MidiNativeTest {
   }
 
   @Test
-  public void testListPorts() {
-    String[] inNames = MidiIn.list();
-    System.out.println("Native MIDI Input Ports (" + inNames.length + "):");
-    for (String n : inNames) System.out.println("  - " + n);
+  public void testSysexMsg() {
+    MidiMsg msg = new MidiMsg();
+    byte[] sysex = {(byte) 0xF0, 1, 2, (byte) 0xF7};
+    msg.setData(sysex);
 
-    String[] outNames = MidiOut.list();
-    System.out.println("MIDI Output Ports (" + outNames.length + "):");
-    for (String n : outNames) System.out.println("  - " + n);
+    assertEquals(4, msg.size());
+    assertEquals(0xF0, msg.data1);
+    assertEquals("MidiMsg[F0 01 02 F7]", msg.toString());
+
+    byte[] out = msg.getData();
+    assertArrayEquals(sysex, out);
   }
 
   @Test

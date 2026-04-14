@@ -108,9 +108,9 @@ public class ChuckMidiNative {
     if (size <= 0) return;
 
     MidiMsg msg = new MidiMsg();
-    msg.data1 = message.get(ValueLayout.JAVA_BYTE, 0) & 0xFF;
-    msg.data2 = size > 1 ? message.get(ValueLayout.JAVA_BYTE, 1) & 0xFF : 0;
-    msg.data3 = size > 2 ? message.get(ValueLayout.JAVA_BYTE, 2) & 0xFF : 0;
+    byte[] raw = new byte[(int) size];
+    MemorySegment.copy(message, ValueLayout.JAVA_BYTE, 0, raw, 0, (int) size);
+    msg.setData(raw);
 
     queue.addLast(msg);
     event.broadcast(vm);

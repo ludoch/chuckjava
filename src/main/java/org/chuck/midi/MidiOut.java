@@ -85,9 +85,22 @@ public class MidiOut extends ChuckObject {
 
     if (receiver == null) return;
     try {
-      ShortMessage sm = new ShortMessage();
-      sm.setMessage(msg.data1, msg.data2, msg.data3);
-      receiver.send(sm, -1);
+      byte[] raw = msg.getData();
+      int status = raw[0] & 0xFF;
+
+      if (status == 0xF0) { // Sysex
+        SysexMessage sm = new SysexMessage();
+        sm.setMessage(raw, raw.length);
+        receiver.send(sm, -1);
+      } else if (status == 0xFF) { // Meta
+        MetaMessage mm = new MetaMessage();
+        mm.setMessage(raw[1] & 0xFF, raw, raw.length);
+        receiver.send(mm, -1);
+      } else {
+        ShortMessage sm = new ShortMessage();
+        sm.setMessage(msg.data1, msg.data2, msg.data3);
+        receiver.send(sm, -1);
+      }
     } catch (InvalidMidiDataException e) {
       System.err.println("MidiOut: Invalid MIDI data: " + e.getMessage());
     }

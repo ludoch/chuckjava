@@ -51,13 +51,12 @@ public class ChuckMidiOutNative {
     if (midiOutPtr.equals(MemorySegment.NULL)) return;
 
     try {
-      // RtMidi expects a buffer of bytes
-      MemorySegment buffer = arena.allocate(3);
-      buffer.set(ValueLayout.JAVA_BYTE, 0, (byte) msg.data1);
-      buffer.set(ValueLayout.JAVA_BYTE, 1, (byte) msg.data2);
-      buffer.set(ValueLayout.JAVA_BYTE, 2, (byte) msg.data3);
+      byte[] raw = msg.getData();
+      int size = msg.size();
+      MemorySegment buffer = arena.allocate(size);
+      MemorySegment.copy(raw, 0, buffer, ValueLayout.JAVA_BYTE, 0, size);
 
-      RtMidi.out_send_message.invoke(midiOutPtr, buffer, 3);
+      RtMidi.out_send_message.invoke(midiOutPtr, buffer, size);
     } catch (Throwable t) {
       logger.log(Level.WARNING, "Failed to send native MIDI message", t);
     }
