@@ -39,10 +39,20 @@ public class ChuckMidiNative {
   }
 
   public void open(int portNumber) {
+    open(portNumber, RtMidi.Api.UNSPECIFIED);
+  }
+
+  public void open(int portNumber, RtMidi.Api api) {
     if (!RtMidi.isAvailable()) return;
 
     try {
-      midiInPtr = (MemorySegment) RtMidi.in_create_default.invoke();
+      if (api == RtMidi.Api.UNSPECIFIED) {
+        midiInPtr = (MemorySegment) RtMidi.in_create_default.invoke();
+      } else {
+        MemorySegment clientName = arena.allocateFrom("ChucK-Java Input");
+        midiInPtr = (MemorySegment) RtMidi.in_create.invoke(api.id, clientName, 1024);
+      }
+
       if (midiInPtr.equals(MemorySegment.NULL)) return;
 
       // Prepare callback stub
@@ -67,7 +77,7 @@ public class ChuckMidiNative {
       MemorySegment portName = arena.allocateFrom("ChucK-Java Input");
       RtMidi.open_port.invoke(midiInPtr, portNumber, portName);
 
-      logger.info("Native MIDI Input opened port " + portNumber);
+      logger.info("Native MIDI Input opened port " + portNumber + " (API=" + api + ")");
     } catch (Throwable t) {
       logger.log(Level.SEVERE, "Failed to open native MIDI input", t);
     }

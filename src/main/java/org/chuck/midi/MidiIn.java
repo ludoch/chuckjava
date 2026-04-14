@@ -17,6 +17,10 @@ public class MidiIn extends ChuckEvent {
     driver.open(port);
   }
 
+  public void open(int port, RtMidi.Api api) {
+    driver.open(port, api);
+  }
+
   /** Lists all available native MIDI input port names. */
   public static String[] list() {
     if (!RtMidi.isAvailable()) return new String[0];
@@ -62,6 +66,11 @@ public class MidiIn extends ChuckEvent {
 
   public boolean isNative() {
     return RtMidi.isAvailable();
+  }
+
+  /** Returns all compiled native MIDI APIs for the current platform. */
+  public static java.util.List<RtMidi.Api> getCompiledApis() {
+    return RtMidi.getCompiledApis();
   }
 
   // Expose the event for 'min => now'

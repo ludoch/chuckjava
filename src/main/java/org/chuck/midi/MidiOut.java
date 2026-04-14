@@ -22,9 +22,15 @@ public class MidiOut extends ChuckObject {
   }
 
   public int open(int port) {
+    return open(port, RtMidi.Api.UNSPECIFIED);
+  }
+
+  public int open(int port, RtMidi.Api api) {
     if (nativeDriver != null) {
-      return nativeDriver.open(port) ? 1 : 0;
+      return nativeDriver.open(port, api) ? 1 : 0;
     }
+
+    if (api != RtMidi.Api.UNSPECIFIED) return 0; // JavaSound doesn't support specific RtMidi APIs
 
     // Fallback to JavaSound
     try {
@@ -120,5 +126,10 @@ public class MidiOut extends ChuckObject {
 
   public boolean isNative() {
     return nativeDriver != null;
+  }
+
+  /** Returns all compiled native MIDI APIs for the current platform. */
+  public static java.util.List<RtMidi.Api> getCompiledApis() {
+    return RtMidi.getCompiledApis();
   }
 }

@@ -28,6 +28,14 @@ public class MidiNativeTest {
   }
 
   @Test
+  public void testCompiledApis() {
+    System.out.println("Compiled MIDI APIs:");
+    for (RtMidi.Api api : MidiIn.getCompiledApis()) {
+      System.out.println("  - " + api);
+    }
+  }
+
+  @Test
   public void testMidiInNative() {
     if (!RtMidi.isAvailable()) return;
 

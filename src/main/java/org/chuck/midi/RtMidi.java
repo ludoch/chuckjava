@@ -20,12 +20,14 @@ public class RtMidi {
 
   // In
   public static MethodHandle in_create_default;
+  public static MethodHandle in_create;
   public static MethodHandle in_free;
   public static MethodHandle in_set_callback;
   public static MethodHandle in_ignore_types;
 
   // Out
   public static MethodHandle out_create_default;
+  public static MethodHandle out_create;
   public static MethodHandle out_free;
   public static MethodHandle out_send_message;
 
@@ -33,6 +35,33 @@ public class RtMidi {
   public static MethodHandle open_port;
   public static MethodHandle open_virtual_port;
   public static MethodHandle close_port;
+  public static MethodHandle get_compiled_api;
+  public static MethodHandle api_name;
+  public static MethodHandle api_display_name;
+
+  /** Native API identifiers matching rtmidi_c.h */
+  public enum Api {
+    UNSPECIFIED(0),
+    MACOSX_CORE(1),
+    LINUX_ALSA(2),
+    UNIX_JACK(3),
+    WINDOWS_MM(4),
+    RTMIDI_DUMMY(5),
+    WEB_MIDI(6),
+    WINDOWS_UWP(7),
+    ANDROID_AMIDI(8);
+
+    public final int id;
+
+    Api(int id) {
+      this.id = id;
+    }
+
+    public static Api fromId(int id) {
+      for (Api a : values()) if (a.id == id) return a;
+      return UNSPECIFIED;
+    }
+  }
 
   static {
     init();
@@ -73,6 +102,16 @@ public class RtMidi {
               linker,
               "rtmidi_in_create_default",
               FunctionDescriptor.of(ValueLayout.ADDRESS));
+      in_create =
+          lookup(
+              rtmidi,
+              linker,
+              "rtmidi_in_create",
+              FunctionDescriptor.of(
+                  ValueLayout.ADDRESS,
+                  ValueLayout.JAVA_INT,
+                  ValueLayout.ADDRESS,
+                  ValueLayout.JAVA_INT));
       in_free =
           lookup(rtmidi, linker, "rtmidi_in_free", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
       in_set_callback =
@@ -100,6 +139,13 @@ public class RtMidi {
               linker,
               "rtmidi_out_create_default",
               FunctionDescriptor.of(ValueLayout.ADDRESS));
+      out_create =
+          lookup(
+              rtmidi,
+              linker,
+              "rtmidi_out_create",
+              FunctionDescriptor.of(
+                  ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS));
       out_free =
           lookup(rtmidi, linker, "rtmidi_out_free", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
       out_send_message =
@@ -131,12 +177,49 @@ public class RtMidi {
           lookup(
               rtmidi, linker, "rtmidi_close_port", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
 
+      // API Info
+      get_compiled_api =
+          lookup(
+              rtmidi,
+              linker,
+              "rtmidi_get_compiled_api",
+              FunctionDescriptor.of(
+                  ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+      api_name =
+          lookup(
+              rtmidi,
+              linker,
+              "rtmidi_api_name",
+              FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+      api_display_name =
+          lookup(
+              rtmidi,
+              linker,
+              "rtmidi_api_display_name",
+              FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.JAVA_INT));
+
       available = true;
       logger.info("RtMidi native library loaded successfully: " + libName);
     } catch (Exception e) {
       logger.log(
           Level.WARNING,
           "RtMidi native library not found (" + libName + "). Falling back to JavaSound or stubs.");
+    }
+  }
+
+  public static java.util.List<Api> getCompiledApis() {
+    if (!available) return java.util.Collections.emptyList();
+    try (Arena arena = Arena.ofConfined()) {
+      int count = (int) get_compiled_api.invoke(MemorySegment.NULL, 0);
+      MemorySegment buf = arena.allocate(ValueLayout.JAVA_INT, count);
+      get_compiled_api.invoke(buf, count);
+      java.util.List<Api> apis = new java.util.ArrayList<>();
+      for (int i = 0; i < count; i++) {
+        apis.add(Api.fromId(buf.get(ValueLayout.JAVA_INT, i * 4)));
+      }
+      return apis;
+    } catch (Throwable t) {
+      return java.util.Collections.emptyList();
     }
   }
 
