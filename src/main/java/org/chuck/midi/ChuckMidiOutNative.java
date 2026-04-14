@@ -32,6 +32,19 @@ public class ChuckMidiOutNative {
 
       if (midiOutPtr.equals(MemorySegment.NULL)) return false;
 
+      // Prepare Error callback stub
+      MethodHandle onErrorHandle =
+          MethodHandles.lookup()
+              .findVirtual(
+                  ChuckMidiOutNative.class,
+                  "onNativeError",
+                  java.lang.invoke.MethodType.methodType(
+                      void.class, int.class, MemorySegment.class, MemorySegment.class));
+      MemorySegment errorStub =
+          Linker.nativeLinker()
+              .upcallStub(onErrorHandle.bindTo(this), RtMidi.ERROR_CALLBACK_DESC, arena);
+      RtMidi.set_error_callback.invoke(midiOutPtr, errorStub, MemorySegment.NULL);
+
       MemorySegment portName = arena.allocateFrom("ChucK-Java Output");
       RtMidi.open_port.invoke(midiOutPtr, portNumber, portName);
 
@@ -41,6 +54,13 @@ public class ChuckMidiOutNative {
       logger.log(Level.SEVERE, "Failed to open native MIDI output", t);
       return false;
     }
+  }
+
+  private void onNativeError(int type, MemorySegment errorText, MemorySegment userData) {
+    String msg = errorText.getString(0);
+    RtMidi.ErrorType et = RtMidi.ErrorType.fromId(type);
+    System.err.println("[RtMidi] Native Error (" + et + "): " + msg);
+    logger.log(Level.WARNING, "[RtMidi] " + et + ": " + msg);
   }
 
   public boolean openVirtual(String name) {

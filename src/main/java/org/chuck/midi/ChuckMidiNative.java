@@ -55,7 +55,7 @@ public class ChuckMidiNative {
 
       if (midiInPtr.equals(MemorySegment.NULL)) return;
 
-      // Prepare callback stub
+      // Prepare MIDI callback stub
       MethodHandle onMidiHandle =
           MethodHandles.lookup()
               .findVirtual(
@@ -67,12 +67,22 @@ public class ChuckMidiNative {
                       MemorySegment.class,
                       long.class,
                       MemorySegment.class));
-
       callbackStub =
           Linker.nativeLinker().upcallStub(onMidiHandle.bindTo(this), CALLBACK_DESC, arena);
-
-      // Set the callback BEFORE opening the port
       RtMidi.in_set_callback.invoke(midiInPtr, callbackStub, MemorySegment.NULL);
+
+      // Prepare Error callback stub
+      MethodHandle onErrorHandle =
+          MethodHandles.lookup()
+              .findVirtual(
+                  ChuckMidiNative.class,
+                  "onNativeError",
+                  java.lang.invoke.MethodType.methodType(
+                      void.class, int.class, MemorySegment.class, MemorySegment.class));
+      MemorySegment errorStub =
+          Linker.nativeLinker()
+              .upcallStub(onErrorHandle.bindTo(this), RtMidi.ERROR_CALLBACK_DESC, arena);
+      RtMidi.set_error_callback.invoke(midiInPtr, errorStub, MemorySegment.NULL);
 
       MemorySegment portName = arena.allocateFrom("ChucK-Java Input");
       RtMidi.open_port.invoke(midiInPtr, portNumber, portName);
@@ -81,6 +91,13 @@ public class ChuckMidiNative {
     } catch (Throwable t) {
       logger.log(Level.SEVERE, "Failed to open native MIDI input", t);
     }
+  }
+
+  private void onNativeError(int type, MemorySegment errorText, MemorySegment userData) {
+    String msg = errorText.getString(0);
+    RtMidi.ErrorType et = RtMidi.ErrorType.fromId(type);
+    vm.print("[RtMidi] Native Error (" + et + "): " + msg + "\n");
+    logger.log(Level.WARNING, "[RtMidi] " + et + ": " + msg);
   }
 
   public void openVirtual(String name) {

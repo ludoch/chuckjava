@@ -35,9 +35,47 @@ public class RtMidi {
   public static MethodHandle open_port;
   public static MethodHandle open_virtual_port;
   public static MethodHandle close_port;
+  public static MethodHandle set_error_callback;
   public static MethodHandle get_compiled_api;
   public static MethodHandle api_name;
   public static MethodHandle api_display_name;
+
+  /** Error types matching rtmidi_c.h */
+  public enum ErrorType {
+    WARNING(0),
+    DEBUG_WARNING(1),
+    UNSPECIFIED(2),
+    NO_DEVICES_FOUND(3),
+    INVALID_PARAMETER(4),
+    MEMORY_ERROR(5),
+    INVALID_PORT(6),
+    DEVICE_ERROR(7),
+    DRIVER_ERROR(8),
+    SYSTEM_ERROR(9),
+    THREAD_ERROR(10);
+
+    public final int id;
+
+    ErrorType(int id) {
+      this.id = id;
+    }
+
+    public static ErrorType fromId(int id) {
+      for (ErrorType t : values()) if (t.id == id) return t;
+      return UNSPECIFIED;
+    }
+  }
+
+  /**
+   * Callback Descriptor for errors: void error_callback(RtMidiError::Type type, const char*
+   * errorText, void* userData)
+   */
+  public static final FunctionDescriptor ERROR_CALLBACK_DESC =
+      FunctionDescriptor.ofVoid(
+          ValueLayout.JAVA_INT, // type
+          ValueLayout.ADDRESS, // error text
+          ValueLayout.ADDRESS // user data
+          );
 
   /** Native API identifiers matching rtmidi_c.h */
   public enum Api {
@@ -176,8 +214,14 @@ public class RtMidi {
       close_port =
           lookup(
               rtmidi, linker, "rtmidi_close_port", FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+      set_error_callback =
+          lookup(
+              rtmidi,
+              linker,
+              "rtmidi_set_error_callback",
+              FunctionDescriptor.ofVoid(
+                  ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
 
-      // API Info
       get_compiled_api =
           lookup(
               rtmidi,
