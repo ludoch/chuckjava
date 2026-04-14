@@ -46,7 +46,7 @@ public class WaveformGoldenTest {
         0.3 => s2.gain;
         440 => s1.freq;
         660 => s2.freq;
-        200::ms => now;
+        1::second => now;
         """;
     verifyAgainstGolden("polyphony_golden", code);
   }

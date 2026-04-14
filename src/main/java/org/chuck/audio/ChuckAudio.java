@@ -227,6 +227,12 @@ public class ChuckAudio {
   private long underrunLogCount = 0; // throttle logging to 1 per 100 events
   private long overflowLogCount = 0;
 
+  // Phase 2: buffer count, minimize-latency, effective buffer size
+  private int numBuffers = 2; // double-buffering by default (matches RtAudio default)
+  private boolean minimizeLatency = false;
+  private int effectiveBufferSize; // set in initJavaSound; may differ from bufferSize when
+  // minimizeLatency=true
+
   private SourceDataLine outputLine;
   private TargetDataLine inputLine; // null if no mic available
   private boolean running = false;
@@ -260,6 +266,7 @@ public class ChuckAudio {
   public ChuckAudio(ChuckVM vm, int bufferSize, int numChannels, float sampleRate) {
     this.vm = vm;
     this.bufferSize = bufferSize;
+    this.effectiveBufferSize = bufferSize; // updated in initJavaSound
     this.numChannels = numChannels;
     this.numInputChannels = numChannels;
     this.sampleRate = sampleRate;
@@ -287,6 +294,36 @@ public class ChuckAudio {
 
   public AudioSampleFormat getActualFormat() {
     return actualFormat;
+  }
+
+  /**
+   * Set the number of internal driver buffers (Phase 2). Default 2 (double-buffering). Higher
+   * values increase latency but reduce the risk of dropouts under CPU load. Must be called before
+   * the engine starts. Corresponds to {@code StreamOptions.numberOfBuffers} in RtAudio.
+   */
+  public void setNumBuffers(int n) {
+    this.numBuffers = Math.max(2, n);
+  }
+
+  public int getNumBuffers() {
+    return numBuffers;
+  }
+
+  /**
+   * When true, {@link #initJavaSound} opens the SourceDataLine with the driver's minimum allowed
+   * buffer size rather than {@code bufferSize * numBuffers} bytes. Corresponds to {@code
+   * RTAUDIO_MINIMIZE_LATENCY} in RtAudio. Must be called before the engine starts.
+   */
+  public void setMinimizeLatency(boolean minimize) {
+    this.minimizeLatency = minimize;
+  }
+
+  /**
+   * Returns the buffer size actually in use (samples). May be smaller than the constructor argument
+   * when {@link #setMinimizeLatency(boolean)} is true.
+   */
+  public int getEffectiveBufferSize() {
+    return effectiveBufferSize;
   }
 
   public void setMasterGainUGen(Gain ugen) {
@@ -416,8 +453,12 @@ public class ChuckAudio {
         AudioFormat jf = sf.toJavaAudioFormat(r, channels);
         try {
           SourceDataLine line = openOutputLine(jf);
-          // open() with 2× buffer (numBuffers=2) for double-buffering
-          line.open(jf, bufferSize * channels * sf.bytesPerSample * 2);
+          if (minimizeLatency) {
+            // Let the driver choose the smallest buffer it can handle
+            line.open(jf);
+          } else {
+            line.open(jf, bufferSize * channels * sf.bytesPerSample * numBuffers);
+          }
           actualFormat = sf;
           actualSampleRate = r;
           if (r != (int) rate) {
@@ -464,12 +505,22 @@ public class ChuckAudio {
     }
 
     // Phase 1-D: compute output latency from actual buffer size
-    outputLatencySamples = outputLine.getBufferSize() / (numChannels * actualFormat.bytesPerSample);
+    int outBufBytes = outputLine.getBufferSize();
+    outputLatencySamples = outBufBytes / (numChannels * actualFormat.bytesPerSample);
+
+    // Phase 2: derive effective buffer size for the audio loop
+    // When minimizeLatency=true the driver chose its minimum; use half the total buffer
+    // (one period) as our write chunk size, clamped to at least 32 samples.
+    if (minimizeLatency) {
+      effectiveBufferSize = Math.max(32, outputLatencySamples / numBuffers);
+    } else {
+      effectiveBufferSize = bufferSize;
+    }
     logger.log(
         Level.INFO,
         String.format(
-            "[Audio] Output latency: %d samples (%.1f ms)",
-            outputLatencySamples, getOutputLatencyMs()));
+            "[Audio] Output latency: %d samples (%.1f ms), effectiveBufferSize=%d, numBuffers=%d",
+            outputLatencySamples, getOutputLatencyMs(), effectiveBufferSize, numBuffers));
 
     // ── Input (microphone) — optional ────────────────────────────────────────
     // Input is always INT16 for simplicity; no format negotiation needed on the input path.
@@ -478,13 +529,13 @@ public class ChuckAudio {
     try {
       if (AudioSystem.isLineSupported(new DataLine.Info(TargetDataLine.class, inFmt16))) {
         inputLine = openInputLine(inFmt16);
-        inputLine.open(inFmt16, bufferSize * numChannels * 2 * 2);
+        inputLine.open(inFmt16, effectiveBufferSize * numChannels * 2 * numBuffers);
         numInputChannels = numChannels;
         logger.log(Level.INFO, "[Audio] Microphone input line opened: " + inFmt16);
       } else if (AudioSystem.isLineSupported(
           new DataLine.Info(TargetDataLine.class, inFmt16mono))) {
         inputLine = openInputLine(inFmt16mono);
-        inputLine.open(inFmt16mono, bufferSize * 1 * 2 * 2);
+        inputLine.open(inFmt16mono, effectiveBufferSize * 1 * 2 * numBuffers);
         numInputChannels = 1;
         logger.log(Level.INFO, "[Audio] Microphone input line opened (MONO): " + inFmt16mono);
       }
@@ -513,19 +564,25 @@ public class ChuckAudio {
 
     final AudioSampleFormat fmt = actualFormat; // capture for lambda
     final int bps = fmt.bytesPerSample;
+    final int effBuf = effectiveBufferSize; // Phase 2: may differ from bufferSize
 
     Thread.ofPlatform()
         .name("ChucK-Audio-Engine")
         .start(
             () -> {
               try (Arena arena = Arena.ofShared()) {
-                int bytesPerBuffer = bufferSize * numChannels * bps;
-                int inBytesPerBuffer = bufferSize * numInputChannels * 2; // input is always INT16
+                int bytesPerBuffer = effBuf * numChannels * bps;
+                int inBytesPerBuffer = effBuf * numInputChannels * 2; // input always INT16
                 MemorySegment outSeg = arena.allocate(bytesPerBuffer);
                 byte[] outBuf = new byte[bytesPerBuffer];
                 byte[] inBuf = inputLine != null ? new byte[inBytesPerBuffer] : null;
 
-                long expectedBufferNanos = (long) (bufferSize * 1_000_000_000.0 / actualSampleRate);
+                // Phase 2 (non-interleaved block path): pre-allocated DAC output buffers.
+                // Used when no ADC input is needed — avoids per-sample loop overhead.
+                final boolean useBlockPath = (inputLine == null);
+                float[][] dacBuffers = useBlockPath ? new float[numChannels][effBuf] : null;
+
+                long expectedBufferNanos = (long) (effBuf * 1_000_000_000.0 / actualSampleRate);
                 lastBufferTimeNanos = System.nanoTime();
 
                 while (running) {
@@ -573,64 +630,61 @@ public class ChuckAudio {
                   double sumSq = 0;
                   float[] bufPeak = new float[numChannels];
 
-                  // ── Per-sample processing ─────────────────────────────────
-                  for (int i = 0; i < bufferSize; i++) {
-                    // Feed ADC (always INT16 from input)
-                    if (inBuf != null) {
+                  if (useBlockPath) {
+                    // ── Phase 2: Non-interleaved SIMD block path ────────────────
+                    // advanceTime fills dacBuffers[channel][sample] via the topologically-
+                    // sorted SIMD kernel. Gain is applied per-sample in the write loop below,
+                    // with smoothedGain advanced analytically over the block to preserve
+                    // zipper-noise suppression at per-buffer granularity.
+                    vm.advanceTime(dacBuffers, 0, effBuf);
+
+                    // Advance smoothedGain exponentially over the whole block
+                    float gainStart = smoothedGain;
+                    for (int step = 0; step < effBuf; step++) {
+                      smoothedGain += gainSmoothAlpha * (targetGain - smoothedGain);
+                    }
+                    float gainEnd = smoothedGain;
+
+                    // Write output: interleave channels and apply linearly-interpolated gain
+                    for (int i = 0; i < effBuf; i++) {
+                      float g = gainStart + (gainEnd - gainStart) * i / effBuf;
                       for (int c = 0; c < numChannels; c++) {
-                        int inputChan = Math.min(c, numInputChannels - 1);
-                        int idx = (i * numInputChannels + inputChan) * 2;
-                        short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
-                        vm.adc.setInputSample(c, pcm / 32768.0f);
+                        float sample = dacBuffers[c][i] * g;
+                        sumSq += (double) sample * sample;
+                        float abs = Math.abs(sample);
+                        if (abs > bufPeak[c]) bufPeak[c] = abs;
+                        writeSample(outSeg, fmt, i, c, numChannels, sample);
                       }
                     }
-
-                    vm.advanceTime(1);
-
-                    smoothedGain += gainSmoothAlpha * (targetGain - smoothedGain);
-
-                    // ── Write output sample (Phase 1-A: format-dispatched) ──
-                    for (int c = 0; c < numChannels; c++) {
-                      float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
-                      sumSq += (double) sample * sample;
-                      float abs = Math.abs(sample);
-                      if (abs > bufPeak[c]) bufPeak[c] = abs;
-
-                      float clamp = Math.max(-1f, Math.min(1f, sample));
-                      long base = (long) (i * numChannels + c);
-                      switch (fmt) {
-                        case INT16 -> {
-                          outSeg.set(
-                              ValueLayout.JAVA_SHORT.withOrder(ByteOrder.LITTLE_ENDIAN),
-                              base * 2,
-                              (short) (clamp * 32767f));
+                  } else {
+                    // ── Per-sample path (used when ADC input is active) ─────────
+                    for (int i = 0; i < effBuf; i++) {
+                      // Feed ADC (always INT16 from input)
+                      if (inBuf != null) {
+                        for (int c = 0; c < numChannels; c++) {
+                          int inputChan = Math.min(c, numInputChannels - 1);
+                          int idx = (i * numInputChannels + inputChan) * 2;
+                          short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
+                          vm.adc.setInputSample(c, pcm / 32768.0f);
                         }
-                        case INT24 -> {
-                          int s24 = (int) (clamp * 8388607f);
-                          long off = base * 3;
-                          outSeg.set(ValueLayout.JAVA_BYTE, off, (byte) (s24 & 0xFF));
-                          outSeg.set(ValueLayout.JAVA_BYTE, off + 1, (byte) ((s24 >> 8) & 0xFF));
-                          outSeg.set(ValueLayout.JAVA_BYTE, off + 2, (byte) ((s24 >> 16) & 0xFF));
-                        }
-                        case INT32 -> {
-                          outSeg.set(
-                              ValueLayout.JAVA_INT.withOrder(ByteOrder.LITTLE_ENDIAN),
-                              base * 4,
-                              (int) (clamp * (float) Integer.MAX_VALUE));
-                        }
-                        case FLOAT32 -> {
-                          outSeg.set(
-                              ValueLayout.JAVA_FLOAT.withOrder(ByteOrder.LITTLE_ENDIAN),
-                              base * 4,
-                              sample); // no clamping — float output can carry headroom
-                        }
+                      }
+
+                      vm.advanceTime(1);
+                      smoothedGain += gainSmoothAlpha * (targetGain - smoothedGain);
+
+                      for (int c = 0; c < numChannels; c++) {
+                        float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
+                        sumSq += (double) sample * sample;
+                        float abs = Math.abs(sample);
+                        if (abs > bufPeak[c]) bufPeak[c] = abs;
+                        writeSample(outSeg, fmt, i, c, numChannels, sample);
                       }
                     }
                   }
 
                   if (verbose > 1
                       || (verbose > 0 && vm.getCurrentTime() % (actualSampleRate * 2) == 0)) {
-                    double rms = Math.sqrt(sumSq / (bufferSize * numChannels));
+                    double rms = Math.sqrt(sumSq / ((double) effBuf * numChannels));
                     if (rms > 1e-9) {
                       vm.print(String.format("[Audio] Engine RMS: %.6f\n", rms));
                     }
@@ -653,6 +707,40 @@ public class ChuckAudio {
                 vm.print("Audio Engine Error: " + t.getMessage());
               }
             });
+  }
+
+  // ── Sample-write helper (format-dispatched) ──────────────────────────────
+
+  /**
+   * Writes one sample into the off-heap MemorySegment in the correct format. Frame index {@code i}
+   * and channel {@code c} are used to compute the byte offset; {@code numCh} is the stride.
+   */
+  private static void writeSample(
+      MemorySegment seg, AudioSampleFormat fmt, int i, int c, int numCh, float sample) {
+    long base = (long) (i * numCh + c);
+    float clamp = Math.max(-1f, Math.min(1f, sample));
+    switch (fmt) {
+      case INT16 ->
+          seg.set(
+              ValueLayout.JAVA_SHORT.withOrder(ByteOrder.LITTLE_ENDIAN),
+              base * 2,
+              (short) (clamp * 32767f));
+      case INT24 -> {
+        int s24 = (int) (clamp * 8388607f);
+        long off = base * 3;
+        seg.set(ValueLayout.JAVA_BYTE, off, (byte) (s24 & 0xFF));
+        seg.set(ValueLayout.JAVA_BYTE, off + 1, (byte) ((s24 >> 8) & 0xFF));
+        seg.set(ValueLayout.JAVA_BYTE, off + 2, (byte) ((s24 >> 16) & 0xFF));
+      }
+      case INT32 ->
+          seg.set(
+              ValueLayout.JAVA_INT.withOrder(ByteOrder.LITTLE_ENDIAN),
+              base * 4,
+              (int) (clamp * (float) Integer.MAX_VALUE));
+      case FLOAT32 ->
+          // No clamping — float output can carry headroom beyond ±1
+          seg.set(ValueLayout.JAVA_FLOAT.withOrder(ByteOrder.LITTLE_ENDIAN), base * 4, sample);
+    }
   }
 
   // ── Recorder ─────────────────────────────────────────────────────────────

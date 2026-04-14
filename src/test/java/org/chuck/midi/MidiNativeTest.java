@@ -36,6 +36,20 @@ public class MidiNativeTest {
   }
 
   @Test
+  public void testOpenByName() {
+    ChuckVM vm = new ChuckVM(44100);
+    MidiIn min = new MidiIn(vm);
+
+    // This port probably doesn't exist, so it should return false safely
+    boolean result = min.open("NonExistentMidiDevice12345");
+    assertFalse(result, "Should not open a non-existent device");
+
+    MidiOut mout = new MidiOut();
+    int outResult = mout.open("NonExistentMidiDevice12345");
+    assertEquals(0, outResult, "Should not open a non-existent device");
+  }
+
+  @Test
   public void testMidiInNative() {
     if (!RtMidi.isAvailable()) return;
 
