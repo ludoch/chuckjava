@@ -1435,6 +1435,7 @@ Run via `mvn exec:java -Dexec.args="[flags] [files]"` or `./run.sh [flags] [file
 | `-` / `--remove N` | Remove shred by ID |
 | `=` / `--replace N file.ck` | Replace shred N with new file |
 | `^` / `--status` | Print VM status (active shreds, logical time) |
+| `--kill` | Stop the VM and all shreds |
 
 ### Examples
 

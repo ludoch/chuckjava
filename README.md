@@ -85,12 +85,23 @@
 
 ## ⌨️ Command Line Interface
 
-ChucK-Java supports a full-featured CLI that mirrors the original ChucK implementation.
+ChucK-Java supports a full-featured CLI that mirrors the original ChucK implementation, including full support for **on-the-fly (OTF)** programming.
 
 ### Usage
 ```bash
 # Via native executable (no JRE needed)
 chuck.exe examples/basic/bar.ck
+
+# Start a persistent VM loop (listens on port 8888)
+chuck.exe --loop
+
+# Add a shred on-the-fly (from another terminal)
+chuck.exe + examples/basic/foo.ck
+
+# Check status, replace a shred, then kill the VM
+chuck.exe ^
+chuck.exe = 2 examples/basic/new_foo.ck
+chuck.exe --kill
 
 # Launch JavaFX IDE
 mvn javafx:run
@@ -98,6 +109,7 @@ chuck-ide.exe          # self-contained IDE bundle
 ```
 
 ### Options
+- `+`, `-`, `=`, `^`, `--kill`: On-the-fly commands (add, remove, replace, status, kill).
 - `--halt` / `-h`: (Default Headless) Exit once all shreds finish.
 - `--loop` / `-l`: Continue running headless (starts the Machine Server).
 - `--silent` / `-s`: Headless mode with audio output disabled.
