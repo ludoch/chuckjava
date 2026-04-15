@@ -8,6 +8,7 @@ import org.chuck.core.ChuckVM;
 public class MidiIn extends ChuckEvent {
   private final ChuckMidiNative driver;
   private final ConcurrentLinkedDeque<MidiMsg> queue = new ConcurrentLinkedDeque<>();
+  private String openedName = "unopened";
 
   public MidiIn(ChuckVM vm) {
     this.driver = new ChuckMidiNative(vm, this, this.queue);
@@ -21,11 +22,18 @@ public class MidiIn extends ChuckEvent {
   }
 
   public void open(int port) {
+    openedName = name(port);
     driver.open(port);
   }
 
   public void open(int port, RtMidi.Api api) {
+    openedName = name(port);
     driver.open(port, api);
+  }
+
+  /** Returns the name of the currently opened port, or "unopened". */
+  public String name() {
+    return openedName;
   }
 
   /** Returns the number of available native MIDI input ports. */

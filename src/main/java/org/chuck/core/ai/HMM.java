@@ -23,11 +23,16 @@ public class HMM extends ChuckObject {
   private int maxIter = 100;
   private static final Random rng = new Random();
 
-  // Model parameters (initialized lazily)
+  // Model parameters — continuous Gaussian HMM
   private double[] pi; // initial state probs [S]
   private double[][] A; // transition [S][S]
   private double[][] mu; // emission mean [S][D]
   private double[][] sigma; // emission std  [S][D]
+
+  // Discrete HMM parameters (set by load() or discrete train())
+  private double[][] B; // emission probability B[state][obs_symbol]
+  private boolean isDiscrete = false;
+  private int numSymbols = 0; // vocabulary size
 
   public long numStates(long n) {
     numStates = (int) Math.max(1, n);
@@ -37,6 +42,143 @@ public class HMM extends ChuckObject {
   public long maxIter(long n) {
     maxIter = (int) n;
     return n;
+  }
+
+  // ── Discrete HMM API (ChucK ChAI examples) ────────────────────────────────
+
+  /**
+   * {@code hmm.load(initial[], transition[][], emission[][])} — directly set discrete HMM
+   * parameters.
+   */
+  public long load(ChuckArray initialArr, ChuckArray transitionArr, ChuckArray emissionArr) {
+    int S = initialArr.size();
+    numStates = S;
+    pi = new double[S];
+    for (int i = 0; i < S; i++) pi[i] = initialArr.getFloat(i);
+
+    A = new double[S][S];
+    for (int i = 0; i < S; i++) {
+      ChuckArray row = (ChuckArray) transitionArr.getObject(i);
+      for (int j = 0; j < S; j++) A[i][j] = row.getFloat(j);
+    }
+
+    numSymbols = ((ChuckArray) emissionArr.getObject(0)).size();
+    B = new double[S][numSymbols];
+    for (int i = 0; i < S; i++) {
+      ChuckArray row = (ChuckArray) emissionArr.getObject(i);
+      for (int k = 0; k < numSymbols; k++) B[i][k] = row.getFloat(k);
+    }
+    isDiscrete = true;
+    return 1L;
+  }
+
+  /**
+   * {@code hmm.train(numHidden, numObs, observations[])} — Baum-Welch for discrete-observation HMM.
+   * observations[] is a 1D int array of symbol indices 0..numObs-1.
+   */
+  public long train(long numHiddenL, long numObsL, ChuckArray obsArr) {
+    int S = (int) numHiddenL;
+    int M = (int) numObsL;
+    numStates = S;
+    numSymbols = M;
+    isDiscrete = true;
+
+    int T = obsArr.size();
+    int[] obs = new int[T];
+    for (int t = 0; t < T; t++) obs[t] = (int) obsArr.getInt(t);
+
+    // random init (uniform + small noise)
+    pi = randomStochastic(S);
+    A = new double[S][S];
+    B = new double[S][M];
+    for (int i = 0; i < S; i++) A[i] = randomStochastic(S);
+    for (int i = 0; i < S; i++) B[i] = randomStochastic(M);
+
+    // Baum-Welch for discrete HMM
+    for (int iter = 0; iter < maxIter; iter++) {
+      // forward
+      double[][] alpha = new double[T][S];
+      for (int i = 0; i < S; i++) alpha[0][i] = pi[i] * B[i][obs[0]];
+      normalize(alpha[0]);
+      for (int t = 1; t < T; t++) {
+        for (int j = 0; j < S; j++) {
+          double s = 0;
+          for (int i = 0; i < S; i++) s += alpha[t - 1][i] * A[i][j];
+          alpha[t][j] = s * B[j][obs[t]];
+        }
+        normalize(alpha[t]);
+      }
+      // backward
+      double[][] beta = new double[T][S];
+      for (int i = 0; i < S; i++) beta[T - 1][i] = 1.0;
+      for (int t = T - 2; t >= 0; t--) {
+        for (int i = 0; i < S; i++) {
+          double s = 0;
+          for (int j = 0; j < S; j++) s += A[i][j] * B[j][obs[t + 1]] * beta[t + 1][j];
+          beta[t][i] = s;
+        }
+        normalize(beta[t]);
+      }
+      // gamma and xi re-estimation
+      double[] newPi = new double[S];
+      double[][] newA = new double[S][S];
+      double[][] newB = new double[S][M];
+      for (int t = 0; t < T; t++) {
+        double z = 0;
+        for (int i = 0; i < S; i++) z += alpha[t][i] * beta[t][i];
+        if (z < 1e-300) z = 1e-300;
+        for (int i = 0; i < S; i++) {
+          double g = alpha[t][i] * beta[t][i] / z;
+          if (t == 0) newPi[i] += g;
+          newB[i][obs[t]] += g;
+          if (t < T - 1) {
+            for (int j = 0; j < S; j++) {
+              newA[i][j] += alpha[t][i] * A[i][j] * B[j][obs[t + 1]] * beta[t + 1][j] / z;
+            }
+          }
+        }
+      }
+      // normalize
+      normalize(newPi);
+      pi = newPi;
+      for (int i = 0; i < S; i++) {
+        normalize(newA[i]);
+        A[i] = newA[i];
+        normalize(newB[i]);
+        B[i] = newB[i];
+      }
+    }
+    return 1L;
+  }
+
+  /**
+   * {@code hmm.generate(length, results[])} — generate a sequence of {@code length} discrete
+   * observation symbols into the pre-allocated int[] results.
+   */
+  public long generate(long length, ChuckArray outArr) {
+    if (pi == null) return 0L;
+    int T = (int) length;
+    int state = sampleCat(pi);
+    for (int t = 0; t < T && t < outArr.size(); t++) {
+      if (isDiscrete) {
+        outArr.setInt(t, sampleCat(B[state]));
+      } else {
+        // continuous: put the mean
+        outArr.setFloat(t, mu != null ? mu[state][0] : 0);
+      }
+      state = sampleCat(A[state]);
+    }
+    return T;
+  }
+
+  private static void normalize(double[] v) {
+    double s = 0;
+    for (double x : v) s += x;
+    if (s < 1e-300) {
+      for (int i = 0; i < v.length; i++) v[i] = 1.0 / v.length;
+    } else {
+      for (int i = 0; i < v.length; i++) v[i] /= s;
+    }
   }
 
   /** train(observations[T][D]) — Baum-Welch on a single sequence */

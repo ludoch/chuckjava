@@ -13,6 +13,7 @@ public class MidiOut extends ChuckObject {
   private MidiDevice device; // javax.sound.midi fallback
 
   private ChuckMidiOutNative nativeDriver;
+  private String openedName = "unopened";
 
   public MidiOut() {
     super(ChuckType.OBJECT);
@@ -22,10 +23,12 @@ public class MidiOut extends ChuckObject {
   }
 
   public int open(int port) {
+    openedName = name(port);
     return open(port, RtMidi.Api.UNSPECIFIED);
   }
 
   public int open(int port, RtMidi.Api api) {
+    openedName = name(port);
     if (nativeDriver != null) {
       return nativeDriver.open(port, api) ? 1 : 0;
     }
@@ -153,6 +156,11 @@ public class MidiOut extends ChuckObject {
 
   public boolean isNative() {
     return nativeDriver != null;
+  }
+
+  /** Returns the name of the currently opened port, or "unopened". */
+  public String name() {
+    return openedName;
   }
 
   /** Returns all compiled native MIDI APIs for the current platform. */

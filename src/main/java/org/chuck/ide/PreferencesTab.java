@@ -171,7 +171,16 @@ public class PreferencesTab extends ScrollPane {
     if (nativeOk) {
       apiBox.setItems(FXCollections.observableArrayList(RtMidi.getCompiledApis()));
       apiBox.getItems().add(0, RtMidi.Api.UNSPECIFIED);
-      apiBox.setValue(RtMidi.Api.UNSPECIFIED);
+
+      int savedApiId = prefs.getInt("midi.api", RtMidi.Api.UNSPECIFIED.id);
+      apiBox.setValue(RtMidi.Api.fromId(savedApiId));
+      apiBox
+          .getSelectionModel()
+          .selectedItemProperty()
+          .addListener(
+              (obs, ov, nv) -> {
+                if (nv != null) prefs.putInt("midi.api", nv.id);
+              });
     } else {
       apiBox.setDisable(true);
     }

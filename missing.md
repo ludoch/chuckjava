@@ -218,7 +218,7 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | Class | Status |
 |-------|--------|
 | `FileIO` (ASCII + binary) | ✅ Done |
-| `MidiIn` / `MidiOut` / `MidiMsg` | ✅ Done | Enhanced with native RtMidi bindings (Callback-driven input, Virtual ports, Native output) |
+| `MidiIn` / `MidiOut` / `MidiMsg` | ✅ Done | Enhanced native RtMidi bindings: Callback-driven input, Virtual ports, Native output, Sysex, Port discovery by name/index, Persistent IDE prefs |
 | `OscIn` / `OscOut` / `OscMsg` / `OscBundle` | ✅ Done | |
 | `Hid` / `HidMsg` | ✅ Done | |
 | `SerialIO` | ✅ Done | |
