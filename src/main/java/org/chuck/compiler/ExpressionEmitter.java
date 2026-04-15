@@ -127,8 +127,15 @@ public class ExpressionEmitter {
 
         boolean isBuiltinPseudoClass =
             Set.of("string", "vec2", "vec3", "vec4", "complex", "polar").contains(e.type());
-        if (isUserClass && !isBuiltinPseudoClass && e.callArgs() instanceof ChuckAST.CallExp call) {
-          argCount = call.args().size();
+        List<ChuckAST.Exp> ctorArgsList =
+            switch (e.callArgs()) {
+              case ChuckAST.CallExp call -> call.args();
+              case ChuckAST.ArrayLitExp arr -> arr.elements();
+              case null -> List.of();
+              default -> List.of();
+            };
+        if (isUserClass && !isBuiltinPseudoClass && !ctorArgsList.isEmpty()) {
+          argCount = ctorArgsList.size();
           if (parent.isInPreCtor()) {
             code.addInstruction(new StackInstrs.PushThis());
             code.addInstruction(
@@ -193,10 +200,10 @@ public class ExpressionEmitter {
             }
           }
           code.addInstruction(new StackInstrs.Dup());
-          for (ChuckAST.Exp arg : call.args()) {
+          for (ChuckAST.Exp arg : ctorArgsList) {
             this.emitExpression(arg, code);
           }
-          List<String> ctorArgTypes = call.args().stream().map(parent::getExprType).toList();
+          List<String> ctorArgTypes = ctorArgsList.stream().map(parent::getExprType).toList();
           String ctorKey = parent.getMethodKey(e.type(), ctorArgTypes);
           code.addInstruction(new ObjectInstrs.CallMethod(e.type(), argCount, ctorKey));
         } else {

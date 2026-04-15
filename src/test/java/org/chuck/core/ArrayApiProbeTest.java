@@ -86,7 +86,6 @@ public class ArrayApiProbeTest {
     assertTrue(r.contains("10") && r.contains("20") && r.contains("30"), "for-auto: " + r);
   }
 
-  @org.junit.jupiter.api.Disabled("Probe for missing feature")
   @Test
   void probe_constructorArg() {
     String r =

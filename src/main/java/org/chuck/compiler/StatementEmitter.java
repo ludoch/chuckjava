@@ -325,7 +325,14 @@ public class StatementEmitter {
           parent.getGlobalVarTypes().put(s.name(), s.type());
         }
 
-        if (isUserClass && s.callArgs() instanceof ChuckAST.CallExp call) {
+        List<ChuckAST.Exp> ctorArgs =
+            switch (s.callArgs()) {
+              case ChuckAST.CallExp call -> call.args();
+              case ChuckAST.ArrayLitExp arr -> arr.elements();
+              case null -> List.of();
+              default -> List.of();
+            };
+        if (isUserClass && !ctorArgs.isEmpty()) {
           if (parent.isInPreCtor()) {
             code.addInstruction(new StackInstrs.PushThis());
             code.addInstruction(
@@ -355,10 +362,12 @@ public class StatementEmitter {
                     s.type(), offset, 0, s.isReference(), false, parent.getUserClassRegistry()));
           }
           code.addInstruction(new StackInstrs.Dup());
-          for (ChuckAST.Exp arg : call.args()) {
+          for (ChuckAST.Exp arg : ctorArgs) {
             parent.emitExpression(arg, code);
           }
-          code.addInstruction(new ObjectInstrs.CallMethod(s.type(), call.args().size()));
+          List<String> ctorArgTypes = ctorArgs.stream().map(parent::getExprType).toList();
+          String ctorKey = parent.getMethodKey(s.type(), ctorArgTypes);
+          code.addInstruction(new ObjectInstrs.CallMethod(s.type(), ctorArgs.size(), ctorKey));
           code.addInstruction(new StackInstrs.Pop());
         } else {
           if (s.callArgs() instanceof ChuckAST.CallExp call) {
