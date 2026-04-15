@@ -49,6 +49,7 @@
 - **MidiFileOut**: Record generative MIDI performances directly to standard `.mid` files. Supports **SMF Format 1** (multi-track), Tempo Maps, Section Markers, and 14-bit NRPN high-resolution sweeps.
 - **MidiFileIn**: Upgraded to support multi-track reading, file metadata (`bpm()`, `tpq()`), and automatic delta-time calculation (`msg.when`).
 - **Precision Timestamps**: Incoming messages now include `msg.when` (seconds) from the native driver for jitter-free alignment.
+- **Visual Grid Sequencer**: TR-808 style 16-step drum sequencer tab in the IDE. Features 8-track (Kick, Snare, etc.) interactive grid with real-time bi-directional sync to the ChucK engine.
 
 #### ⚡ Audio Fidelity & Performance
 - **Idle CPU Optimization**: The audio engine automatically detects when the VM is idle (no active shreds). It applies a smooth global fade-out and puts the processing loop into a low-power sleep mode, reducing "doing nothing" CPU usage to near 0%.

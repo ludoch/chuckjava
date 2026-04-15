@@ -1339,6 +1339,23 @@ mpe.bendRange(48);                          // Set MPE pitch bend range in semit
 1::week => now;
 ```
 
+### Visual Grid Sequencer (IDE Integration)
+
+The IDE includes a 16-step visual grid sequencer that communicates with the VM via global variables.
+
+- `seq_pattern` (ChuckArray): A shared 1D array of size 128 (8 tracks * 16 steps). 1 = active, 0 = inactive.
+- `seq_current_step` (int): Set this from ChucK to move the visual cursor in the IDE.
+
+Example snippet to read the grid:
+```chuck
+Machine.getGlobalObject("seq_pattern") $ ChuckArray @=> ChuckArray pattern;
+for(0 => int r; r < 8; r++) {
+    if (pattern.getInt(r * 16 + currentStep) > 0) {
+        // play drum note...
+    }
+}
+```
+
 ### MidiClock (Transport Synchronization)
 
 Synchronize ChucK to external hardware or DAWs using MIDI Real-Time messages (24ppq). Note: Ensure your `MidiIn` does not filter out Time messages.
