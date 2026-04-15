@@ -82,6 +82,8 @@ import org.fxmisc.richtext.model.StyleSpansBuilder;
  * numbers, keyboard shortcuts, shred management, WAV recording, and a file browser.
  */
 public class ChuckIDE extends Application {
+  private PianoKeyboard pianoKeyboard;
+  private ControlSurface controlSurface;
 
   /** Completion item: the text to insert, a short label to display, and its kind badge. */
   private record CompItem(String insertText, String label, String kind) {}
@@ -595,7 +597,7 @@ public class ChuckIDE extends Application {
     Tab ugenTab = new Tab("UGens", ugenBrowser);
     ugenTab.setClosable(false);
 
-    controlSurface = new ControlSurface();
+    this.controlSurface = new ControlSurface();
     controlSurface.setVm(vm);
     Tab controlTab = new Tab("Control", controlSurface);
     controlTab.setClosable(false);
@@ -775,7 +777,7 @@ public class ChuckIDE extends Application {
     outputArea.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 12;");
 
     // --- Piano Keyboard Monitor ---
-    PianoKeyboard pianoKeyboard = new PianoKeyboard();
+    this.pianoKeyboard = new PianoKeyboard();
     org.chuck.midi.ChuckMidiNative.addMonitor((device, msg) -> pianoKeyboard.onMidiMessage(msg));
 
     VBox consoleAndMidi = new VBox(2, outputArea, pianoKeyboard);

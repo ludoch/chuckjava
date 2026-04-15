@@ -70,9 +70,11 @@ public class MidiPoly extends ChuckUGen {
                     vm,
                     shred,
                     null);
-        if (u == null) u = new org.chuck.audio.osc.SinOsc();
+        if (u == null)
+          u = new org.chuck.audio.osc.SinOsc(vm != null ? (float) vm.getSampleRate() : 44100.0f);
         voicePool[i] = new Voice(u);
       }
+
     } finally {
       ugenLock.unlock();
     }
