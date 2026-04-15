@@ -1087,6 +1087,12 @@ public class ExpressionEmitter {
             case "LSTM" -> code.addInstruction(new PushInstrs.PushInt(5));
             case "Regression" -> code.addInstruction(new PushInstrs.PushInt(0));
             case "Classification" -> code.addInstruction(new PushInstrs.PushInt(1));
+            // activation-function constants
+            case "Sigmoid" -> code.addInstruction(new PushInstrs.PushInt(0));
+            case "Tanh" -> code.addInstruction(new PushInstrs.PushInt(1));
+            case "ReLU", "Relu" -> code.addInstruction(new PushInstrs.PushInt(2));
+            case "Linear" -> code.addInstruction(new PushInstrs.PushInt(3));
+            case "Softmax" -> code.addInstruction(new PushInstrs.PushInt(4));
             default -> code.addInstruction(new PushInstrs.PushInt(0));
           }
           return;
@@ -1295,6 +1301,13 @@ public class ExpressionEmitter {
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
             code.addInstruction(
                 new ObjectInstrs.CallBuiltinStatic("org.chuck.core." + bn, mn, argc));
+            return;
+          }
+          // AI/ML static class methods: MLP.shuffle(X, Y), etc.
+          if (bn.equals("MLP")) {
+            for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
+            code.addInstruction(
+                new ObjectInstrs.CallBuiltinStatic("org.chuck.core.ai.MLP", mn, argc));
             return;
           }
         }
