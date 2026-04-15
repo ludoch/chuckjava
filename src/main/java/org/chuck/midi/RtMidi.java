@@ -132,7 +132,31 @@ public class RtMidi {
         }
       }
 
-      // 2. Fallback to system lookup
+      // 2. Try common installation paths
+      if (rtmidi == null) {
+        java.util.List<String> commonPaths = new java.util.ArrayList<>();
+        if (os.contains("mac")) {
+          commonPaths.add("/opt/homebrew/lib");
+          commonPaths.add("/usr/local/lib");
+        } else if (os.contains("linux")) {
+          commonPaths.add("/usr/lib/x86_64-linux-gnu");
+          commonPaths.add("/usr/local/lib");
+        }
+
+        for (String cp : commonPaths) {
+          java.nio.file.Path p = java.nio.file.Path.of(cp, libName);
+          if (java.nio.file.Files.exists(p)) {
+            try {
+              rtmidi = SymbolLookup.libraryLookup(p, globalArena);
+              logger.info("RtMidi auto-detected at: " + p);
+              break;
+            } catch (Exception ignored) {
+            }
+          }
+        }
+      }
+
+      // 3. Fallback to system lookup (LD_LIBRARY_PATH, etc.)
       if (rtmidi == null) {
         rtmidi = SymbolLookup.libraryLookup(libName, globalArena);
         logger.info("RtMidi loaded from system path: " + libName);
