@@ -10,6 +10,7 @@ By default, ChucK-Java uses the standard JavaSound MIDI system. For professional
 
 ### Benefits of Native MIDI:
 - **Low Latency:** Bypasses the JVM's polling jitter for much tighter timing.
+- **Native Port Sharing:** Open the same port multiple times across different shreds without "Device Busy" conflicts.
 - **ASIO/WinMM (Windows):** Direct access to Windows MIDI drivers.
 - **CoreMIDI (macOS):** Full support for macOS MIDI services and virtual ports.
 - **ALSA/JACK (Linux):** Native Linux audio/MIDI integration.
@@ -41,7 +42,7 @@ if( min.open("KeyStep") ) {
 
 ---
 
-## 3. Automatic Polyphony with `MidiPoly`
+## 3. Automatic Polyphony with `MidiPoly` & `MidiMpe`
 
 Writing polyphonic logic manually (voice arrays, note-tracking) is complex. ChucK-Java provides `MidiPoly` to handle this for you.
 
@@ -52,10 +53,26 @@ MidiIn min => MidiPoly poly => dac;
 poly.setInstrument("Rhodey");
 poly.voices(12); // Support up to 12 simultaneous notes
 
+// Optional: Custom microtonal tuning
+// float myScale[128]; ... poly.tuning(myScale);
+
 while( min => now ) {
     while( min.recv(msg) ) {
         poly.onMessage(msg); // Auto-dispatches to voices
     }
+}
+```
+
+### MPE (MIDI Polyphonic Expression)
+If you have an MPE controller (Roli Seaboard, LinnStrument), use `MidiMpe` instead of `MidiPoly`. It handles per-note pitch bend and channel pressure automatically:
+
+```chuck
+MidiIn min => MidiMpe mpe => dac;
+mpe.setInstrument("Moog");
+mpe.bendRange(48); // Set pitch bend range (default 48 semitones)
+
+while(min => now) {
+    while(min.recv(msg)) mpe.onMessage(msg);
 }
 ```
 
@@ -83,6 +100,31 @@ Bind physical knobs to your code without writing a single line of MIDI parsing:
 
 ### Sample-Accurate Timing
 Every `MidiMsg` includes a `msg.when` field containing the precision timestamp from the hardware. 
+
+### MIDI Clock (Transport Sync)
+Sync ChucK to Ableton, drum machines, or hardware sequencers using MIDI Real-Time messages (24ppq). Note: ensure your `MidiIn` does not filter out Time messages.
+
+```chuck
+MidiIn min; min.open(0);
+min.ignoreTypes(1, 0, 1); // Allow Time messages (middle argument = 0)
+
+MidiClock clock;
+
+// Feed the clock in a background shred
+spork ~ feedClock();
+fun void feedClock() {
+    MidiMsg msg;
+    while(min => now) {
+        while(min.recv(msg)) clock.update(msg);
+    }
+}
+
+// Main sequence loop
+while(clock.onBeat() => now) {
+    <<< "Beat! BPM:", clock.bpm() >>>;
+    // Trigger your drums, sequences, etc.
+}
+```
 
 ### MIDI File Recording
 Use `MidiFileOut` to save your generative performances.

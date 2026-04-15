@@ -125,6 +125,8 @@ public class ChuckFactory {
           case "OscMsg" -> new OscMsg();
           case "MidiMsg" -> new MidiMsg();
           case "MidiPoly" -> new org.chuck.midi.MidiPoly();
+          case "MidiMpe" -> new org.chuck.midi.MidiMpe();
+          case "MidiClock" -> new org.chuck.midi.MidiClock();
           case "HidMsg" -> new HidMsg();
           case "KNN" -> new org.chuck.core.ai.KNN();
           case "KNN2" -> new org.chuck.core.ai.KNN2();

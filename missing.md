@@ -219,8 +219,11 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 |-------|--------|
 | `FileIO` (ASCII + binary) | ✅ Done |
 | `MidiIn` / `MidiOut` / `MidiMsg` | ✅ Done | Enhanced native RtMidi bindings: Callback-driven input, Virtual ports, Native output, Sysex, Port discovery by name/index, Persistent IDE prefs |
-| `MidiPoly` | ✅ Done | High-level automatic voice management (polyphonic pools, instrument mapping, voice stealing) |
+| `MidiPoly` | ✅ Done | High-level automatic voice management (polyphonic pools, instrument mapping, voice stealing, microtonal tuning) |
 | `IDE MIDI Learn` | ✅ Done | IDE Control Surface features auto-mapping of MIDI CC messages to global variables via "L" button |
+| `MidiClock` | ✅ Done | Parses 24ppq MIDI clock messages for transport sync (`onBeat()`, `onSixteenth()`, etc.) |
+| `MidiMpe` | ✅ Done | MPE support for per-note pitch bend and channel pressure |
+| `Native Port Sharing` | ✅ Done | Shared native handles for concurrent `MidiIn`/`MidiOut` access |
 | `OscIn` / `OscOut` / `OscMsg` / `OscBundle` | ✅ Done | |
 | `Hid` / `HidMsg` | ✅ Done | |
 | `SerialIO` | ✅ Done | |

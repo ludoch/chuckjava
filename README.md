@@ -32,7 +32,10 @@
 
 #### 🎹 Advanced MIDI & Musician Features
 - **Native RtMidi Support**: Low-latency native MIDI drivers via Project Panama (ASIO, CoreMIDI, ALSA, JACK). Replaces the 1ms polling loop with a true native callback model.
-- **`MidiPoly`**: Automatic high-level voice management. Map MIDI to STK instruments or custom UGens with zero manual sporking. Supports instrument selection, voice stealing, and polyphonic pools.
+- **Native Port Sharing**: Run multiple `MidiIn` and `MidiOut` objects on the same physical hardware port safely (prevents "Device Busy" errors).
+- **`MidiPoly`**: Automatic high-level voice management. Map MIDI to STK instruments or custom UGens with zero manual sporking. Supports instrument selection, voice stealing, polyphonic pools, and custom microtonal tuning maps (`tuning(float[])`).
+- **`MidiMpe`**: Full MIDI Polyphonic Expression (MPE) support for per-note pitch bend and channel pressure.
+- **`MidiClock`**: Dedicated class for tracking MIDI 24ppq clock, start, stop, and continue messages, allowing tight transport sync (`onBeat()`, `onSixteenth()`, etc.).
 - **IDE MIDI Visualizer**: Real-time 88-key piano keyboard showing Note-On/Off, CC, and Pitch Bend movements.
 - **MIDI Learn**: Bind physical knobs and faders to ChucK global variables with a single click in the "Control" tab.
 - **MidiFileOut**: Record generative MIDI performances directly to standard `.mid` files.

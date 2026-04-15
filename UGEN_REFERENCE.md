@@ -1114,9 +1114,33 @@ Class: `org.chuck.midi.MidiPoly`
 - `instrument()` -> string
 - `voices(int)` -> int
 - `voices()` -> int
+- `tuning(float[])` -> void : Set custom microtonal tuning map (128 elements in Hz).
+- `standardTuning()` -> void : Revert to standard 12-TET.
 - `onMessage(MidiMsg)` -> void
 
-## Mesh2D
+## MidiMpe
+Description: MIDI Polyphonic Expression (MPE) voice manager. Extends MidiPoly to handle per-note pitch bend and channel pressure.
+
+Class: `org.chuck.midi.MidiMpe`
+
+### Methods
+- `bendRange(int)` -> void : Set pitch bend range in semitones (default 48).
+- (inherits all methods from MidiPoly)
+
+## MidiClock
+Description: Tracks MIDI Real-time clock messages and provides synchronization events.
+
+Class: `org.chuck.midi.MidiClock`
+
+### Methods
+- `update(MidiMsg)` -> void : Feed raw messages from MidiIn.
+- `onBeat()` -> Event : Signals every 24 clocks (quarter note).
+- `onSixteenth()` -> Event : Signals every 6 clocks.
+- `onStart()` -> Event : Signals on Start or Continue message.
+- `onStop()` -> Event : Signals on Stop message.
+- `bpm()` -> double : Returns the estimated BPM based on clock intervals.
+
+## ModalBar
 Class: `org.chuck.audio.stk.Mesh2D`
 
 ### Parameters

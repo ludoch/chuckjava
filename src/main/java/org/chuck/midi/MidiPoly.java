@@ -7,20 +7,22 @@ import org.chuck.core.ChuckVM;
 
 /**
  * MidiPoly: Automatic voice management for polyphonic MIDI instruments. Manages a pool of UGens and
- * maps MIDI Note messages to voices.
+ * maps MIDI Note messages to voices. Supports custom tuning maps.
  */
 public class MidiPoly extends ChuckUGen {
-  private String instrumentType = "SinOsc";
-  private int numVoices = 8;
-  private Voice[] voicePool;
-  private int nextVoiceIdx = 0;
+  protected String instrumentType = "SinOsc";
+  protected int numVoices = 8;
+  protected Voice[] voicePool;
+  protected int nextVoiceIdx = 0;
+  protected float[] tuningMap = null; // Custom microtonal frequency mapping
 
-  private static class Voice {
-    ChuckUGen ugen;
-    int activeNote = -1; // -1 if idle
-    long startTime = 0;
+  protected static class Voice {
+    public ChuckUGen ugen;
+    public int activeNote = -1; // -1 if idle
+    public int activeChannel = -1; // MPE support
+    public long startTime = 0;
 
-    Voice(ChuckUGen ugen) {
+    public Voice(ChuckUGen ugen) {
       this.ugen = ugen;
     }
   }
@@ -52,7 +54,19 @@ public class MidiPoly extends ChuckUGen {
     return numVoices;
   }
 
-  private void initPool() {
+  /** ChucK API: set custom microtonal tuning map (128 array of frequencies in Hz) */
+  public void tuning(float[] freqs) {
+    if (freqs != null && freqs.length >= 128) {
+      this.tuningMap = freqs;
+    }
+  }
+
+  /** ChucK API: reset to 12-TET tuning */
+  public void standardTuning() {
+    this.tuningMap = null;
+  }
+
+  protected void initPool() {
     ugenLock.lock();
     try {
       voicePool = new Voice[numVoices];
@@ -85,21 +99,22 @@ public class MidiPoly extends ChuckUGen {
     int status = msg.data1 & 0xF0;
     int note = msg.data2;
     int velocity = msg.data3;
+    int channel = msg.data1 & 0x0F;
 
     if (status == 0x90 && velocity > 0) {
-      noteOn(note, velocity / 127.0f);
+      noteOn(note, velocity / 127.0f, channel);
     } else if (status == 0x80 || (status == 0x90 && velocity == 0)) {
-      noteOff(note);
+      noteOff(note, channel);
     }
   }
 
-  private void noteOn(int note, float velocity) {
+  protected void noteOn(int note, float velocity, int channel) {
     ugenLock.lock();
     try {
       // 1. Check if note already playing
       for (Voice v : voicePool) {
         if (v.activeNote == note) {
-          triggerVoice(v, note, velocity);
+          triggerVoice(v, note, velocity, channel);
           return;
         }
       }
@@ -107,7 +122,7 @@ public class MidiPoly extends ChuckUGen {
       // 2. Find idle voice
       for (Voice v : voicePool) {
         if (v.activeNote == -1) {
-          triggerVoice(v, note, velocity);
+          triggerVoice(v, note, velocity, channel);
           return;
         }
       }
@@ -115,14 +130,14 @@ public class MidiPoly extends ChuckUGen {
       // 3. Steal voice (round robin)
       Voice v = voicePool[nextVoiceIdx];
       nextVoiceIdx = (nextVoiceIdx + 1) % numVoices;
-      triggerVoice(v, note, velocity);
+      triggerVoice(v, note, velocity, channel);
 
     } finally {
       ugenLock.unlock();
     }
   }
 
-  private void noteOff(int note) {
+  protected void noteOff(int note, int channel) {
     ugenLock.lock();
     try {
       for (Voice v : voicePool) {
@@ -135,6 +150,7 @@ public class MidiPoly extends ChuckUGen {
           }
 
           v.activeNote = -1;
+          v.activeChannel = -1;
         }
       }
     } finally {
@@ -142,12 +158,16 @@ public class MidiPoly extends ChuckUGen {
     }
   }
 
-  private void triggerVoice(Voice v, int note, float velocity) {
+  protected void triggerVoice(Voice v, int note, float velocity, int channel) {
     v.activeNote = note;
+    v.activeChannel = channel;
     v.startTime = System.currentTimeMillis();
 
     // Map MIDI note to frequency
     double freq = 440.0 * Math.pow(2.0, (note - 69) / 12.0);
+    if (tuningMap != null && note >= 0 && note < 128) {
+      freq = tuningMap[note];
+    }
 
     // Use reflection to call noteOn or freq/gain
     try {
@@ -169,9 +189,6 @@ public class MidiPoly extends ChuckUGen {
   @Override
   protected float compute(float input, long systemTime) {
     float sum = 0;
-    // ugenLock is already held by tick() calling compute() in some implementations,
-    // but ChuckUGen.tick doesn't hold it for compute.
-    // We'll use a local reference to avoid array size changes during iteration
     Voice[] activePool = voicePool;
     if (activePool == null) return 0;
 

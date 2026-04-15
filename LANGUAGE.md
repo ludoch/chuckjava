@@ -1293,8 +1293,55 @@ MidiIn min => MidiPoly poly => dac;
 poly.setInstrument("Rhodey");         // choose STK instrument or SinOsc/SawOsc/etc.
 poly.voices(12);                      // set max polyphony
 
+// Microtonal Tuning
+float myScale[128];
+// ... populate myScale with frequencies in Hz ...
+poly.tuning(myScale);                 // override standard 12-TET
+// poly.standardTuning();             // revert to default
+
 while (min => now) {
     while (min.recv(msg)) poly.onMessage(msg); // auto-dispatches to voices
+}
+```
+
+### MidiMpe (MIDI Polyphonic Expression)
+
+Advanced voice management for MPE controllers (like Roli Seaboard, LinnStrument). Notes are mapped by channel instead of note number.
+
+```chuck
+MidiIn min => MidiMpe mpe => dac;
+mpe.setInstrument("Moog");
+mpe.bendRange(48);                    // Set MPE pitch bend range in semitones (default 48)
+
+while (min => now) {
+    while (min.recv(msg)) mpe.onMessage(msg); // Handles per-note pitch bend and pressure
+}
+```
+
+### MidiClock (Transport Synchronization)
+
+Synchronize ChucK to external hardware or DAWs using MIDI Real-Time messages (24ppq). Note: Ensure your `MidiIn` does not filter out Time messages.
+
+```chuck
+MidiIn min;
+min.open(0);
+min.ignoreTypes(1, 0, 1);             // Sysex, **Time (0 = allow)**, Sense
+
+MidiClock clock;
+
+// Dedicated shred to feed clock
+spork ~ feedClock();
+fun void feedClock() {
+    MidiMsg msg;
+    while(min => now) {
+        while(min.recv(msg)) clock.update(msg);
+    }
+}
+
+// Wait for clock events
+while(clock.onBeat() => now) {
+    <<< "Beat! BPM:", clock.bpm() >>>;
+    // trigger drums, sequences, etc.
 }
 ```
 
