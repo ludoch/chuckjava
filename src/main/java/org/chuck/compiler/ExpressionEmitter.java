@@ -1303,11 +1303,11 @@ public class ExpressionEmitter {
                 new ObjectInstrs.CallBuiltinStatic("org.chuck.core." + bn, mn, argc));
             return;
           }
-          // AI/ML static class methods: MLP.shuffle(X, Y), etc.
-          if (bn.equals("MLP")) {
+          // AI/ML static class methods: MLP.shuffle(X, Y), PCA.reduce(X, k, out), etc.
+          if (bn.equals("MLP") || bn.equals("PCA")) {
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
             code.addInstruction(
-                new ObjectInstrs.CallBuiltinStatic("org.chuck.core.ai.MLP", mn, argc));
+                new ObjectInstrs.CallBuiltinStatic("org.chuck.core.ai." + bn, mn, argc));
             return;
           }
         }

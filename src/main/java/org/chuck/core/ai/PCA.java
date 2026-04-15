@@ -109,4 +109,45 @@ public class PCA extends ChuckObject {
     }
     return num;
   }
+
+  // ── Static convenience API ─────────────────────────────────────────────────
+
+  /**
+   * {@code PCA.reduce(input[][], k, output[][])} — fit PCA on input and project to k dimensions.
+   * Static convenience method (can also be called on an instance).
+   */
+  public static long reduce(ChuckArray inputArr, long k, ChuckArray outputArr) {
+    PCA pca = new PCA();
+    pca.numComponents(k);
+    pca.train(inputArr);
+    int n = inputArr.size();
+    for (int i = 0; i < n && i < outputArr.size(); i++) {
+      Object rowObj = outputArr.getObject(i);
+      if (rowObj instanceof ChuckArray row) {
+        ChuckArray inRow = (ChuckArray) inputArr.getObject(i);
+        pca.transform(inRow, row);
+      }
+    }
+    return n;
+  }
+
+  /**
+   * {@code pca.transform(input[][], output[][])} — batch transform of 2D data (instance method).
+   */
+  public long transform(ChuckArray inputArr, ChuckArray outputArr) {
+    if (components == null) return 0L;
+    int n = inputArr.size();
+    for (int i = 0; i < n && i < outputArr.size(); i++) {
+      Object rowObj = outputArr.getObject(i);
+      ChuckArray inRow = (ChuckArray) inputArr.getObject(i);
+      if (rowObj instanceof ChuckArray row) {
+        transform(inRow, row);
+      } else {
+        // outputArr is 1D — project single row
+        transform(inRow, outputArr);
+        break;
+      }
+    }
+    return n;
+  }
 }
