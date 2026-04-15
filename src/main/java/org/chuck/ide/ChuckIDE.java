@@ -551,6 +551,13 @@ public class ChuckIDE extends Application {
     sampleRateLabel = new Label(prefSampleRate + " Hz");
     fileNameLabel = new Label("Untitled.ck");
 
+    // Fix flickering by setting fixed widths for status bar elements
+    lineColLabel.setPrefWidth(100);
+    cpuLabel.setPrefWidth(85);
+    sampleRateLabel.setPrefWidth(80);
+    fileNameLabel.setPrefWidth(180);
+    fileNameLabel.setEllipsisString("...");
+
     tabPane
         .getSelectionModel()
         .selectedItemProperty()
@@ -2496,6 +2503,7 @@ public class ChuckIDE extends Application {
     visTimer =
         new javafx.animation.AnimationTimer() {
           private long lastSlowTick = 0;
+          private long lastTextUpdateTick = 0;
           private boolean wasIdle = false;
           private long silenceStartTime = 0;
 
@@ -2520,15 +2528,25 @@ public class ChuckIDE extends Application {
               renderScope();
               renderWaterfall();
               renderPhaseScope();
-              updateVMTime();
+
+              // Logic updates (always high-freq for smooth VU/stall detection)
+              updateVMLogic();
               updateShredList();
-              updateCpuLoad();
+
+              // Throttled text updates (10 Hz)
+              if (now - lastTextUpdateTick > 100_000_000L) {
+                updateVMText();
+                updateCpuLoad();
+                lastTextUpdateTick = now;
+              }
+
               wasIdle = false;
             } else {
               // Transitioning to Idle: Clear once
               if (!wasIdle) {
                 clearVisualizers();
-                updateVMTime();
+                updateVMLogic();
+                updateVMText();
                 updateShredList();
                 updateCpuLoad();
                 wasIdle = true;
@@ -2536,7 +2554,8 @@ public class ChuckIDE extends Application {
 
               // Low-frequency updates when idle (1 Hz)
               if (now - lastSlowTick > 1_000_000_000L) {
-                updateVMTime();
+                updateVMLogic();
+                updateVMText();
                 updateShredList();
                 updateCpuLoad();
                 lastSlowTick = now;
