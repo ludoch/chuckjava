@@ -2115,7 +2115,40 @@ public class ChuckIDE extends Application {
         });
     viewMenu.getItems().add(showKeyboardItem);
 
-    mb.getMenus().addAll(fileMenu, editMenu, viewMenu, optionsMenu, examplesMenu, helpMenu);
+    // Tutorial
+    Menu tutorialMenu = new Menu("_Tutorial");
+    addTutorialStep(
+        tutorialMenu,
+        "1. Getting Started",
+        "Welcome to ChucK-Java! In this step, we connect a Unit Generator (StifKarp) to the audio output (dac), set its frequency using a MIDI-to-frequency helper, and wait for 1 second.",
+        "// Connect a plucked string to the soundcard out\nStifKarp inst => dac;\n\n// Play middle-C (MIDI 60)\n60 => Std.mtof => inst.freq; \n0.5 => inst.noteOn; \n1::second => now; ");
+
+    addTutorialStep(
+        tutorialMenu,
+        "2. Melody and Scales",
+        "Music often uses scales. Here we use an array to define a melody and another to define the major scale intervals. We loop through the melody, mapping each step to a frequency.",
+        "StifKarp inst => dac;\n\n// A sequence of scale degrees\n[0, 2, 4, 0, 4, 2, 7, 0] @=> int melody[];\n// Major scale intervals\n[0, 2, 4, 5, 7, 9, 11, 12] @=> int major[];\n\nfor (0 => int i; ; i++) {\n    // Map melody degree to major scale semitone, offset by MIDI 60\n    60 + major[melody[i % melody.cap()]] => Std.mtof => inst.freq;\n    0.5 => inst.noteOn;\n    200::ms => now;\n}");
+
+    addTutorialStep(
+        tutorialMenu,
+        "3. The Scale Function",
+        "What if you want to play notes outside the first octave? We write a custom function that handles math to wrap notes into higher or lower octaves automatically.",
+        "StifKarp inst => dac;\n[0, 2, 4, 5, 7, 9, 11] @=> int major[];\n\n// Function to handle octave wrapping for any scale\nfun int getFreq(int degree, int scale[]) {\n    scale.cap() => int len;\n    degree / len => int octave;\n    degree % len => int step;\n    return octave * 12 + scale[step];\n}\n\nfor (0 => int i; ; i++) {\n    60 + getFreq(i, major) => Std.mtof => inst.freq;\n    0.5 => inst.noteOn;\n    150::ms => now;\n}");
+
+    addTutorialStep(
+        tutorialMenu,
+        "4. Synchronization",
+        "ChucK's strongest feature is 'strong timing'. By using T - (now % T) => now, we ensure that multiple scripts (shreds) start exactly on the same beat, no matter when you hit 'Add Shred'. Run this file twice!",
+        "// Run this file twice (Ctrl+Enter)! They will stay in sync.\nSinOsc s => dac;\n0.2 => s.gain;\n.5::second => dur T;\n\n// Synchronize to the next \"even\" period of T\nT - (now % T) => now;\n\nfor (0 => int i; ; i++) {\n    (Math.random2(60, 72)) => Std.mtof => s.freq;\n    T => now;\n}");
+
+    addTutorialStep(
+        tutorialMenu,
+        "5. Arpeggios and Progressions",
+        "Combining everything: functions, arrays, and sync. This script calculates a root note from a progression and cycles through a triad arpeggio while staying sample-locked to the global beat.",
+        "// Advanced: Bass and Arpeggio sync\nStifKarp inst => dac;\n[0, 2, 4, 5, 7, 9, 11] @=> int major[];\n\nfun int getFreq(int degree, int scale[]) {\n    scale.cap() => int len;\n    degree / len => int octave;\n    degree % len => int step;\n    return octave * 12 + scale[step];\n}\n\n.2::second => dur T;\nT - (now % T) => now;\n\n[0, 3, 4, 1] @=> int bassLine[];\n\nfor (0 => int i; ; i++) {\n    i / 4 => int measure;\n    bassLine[measure % 4] => int root;\n    \n    // Cycle through triad (0, 2, 4) relative to the root\n    [0, 2, 4] @=> int triad[];\n    triad[i % 3] + root => int degree;\n    \n    48 + getFreq(degree, major) => Std.mtof => inst.freq;\n    0.5 => inst.noteOn;\n    T => now;\n}");
+
+    mb.getMenus()
+        .addAll(fileMenu, editMenu, viewMenu, optionsMenu, tutorialMenu, examplesMenu, helpMenu);
     return mb;
   }
 
@@ -3463,6 +3496,21 @@ public class ChuckIDE extends Application {
 
   private boolean isWordChar(char c) {
     return Character.isLetterOrDigit(c) || c == '_';
+  }
+
+  private void addTutorialStep(Menu menu, String title, String desc, String code) {
+    MenuItem item = new MenuItem(title);
+    item.setOnAction(
+        e -> {
+          addNewTab(title.replace(" ", "_") + ".ck", code);
+          Alert a = new Alert(Alert.AlertType.INFORMATION);
+          a.setTitle("Tutorial: " + title);
+          a.setHeaderText(null);
+          a.setContentText(desc);
+          a.getDialogPane().setPrefWidth(400);
+          a.show();
+        });
+    menu.getItems().add(item);
   }
 
   /**
