@@ -694,7 +694,7 @@ public class ObjectInstrs {
       }
       if (target != null) {
         s.mem.pushObject(s.getCode());
-        s.mem.push((long) s.getPc());
+        s.mem.push((long) (s.getPc() + 1));
         s.mem.push((long) s.getFramePointer());
         s.mem.push((long) s.reg.getSp());
         s.setFramePointer(s.mem.getSp());
@@ -706,7 +706,7 @@ public class ObjectInstrs {
         }
         s.thisStack.push(uo);
         s.setCode(target);
-        s.setPc(-1);
+        s.setPc(0);
       }
     }
   }

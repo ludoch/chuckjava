@@ -218,7 +218,24 @@ public class ChuckShred implements Comparable<ChuckShred> {
     closeables.add(c);
   }
 
-  public void cleanup() {
+  public void cleanup(ChuckVM vm) {
+    // Call @destruct on registered UserObjects (LIFO order), before isDone is permanently set.
+    if (vm != null && !destructibles.isEmpty()) {
+      boolean savedDone = isDone;
+      isDone = false; // temporarily re-enable execution so dtor instructions can run
+      for (int i = destructibles.size() - 1; i >= 0; i--) {
+        UserObject uo = destructibles.get(i);
+        ChuckCode dtorCode = uo.methods.get("@destruct:0");
+        if (dtorCode != null) {
+          try {
+            executeCtorSynchronous(vm, dtorCode, uo, null, null);
+          } catch (Exception ignored) {
+          }
+        }
+      }
+      isDone = savedDone;
+      destructibles.clear();
+    }
     for (ChuckUGen ugen : ownedUGens) {
       try {
         ugen.disconnectAll();

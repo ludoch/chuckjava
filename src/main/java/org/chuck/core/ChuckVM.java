@@ -454,7 +454,7 @@ public class ChuckVM {
               } finally {
                 activeShreds.remove(shred.getId());
                 shred.setDone(true);
-                shred.cleanup();
+                shred.cleanup(this);
                 shred.broadcast(this);
                 deadShreds.add(shred);
                 if (deadShreds.size() > 50) deadShreds.remove(0);
@@ -487,7 +487,7 @@ public class ChuckVM {
               } finally {
                 activeShreds.remove(shred.getId());
                 shred.setDone(true);
-                shred.cleanup();
+                shred.cleanup(this);
                 shred.broadcast(this);
                 deadShreds.add(shred);
                 if (deadShreds.size() > 50) deadShreds.remove(0);
@@ -689,7 +689,7 @@ public class ChuckVM {
   public void removeShred(int id) {
     ChuckShred s = activeShreds.remove(id);
     if (s != null) {
-      s.cleanup();
+      s.cleanup(this);
     }
   }
 
@@ -746,7 +746,7 @@ public class ChuckVM {
       shredulerLock.unlock();
     }
     for (ChuckShred s : shreds) {
-      s.cleanup();
+      s.cleanup(this);
     }
   }
 

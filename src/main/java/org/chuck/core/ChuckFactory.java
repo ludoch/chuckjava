@@ -75,6 +75,7 @@ public class ChuckFactory {
             s.thisStack.pop();
           }
         }
+        s.registerDestructible(uo);
       }
       return uo;
     }

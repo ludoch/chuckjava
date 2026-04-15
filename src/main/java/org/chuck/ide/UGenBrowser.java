@@ -74,53 +74,57 @@ public class UGenBrowser extends VBox {
               String name = selected.getValue();
               if (name.contains("Chord Trigger")) {
                 onInsert.accept(
-                    "MidiIn min => MidiPoly poly => dac;\n"
-                        + "min.open(0);\n"
-                        + "while(min => now) {\n"
-                        + "  MidiMsg m; while(min.recv(m)) {\n"
-                        + "    if(m.data1 & 0x90) {\n"
-                        + "      poly.noteOn(m.data2, m.data3/127.0, 0);\n"
-                        + "      poly.noteOn(m.data2+4, m.data3/127.0, 0);\n"
-                        + "      poly.noteOn(m.data2+7, m.data3/127.0, 0);\n"
-                        + "    }\n"
-                        + "  }\n"
-                        + "}");
+                    """
+                                MidiIn min => MidiPoly poly => dac;
+                                min.open(0);
+                                while(min => now) {
+                                  MidiMsg m; while(min.recv(m)) {
+                                    if(m.data1 & 0x90) {
+                                      poly.noteOn(m.data2, m.data3/127.0, 0);
+                                      poly.noteOn(m.data2+4, m.data3/127.0, 0);
+                                      poly.noteOn(m.data2+7, m.data3/127.0, 0);
+                                    }
+                                  }
+                                }""");
               } else if (name.contains("Scale Constrain")) {
                 onInsert.accept(
-                    "MidiIn min => MidiPoly poly => dac;\n"
-                        + "min.open(0);\n"
-                        + "[0,2,3,5,7,8,10] @=> int scale[]; // Natural Minor\n"
-                        + "while(min => now) {\n"
-                        + "  MidiMsg m; while(min.recv(m)) {\n"
-                        + "    m.data2 % 12 @=> int note; \n"
-                        + "    // logic to snap to scale...\n"
-                        + "    poly.onMessage(m);\n"
-                        + "  }\n"
-                        + "}");
+                    """
+                                MidiIn min => MidiPoly poly => dac;
+                                min.open(0);
+                                [0,2,3,5,7,8,10] @=> int scale[]; // Natural Minor
+                                while(min => now) {
+                                  MidiMsg m; while(min.recv(m)) {
+                                    m.data2 % 12 @=> int note;
+                                    // logic to snap to scale...
+                                    poly.onMessage(m);
+                                  }
+                                }""");
               } else if (name.contains("Simple Arpeggiator")) {
                 onInsert.accept(
-                    "MidiIn min => MidiPoly poly => dac;\n"
-                        + "min.open(0);\n"
-                        + "while(min => now) {\n"
-                        + "  MidiMsg m; while(min.recv(m)) {\n"
-                        + "    spork ~ playArp(m.data2, m.data3/127.0);\n"
-                        + "  }\n"
-                        + "}\n"
-                        + "fun void playArp(int note, float v) {\n"
-                        + "  poly.noteOn(note, v, 0); 0.25::second => now;\n"
-                        + "  poly.noteOn(note+4, v, 0); 0.25::second => now;\n"
-                        + "  poly.noteOn(note+7, v, 0); 0.25::second => now;\n"
-                        + "}");
+                    """
+                                MidiIn min => MidiPoly poly => dac;
+                                min.open(0);
+                                while(min => now) {
+                                  MidiMsg m; while(min.recv(m)) {
+                                    spork ~ playArp(m.data2, m.data3/127.0);
+                                  }
+                                }
+                                fun void playArp(int note, float v) {
+                                  poly.noteOn(note, v, 0); 0.25::second => now;
+                                  poly.noteOn(note+4, v, 0); 0.25::second => now;
+                                  poly.noteOn(note+7, v, 0); 0.25::second => now;
+                                }""");
               } else if (name.contains("CC Mapper")) {
                 onInsert.accept(
-                    "MidiIn min; min.open(0);\n"
-                        + "while(min => now) {\n"
-                        + "  MidiMsg m; while(min.recv(m)) {\n"
-                        + "    if((m.data1 & 0xF0) == 0xB0) {\n"
-                        + "       <<< \"CC:\", m.data2, \"Val:\", m.data3 >>>;\n"
-                        + "    }\n"
-                        + "  }\n"
-                        + "}");
+                    """
+                                MidiIn min; min.open(0);
+                                while(min => now) {
+                                  MidiMsg m; while(min.recv(m)) {
+                                    if((m.data1 & 0xF0) == 0xB0) {
+                                       <<< "CC:", m.data2, "Val:", m.data3 >>>;
+                                    }
+                                  }
+                                }""");
               } else {
                 onInsert.accept(name + " s => dac;");
               }
