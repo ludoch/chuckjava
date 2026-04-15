@@ -366,7 +366,6 @@ public class ChuckArray extends ChuckObject {
   }
 
   public ChuckArray append(Object val) {
-    System.err.println("  ChuckArray.append: val=" + val + " elemType=" + elementTypeName);
     if ("float".equals(elementTypeName)) {
       if (val instanceof Number n) return append(n.doubleValue());
     }

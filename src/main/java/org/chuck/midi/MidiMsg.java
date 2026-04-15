@@ -12,6 +12,9 @@ public class MidiMsg extends ChuckObject {
   public int data2 = 0;
   public int data3 = 0;
 
+  /** Native timestamp (seconds) provided by the driver. */
+  public double when = 0;
+
   /** Optional buffer for variable-length messages (Sysex). */
   private byte[] data = null;
 

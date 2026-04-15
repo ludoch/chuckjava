@@ -155,6 +155,7 @@ public class ChuckMidiNative {
     if (size <= 0) return;
 
     MidiMsg msg = new MidiMsg();
+    msg.when = timestamp;
     byte[] raw = new byte[(int) size];
     MemorySegment.copy(message, ValueLayout.JAVA_BYTE, 0, raw, 0, (int) size);
     msg.setData(raw);

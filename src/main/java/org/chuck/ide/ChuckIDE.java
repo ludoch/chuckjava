@@ -1875,7 +1875,22 @@ public class ChuckIDE extends Application {
         e -> getHostServices().showDocument("https://github.com/ludoch/chuckjava"));
     helpMenu.getItems().add(githubItem);
 
-    mb.getMenus().addAll(fileMenu, editMenu, optionsMenu, examplesMenu, helpMenu);
+    MenuItem programChangeItem = new MenuItem("Program Change...");
+    // ... logic for other menus ...
+
+    // View
+    Menu viewMenu = new Menu("_View");
+    javafx.scene.control.CheckMenuItem showKeyboardItem =
+        new javafx.scene.control.CheckMenuItem("Show MIDI Keyboard");
+    showKeyboardItem.setSelected(true);
+    showKeyboardItem.setOnAction(
+        e -> {
+          pianoKeyboard.setVisible(showKeyboardItem.isSelected());
+          pianoKeyboard.setManaged(showKeyboardItem.isSelected());
+        });
+    viewMenu.getItems().add(showKeyboardItem);
+
+    mb.getMenus().addAll(fileMenu, editMenu, viewMenu, optionsMenu, examplesMenu, helpMenu);
     return mb;
   }
 
