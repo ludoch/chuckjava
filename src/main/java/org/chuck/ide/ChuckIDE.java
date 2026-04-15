@@ -2495,15 +2495,71 @@ public class ChuckIDE extends Application {
   private void startVisualizer() {
     visTimer =
         new javafx.animation.AnimationTimer() {
+          private long lastSlowTick = 0;
+          private boolean wasIdle = false;
+          private long silenceStartTime = 0;
+
           @Override
           public void handle(long now) {
-            renderSpectrum();
-            renderScope();
-            renderWaterfall();
-            renderPhaseScope();
-            updateVMTime();
-            updateShredList();
-            updateCpuLoad();
+            boolean currentSilence =
+                audio != null && (vm.getActiveShredCount() == 0) && audio.getPeakOut(0) < 0.0001;
+
+            // Hysteresis: Only enter idle after 1 second of continuous silence
+            if (currentSilence) {
+              if (silenceStartTime == 0) silenceStartTime = now;
+            } else {
+              silenceStartTime = 0;
+            }
+
+            boolean shouldBeIdle =
+                (silenceStartTime != 0) && (now - silenceStartTime > 1_000_000_000L);
+
+            if (!shouldBeIdle) {
+              // High-frequency rendering only when active
+              renderSpectrum();
+              renderScope();
+              renderWaterfall();
+              renderPhaseScope();
+              updateVMTime();
+              updateShredList();
+              updateCpuLoad();
+              wasIdle = false;
+            } else {
+              // Transitioning to Idle: Clear once
+              if (!wasIdle) {
+                clearVisualizers();
+                updateVMTime();
+                updateShredList();
+                updateCpuLoad();
+                wasIdle = true;
+              }
+
+              // Low-frequency updates when idle (1 Hz)
+              if (now - lastSlowTick > 1_000_000_000L) {
+                updateVMTime();
+                updateShredList();
+                updateCpuLoad();
+                lastSlowTick = now;
+              }
+            }
+          }
+
+          private void clearVisualizers() {
+            GraphicsContext gc = visualizerCanvas.getGraphicsContext2D();
+            gc.setFill(Color.BLACK);
+            gc.fillRect(0, 0, visualizerCanvas.getWidth(), visualizerCanvas.getHeight());
+
+            gc = scopeCanvas.getGraphicsContext2D();
+            gc.setFill(Color.BLACK);
+            gc.fillRect(0, 0, scopeCanvas.getWidth(), scopeCanvas.getHeight());
+
+            gc = waterfallCanvas.getGraphicsContext2D();
+            gc.setFill(Color.BLACK);
+            gc.fillRect(0, 0, waterfallCanvas.getWidth(), waterfallCanvas.getHeight());
+
+            gc = phaseScopeCanvas.getGraphicsContext2D();
+            gc.setFill(Color.BLACK);
+            gc.fillRect(0, 0, phaseScopeCanvas.getWidth(), phaseScopeCanvas.getHeight());
           }
         };
 
