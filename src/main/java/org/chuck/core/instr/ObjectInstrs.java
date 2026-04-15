@@ -751,13 +751,15 @@ public class ObjectInstrs {
         return;
       }
 
-      // Check for existing object at this local offset?
-      // Usually local variables are not re-instantiated if they are in the same shred run.
-      // But ChucK variables are typically initialized once per scope entry.
-      // For now, we assume if it's already an object, we use it.
+      // Reuse an already-instantiated local variable only when it is a live user object
+      // (UserObject, ChuckArray, ChuckString) — never when the slot contains a saved
+      // return-frame value (ChuckCode, Long, etc.) that happens to share the same address.
       if (s.mem.isObjectAt(fp + o)) {
         Object existing = s.mem.getRef(fp + o);
-        if (existing != null) {
+        if (existing instanceof UserObject
+            || existing instanceof ChuckArray
+            || existing instanceof ChuckString
+            || (existing instanceof ChuckObject && !(existing instanceof ChuckCode))) {
           s.reg.pushObject(existing);
           return;
         }
