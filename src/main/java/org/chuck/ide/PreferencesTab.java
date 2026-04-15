@@ -162,8 +162,48 @@ public class PreferencesTab extends ScrollPane {
             prefs.put("midi.libPath", folder.getAbsolutePath());
           }
         });
+
+    Button helpBtn = new Button("?");
+    helpBtn.setTooltip(new Tooltip("How to get RtMidi?"));
+    helpBtn.setOnAction(
+        e -> {
+          Alert alert = new Alert(Alert.AlertType.INFORMATION);
+          alert.setTitle("RtMidi Setup Help");
+          alert.setHeaderText("How to get the Native MIDI Library");
+
+          String os = System.getProperty("os.name").toLowerCase();
+          String instructions = "";
+          if (os.contains("mac")) {
+            instructions =
+                "macOS Setup:\n"
+                    + "1. Install Homebrew (brew.sh)\n"
+                    + "2. Run: brew install rtmidi\n"
+                    + "3. The library is usually in /opt/homebrew/lib (Silicon) or /usr/local/lib (Intel).\n"
+                    + "4. Browse to that folder and select it.";
+          } else if (os.contains("win")) {
+            instructions =
+                "Windows Setup:\n"
+                    + "1. Download a pre-compiled rtmidi.dll (e.g., from a reputable project like Bespoke Synth or VCV Rack).\n"
+                    + "2. OR use 'vcpkg install rtmidi:x64-windows' if you have vcpkg.\n"
+                    + "3. Place the DLL in a folder and browse to it here.";
+          } else {
+            instructions =
+                "Linux Setup:\n"
+                    + "1. Run: sudo apt-get install librtmidi-dev (or equivalent)\n"
+                    + "2. The library is usually in /usr/lib/x86_64-linux-gnu/\n"
+                    + "3. Browse to that folder and select it.";
+          }
+
+          TextArea area = new TextArea(instructions);
+          area.setEditable(false);
+          area.setWrapText(true);
+          area.setPrefHeight(150);
+          alert.getDialogPane().setContent(area);
+          alert.showAndWait();
+        });
+
     libPathField.textProperty().addListener((obs, ov, nv) -> prefs.put("midi.libPath", nv));
-    HBox pathBox = new HBox(5, libPathField, browseBtn);
+    HBox pathBox = new HBox(5, libPathField, browseBtn, helpBtn);
     javafx.scene.layout.HBox.setHgrow(libPathField, javafx.scene.layout.Priority.ALWAYS);
 
     // API Selection (Native only)

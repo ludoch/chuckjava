@@ -19,8 +19,15 @@ By default, ChucK-Java uses the standard JavaSound MIDI system. For professional
 ### How to Enable:
 1.  Open the IDE.
 2.  Go to **Preferences -> MIDI Settings**.
-3.  Check the **Native MIDI Status**. If it shows a 🔴 red dot, you may need to provide the path to your `rtmidi.dll` (Windows), `.so` (Linux), or `.dylib` (macOS).
-4.  Once enabled (🟢 green dot), ChucK will automatically prefer native drivers.
+3.  Check the **Native MIDI Status**. If it shows a 🔴 red dot, you need to provide the `rtmidi` library for your system.
+
+#### **Where to find the library?**
+-   **macOS:** Install via Homebrew (`brew install rtmidi`). The file `librtmidi.dylib` will be in `/opt/homebrew/lib` (Apple Silicon) or `/usr/local/lib` (Intel).
+-   **Linux:** Install via apt (`sudo apt-get install librtmidi-dev`). The file `librtmidi.so` is usually in `/usr/lib/x86_64-linux-gnu/`.
+-   **Windows:** You need `rtmidi.dll`. The easiest way is to copy it from another audio app that uses it (like **Bespoke Synth**, **VCV Rack**, or **SuperCollider**) or use a package manager like `vcpkg`.
+
+4.  Once you have the file, click the **...** button in MIDI Preferences and select the **folder** containing the file.
+5.  Click **Refresh Devices**. Once enabled (🟢 green dot), ChucK will automatically prefer native drivers.
 
 ---
 

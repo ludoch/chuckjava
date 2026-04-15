@@ -108,13 +108,16 @@ chuck-ide.exe          # self-contained IDE bundle
 The engine will run without these using JavaSound fallback, but for low-latency and virtual ports, the `rtmidi` library is recommended:
 
 #### **Windows**
--   Ensure `rtmidi.dll` is in your PATH, the project root, or set the path in **IDE Preferences -> MIDI**.
+-   Requires `rtmidi.dll`.
+-   **Where to find it?** Search your system for other music apps like **Bespoke Synth**, **VCV Rack**, or **SuperCollider**. Copy the DLL to a folder of your choice and point the IDE to it in **Preferences -> MIDI**.
 
 #### **macOS**
--   Use Homebrew: `brew install rtmidi`
+-   Install via Homebrew: `brew install rtmidi`
+-   **Where to find it?** Usually in `/opt/homebrew/lib` (Apple Silicon) or `/usr/local/lib` (Intel). Point the IDE to the containing folder.
 
 #### **Linux**
--   Use your package manager: `sudo apt-get install librtmidi-dev` (on Debian/Ubuntu)
+-   Install via your package manager: `sudo apt-get install librtmidi-dev` (on Debian/Ubuntu)
+-   **Where to find it?** Usually in `/usr/lib/x86_64-linux-gnu/`. Point the IDE to that folder.
 
 ---
 
