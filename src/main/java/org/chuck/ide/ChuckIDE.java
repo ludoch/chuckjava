@@ -32,12 +32,13 @@ public class ChuckIDE extends Application {
   private VisualizerPanel visualizerPanel;
   private StatusBar statusBar;
   private IDEProjectBrowser projectBrowser;
+  private SequencerPanel sequencerPanel;
 
   // UI Elements
   private TabPane tabPane;
+  private TabPane leftTabPane;
   private ListView<ShredInfo> shredListView;
   private TextArea outputArea;
-  private Label statusLabel;
   private Button addShredBtnRef;
   private Button replaceBtnRef;
 
@@ -45,9 +46,6 @@ public class ChuckIDE extends Application {
   private PianoKeyboard pianoKeyboard;
   private MidiMonitor midiMonitor;
   private MidiRecorder midiRecorder = new MidiRecorder();
-  private org.chuck.midi.MidiClockOut midiClockOut = new org.chuck.midi.MidiClockOut();
-  private javafx.scene.shape.Circle midiActivityIndicator;
-  private javafx.animation.Timeline midiActivityTimeline;
 
   // Master Gain
   private Gain masterGain;
@@ -90,7 +88,8 @@ public class ChuckIDE extends Application {
 
   private void initVM() {
     vm = new ChuckVM(prefSampleRate, 2);
-    audio = new ChuckAudio(vm);
+    // Fixed: required: org.chuck.core.ChuckVM,int,int,float
+    audio = new ChuckAudio(vm, 512, 2, (float) prefSampleRate);
     vm.setAudio(audio);
     vm.initIO(
         new java.io.PrintStream(new ConsoleOutputStream(this::print)),
@@ -98,8 +97,9 @@ public class ChuckIDE extends Application {
 
     masterGain = new Gain();
     masterGain.setGain(prefs.getFloat("audio.masterGain", 0.8f));
-    vm.dac.connect(masterGain);
-    masterGain.connect(vm.blackhole);
+    // Fixed: use chuckTo instead of connect
+    vm.dac.chuckTo(masterGain);
+    masterGain.chuckTo(vm.blackhole);
 
     editorSupport = new EditorSupport(prefs, stage);
   }
@@ -130,9 +130,9 @@ public class ChuckIDE extends Application {
 
     // Visualizers
     FFT analyzer = new FFT(1024);
-    vm.getDacChannel(0).connect(analyzer);
+    vm.getDacChannel(0).chuckTo(analyzer);
     Scope scope = new Scope(1024);
-    vm.getDacChannel(0).connect(scope);
+    vm.getDacChannel(0).chuckTo(scope);
     visualizerPanel = new VisualizerPanel(vm, audio, analyzer, scope);
 
     // Output and MIDI
@@ -146,16 +146,26 @@ public class ChuckIDE extends Application {
     midiMonitor = new MidiMonitor();
     setupMidiMonitors();
 
-    // Shred List
+    // Right Panel: Shred List
     shredListView = new ListView<>();
     shredListView.setCellFactory(lv -> new ShredListCell(this));
     VBox rightPanel = new VBox(5, new Label(" Active Shreds"), shredListView);
     rightPanel.setPrefWidth(200);
 
+    // Left TabPane: Project Browser and Sequencer
+    Tab projectTab = new Tab("Project", projectBrowser);
+    projectTab.setClosable(false);
+
+    sequencerPanel = new SequencerPanel(vm);
+    Tab seqTab = new Tab("Sequencer", sequencerPanel);
+    seqTab.setClosable(false);
+
+    leftTabPane = new TabPane(projectTab, seqTab);
+    leftTabPane.setPrefWidth(250);
+
     // Layout
-    VBox leftPanel = new VBox(new Label(" Project"), projectBrowser);
-    SplitPane hSplit = new SplitPane(leftPanel, tabPane, rightPanel);
-    hSplit.setDividerPositions(0.18, 0.82);
+    SplitPane hSplit = new SplitPane(leftTabPane, tabPane, rightPanel);
+    hSplit.setDividerPositions(0.20, 0.80);
 
     VBox bottomPanel = new VBox(new SplitPane(outputArea, pianoKeyboard), statusBar);
     SplitPane vSplit = new SplitPane(hSplit, bottomPanel);
@@ -227,12 +237,12 @@ public class ChuckIDE extends Application {
     addTutorialStep(
         m,
         "1. Getting Started",
-        "Learn SinOsc",
+        "Welcome to ChucK-Java!",
         "/* Welcome to ChucK! */\nSinOsc s => dac;\n0.5 => s.gain;\n1::second => now;");
     addTutorialStep(
         m,
         "2. Melody",
-        "Using arrays",
+        "Using arrays for sequencing.",
         "/* Melody loop */\nSinOsc s => dac;\n[60, 62, 64, 65, 67] @=> int scale[];\nfor(0=>int i;;i++) {\n  scale[i%scale.cap()] => Std.mtof => s.freq;\n  200::ms => now;\n}");
     return m;
   }
@@ -290,6 +300,13 @@ public class ChuckIDE extends Application {
       @Override
       public void handle(long now) {
         updateVMLogic();
+
+        // Sync visual sequencer cursor
+        if (sequencerPanel != null) {
+          int step = (int) vm.getGlobalInt("seq_current_step");
+          sequencerPanel.setStep(step);
+        }
+
         if (now - lastTextUpdate > 100_000_000L) {
           statusBar.updateVMText();
           statusBar.updateCpuLoad();
