@@ -413,6 +413,7 @@ public class ChuckIDE extends Application {
   // MIDI
   private MidiMonitor midiMonitor;
   private MidiRecorder midiRecorder = new MidiRecorder();
+  private org.chuck.midi.MidiClockOut midiClockOut = new org.chuck.midi.MidiClockOut();
   private javafx.scene.shape.Circle midiActivityIndicator;
   private javafx.animation.Timeline midiActivityTimeline;
 
@@ -791,12 +792,25 @@ public class ChuckIDE extends Application {
     org.chuck.midi.ChuckMidiNative.addMonitor(
         (device, msg) -> {
           pianoKeyboard.onMidiMessage(msg);
-          if (midiMonitor != null) midiMonitor.onMidiMessage(msg);
-          if (midiRecorder != null) midiRecorder.onMidiMessage(msg);
+          if (midiMonitor != null) midiMonitor.onMidiMessage("In", msg);
+          if (midiRecorder != null) midiRecorder.onMidiMessage("In", msg);
           if (midiActivityIndicator != null) {
             Platform.runLater(
                 () -> {
                   midiActivityIndicator.setFill(Color.LIME);
+                  midiActivityTimeline.playFromStart();
+                });
+          }
+        });
+
+    org.chuck.midi.ChuckMidiOutNative.addMonitor(
+        (device, msg) -> {
+          if (midiMonitor != null) midiMonitor.onMidiMessage("Out", msg);
+          if (midiRecorder != null) midiRecorder.onMidiMessage("Out", msg);
+          if (midiActivityIndicator != null) {
+            Platform.runLater(
+                () -> {
+                  midiActivityIndicator.setFill(Color.ORANGE);
                   midiActivityTimeline.playFromStart();
                 });
           }
@@ -830,27 +844,81 @@ public class ChuckIDE extends Application {
     midiMenu.setOnShowing(
         e -> {
           midiMenu.getItems().clear();
-          String[] ports = org.chuck.midi.MidiIn.list();
-          for (int i = 0; i < ports.length; i++) {
+
+          Menu inMenu = new Menu("Input Monitor");
+          String[] inPorts = org.chuck.midi.MidiIn.list();
+          for (int i = 0; i < inPorts.length; i++) {
             final int portIdx = i;
             javafx.scene.control.CheckMenuItem item =
-                new javafx.scene.control.CheckMenuItem(ports[i]);
-            // Check if it's already open by monitoring
-            // (SharedPort management in ChuckMidiNative already tracks this)
+                new javafx.scene.control.CheckMenuItem(inPorts[i]);
+            item.setOnAction(
+                ae -> {
+                  if (item.isSelected()) org.chuck.midi.ChuckMidiNative.openGlobalMonitor(portIdx);
+                });
+            inMenu.getItems().add(item);
+          }
+
+          Menu outMenu = new Menu("Output Monitor / Sync");
+          String[] outPorts = org.chuck.midi.MidiOut.list();
+          for (int i = 0; i < outPorts.length; i++) {
+            final int portIdx = i;
+            javafx.scene.control.CheckMenuItem item =
+                new javafx.scene.control.CheckMenuItem(outPorts[i]);
             item.setOnAction(
                 ae -> {
                   if (item.isSelected()) {
-                    org.chuck.midi.ChuckMidiNative.openGlobalMonitor(portIdx);
+                    org.chuck.midi.MidiOut mout = new org.chuck.midi.MidiOut();
+                    mout.open(portIdx);
+                    midiClockOut.addOutput(mout);
                   }
                 });
-            midiMenu.getItems().add(item);
+            outMenu.getItems().add(item);
           }
-          if (ports.length == 0) {
-            midiMenu.getItems().add(new javafx.scene.control.MenuItem("No MIDI inputs found"));
+
+          midiMenu.getItems().addAll(inMenu, outMenu);
+
+          if (inPorts.length == 0 && outPorts.length == 0) {
+            midiMenu.getItems().add(new javafx.scene.control.MenuItem("No MIDI ports found"));
           }
         });
 
+    javafx.scene.control.TextField bpmField = new javafx.scene.control.TextField("120.0");
+    bpmField.setPrefWidth(45);
+    bpmField.setStyle("-fx-font-size: 10; -fx-padding: 1 2;");
+    bpmField
+        .textProperty()
+        .addListener(
+            (obs, ov, nv) -> {
+              try {
+                midiClockOut.setBpm(Float.parseFloat(nv));
+              } catch (Exception ignored) {
+              }
+            });
+
+    javafx.scene.control.ToggleButton syncBtn = new javafx.scene.control.ToggleButton("SYNC");
+    syncBtn.setStyle("-fx-font-size: 10; -fx-padding: 1 5;");
+    syncBtn.setTooltip(new Tooltip("Send MIDI Clock to selected outputs"));
+    syncBtn.setOnAction(
+        e -> {
+          if (syncBtn.isSelected()) midiClockOut.start();
+          else midiClockOut.stop();
+        });
+
     statusLabel = new Label("  Ready");
+
+    // Hot-plug polling (basic)
+    javafx.animation.Timeline hotplugTimeline =
+        new javafx.animation.Timeline(
+            new javafx.animation.KeyFrame(
+                javafx.util.Duration.seconds(3),
+                e -> {
+                  // If the MIDI menu is open, we don't want to mess with it
+                  // but we can re-probe the counts internally
+                  // For now, this just ensures RtMidi remains initialized
+                  org.chuck.midi.RtMidi.reinit();
+                }));
+    hotplugTimeline.setCycleCount(javafx.animation.Timeline.INDEFINITE);
+    hotplugTimeline.play();
 
     // MIDI Activity Indicator
     midiActivityIndicator = new javafx.scene.shape.Circle(4, Color.TRANSPARENT);
@@ -864,7 +932,10 @@ public class ChuckIDE extends Application {
                 javafx.util.Duration.millis(100),
                 e -> midiActivityIndicator.setFill(Color.TRANSPARENT)));
 
-    for (Label l : List.of(statusLabel, lineColLabel, cpuLabel, sampleRateLabel, fileNameLabel)) {
+    Label bpmLabel = new Label("BPM");
+
+    for (Label l :
+        List.of(statusLabel, lineColLabel, cpuLabel, sampleRateLabel, fileNameLabel, bpmLabel)) {
       l.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 11;");
     }
 
@@ -878,6 +949,10 @@ public class ChuckIDE extends Application {
             new Separator(Orientation.VERTICAL),
             midiMenu,
             recordMidiBtn,
+            new Separator(Orientation.VERTICAL),
+            bpmLabel,
+            bpmField,
+            syncBtn,
             new Separator(Orientation.VERTICAL),
             statusLabel,
             statusSpacer,

@@ -71,7 +71,59 @@ public class UGenBrowser extends VBox {
           if (event.getClickCount() == 2) {
             TreeItem<String> selected = treeView.getSelectionModel().getSelectedItem();
             if (selected != null && selected.isLeaf() && onInsert != null) {
-              onInsert.accept(selected.getValue() + " s => dac;");
+              String name = selected.getValue();
+              if (name.contains("Chord Trigger")) {
+                onInsert.accept(
+                    "MidiIn min => MidiPoly poly => dac;\n"
+                        + "min.open(0);\n"
+                        + "while(min => now) {\n"
+                        + "  MidiMsg m; while(min.recv(m)) {\n"
+                        + "    if(m.data1 & 0x90) {\n"
+                        + "      poly.noteOn(m.data2, m.data3/127.0, 0);\n"
+                        + "      poly.noteOn(m.data2+4, m.data3/127.0, 0);\n"
+                        + "      poly.noteOn(m.data2+7, m.data3/127.0, 0);\n"
+                        + "    }\n"
+                        + "  }\n"
+                        + "}");
+              } else if (name.contains("Scale Constrain")) {
+                onInsert.accept(
+                    "MidiIn min => MidiPoly poly => dac;\n"
+                        + "min.open(0);\n"
+                        + "[0,2,3,5,7,8,10] @=> int scale[]; // Natural Minor\n"
+                        + "while(min => now) {\n"
+                        + "  MidiMsg m; while(min.recv(m)) {\n"
+                        + "    m.data2 % 12 @=> int note; \n"
+                        + "    // logic to snap to scale...\n"
+                        + "    poly.onMessage(m);\n"
+                        + "  }\n"
+                        + "}");
+              } else if (name.contains("Simple Arpeggiator")) {
+                onInsert.accept(
+                    "MidiIn min => MidiPoly poly => dac;\n"
+                        + "min.open(0);\n"
+                        + "while(min => now) {\n"
+                        + "  MidiMsg m; while(min.recv(m)) {\n"
+                        + "    spork ~ playArp(m.data2, m.data3/127.0);\n"
+                        + "  }\n"
+                        + "}\n"
+                        + "fun void playArp(int note, float v) {\n"
+                        + "  poly.noteOn(note, v, 0); 0.25::second => now;\n"
+                        + "  poly.noteOn(note+4, v, 0); 0.25::second => now;\n"
+                        + "  poly.noteOn(note+7, v, 0); 0.25::second => now;\n"
+                        + "}");
+              } else if (name.contains("CC Mapper")) {
+                onInsert.accept(
+                    "MidiIn min; min.open(0);\n"
+                        + "while(min => now) {\n"
+                        + "  MidiMsg m; while(min.recv(m)) {\n"
+                        + "    if((m.data1 & 0xF0) == 0xB0) {\n"
+                        + "       <<< \"CC:\", m.data2, \"Val:\", m.data3 >>>;\n"
+                        + "    }\n"
+                        + "  }\n"
+                        + "}");
+              } else {
+                onInsert.accept(name + " s => dac;");
+              }
             }
           }
         });
@@ -92,8 +144,16 @@ public class UGenBrowser extends VBox {
     TreeItem<String> anaNode = new TreeItem<>("Analyzers");
     TreeItem<String> ioNode = new TreeItem<>("Sampling & I/O");
     TreeItem<String> utilNode = new TreeItem<>("Utilities");
+    TreeItem<String> midiToolsNode = new TreeItem<>("MIDI Tools (Snippets)");
 
-    root.getChildren().addAll(oscNode, filterNode, effectNode, stkNode, anaNode, ioNode, utilNode);
+    root.getChildren()
+        .addAll(oscNode, filterNode, effectNode, stkNode, anaNode, ioNode, utilNode, midiToolsNode);
+
+    // Add MIDI Tools Snippets
+    midiToolsNode.getChildren().add(new TreeItem<>("Chord Trigger (Major)"));
+    midiToolsNode.getChildren().add(new TreeItem<>("Scale Constrain (Minor)"));
+    midiToolsNode.getChildren().add(new TreeItem<>("Simple Arpeggiator"));
+    midiToolsNode.getChildren().add(new TreeItem<>("MIDI CC Mapper"));
 
     Set<String> names = UGenRegistry.getRegisteredNames();
     List<String> sortedNames = new ArrayList<>(names);

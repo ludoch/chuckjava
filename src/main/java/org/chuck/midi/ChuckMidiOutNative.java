@@ -4,12 +4,29 @@ import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /** Native MIDI output using RtMidi via FFM. Supports port sharing. */
 public class ChuckMidiOutNative {
   private static final Logger logger = Logger.getLogger(ChuckMidiOutNative.class.getName());
+
+  /** Functional interface for monitoring MIDI messages globally in the IDE. */
+  @FunctionalInterface
+  public interface MidiMonitor {
+    void onMessage(String deviceName, MidiMsg msg);
+  }
+
+  private static final java.util.List<MidiMonitor> monitors = new CopyOnWriteArrayList<>();
+
+  public static void addMonitor(MidiMonitor monitor) {
+    monitors.add(monitor);
+  }
+
+  public static void removeMonitor(MidiMonitor monitor) {
+    monitors.remove(monitor);
+  }
 
   // --- Shared Port Management ---
   private static class SharedPort {
@@ -134,6 +151,10 @@ public class ChuckMidiOutNative {
       MemorySegment.copy(raw, 0, buffer, ValueLayout.JAVA_BYTE, 0, size);
 
       RtMidi.out_send_message.invoke(myPort.ptr, buffer, size);
+
+      for (MidiMonitor monitor : monitors) {
+        monitor.onMessage(myPort.name, msg);
+      }
     } catch (Throwable t) {
       logger.log(Level.WARNING, "Failed to send native MIDI message", t);
     }

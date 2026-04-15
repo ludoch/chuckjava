@@ -48,7 +48,7 @@ public class MidiRecorder {
     return recording;
   }
 
-  public void onMidiMessage(MidiMsg msg) {
+  public void onMidiMessage(String source, MidiMsg msg) {
     if (!recording) return;
 
     // Use wall-clock time relative to start of recording
