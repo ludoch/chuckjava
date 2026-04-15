@@ -297,6 +297,10 @@ public class StatementEmitter {
         }
         int argCount = 0;
         boolean isUserClass = parent.getUserClassRegistry().containsKey(s.type());
+        // For array declarations like Foo array1(2)[3], the type is "Foo[]" but the element type
+        // "Foo" may be a user class. Compute the element type for ctor dispatch.
+        String elemTypeS = parent.getBaseType(s.type());
+        boolean isUserClassElem = parent.getUserClassRegistry().containsKey(elemTypeS);
         boolean isObject = parent.isObjectType(s.type());
         boolean forceGlobal = s.isGlobal();
         boolean useGlobal = forceGlobal; // Top-level vars are shred-local by default in ChucK
@@ -336,15 +340,19 @@ public class StatementEmitter {
         // OR class defines a zero-arg @construct (Foo f; should call @construct()).
         boolean hasExplicitCallArgs = s.callArgs() != null;
         boolean hasZeroArgCtor =
-            isUserClass
+            (isUserClass || isUserClassElem)
                 && !hasExplicitCallArgs
-                && parent.getUserClassRegistry().containsKey(s.type())
+                && parent.getUserClassRegistry().containsKey(elemTypeS)
                 && parent
                     .getUserClassRegistry()
-                    .get(s.type())
+                    .get(elemTypeS)
                     .methods()
-                    .containsKey(s.type() + ":0");
-        if (isUserClass && !s.isReference() && (hasExplicitCallArgs || hasZeroArgCtor)) {
+                    .containsKey(elemTypeS + ":0");
+        boolean isArrayDeclS = !s.arraySizes().isEmpty();
+        if (isUserClass
+            && !s.isReference()
+            && !isArrayDeclS
+            && (hasExplicitCallArgs || hasZeroArgCtor)) {
           if (parent.isInPreCtor()) {
             code.addInstruction(new StackInstrs.PushThis());
             code.addInstruction(
@@ -380,6 +388,47 @@ public class StatementEmitter {
           List<String> ctorArgTypes = ctorArgs.stream().map(parent::getExprType).toList();
           String ctorKey = parent.getMethodKey(s.type(), ctorArgTypes);
           code.addInstruction(new ObjectInstrs.CallMethod(s.type(), ctorArgs.size(), ctorKey));
+          code.addInstruction(new StackInstrs.Pop());
+        } else if ((isUserClass || isUserClassElem)
+            && !s.isReference()
+            && isArrayDeclS
+            && (hasExplicitCallArgs || hasZeroArgCtor)) {
+          // Array declaration with per-element constructor: Foo arr(ctorArg)[size]
+          // elemTypeS is the base element type (e.g. "Foo" from "Foo[]")
+          List<String> ctorArgTypes = ctorArgs.stream().map(parent::getExprType).toList();
+          String ctorKey = parent.getMethodKey(elemTypeS, ctorArgTypes);
+          // Emit array size(s)
+          for (ChuckAST.Exp sizeExp : s.arraySizes()) {
+            parent.emitExpression(sizeExp, code);
+          }
+          // Emit ctor args
+          for (ChuckAST.Exp arg : ctorArgs) {
+            parent.emitExpression(arg, code);
+          }
+          if (useGlobal) {
+            parent.getGlobalVarTypes().put(s.name(), s.type());
+            code.addInstruction(
+                new ObjectInstrs.InstantiateArrayWithCtorGlobal(
+                    elemTypeS,
+                    s.name(),
+                    s.arraySizes().size(),
+                    ctorArgs.size(),
+                    ctorKey,
+                    parent.getUserClassRegistry()));
+          } else {
+            Map<String, Integer> scope = parent.getLocalScopes().peek();
+            int offset = parent.getLocalCount();
+            parent.setLocalCount(offset + 1);
+            scope.put(s.name(), offset);
+            code.addInstruction(
+                new ObjectInstrs.InstantiateArrayWithCtorLocal(
+                    elemTypeS,
+                    offset,
+                    s.arraySizes().size(),
+                    ctorArgs.size(),
+                    ctorKey,
+                    parent.getUserClassRegistry()));
+          }
           code.addInstruction(new StackInstrs.Pop());
         } else {
           if (s.callArgs() instanceof ChuckAST.CallExp call) {

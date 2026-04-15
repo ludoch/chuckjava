@@ -966,6 +966,157 @@ public class ObjectInstrs {
     }
   }
 
+  /**
+   * Creates an array of user-class objects, calling the @construct method on each element. Used for
+   * declarations like {@code Foo array1(2)[3]} where each element gets ctor arg 2. Stack before:
+   * [..., arraySize, ctorArg0, ctorArg1, ...] Stack after: [..., ChuckArray]
+   */
+  public static class InstantiateArrayWithCtorLocal implements ChuckInstr {
+    String t, ctorKey;
+    int o, arraySizeCount, ctorArgCount;
+    Map<String, UserClassDescriptor> rm;
+
+    public InstantiateArrayWithCtorLocal(
+        String type,
+        int off,
+        int arraySzCount,
+        int ctorArgCnt,
+        String ctorKey,
+        Map<String, UserClassDescriptor> m) {
+      t = type;
+      o = off;
+      arraySizeCount = arraySzCount;
+      ctorArgCount = ctorArgCnt;
+      this.ctorKey = ctorKey;
+      rm = m;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      // Pop ctor args (in declaration order)
+      Object[] ctorArgs = new Object[ctorArgCount];
+      boolean[] isDouble = new boolean[ctorArgCount];
+      for (int i = ctorArgCount - 1; i >= 0; i--) {
+        if (s.reg.getSp() > 0) {
+          isDouble[i] = s.reg.isDouble(0);
+          if (s.reg.isObject(0)) ctorArgs[i] = s.reg.popObject();
+          else if (isDouble[i]) ctorArgs[i] = s.reg.popAsDouble();
+          else ctorArgs[i] = s.reg.popAsLong();
+        }
+      }
+      // Pop array size (first array dimension only)
+      int sz = 0;
+      if (arraySizeCount >= 1 && s.reg.getSp() > 0) {
+        sz = (int) s.reg.popAsLong();
+      }
+      if (sz < 0) sz = 0;
+
+      // Resolve the ctor method
+      ChuckCode ctorCode = null;
+      UserClassDescriptor desc = (rm != null && rm.containsKey(t)) ? rm.get(t) : vm.getUserClass(t);
+      if (desc != null) {
+        ctorCode = desc.methods().get(ctorKey);
+        if (ctorCode == null) {
+          // try @construct:n variant
+          String altKey = "@construct:" + ctorArgCount;
+          ctorCode = desc.methods().get(altKey);
+        }
+        if (ctorCode == null) {
+          // try zero-arg fallback
+          ctorCode = desc.methods().get(t + ":0");
+          if (ctorCode == null) ctorCode = desc.methods().get("@construct:0");
+        }
+      }
+
+      // Build the array and call the ctor on each element
+      ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
+      arr.elementTypeName = t;
+      for (int i = 0; i < sz; i++) {
+        ChuckObject elem = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+        if (elem instanceof UserObject uo) {
+          arr.setObject(i, elem);
+          if (ctorCode != null) {
+            s.executeCtorSynchronous(vm, ctorCode, uo, ctorArgs, isDouble);
+          }
+        } else if (elem != null) {
+          arr.setObject(i, elem);
+          if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
+        }
+      }
+
+      int fp = s.getFramePointer();
+      s.mem.setRef(fp + o, arr);
+      if (fp + o >= s.mem.getSp()) s.mem.setSp(fp + o + 1);
+      s.reg.pushObject(arr);
+    }
+  }
+
+  /** Global-variable variant of InstantiateArrayWithCtorLocal. */
+  public static class InstantiateArrayWithCtorGlobal implements ChuckInstr {
+    String t, n, ctorKey;
+    int arraySizeCount, ctorArgCount;
+    Map<String, UserClassDescriptor> rm;
+
+    public InstantiateArrayWithCtorGlobal(
+        String type,
+        String name,
+        int arraySzCount,
+        int ctorArgCnt,
+        String ctorKey,
+        Map<String, UserClassDescriptor> m) {
+      t = type;
+      n = name;
+      arraySizeCount = arraySzCount;
+      ctorArgCount = ctorArgCnt;
+      this.ctorKey = ctorKey;
+      rm = m;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      Object[] ctorArgs = new Object[ctorArgCount];
+      boolean[] isDouble = new boolean[ctorArgCount];
+      for (int i = ctorArgCount - 1; i >= 0; i--) {
+        if (s.reg.getSp() > 0) {
+          isDouble[i] = s.reg.isDouble(0);
+          if (s.reg.isObject(0)) ctorArgs[i] = s.reg.popObject();
+          else if (isDouble[i]) ctorArgs[i] = s.reg.popAsDouble();
+          else ctorArgs[i] = s.reg.popAsLong();
+        }
+      }
+      int sz = 0;
+      if (arraySizeCount >= 1 && s.reg.getSp() > 0) {
+        sz = (int) s.reg.popAsLong();
+      }
+      if (sz < 0) sz = 0;
+
+      ChuckCode ctorCode = null;
+      UserClassDescriptor desc = (rm != null && rm.containsKey(t)) ? rm.get(t) : vm.getUserClass(t);
+      if (desc != null) {
+        ctorCode = desc.methods().get(ctorKey);
+        if (ctorCode == null) ctorCode = desc.methods().get("@construct:" + ctorArgCount);
+        if (ctorCode == null) ctorCode = desc.methods().get(t + ":0");
+        if (ctorCode == null) ctorCode = desc.methods().get("@construct:0");
+      }
+
+      ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
+      arr.elementTypeName = t;
+      for (int i = 0; i < sz; i++) {
+        ChuckObject elem = ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+        if (elem instanceof UserObject uo) {
+          arr.setObject(i, elem);
+          if (ctorCode != null) s.executeCtorSynchronous(vm, ctorCode, uo, ctorArgs, isDouble);
+        } else if (elem != null) {
+          arr.setObject(i, elem);
+          if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
+        }
+      }
+
+      vm.setGlobalObject(n, arr);
+      s.reg.pushObject(arr);
+    }
+  }
+
   public static class CallBuiltinStatic implements ChuckInstr {
     String className, methodName;
     int argc;

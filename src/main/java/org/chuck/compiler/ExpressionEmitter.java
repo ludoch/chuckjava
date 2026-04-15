@@ -145,9 +145,11 @@ public class ExpressionEmitter {
                     .get(e.type())
                     .methods()
                     .containsKey(e.type() + ":0");
+        boolean isArrayDeclE = !e.arraySizes().isEmpty();
         if (isUserClass
             && !isBuiltinPseudoClass
             && !e.isReference()
+            && !isArrayDeclE
             && (hasExplicitCallArgsE || hasZeroArgCtorE)) {
           argCount = ctorArgsList.size();
           if (parent.isInPreCtor()) {
@@ -220,6 +222,60 @@ public class ExpressionEmitter {
           List<String> ctorArgTypes = ctorArgsList.stream().map(parent::getExprType).toList();
           String ctorKey = parent.getMethodKey(e.type(), ctorArgTypes);
           code.addInstruction(new ObjectInstrs.CallMethod(e.type(), argCount, ctorKey));
+        } else if (isUserClass
+            && !isBuiltinPseudoClass
+            && !e.isReference()
+            && isArrayDeclE
+            && (hasExplicitCallArgsE || hasZeroArgCtorE)) {
+          // Array declaration with per-element constructor: new Foo(ctorArg)[size]
+          List<String> ctorArgTypes = ctorArgsList.stream().map(parent::getExprType).toList();
+          String ctorKey = parent.getMethodKey(e.type(), ctorArgTypes);
+          // Emit array size(s)
+          for (ChuckAST.Exp sizeExp : e.arraySizes()) {
+            this.emitExpression(sizeExp, code);
+          }
+          // Emit ctor args
+          for (ChuckAST.Exp arg : ctorArgsList) {
+            this.emitExpression(arg, code);
+          }
+          boolean isField =
+              parent.getCurrentClass() != null
+                  && (parent.getCurrentClassFields().contains(e.name())
+                      || parent.hasInstanceField(parent.getCurrentClass(), e.name()));
+          Integer localOffset =
+              (forceGlobal || useGlobal || isField) ? null : parent.getLocalOffset(e.name());
+          if (localOffset != null) {
+            code.addInstruction(
+                new ObjectInstrs.InstantiateArrayWithCtorLocal(
+                    e.type(),
+                    localOffset,
+                    e.arraySizes().size(),
+                    ctorArgsList.size(),
+                    ctorKey,
+                    parent.getUserClassRegistry()));
+          } else if (!forceGlobal && !useGlobal && !isField && !parent.getLocalScopes().isEmpty()) {
+            Map<String, Integer> scope = parent.getLocalScopes().peek();
+            localOffset = parent.getLocalCount();
+            parent.setLocalCount(localOffset + 1);
+            scope.put(e.name(), localOffset);
+            code.addInstruction(
+                new ObjectInstrs.InstantiateArrayWithCtorLocal(
+                    e.type(),
+                    localOffset,
+                    e.arraySizes().size(),
+                    ctorArgsList.size(),
+                    ctorKey,
+                    parent.getUserClassRegistry()));
+          } else {
+            code.addInstruction(
+                new ObjectInstrs.InstantiateArrayWithCtorGlobal(
+                    e.type(),
+                    e.name(),
+                    e.arraySizes().size(),
+                    ctorArgsList.size(),
+                    ctorKey,
+                    parent.getUserClassRegistry()));
+          }
         } else {
           if (e.callArgs() instanceof ChuckAST.CallExp call) {
             for (ChuckAST.Exp arg : call.args()) {

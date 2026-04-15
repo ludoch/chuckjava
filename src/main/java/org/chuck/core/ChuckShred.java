@@ -491,6 +491,72 @@ public class ChuckShred implements Comparable<ChuckShred> {
     }
   }
 
+  /**
+   * Synchronous execution of a constructor method with a proper call frame. Used by array-with-ctor
+   * instructions to call @construct on each element without going through the main shred loop.
+   */
+  public void executeCtorSynchronous(
+      ChuckVM vm, ChuckCode ctorCode, UserObject thisObj, Object[] args, boolean[] isDouble) {
+    if (ctorCode == null || thisObj == null) return;
+
+    ChuckCode savedCode = this.code;
+    int savedPc = this.pc;
+    int savedFp = this.framePointer;
+    int savedMemSp = this.mem.getSp();
+    int savedRegSp = this.reg.getSp();
+    boolean savedDone = this.isDone;
+
+    // Push a fake call frame (4 slots) so that ReturnMethod can tear it down cleanly.
+    // Slot layout: [fp-4: savedCode=null, fp-3: savedPc=0, fp-2: savedFP, fp-1: savedRegSp]
+    int newFp = savedMemSp + 4;
+    this.mem.setRef(savedMemSp, null);
+    this.mem.setData(savedMemSp + 1, 0L);
+    this.mem.setData(savedMemSp + 2, (long) savedFp);
+    this.mem.setData(savedMemSp + 3, (long) savedRegSp);
+    this.mem.setSp(newFp);
+    this.framePointer = newFp;
+
+    // Push ctor args to reg stack so that MoveArgs inside the ctor can pick them up.
+    if (args != null) {
+      for (int i = 0; i < args.length; i++) {
+        Object arg = args[i];
+        if (arg instanceof ChuckObject co) this.reg.pushObject(co);
+        else if (isDouble != null && i < isDouble.length && isDouble[i])
+          this.reg.push(((Number) arg).doubleValue());
+        else if (arg instanceof Long l) this.reg.push(l);
+        else if (arg instanceof Number n) this.reg.push(n.longValue());
+        else this.reg.pushObject(arg);
+      }
+    }
+
+    this.thisStack.push(thisObj);
+    this.code = ctorCode;
+    this.pc = 0;
+
+    try {
+      while (this.code == ctorCode && pc < ctorCode.getNumInstructions() && !isDone) {
+        MethodHandle handle = ctorCode.getHandle(pc);
+        if (handle == null) break;
+        int oldPc = pc;
+        ChuckCode oldC = this.code;
+        handle.invokeExact(vm, this);
+        if (this.code == oldC && pc == oldPc) pc++;
+      }
+    } catch (Throwable t) {
+      // constructor threw; ignore, continue with other elements
+    } finally {
+      // Pop thisObj if ReturnMethod did not already do so (e.g. early exit)
+      if (!thisStack.isEmpty() && thisStack.peek() == thisObj) thisStack.pop();
+      // Restore all state unconditionally (ReturnMethod may have partially restored some)
+      this.code = savedCode;
+      this.pc = savedPc;
+      this.framePointer = savedFp;
+      this.mem.setSp(savedMemSp);
+      this.reg.setSp(savedRegSp);
+      this.isDone = savedDone;
+    }
+  }
+
   /** Synchronous execution of a code block (e.g. for ChuGen.tick). */
   public void executeSynchronous(ChuckVM vm, ChuckCode code) {
     if (code == null) return;

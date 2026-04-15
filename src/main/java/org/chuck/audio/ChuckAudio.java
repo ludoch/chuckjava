@@ -661,6 +661,7 @@ public class ChuckAudio {
                       // ── Idle Optimization ──
                       if (isIdle && smoothedGain < 0.0001f) {
                         // Truly idle: output silence and sleep to save CPU
+                        smoothedGain = 0.0f; // Ensure it hits zero exactly
                         for (int i = 0; i < effBuf; i++) {
                           for (int c = 0; c < numChannels; c++) {
                             writeSample(outSeg, fmt, i, c, numChannels, 0.0f);

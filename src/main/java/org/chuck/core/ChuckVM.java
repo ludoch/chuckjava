@@ -320,10 +320,6 @@ public class ChuckVM {
   public void registerUserClass(String name, UserClassDescriptor desc) {
     UserClassDescriptor existing = userClassRegistry.get(name);
     if (existing != null) {
-      // Keep the OLD static state, but accept the NEW method definitions and descriptor.
-      // We want to update the methods/code but NOT reset the static variables.
-      // Since UserClassDescriptor is a record, we must use the new one's maps
-      // but fill them with existing data if present.
       desc.staticInts().putAll(existing.staticInts());
       desc.staticIsDouble().putAll(existing.staticIsDouble());
       desc.staticObjects().putAll(existing.staticObjects());
@@ -391,7 +387,6 @@ public class ChuckVM {
 
   public int add(String filename, ChuckShred caller) {
     try {
-      // ChucK supports passing arguments to added shreds via colons: "file.ck:arg1:arg2"
       String baseFilename = filename;
       String[] parts = filename.split(":");
       if (parts.length > 1 && (parts[0].endsWith(".ck") || parts[0].endsWith(".disabled"))) {
@@ -446,16 +441,13 @@ public class ChuckVM {
       shred.setId(nextShredId++);
     }
     activeShreds.put(shred.getId(), shred);
-    // Initialize wakeTime to NOW so yield(n) sets absolute time = now + n, not 0 + n.
     shred.setWakeTime(now.get());
     schedule(shred);
 
-    // Start shred execution in a Virtual Thread
     Thread.ofVirtual()
         .start(
             () -> {
               try {
-                // Ensure we are inside the ScopedValue context
                 ScopedValue.where(CURRENT_VM, this)
                     .where(ChuckShred.CURRENT_SHRED, shred)
                     .run(() -> shred.execute(this));
@@ -463,8 +455,9 @@ public class ChuckVM {
                 activeShreds.remove(shred.getId());
                 shred.setDone(true);
                 shred.cleanup();
-                // Wake up any shreds waiting on this shred (if it's an Event)
                 shred.broadcast(this);
+                deadShreds.add(shred);
+                if (deadShreds.size() > 50) deadShreds.remove(0);
               }
             });
 
@@ -472,7 +465,7 @@ public class ChuckVM {
   }
 
   public int spork(Runnable task) {
-    ChuckShred shred = new ChuckShred(null); // No ChucK code
+    ChuckShred shred = new ChuckShred(null);
     if (shred.getId() <= 0) {
       shred.setId(nextShredId++);
     }
@@ -496,6 +489,8 @@ public class ChuckVM {
                 shred.setDone(true);
                 shred.cleanup();
                 shred.broadcast(this);
+                deadShreds.add(shred);
+                if (deadShreds.size() > 50) deadShreds.remove(0);
               }
             });
 
@@ -535,20 +530,14 @@ public class ChuckVM {
     }
   }
 
-  /**
-   * Schedules a timeout to wake a shred if the event hasn't triggered by wakeTime. Fired directly
-   * from advanceTime (no extra thread).
-   */
   public void scheduleTimeout(ChuckShred shred, ChuckEvent event, long wakeTime) {
     pendingTimeouts.add(new TimeoutEntry(shred, event, wakeTime));
   }
 
-  /** Check and fire any pending timeouts whose wakeTime <= current VM time. */
   private void fireTimeouts(long currentTime) {
     pendingTimeouts.removeIf(
         t -> {
           if (currentTime < t.wakeTime()) return false;
-          // Only fire if the shred is still waiting on THIS event
           if (t.waitingShred().isWaiting()
               && (t.waitingShred().getEventWaitingOn() == t.event()
                   || t.waitingShred().getEventWaitingOn() == null)) {
@@ -556,7 +545,6 @@ public class ChuckVM {
             t.waitingShred().setEventWaitingOn(null);
             t.waitingShred().setWakeTime(currentTime);
             t.waitingShred().resume(this);
-            // Do not reschedule here — yield() will reschedule with the correct wakeTime.
           }
           return true;
         });
@@ -576,21 +564,15 @@ public class ChuckVM {
 
     while (now.get() < targetTime) {
       long currentTime = now.get();
-
-      // 0. Check timeouts (must happen even in fast path for event reliability)
       fireTimeouts(currentTime);
 
-      // FAST PATH: Check if we can skip the scheduler lock entirely for this sample
       if (currentTime + 1 < nextWakeTime.get()) {
-        // No shreds waking up, skip fireTimeouts and shreduler checks
         for (DacChannel chan : dacChannels) chan.tick(currentTime);
         blackhole.tick(currentTime);
         now.incrementAndGet();
         continue;
       }
 
-      // SLOW PATH: At least one shred might wake up
-      // 1. Run all shreds scheduled for this time (allow 0-yield chaining)
       int safety = 0;
       while (safety++ < 1000) {
         List<ChuckShred> ready = new ArrayList<>();
@@ -609,33 +591,24 @@ public class ChuckVM {
         if (ready.isEmpty()) break;
 
         if (parallel && ready.size() > 1) {
-          // PARALLEL MODE: Resume all at once and wait
-          final Phaser phaser = new Phaser(1); // 1 for the current thread
+          final Phaser phaser = new Phaser(1);
           for (ChuckShred nextShred : ready) {
             updateJitter(currentTime, nextShred);
             phaser.register();
             nextShred.onNextPark(phaser::arriveAndDeregister);
-            nextShred.resume(this, false); // Asynchronous resume
+            nextShred.resume(this, false);
           }
-          // Wait for all shreds to park (yield or suspend)
           phaser.arriveAndAwaitAdvance();
         } else {
-          // SCALAR MODE: Resume one by one
           for (ChuckShred nextShred : ready) {
             updateJitter(currentTime, nextShred);
-            nextShred.resume(this, true); // Synchronous resume
+            nextShred.resume(this, true);
           }
         }
       }
 
-      // 2. Roots are the DAC channels
-      for (DacChannel chan : dacChannels) {
-        chan.tick(currentTime);
-      }
-
-      // 3. Tick the blackhole so any UGens/UAnas chucked to it are also pulled
+      for (DacChannel chan : dacChannels) chan.tick(currentTime);
       blackhole.tick(currentTime);
-
       now.incrementAndGet();
     }
   }
@@ -647,38 +620,26 @@ public class ChuckVM {
     if (jitter > maxJitter.get()) maxJitter.set(jitter);
   }
 
-  /** Optimized advancement that can process blocks using SIMD if no shreds wake up. */
   public void advanceTime(float[][] dacBuffers, int offset, int length) {
     int processed = 0;
     while (processed < length) {
       long currentTime = now.get();
       long nextWake = nextWakeTime.get();
-
-      // How many samples can we process safely in a block?
       int remaining = length - processed;
       int blockSize = (int) Math.min(remaining, Math.max(1, nextWake - currentTime));
 
       if (blockSize > 1) {
-        // FAST PATH: No shreds wake up. Use Topologically Sorted SIMD processing.
         rebuildGraph();
-
-        // 1. Tick all UGens in sorted order.
-        // Important: we pass 'currentTime' which is the time of the FIRST sample in the block.
         for (org.chuck.audio.ChuckUGen ugen : sortedUGens) {
           ugen.tick(null, 0, blockSize, currentTime);
         }
-
-        // 2. Collect final output from DAC channels into dacBuffers
         for (int c = 0; c < numChannels; c++) {
           System.arraycopy(
               dacChannels[c].getBlockCache(), 0, dacBuffers[c], offset + processed, blockSize);
         }
-
         now.addAndGet(blockSize);
         processed += blockSize;
       } else {
-        // SLOW PATH: A shred is waking up. Fall back to sample-by-sample.
-        // advanceTime(1) will handle parallel execution if enabled.
         advanceTime(1);
         for (int c = 0; c < numChannels; c++) {
           dacBuffers[c][offset + processed] = dacChannels[c].getLastOut();
@@ -728,7 +689,7 @@ public class ChuckVM {
   public void removeShred(int id) {
     ChuckShred s = activeShreds.remove(id);
     if (s != null) {
-      s.cleanup(); // disconnect UGens immediately; also signals done + wakes virtual thread
+      s.cleanup();
     }
   }
 
@@ -737,7 +698,6 @@ public class ChuckVM {
     ChuckShred.resetIdCounter();
   }
 
-  /** eval(source, args[]) — spork eval'd shred with string arguments. */
   public int eval(String source, ChuckArray argArr) {
     int id = run(source, "eval");
     if (id > 0 && argArr != null) {
@@ -754,7 +714,6 @@ public class ChuckVM {
     return id;
   }
 
-  /** Remove the most recently sporked shred; returns its ID or -1 if none. */
   public int removeLastShred() {
     if (activeShreds.isEmpty()) return -1;
     int lastId = activeShreds.keySet().stream().mapToInt(Integer::intValue).max().orElse(-1);
@@ -762,7 +721,6 @@ public class ChuckVM {
     return lastId;
   }
 
-  // Machine API
   private static final String VERSION = "1.5.4.0 (java)";
   private int logLevel = 1;
 
@@ -808,42 +766,39 @@ public class ChuckVM {
 
   public String status() {
     StringBuilder sb = new StringBuilder();
-    sb.append("--- ChucK VM Status ---\n");
-    sb.append("Time: ").append(now.get()).append(" samples\n");
-    sb.append("Active Shreds: ").append(activeShreds.size()).append("\n");
-    for (ChuckShred s : activeShreds.values()) {
-      ChuckCode c = s.getCode();
-      sb.append("  [").append(s.getId()).append("] ").append(c != null ? c.getName() : "unknown");
-      if (c != null && c.getJitExecutable() != null) {
-        sb.append(" (JIT)");
-      }
-      sb.append("\n");
+    double secs = (double) now.get() / sampleRate;
+    sb.append(
+        String.format(
+            "[ChucK VM] uptime: %.2fs | shreds: %d | srate: %d Hz\n",
+            secs, activeShreds.size(), sampleRate));
+
+    if (audio != null) {
+      sb.append(
+          String.format(
+              "           load: %.1f%% | drift avg: %.2fms | max: %.2fms\n",
+              audio.getCpuLoad() * 100.0, getAverageDrift(), getMaxDrift()));
     }
 
-    // Performance Stats
-    sb.append("\n--- Performance ---\n");
-    sb.append(String.format("Avg Jitter: %.4f samples\n", getAverageJitter()));
-    sb.append(String.format("Max Jitter: %d samples\n", getMaxJitter()));
-    sb.append(String.format("Avg Drift:  %.4f ms\n", getAverageDrift()));
-    sb.append(String.format("Max Drift:  %.4f ms\n", getMaxDrift()));
+    if (!activeShreds.isEmpty()) {
+      sb.append("           Active Shreds:\n");
+      for (ChuckShred s : activeShreds.values()) {
+        ChuckCode c = s.getCode();
+        sb.append(String.format("             [%d] %s", s.getId(), s.getName()));
+        if (c != null && c.getJitExecutable() != null) sb.append(" (JIT)");
+        sb.append("\n");
+      }
+    }
 
-    // JIT Stats
-    long jitCount =
-        activeShreds.values().stream()
-            .map(ChuckShred::getCode)
-            .filter(c -> c != null && c.getJitExecutable() != null)
-            .distinct()
-            .count();
-    sb.append("JIT fragments: ").append(jitCount).append("\n");
-
-    // Recent Failures
-    java.util.List<ChuckShred> failures =
-        deadShreds.stream().filter(s -> s.getLastExceptionMessage() != null).toList();
-    if (!failures.isEmpty()) {
-      sb.append("\n--- Recent Exceptions ---\n");
-      for (int i = Math.max(0, failures.size() - 5); i < failures.size(); i++) {
-        ChuckShred s = failures.get(i);
-        sb.append(String.format("  [%d] %s\n", s.getId(), s.getLastExceptionMessage()));
+    if (!deadShreds.isEmpty()) {
+      java.util.List<ChuckShred> failures =
+          deadShreds.stream().filter(s -> s.getLastExceptionMessage() != null).toList();
+      if (!failures.isEmpty()) {
+        sb.append("           Recent Exceptions:\n");
+        for (int i = Math.max(0, failures.size() - 5); i < failures.size(); i++) {
+          ChuckShred s = failures.get(i);
+          sb.append(
+              String.format("             [%d] %s\n", s.getId(), s.getLastExceptionMessage()));
+        }
       }
     }
 

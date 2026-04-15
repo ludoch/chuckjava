@@ -101,6 +101,7 @@ public class ChuckCLI {
           if (i + 1 < args.length) otfCommands.add("=" + args[++i]);
         }
         case "^", "--status" -> otfCommands.add("^");
+        case "--kill" -> otfCommands.add("kill");
         default -> {
           if (arg.startsWith("-")) {
             System.err.println("Unknown option: " + arg);
@@ -133,9 +134,11 @@ public class ChuckCLI {
         }
       } else if (cmd.equals("^")) {
         msg.address = "/chuck/status";
+      } else if (cmd.equals("kill")) {
+        msg.address = "/chuck/kill";
       }
       oscOut.send(msg);
-      System.out.println("Sent OTF command: " + cmd);
+      System.out.println("Sent OTF command: " + msg.address + " " + cmd);
     }
   }
 
@@ -324,5 +327,6 @@ public class ChuckCLI {
     System.out.println("  - / --remove     Remove shred from running VM");
     System.out.println("  = / --replace    Replace shred in running VM");
     System.out.println("  ^ / --status     Print VM status");
+    System.out.println("  --kill           Kill the running VM");
   }
 }

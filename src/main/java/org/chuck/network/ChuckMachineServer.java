@@ -50,6 +50,10 @@ public class ChuckMachineServer {
                         vm.removeShred(id);
                         vm.add(file);
                       }
+                      case "/chuck/status" -> {
+                        logger.info("Received OSC: status");
+                        System.out.println(vm.status());
+                      }
                       case "/chuck/kill" -> {
                         logger.info("Received OSC: kill");
                         System.exit(0);
