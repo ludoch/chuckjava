@@ -142,6 +142,79 @@ public class MidiOut extends ChuckObject {
     }
   }
 
+  /** Sends a Note On message. */
+  public void noteOn(int chan, int note, int velocity) {
+    MidiMsg msg = new MidiMsg();
+    msg.data1 = 0x90 | (chan & 0x0F);
+    msg.data2 = note & 0x7F;
+    msg.data3 = velocity & 0x7F;
+    send(msg);
+  }
+
+  /** Sends a Note Off message. */
+  public void noteOff(int chan, int note, int velocity) {
+    MidiMsg msg = new MidiMsg();
+    msg.data1 = 0x80 | (chan & 0x0F);
+    msg.data2 = note & 0x7F;
+    msg.data3 = velocity & 0x7F;
+    send(msg);
+  }
+
+  /** Sends a Control Change message. */
+  public void controlChange(int chan, int ctrl, int value) {
+    MidiMsg msg = new MidiMsg();
+    msg.data1 = 0xB0 | (chan & 0x0F);
+    msg.data2 = ctrl & 0x7F;
+    msg.data3 = value & 0x7F;
+    send(msg);
+  }
+
+  /** Sends a Program Change message. */
+  public void programChange(int chan, int program) {
+    MidiMsg msg = new MidiMsg();
+    msg.data1 = 0xC0 | (chan & 0x0F);
+    msg.data2 = program & 0x7F;
+    msg.data3 = 0;
+    msg.setData(new byte[] {(byte) msg.data1, (byte) msg.data2});
+    send(msg);
+  }
+
+  /** Sends a Polyphonic Key Pressure (Aftertouch) message. */
+  public void polyPressure(int chan, int note, int value) {
+    MidiMsg msg = new MidiMsg();
+    msg.data1 = 0xA0 | (chan & 0x0F);
+    msg.data2 = note & 0x7F;
+    msg.data3 = value & 0x7F;
+    send(msg);
+  }
+
+  /** Sends a Channel Pressure (Aftertouch) message. */
+  public void channelPressure(int chan, int value) {
+    MidiMsg msg = new MidiMsg();
+    msg.data1 = 0xD0 | (chan & 0x0F);
+    msg.data2 = value & 0x7F;
+    msg.data3 = 0;
+    msg.setData(new byte[] {(byte) msg.data1, (byte) msg.data2});
+    send(msg);
+  }
+
+  /** Sends a Pitch Bend message (14-bit). */
+  public void pitchBend(int chan, int value) {
+    // value is 0 to 16383, 8192 is center
+    int lsb = value & 0x7F;
+    int msb = (value >> 7) & 0x7F;
+    pitchBend(chan, lsb, msb);
+  }
+
+  /** Sends a Pitch Bend message (LSB, MSB). */
+  public void pitchBend(int chan, int lsb, int msb) {
+    MidiMsg msg = new MidiMsg();
+    msg.data1 = 0xE0 | (chan & 0x0F);
+    msg.data2 = lsb & 0x7F;
+    msg.data3 = msb & 0x7F;
+    send(msg);
+  }
+
   public void close() {
     if (nativeDriver != null) {
       nativeDriver.close();
