@@ -2120,32 +2120,152 @@ public class ChuckIDE extends Application {
     addTutorialStep(
         tutorialMenu,
         "1. Getting Started",
-        "Welcome to ChucK-Java! In this step, we connect a Unit Generator (StifKarp) to the audio output (dac), set its frequency using a MIDI-to-frequency helper, and wait for 1 second.",
-        "// Connect a plucked string to the soundcard out\nStifKarp inst => dac;\n\n// Play middle-C (MIDI 60)\n60 => Std.mtof => inst.freq; \n0.5 => inst.noteOn; \n1::second => now; ");
+        "Welcome to ChucK-Java! In this step, we connect a Unit Generator (SinOsc) to the audio output (dac), set its frequency, and wait for 1 second.",
+        """
+        /*
+           Welcome to ChucK-Java! In this step, we connect a Unit Generator (SinOsc)
+           to the audio output (dac), set its frequency and gain, and wait for 1 second.
+        */
+
+        // Connect a sine wave oscillator to the soundcard out
+        SinOsc s => dac;
+
+        // Set volume (0.0 to 1.0)
+        0.5 => s.gain;
+
+        // Play middle-C (MIDI 60)
+        60 => Std.mtof => s.freq;
+
+        // Advance time by 1 second to hear the sound
+        1::second => now;
+        """);
 
     addTutorialStep(
         tutorialMenu,
         "2. Melody and Scales",
         "Music often uses scales. Here we use an array to define a melody and another to define the major scale intervals. We loop through the melody, mapping each step to a frequency.",
-        "StifKarp inst => dac;\n\n// A sequence of scale degrees\n[0, 2, 4, 0, 4, 2, 7, 0] @=> int melody[];\n// Major scale intervals\n[0, 2, 4, 5, 7, 9, 11, 12] @=> int major[];\n\nfor (0 => int i; ; i++) {\n    // Map melody degree to major scale semitone, offset by MIDI 60\n    60 + major[melody[i % melody.cap()]] => Std.mtof => inst.freq;\n    0.5 => inst.noteOn;\n    200::ms => now;\n}");
+        """
+        /*
+           Music often uses scales. Here we use an array to define a melody
+           and another to define the major scale intervals. We loop through
+           the melody, mapping each step to a frequency.
+        */
+
+        // Use a plucked string model
+        StifKarp inst => dac;
+        0.5 => dac.gain; // Lower master gain to prevent clipping
+
+        // A sequence of scale degrees
+        [0, 2, 4, 0, 4, 2, 7, 0] @=> int melody[];
+        // Major scale intervals
+        [0, 2, 4, 5, 7, 9, 11, 12] @=> int major[];
+
+        for (0 => int i; ; i++) {
+            // Map melody degree to major scale semitone, offset by MIDI 60
+            60 + major[melody[i % melody.cap()]] => Std.mtof => inst.freq;
+            0.5 => inst.noteOn;
+            200::ms => now;
+        }
+        """);
 
     addTutorialStep(
         tutorialMenu,
         "3. The Scale Function",
         "What if you want to play notes outside the first octave? We write a custom function that handles math to wrap notes into higher or lower octaves automatically.",
-        "StifKarp inst => dac;\n[0, 2, 4, 5, 7, 9, 11] @=> int major[];\n\n// Function to handle octave wrapping for any scale\nfun int getFreq(int degree, int scale[]) {\n    scale.cap() => int len;\n    degree / len => int octave;\n    degree % len => int step;\n    return octave * 12 + scale[step];\n}\n\nfor (0 => int i; ; i++) {\n    60 + getFreq(i, major) => Std.mtof => inst.freq;\n    0.5 => inst.noteOn;\n    150::ms => now;\n}");
+        """
+        /*
+           What if you want to play notes outside the first octave? We write
+           a custom function that handles math to wrap notes into higher
+           or lower octaves automatically.
+        */
+
+        StifKarp inst => dac;
+        0.5 => dac.gain;
+        [0, 2, 4, 5, 7, 9, 11] @=> int major[];
+
+        // Function to handle octave wrapping for any scale
+        fun int getFreq(int degree, int scale[]) {
+            scale.cap() => int len;
+            degree / len => int octave;
+            degree % len => int step;
+            // Handle negative steps
+            if( step < 0 ) { step + len => step; octave - 1 => octave; }
+            return octave * 12 + scale[step];
+        }
+
+        for (0 => int i; ; i++) {
+            60 + getFreq(i, major) => Std.mtof => inst.freq;
+            0.5 => inst.noteOn;
+            150::ms => now;
+        }
+        """);
 
     addTutorialStep(
         tutorialMenu,
         "4. Synchronization",
         "ChucK's strongest feature is 'strong timing'. By using T - (now % T) => now, we ensure that multiple scripts (shreds) start exactly on the same beat, no matter when you hit 'Add Shred'. Run this file twice!",
-        "// Run this file twice (Ctrl+Enter)! They will stay in sync.\nSinOsc s => dac;\n0.2 => s.gain;\n.5::second => dur T;\n\n// Synchronize to the next \"even\" period of T\nT - (now % T) => now;\n\nfor (0 => int i; ; i++) {\n    (Math.random2(60, 72)) => Std.mtof => s.freq;\n    T => now;\n}");
+        """
+        /*
+           ChucK's strongest feature is 'strong timing'. By using T - (now % T) => now,
+           we ensure that multiple scripts (shreds) start exactly on the same beat,
+           no matter when you hit 'Add Shred'.
+
+           TRY THIS: Run this file twice (Ctrl+Enter)! They will stay in sync.
+        */
+
+        SinOsc s => dac;
+        0.2 => s.gain;
+        .5::second => dur T;
+
+        // Synchronize to the next "even" period of T
+        T - (now % T) => now;
+
+        for (0 => int i; ; i++) {
+            (Math.random2(60, 72)) => Std.mtof => s.freq;
+            T => now;
+        }
+        """);
 
     addTutorialStep(
         tutorialMenu,
         "5. Arpeggios and Progressions",
         "Combining everything: functions, arrays, and sync. This script calculates a root note from a progression and cycles through a triad arpeggio while staying sample-locked to the global beat.",
-        "// Advanced: Bass and Arpeggio sync\nStifKarp inst => dac;\n[0, 2, 4, 5, 7, 9, 11] @=> int major[];\n\nfun int getFreq(int degree, int scale[]) {\n    scale.cap() => int len;\n    degree / len => int octave;\n    degree % len => int step;\n    return octave * 12 + scale[step];\n}\n\n.2::second => dur T;\nT - (now % T) => now;\n\n[0, 3, 4, 1] @=> int bassLine[];\n\nfor (0 => int i; ; i++) {\n    i / 4 => int measure;\n    bassLine[measure % 4] => int root;\n    \n    // Cycle through triad (0, 2, 4) relative to the root\n    [0, 2, 4] @=> int triad[];\n    triad[i % 3] + root => int degree;\n    \n    48 + getFreq(degree, major) => Std.mtof => inst.freq;\n    0.5 => inst.noteOn;\n    T => now;\n}");
+        """
+        /*
+           Combining everything: functions, arrays, and sync.
+           This script calculates a root note from a progression and cycles
+           through a triad arpeggio while staying sample-locked to the global beat.
+        */
+
+        StifKarp inst => dac;
+        0.5 => dac.gain;
+        [0, 2, 4, 5, 7, 9, 11] @=> int major[];
+
+        fun int getFreq(int degree, int scale[]) {
+            scale.cap() => int len;
+            degree / len => int octave;
+            degree % len => int step;
+            return octave * 12 + scale[step];
+        }
+
+        .2::second => dur T;
+        T - (now % T) => now;
+
+        [0, 3, 4, 1] @=> int bassLine[];
+
+        for (0 => int i; ; i++) {
+            i / 4 => int measure;
+            bassLine[measure % 4] => int root;
+
+            // Cycle through triad (0, 2, 4) relative to the root
+            [0, 2, 4] @=> int triad[];
+            triad[i % 3] + root => int degree;
+
+            48 + getFreq(degree, major) => Std.mtof => inst.freq;
+            0.5 => inst.noteOn;
+            T => now;
+        }
+        """);
 
     mb.getMenus()
         .addAll(fileMenu, editMenu, viewMenu, optionsMenu, tutorialMenu, examplesMenu, helpMenu);
