@@ -24,7 +24,10 @@
 | **MidiPoly** | High-level automatic voice management for polyphonic MIDI instruments. | ✅ New |
 | **MIDI Learn** | Persistent MIDI mapping for global variables (saves to preferences). | ✅ Enhanced |
 | **MIDI Recorder** | One-click "REC" button to capture all MIDI to timestamped files. | ✅ New |
-| **MIDI Monitor** | Real-time diagnostic tab and status bar activity tracking. | ✅ New |
+| **MIDI Map Manager** | Central dashboard for all persistent variable bindings. | ✅ New |
+| **MIDI Thru Patchbay** | Route any physical input to any output at the IDE level. | ✅ New |
+| **MIDI Master Clock** | IDE acts as sync master (BPM + Start/Stop) for external gear. | ✅ New |
+| **MIDI Monitor** | Real-time diagnostics, CC Grid, and status bar activity tracking. | ✅ Enhanced |
 | **MidiPoly** | High-level voices with customizable **Velocity Curves**. | ✅ Enhanced |
 | **MidiPlayer** | High-level MIDI sequencer. Connects directly to `MidiPoly` (`file => player => poly;`). | ✅ New |
 | **Device Probing** | Robust audio/MIDI device discovery with native port names. | ✅ Fixed |
@@ -39,10 +42,10 @@
 - **`MidiPlayer`**: A high-level MIDI sequencer. Load a `MidiFileIn`, connect it to an instrument (`player => poly`), and call `player.play()` for automatic, sample-accurate playback.
 - **`MidiMpe`**: Full MIDI Polyphonic Expression (MPE) support for per-note pitch bend and channel pressure.
 - **`MidiClock`**: Dedicated class for tracking MIDI 24ppq clock, start, stop, and continue messages, allowing tight transport sync (`onBeat()`, `onSixteenth()`, etc.).
-- **IDE MIDI Monitor**: Dedicated tab for real-time logging of incoming MIDI messages with high-resolution timestamps.
-- **Status Bar MIDI Tools**: Quick-access port selection menu, a one-click **MIDI Recorder (REC)**, and a flashing activity indicator.
+- **IDE MIDI Monitor**: Diagnostics tab with real-time Message Log, 128-knob CC Grid, and a Map Manager dashboard.
+- **Status Bar MIDI Tools**: Quick-access port selection, Thru Patchbay routing, Master Sync (BPM/Clock), a one-click **REC** button, and an "All Notes Off" Panic button (`!`).
 - **Persistent MIDI Learn**: Bind physical knobs to variables; mappings are automatically saved and restored across sessions.
-- **IDE MIDI Visualizer**: Real-time 88-key piano keyboard showing Note-On/Off, CC, and Pitch Bend movements.
+- **IDE MIDI Visualizer**: Real-time 88-key piano keyboard that highlights in Orange for physical input and Light Blue for generative code output.
 - **MidiFileOut**: Record generative MIDI performances directly to standard `.mid` files. Supports **SMF Format 1** (multi-track), Tempo Maps, Section Markers, and 14-bit NRPN high-resolution sweeps.
 - **MidiFileIn**: Upgraded to support multi-track reading, file metadata (`bpm()`, `tpq()`), and automatic delta-time calculation (`msg.when`).
 - **Precision Timestamps**: Incoming messages now include `msg.when` (seconds) from the native driver for jitter-free alignment.

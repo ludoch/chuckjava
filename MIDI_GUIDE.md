@@ -104,20 +104,23 @@ mpe.bendRange(48); // Set pitch bend range (default 48 semitones)
 
 ### MIDI Keyboard Monitor
 Located at the bottom of the IDE, the real-time keyboard visualizes:
-- **Active Notes:** Highlights keys in orange when you play.
+- **Hardware Input:** Highlights keys in **Orange** when you play.
+- **Code Output:** Highlights keys in **Light Blue** when your ChucK code plays a note (via `MidiOut` or `MidiPoly`), giving you visual feedback on generative melodies.
 - **Pitch Bend:** A vertical cyan bar on the left shows bend depth.
 - **CC Activity:** A status label showing the last received MIDI message.
 
 ### MIDI Monitor Tab
-A dedicated **MIDI** tab in the left panel provides a detailed history of all incoming messages:
-- **Real-time Logging:** View Type (Note On/Off, CC, etc.), Channel, and Data values.
-- **Precision Timestamps:** Messages are logged with high-resolution arrival times.
-- **Diagnostic Tool:** Perfect for verifying your hardware is sending the data you expect.
+A dedicated **MIDI** tab in the left panel provides advanced diagnostics:
+- **Log Tab:** Detailed history of incoming (In) and outgoing (Out) messages with precision timestamps.
+- **CC Grid Tab:** Real-time visual feedback for all 128 Control Change values.
+- **Mappings Tab (Map Manager):** A central dashboard listing every active MIDI Learn connection, making it easy to manage your hardware-to-software setup.
 
 ### Status Bar Tools
-- **MIDI Menu:** A quick-access button in the status bar allows you to view available ports and toggle global monitoring for any device without opening Preferences.
+- **MIDI Menu (Patchbay):** View available ports, toggle global monitoring, and setup **Thru routes** to connect inputs directly to outputs.
+- **SYNC Button:** Turn ChucK into the master clock for your studio. Sends 24ppq MIDI Clock to selected outputs based on the BPM field.
 - **REC Button:** Instantly capture all incoming MIDI data into a timestamped `.mid` file in the `recordings/` directory. No code required!
-- **Activity Indicator:** A small circular "LED" in the status bar flashes bright green whenever any MIDI message is received.
+- **! (Panic) Button:** Sends "All Notes Off" and "Reset All Controllers" to all active MIDI outputs. Essential for silencing stuck notes.
+- **Activity Indicator:** A small circular "LED" flashes **Green** for incoming MIDI and **Orange** for outgoing MIDI.
 
 ### MIDI Learn (The "L" Button)
 Bind physical knobs to your code without writing a single line of MIDI parsing:
