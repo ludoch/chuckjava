@@ -400,7 +400,6 @@ public class ChuckIDE extends Application {
   private record UserSymbol(String name, String type, String signature) {}
 
   private ListView<ShredInfo> shredListView;
-  private ControlSurface controlSurface;
   private Label statusLabel;
 
   private Label lineColLabel;
