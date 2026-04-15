@@ -66,6 +66,7 @@ public class ControlSurface extends VBox {
         row.learnBtn.setStyle(
             "-fx-background-color: lightgreen; -fx-font-size: 10; -fx-padding: 2 4;");
         row.learnBtn.setTooltip(new Tooltip("Mapped to CC " + cc + " (Ch " + (channel + 1) + ")"));
+        row.midiLabel.setText("CC " + cc);
       }
       if (row.mappedChannel == channel && row.mappedCc == cc) {
         row.onMidiCc(val);
@@ -134,6 +135,7 @@ public class ControlSurface extends VBox {
     int mappedChannel = -1;
     int mappedCc = -1;
     final Button learnBtn;
+    final Label midiLabel;
 
     public ControlRow(String key, boolean isInt, double initialValue) {
       this.key = key;
@@ -141,6 +143,9 @@ public class ControlSurface extends VBox {
 
       Label nameLabel = new Label(key);
       nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 11;");
+
+      midiLabel = new Label("");
+      midiLabel.setStyle("-fx-font-size: 9; -fx-text-fill: #666;");
 
       learnBtn = new Button("L");
       learnBtn.setStyle("-fx-font-size: 10; -fx-padding: 2 4;");
@@ -151,13 +156,16 @@ public class ControlSurface extends VBox {
             if (isLearning) {
               learnBtn.setStyle(
                   "-fx-background-color: yellow; -fx-font-size: 10; -fx-padding: 2 4;");
+              midiLabel.setText("Learning...");
             } else {
               // Cancel learning, but keep mapping if it exists
               if (mappedChannel >= 0) {
                 learnBtn.setStyle(
                     "-fx-background-color: lightgreen; -fx-font-size: 10; -fx-padding: 2 4;");
+                midiLabel.setText("CC " + mappedCc);
               } else {
                 learnBtn.setStyle("-fx-font-size: 10; -fx-padding: 2 4;");
+                midiLabel.setText("");
               }
             }
           });
@@ -172,11 +180,12 @@ public class ControlSurface extends VBox {
             isLearning = false;
             learnBtn.setStyle("-fx-font-size: 10; -fx-padding: 2 4;");
             learnBtn.setTooltip(new Tooltip("MIDI Learn"));
+            midiLabel.setText("");
           });
       ctxMenu.getItems().add(unmapItem);
       learnBtn.setContextMenu(ctxMenu);
 
-      HBox header = new HBox(5, nameLabel, learnBtn);
+      HBox header = new HBox(5, nameLabel, learnBtn, midiLabel);
       header.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
       double min = 0;

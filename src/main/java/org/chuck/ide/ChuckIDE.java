@@ -42,6 +42,7 @@ import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.control.ToolBar;
+import javafx.scene.control.Tooltip;
 import javafx.scene.control.TreeCell;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TreeView;
@@ -409,6 +410,11 @@ public class ChuckIDE extends Application {
   private TreeView<File> fileBrowser;
   private Stage stage;
 
+  // MIDI
+  private MidiMonitor midiMonitor;
+  private javafx.scene.shape.Circle midiActivityIndicator;
+  private javafx.animation.Timeline midiActivityTimeline;
+
   // Track files per tab
   private final Map<Tab, File> tabToFile = new java.util.HashMap<>();
 
@@ -601,7 +607,11 @@ public class ChuckIDE extends Application {
     Tab controlTab = new Tab("Control", controlSurface);
     controlTab.setClosable(false);
 
-    leftTabPane.getTabs().addAll(projectTab, ugenTab, controlTab);
+    this.midiMonitor = new MidiMonitor();
+    Tab midiTab = new Tab("MIDI", midiMonitor);
+    midiTab.setClosable(false);
+
+    leftTabPane.getTabs().addAll(projectTab, ugenTab, controlTab, midiTab);
 
     VBox leftPanel = new VBox(leftTabPane);
     VBox.setVgrow(leftTabPane, Priority.ALWAYS);
@@ -777,7 +787,18 @@ public class ChuckIDE extends Application {
 
     // --- Piano Keyboard Monitor ---
     this.pianoKeyboard = new PianoKeyboard();
-    org.chuck.midi.ChuckMidiNative.addMonitor((device, msg) -> pianoKeyboard.onMidiMessage(msg));
+    org.chuck.midi.ChuckMidiNative.addMonitor(
+        (device, msg) -> {
+          pianoKeyboard.onMidiMessage(msg);
+          if (midiMonitor != null) midiMonitor.onMidiMessage(msg);
+          if (midiActivityIndicator != null) {
+            Platform.runLater(
+                () -> {
+                  midiActivityIndicator.setFill(Color.LIME);
+                  midiActivityTimeline.playFromStart();
+                });
+          }
+        });
 
     VBox consoleAndMidi = new VBox(2, outputArea, pianoKeyboard);
     VBox.setVgrow(outputArea, Priority.ALWAYS);
@@ -785,7 +806,44 @@ public class ChuckIDE extends Application {
     Button clearConsoleBtn = new Button("Clear");
     clearConsoleBtn.setOnAction(e -> clearConsole());
 
+    javafx.scene.control.MenuButton midiMenu = new javafx.scene.control.MenuButton("MIDI");
+    midiMenu.setStyle("-fx-font-size: 10; -fx-padding: 1 5;");
+    midiMenu.setOnShowing(
+        e -> {
+          midiMenu.getItems().clear();
+          String[] ports = org.chuck.midi.MidiIn.list();
+          for (int i = 0; i < ports.length; i++) {
+            final int portIdx = i;
+            javafx.scene.control.CheckMenuItem item =
+                new javafx.scene.control.CheckMenuItem(ports[i]);
+            // Check if it's already open by monitoring
+            // (SharedPort management in ChuckMidiNative already tracks this)
+            item.setOnAction(
+                ae -> {
+                  if (item.isSelected()) {
+                    org.chuck.midi.ChuckMidiNative.openGlobalMonitor(portIdx);
+                  }
+                });
+            midiMenu.getItems().add(item);
+          }
+          if (ports.length == 0) {
+            midiMenu.getItems().add(new javafx.scene.control.MenuItem("No MIDI inputs found"));
+          }
+        });
+
     statusLabel = new Label("  Ready");
+
+    // MIDI Activity Indicator
+    midiActivityIndicator = new javafx.scene.shape.Circle(4, Color.TRANSPARENT);
+    midiActivityIndicator.setStroke(Color.GRAY);
+    midiActivityIndicator.setStrokeWidth(0.5);
+    Tooltip.install(midiActivityIndicator, new Tooltip("MIDI Activity"));
+
+    midiActivityTimeline =
+        new javafx.animation.Timeline(
+            new javafx.animation.KeyFrame(
+                javafx.util.Duration.millis(100),
+                e -> midiActivityIndicator.setFill(Color.TRANSPARENT)));
 
     for (Label l : List.of(statusLabel, lineColLabel, cpuLabel, sampleRateLabel, fileNameLabel)) {
       l.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 11;");
@@ -799,8 +857,11 @@ public class ChuckIDE extends Application {
             5,
             clearConsoleBtn,
             new Separator(Orientation.VERTICAL),
+            midiMenu,
+            new Separator(Orientation.VERTICAL),
             statusLabel,
             statusSpacer,
+            midiActivityIndicator,
             fileNameLabel,
             new Separator(Orientation.VERTICAL),
             lineColLabel,

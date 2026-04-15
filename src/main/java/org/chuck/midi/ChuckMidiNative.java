@@ -94,6 +94,47 @@ public class ChuckMidiNative {
           ValueLayout.ADDRESS // user data
           );
 
+  /** Opens a MIDI input port for global monitoring (IDE-level). */
+  public static void openGlobalMonitor(int portNumber) {
+    if (!RtMidi.isAvailable()) return;
+
+    String portKey = RtMidi.Api.UNSPECIFIED.id + ":" + portNumber;
+    sharedPorts.computeIfAbsent(
+        portKey,
+        k -> {
+          SharedPort sp = new SharedPort();
+          sp.arena = Arena.ofShared();
+          try {
+            sp.ptr = (MemorySegment) RtMidi.in_create_default.invoke();
+            if (sp.ptr.equals(MemorySegment.NULL)) return sp;
+
+            MethodHandle onMidiHandle =
+                MethodHandles.lookup()
+                    .findVirtual(
+                        SharedPort.class,
+                        "onMidiMessage",
+                        java.lang.invoke.MethodType.methodType(
+                            void.class,
+                            double.class,
+                            MemorySegment.class,
+                            long.class,
+                            MemorySegment.class));
+            sp.callbackStub =
+                Linker.nativeLinker().upcallStub(onMidiHandle.bindTo(sp), CALLBACK_DESC, sp.arena);
+            RtMidi.in_set_callback.invoke(sp.ptr, sp.callbackStub, MemorySegment.NULL);
+
+            sp.name = RtMidi.getPortName(sp.ptr, portNumber);
+            RtMidi.open_port.invoke(
+                sp.ptr, portNumber, sp.arena.allocateFrom("ChucK-Java Monitor"));
+
+            logger.info("Global MIDI Monitor opened port " + portNumber + " (" + sp.name + ")");
+          } catch (Throwable t) {
+            logger.log(Level.SEVERE, "Failed to initialize global MIDI monitor", t);
+          }
+          return sp;
+        });
+  }
+
   public ChuckMidiNative(ChuckVM vm, ChuckEvent event, ConcurrentLinkedDeque<MidiMsg> queue) {
     this.vm = vm;
     this.event = event;
