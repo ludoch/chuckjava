@@ -1,5 +1,6 @@
 package org.chuck.midi;
 
+import java.util.List;
 import javax.sound.midi.*;
 import org.chuck.core.ChuckObject;
 import org.chuck.core.ChuckType;

@@ -1,5 +1,6 @@
 package org.chuck.midi;
 
+import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import org.chuck.core.ChuckEvent;
 import org.chuck.core.ChuckVM;

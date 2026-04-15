@@ -2659,10 +2659,8 @@ public class ChuckIDE extends Application {
     if (stallWarningLabel != null) stallWarningLabel.setVisible(false);
   }
 
-  private void updateVMTime() {
+  private void updateVMLogic() {
     long nowSample = vm.getCurrentTime();
-    double seconds = nowSample / (double) vm.getSampleRate();
-    vmTimeLabel.setText(String.format("Time: %.3fs", seconds));
 
     // Stall detection: if the VM hasn't advanced since the last frame, increment stall counter.
     // The animation timer fires at ~60 fps; we sample every ~3 frames → ~20 Hz, matching
@@ -2701,6 +2699,12 @@ public class ChuckIDE extends Application {
       if (!leftStyle.equals(vuLeft.getStyle())) vuLeft.setStyle(leftStyle);
       if (!rightStyle.equals(vuRight.getStyle())) vuRight.setStyle(rightStyle);
     }
+  }
+
+  private void updateVMText() {
+    long nowSample = vm.getCurrentTime();
+    double seconds = nowSample / (double) vm.getSampleRate();
+    vmTimeLabel.setText(String.format("Time: %.3fs", seconds));
   }
 
   private void renderSpectrum() {
