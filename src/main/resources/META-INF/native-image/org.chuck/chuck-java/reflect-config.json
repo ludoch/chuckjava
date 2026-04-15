@@ -2106,6 +2106,15 @@
     "allDeclaredConstructors": true
   },
   {
+    "name": "org.chuck.audio.analysis.Windowing",
+    "allPublicMethods": true,
+    "allDeclaredMethods": true,
+    "allPublicFields": true,
+    "allDeclaredFields": true,
+    "allPublicConstructors": true,
+    "allDeclaredConstructors": true
+  },
+  {
     "name": "org.chuck.core.instr.ArithmeticInstrs",
     "allPublicMethods": true,
     "allDeclaredMethods": true,

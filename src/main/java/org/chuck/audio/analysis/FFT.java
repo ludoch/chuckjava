@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.chuck.audio.UAna;
 import org.chuck.audio.util.Complex;
+import org.chuck.core.ChuckArray;
 
 /**
  * Fast Fourier Transform Unit Analyzer.
@@ -56,6 +57,20 @@ public class FFT extends UAna {
 
   public int getWindow() {
     return windowType;
+  }
+
+  /**
+   * Set a custom window from a {@code ChuckArray} of coefficients (e.g. from {@code
+   * Windowing.hann(n)}). The array length must match the FFT size; extra values are ignored and
+   * short arrays are zero-padded.
+   */
+  public ChuckArray window(ChuckArray coeffs) {
+    if (coeffs == null) return coeffs;
+    win = new double[size];
+    int len = Math.min(size, coeffs.size());
+    for (int i = 0; i < len; i++) win[i] = coeffs.getFloat(i);
+    // zero-pad remainder (already 0 from array init)
+    return coeffs;
   }
 
   private void buildWindow() {

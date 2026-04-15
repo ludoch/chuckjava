@@ -133,6 +133,7 @@ public class ChuckFactory {
           case "PCA" -> new org.chuck.core.ai.PCA();
           case "Word2Vec" -> new org.chuck.core.ai.Word2Vec();
           case "Wekinator" -> new org.chuck.core.ai.Wekinator();
+          case "Windowing" -> new org.chuck.audio.analysis.Windowing();
           default -> null;
         };
     return res;

@@ -1310,6 +1310,13 @@ public class ExpressionEmitter {
                 new ObjectInstrs.CallBuiltinStatic("org.chuck.core.ai." + bn, mn, argc));
             return;
           }
+          // Windowing static factory: Windowing.hann(n), Windowing.hamming(n), etc.
+          if (bn.equals("Windowing")) {
+            for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
+            code.addInstruction(
+                new ObjectInstrs.CallBuiltinStatic("org.chuck.audio.analysis.Windowing", mn, argc));
+            return;
+          }
         }
         if (e.base() instanceof ChuckAST.DotExp dot
             && (dot.base() instanceof ChuckAST.MeExp

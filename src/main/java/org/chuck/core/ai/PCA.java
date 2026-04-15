@@ -64,9 +64,35 @@ public class PCA extends ChuckObject {
     return k;
   }
 
-  /** project input[] onto PCA space → output[] */
+  /**
+   * Project input onto PCA space. Handles both 1D ({@code input[], output[]}) and 2D ({@code
+   * input[][], output[][]}) arrays: if the first element of inputArr is a ChuckArray, the batch
+   * form is used; otherwise the single-row form is used.
+   */
   public long transform(ChuckArray inArr, ChuckArray outArr) {
     if (components == null) return 0L;
+    // 2D batch: first element is itself a ChuckArray
+    if (inArr.size() > 0 && inArr.getObject(0) instanceof ChuckArray) {
+      int n = inArr.size();
+      for (int i = 0; i < n && i < outArr.size(); i++) {
+        ChuckArray inRow = (ChuckArray) inArr.getObject(i);
+        Object rowObj = outArr.getObject(i);
+        if (rowObj instanceof ChuckArray outRow) {
+          projectRow(inRow, outRow);
+        } else {
+          projectRow(inRow, outArr);
+          break;
+        }
+      }
+      return n;
+    }
+    // 1D single row
+    projectRow(inArr, outArr);
+    return components.length;
+  }
+
+  /** Project a single 1D row onto PCA space into outArr. */
+  private void projectRow(ChuckArray inArr, ChuckArray outArr) {
     double[] x = KNN.toDoubleArray(inArr);
     int D = mean.length, k = components.length;
     double[] centered = new double[D];
@@ -76,7 +102,6 @@ public class PCA extends ChuckObject {
       for (int d = 0; d < D; d++) dot += components[pc][d] * centered[d];
       outArr.setFloat(pc, dot);
     }
-    return k;
   }
 
   public long explainedVariance(ChuckArray outArr) {
@@ -126,26 +151,6 @@ public class PCA extends ChuckObject {
       if (rowObj instanceof ChuckArray row) {
         ChuckArray inRow = (ChuckArray) inputArr.getObject(i);
         pca.transform(inRow, row);
-      }
-    }
-    return n;
-  }
-
-  /**
-   * {@code pca.transform(input[][], output[][])} — batch transform of 2D data (instance method).
-   */
-  public long transform(ChuckArray inputArr, ChuckArray outputArr) {
-    if (components == null) return 0L;
-    int n = inputArr.size();
-    for (int i = 0; i < n && i < outputArr.size(); i++) {
-      Object rowObj = outputArr.getObject(i);
-      ChuckArray inRow = (ChuckArray) inputArr.getObject(i);
-      if (rowObj instanceof ChuckArray row) {
-        transform(inRow, row);
-      } else {
-        // outputArr is 1D — project single row
-        transform(inRow, outputArr);
-        break;
       }
     }
     return n;

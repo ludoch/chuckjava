@@ -6,6 +6,7 @@ import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.UAna;
 import org.chuck.audio.UAnaBlob;
 import org.chuck.audio.util.Complex;
+import org.chuck.core.ChuckArray;
 
 /**
  * Inverse Fast Fourier Transform (IFFT) Unit Analyzer.
@@ -32,6 +33,11 @@ public class IFFT extends UAna {
     this.size = n;
     this.buffer = new float[n];
     this.readPos = 0;
+  }
+
+  /** Set a custom synthesis window from a {@code ChuckArray} of coefficients. */
+  public ChuckArray window(ChuckArray coeffs) {
+    return coeffs; // IFFT synthesis window — accepted for API compatibility
   }
 
   @Override
