@@ -9,9 +9,7 @@ import org.chuck.core.ChuckType;
  * javax.sound.midi.
  */
 public class MidiOut extends ChuckObject {
-  private Receiver receiver; // javax.sound.midi fallback
-  private MidiDevice device; // javax.sound.midi fallback
-
+  private ChuckMidiOut javaDriver;
   private ChuckMidiOutNative nativeDriver;
   private String openedName = "unopened";
 
@@ -20,6 +18,7 @@ public class MidiOut extends ChuckObject {
     if (RtMidi.isAvailable()) {
       nativeDriver = new ChuckMidiOutNative();
     }
+    javaDriver = new ChuckMidiOut();
   }
 
   public int open(int port) {
@@ -32,28 +31,12 @@ public class MidiOut extends ChuckObject {
     if (nativeDriver != null) {
       return nativeDriver.open(port, api) ? 1 : 0;
     }
-
-    if (api != RtMidi.Api.UNSPECIFIED) return 0; // JavaSound doesn't support specific RtMidi APIs
-
-    // Fallback to JavaSound
-    try {
-      MidiDevice.Info[] infos = MidiSystem.getMidiDeviceInfo();
-      if (port < 0 || port >= infos.length) return 0;
-
-      device = MidiSystem.getMidiDevice(infos[port]);
-      if (!device.isOpen()) device.open();
-      receiver = device.getReceiver();
-      return 1;
-    } catch (MidiUnavailableException e) {
-      System.err.println("MidiOut: Error opening port " + port + ": " + e.getMessage());
-      return 0;
-    }
+    return javaDriver.open(port) ? 1 : 0;
   }
 
   /** Returns the number of available MIDI output ports. */
   public int num() {
-    String[] ports = list();
-    return ports.length;
+    return list().length;
   }
 
   /** Returns the name of the MIDI output port at the given index. */
@@ -97,12 +80,8 @@ public class MidiOut extends ChuckObject {
     }
 
     // Fallback: list JavaSound devices
-    MidiDevice.Info[] infos = MidiSystem.getMidiDeviceInfo();
-    String[] names = new String[infos.length];
-    for (int i = 0; i < infos.length; i++) {
-      names[i] = infos[i].getName();
-    }
-    return names;
+    List<String> javaPorts = ChuckMidiOut.listOutputDevices();
+    return javaPorts.toArray(new String[0]);
   }
 
   /** Virtual ports are only supported by the native driver (macOS/Linux). */
@@ -116,29 +95,8 @@ public class MidiOut extends ChuckObject {
   public void send(MidiMsg msg) {
     if (nativeDriver != null) {
       nativeDriver.send(msg);
-      return;
-    }
-
-    if (receiver == null) return;
-    try {
-      byte[] raw = msg.getData();
-      int status = raw[0] & 0xFF;
-
-      if (status == 0xF0) { // Sysex
-        SysexMessage sm = new SysexMessage();
-        sm.setMessage(raw, raw.length);
-        receiver.send(sm, -1);
-      } else if (status == 0xFF) { // Meta
-        MetaMessage mm = new MetaMessage();
-        mm.setMessage(raw[1] & 0xFF, raw, raw.length);
-        receiver.send(mm, -1);
-      } else {
-        ShortMessage sm = new ShortMessage();
-        sm.setMessage(msg.data1, msg.data2, msg.data3);
-        receiver.send(sm, -1);
-      }
-    } catch (InvalidMidiDataException e) {
-      System.err.println("MidiOut: Invalid MIDI data: " + e.getMessage());
+    } else {
+      javaDriver.send(msg);
     }
   }
 
@@ -218,13 +176,8 @@ public class MidiOut extends ChuckObject {
   public void close() {
     if (nativeDriver != null) {
       nativeDriver.close();
-      return;
     }
-
-    if (receiver != null) receiver.close();
-    if (device != null && device.isOpen()) device.close();
-    receiver = null;
-    device = null;
+    javaDriver.close();
   }
 
   public boolean isNative() {

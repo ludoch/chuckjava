@@ -7,6 +7,7 @@ import org.chuck.core.ChuckVM;
 /** The ChucK MidiIn object. Support native RtMidi via ChuckMidiNative. */
 public class MidiIn extends ChuckEvent {
   private final ChuckMidiNative driver;
+  private final ChuckMidi javaDriver;
   private final ConcurrentLinkedDeque<MidiMsg> queue = new ConcurrentLinkedDeque<>();
   private String openedName = "unopened";
 
@@ -15,6 +16,7 @@ public class MidiIn extends ChuckEvent {
 
   public MidiIn(ChuckVM vm) {
     this.driver = new ChuckMidiNative(vm, this, this.queue);
+    this.javaDriver = new ChuckMidi(vm, this);
 
     // Auto-apply preferences from IDE
     java.util.prefs.Preferences prefs =
@@ -34,12 +36,20 @@ public class MidiIn extends ChuckEvent {
 
   public void open(int port) {
     openedName = name(port);
-    driver.open(port);
+    if (RtMidi.isAvailable()) {
+      driver.open(port);
+    } else {
+      javaDriver.open(port);
+    }
   }
 
   public void open(int port, RtMidi.Api api) {
     openedName = name(port);
-    driver.open(port, api);
+    if (RtMidi.isAvailable()) {
+      driver.open(port, api);
+    } else {
+      javaDriver.open(port);
+    }
   }
 
   /** Returns the name of the currently opened port, or "unopened". */
@@ -47,10 +57,9 @@ public class MidiIn extends ChuckEvent {
     return openedName;
   }
 
-  /** Returns the number of available native MIDI input ports. */
+  /** Returns the number of available MIDI input ports. */
   public int num() {
-    String[] ports = list();
-    return ports.length;
+    return list().length;
   }
 
   /** Returns the name of the MIDI input port at the given index. */
@@ -65,7 +74,6 @@ public class MidiIn extends ChuckEvent {
    * (case-insensitive).
    */
   public boolean open(String name) {
-    if (!RtMidi.isAvailable()) return false;
     String[] ports = list();
     String lowerTarget = name.toLowerCase();
     for (int i = 0; i < ports.length; i++) {
@@ -77,47 +85,66 @@ public class MidiIn extends ChuckEvent {
     return false;
   }
 
-  /** Lists all available native MIDI input port names. */
+  /** Lists all available MIDI input port names. */
   public static String[] list() {
-    if (!RtMidi.isAvailable()) return new String[0];
-    try (java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofConfined()) {
-      java.lang.foreign.MemorySegment in =
-          (java.lang.foreign.MemorySegment) RtMidi.in_create_default.invoke();
-      if (in.equals(java.lang.foreign.MemorySegment.NULL)) return new String[0];
+    if (RtMidi.isAvailable()) {
+      try (java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofConfined()) {
+        java.lang.foreign.MemorySegment in =
+            (java.lang.foreign.MemorySegment) RtMidi.in_create_default.invoke();
+        if (in.equals(java.lang.foreign.MemorySegment.NULL)) return new String[0];
 
-      int count = (int) RtMidi.get_port_count.invoke(in);
-      String[] names = new String[count];
-      for (int i = 0; i < count; i++) {
-        names[i] = RtMidi.getPortName(in, i);
+        int count = (int) RtMidi.get_port_count.invoke(in);
+        String[] names = new String[count];
+        for (int i = 0; i < count; i++) {
+          names[i] = RtMidi.getPortName(in, i);
+        }
+        RtMidi.in_free.invoke(in);
+        return names;
+      } catch (Throwable t) {
+        // fall through to JavaSound if native call fails
       }
-      RtMidi.in_free.invoke(in);
-      return names;
-    } catch (Throwable t) {
-      return new String[0];
     }
+
+    // Fallback to JavaSound
+    List<String> javaPorts = ChuckMidi.listInputDevices();
+    return javaPorts.toArray(new String[0]);
   }
 
   public void openVirtual(String name) {
-    driver.openVirtual(name);
+    if (RtMidi.isAvailable()) {
+      driver.openVirtual(name);
+    }
   }
 
   public void ignoreTypes(boolean midiSysex, boolean midiTime, boolean midiSense) {
-    driver.ignoreTypes(midiSysex, midiTime, midiSense);
+    if (RtMidi.isAvailable()) {
+      driver.ignoreTypes(midiSysex, midiTime, midiSense);
+    }
   }
 
   public boolean recv(MidiMsg msg) {
-    MidiMsg m = queue.pollFirst();
-    if (m != null) {
-      msg.data1 = m.data1;
-      msg.data2 = m.data2;
-      msg.data3 = m.data3;
-      return true;
+    if (RtMidi.isAvailable()) {
+      MidiMsg m = queue.pollFirst();
+      if (m != null) {
+        msg.data1 = m.data1;
+        msg.data2 = m.data2;
+        msg.data3 = m.data3;
+        msg.when = m.when;
+        msg.setData(m.getData());
+        return true;
+      }
+    } else {
+      return javaDriver.recv(msg);
     }
     return false;
   }
 
   public void close() {
-    driver.close();
+    if (RtMidi.isAvailable()) {
+      driver.close();
+    } else {
+      javaDriver.close();
+    }
   }
 
   public boolean isNative() {

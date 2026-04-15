@@ -35,14 +35,14 @@ public class ChuckMidi {
 
   // ── Device enumeration ─────────────────────────────────────────────────────
 
-  /** Returns a human-readable list of all available MIDI input devices. */
+  /** Returns a list of all available MIDI input device names. */
   public static List<String> listInputDevices() {
     List<String> names = new ArrayList<>();
     for (MidiDevice.Info info : MidiSystem.getMidiDeviceInfo()) {
       try {
         MidiDevice dev = MidiSystem.getMidiDevice(info);
         if (dev.getMaxTransmitters() != 0) { // input-capable
-          names.add(info.getName() + " — " + info.getDescription());
+          names.add(info.getName());
         }
       } catch (MidiUnavailableException ignored) {
       }
