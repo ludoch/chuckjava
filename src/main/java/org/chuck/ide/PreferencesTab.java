@@ -62,9 +62,13 @@ public class PreferencesTab extends ScrollPane {
     // --- Syntax Colors Section ---
     TitledPane colorSection = createColorSection();
 
+    // --- Virtual MIDI Section ---
+    TitledPane virtualMidiSection = createVirtualMidiSection();
+
     container
         .getChildren()
-        .addAll(audioSection, midiSection, visSection, editorSection, colorSection);
+        .addAll(
+            audioSection, midiSection, virtualMidiSection, visSection, editorSection, colorSection);
     setContent(container);
   }
 
@@ -280,6 +284,63 @@ public class PreferencesTab extends ScrollPane {
     grid.add(filters, 1, 6);
 
     TitledPane pane = new TitledPane("MIDI Settings", grid);
+    pane.setCollapsible(false);
+    return pane;
+  }
+
+  private TitledPane createVirtualMidiSection() {
+    GridPane grid = new GridPane();
+    grid.setHgap(10);
+    grid.setVgap(8);
+    grid.setPadding(new Insets(10));
+
+    boolean nativeOk = RtMidi.isAvailable();
+    String os = System.getProperty("os.name").toLowerCase();
+    boolean supportsVirtual = nativeOk && (os.contains("mac") || os.contains("linux"));
+
+    Label infoLabel =
+        new Label(
+            supportsVirtual
+                ? "Create virtual ports for other apps to see."
+                : "Virtual ports not supported on Windows JavaSound.");
+    infoLabel.setStyle("-fx-font-style: italic; -fx-text-fill: #666;");
+
+    TextField nameField = new TextField("ChucK-Java");
+    Button createInBtn = new Button("Create Virtual IN");
+    Button createOutBtn = new Button("Create Virtual OUT");
+
+    createInBtn.setDisable(!supportsVirtual);
+    createOutBtn.setDisable(!supportsVirtual);
+
+    createInBtn.setOnAction(
+        e -> {
+          MidiIn min = new MidiIn(null); // Headless monitor
+          min.openVirtual(nameField.getText());
+          Alert alert =
+              new Alert(
+                  Alert.AlertType.INFORMATION,
+                  "Virtual Input Port '" + nameField.getText() + "' created.");
+          alert.show();
+        });
+
+    createOutBtn.setOnAction(
+        e -> {
+          MidiOut mout = new MidiOut();
+          mout.openVirtual(nameField.getText());
+          Alert alert =
+              new Alert(
+                  Alert.AlertType.INFORMATION,
+                  "Virtual Output Port '" + nameField.getText() + "' created.");
+          alert.show();
+        });
+
+    grid.add(infoLabel, 0, 0, 2, 1);
+    grid.add(new Label("Port Name:"), 0, 1);
+    grid.add(nameField, 1, 1);
+    grid.add(createInBtn, 0, 2);
+    grid.add(createOutBtn, 1, 2);
+
+    TitledPane pane = new TitledPane("Virtual MIDI Ports", grid);
     pane.setCollapsible(false);
     return pane;
   }

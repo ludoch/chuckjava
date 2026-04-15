@@ -412,6 +412,7 @@ public class ChuckIDE extends Application {
 
   // MIDI
   private MidiMonitor midiMonitor;
+  private MidiRecorder midiRecorder = new MidiRecorder();
   private javafx.scene.shape.Circle midiActivityIndicator;
   private javafx.animation.Timeline midiActivityTimeline;
 
@@ -791,6 +792,7 @@ public class ChuckIDE extends Application {
         (device, msg) -> {
           pianoKeyboard.onMidiMessage(msg);
           if (midiMonitor != null) midiMonitor.onMidiMessage(msg);
+          if (midiRecorder != null) midiRecorder.onMidiMessage(msg);
           if (midiActivityIndicator != null) {
             Platform.runLater(
                 () -> {
@@ -805,6 +807,23 @@ public class ChuckIDE extends Application {
 
     Button clearConsoleBtn = new Button("Clear");
     clearConsoleBtn.setOnAction(e -> clearConsole());
+
+    Button recordMidiBtn = new Button("REC");
+    recordMidiBtn.setStyle("-fx-font-size: 10; -fx-padding: 1 5; -fx-text-fill: darkred;");
+    recordMidiBtn.setTooltip(new Tooltip("Capture all MIDI to .mid file"));
+    recordMidiBtn.setOnAction(
+        e -> {
+          if (midiRecorder.isRecording()) {
+            midiRecorder.stop();
+            recordMidiBtn.setText("REC");
+            recordMidiBtn.setStyle("-fx-font-size: 10; -fx-padding: 1 5; -fx-text-fill: darkred;");
+          } else {
+            midiRecorder.start();
+            recordMidiBtn.setText("STOP");
+            recordMidiBtn.setStyle(
+                "-fx-font-size: 10; -fx-padding: 1 5; -fx-text-fill: white; -fx-background-color: red;");
+          }
+        });
 
     javafx.scene.control.MenuButton midiMenu = new javafx.scene.control.MenuButton("MIDI");
     midiMenu.setStyle("-fx-font-size: 10; -fx-padding: 1 5;");
@@ -858,6 +877,7 @@ public class ChuckIDE extends Application {
             clearConsoleBtn,
             new Separator(Orientation.VERTICAL),
             midiMenu,
+            recordMidiBtn,
             new Separator(Orientation.VERTICAL),
             statusLabel,
             statusSpacer,

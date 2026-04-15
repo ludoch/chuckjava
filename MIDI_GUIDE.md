@@ -116,6 +116,7 @@ A dedicated **MIDI** tab in the left panel provides a detailed history of all in
 
 ### Status Bar Tools
 - **MIDI Menu:** A quick-access button in the status bar allows you to view available ports and toggle global monitoring for any device without opening Preferences.
+- **REC Button:** Instantly capture all incoming MIDI data into a timestamped `.mid` file in the `recordings/` directory. No code required!
 - **Activity Indicator:** A small circular "LED" in the status bar flashes bright green whenever any MIDI message is received.
 
 ### MIDI Learn (The "L" Button)
@@ -126,9 +127,24 @@ Bind physical knobs to your code without writing a single line of MIDI parsing:
 4.  Move a knob on your keyboard. It's now mapped! (Button turns green, and the **CC Number** is displayed).
 5.  Right-click the "L" button to unmap.
 
+**Mappings are automatically saved** to your preferences and will be restored the next time you use the same variable names in a script.
+
 ---
 
 ## 5. Advanced Techniques
+
+### Velocity Curves for Expressive Play
+When using `MidiPoly`, you can customize how the instrument responds to your touch using the `curve()` method:
+```chuck
+MidiPoly poly => dac;
+poly.setInstrument("Rhodey");
+
+// Set exponential response (requires harder hits for full volume)
+poly.curve(2.0);
+
+// Set logarithmic response (sensitive to light touches)
+poly.curve(0.5);
+```
 
 ### Sample-Accurate Timing
 Every `MidiMsg` includes a `msg.when` field containing the precision timestamp from the hardware. 

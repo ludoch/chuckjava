@@ -15,6 +15,7 @@ public class MidiPoly extends ChuckUGen {
   protected Voice[] voicePool;
   protected int nextVoiceIdx = 0;
   protected float[] tuningMap = null; // Custom microtonal frequency mapping
+  protected float velocityCurve = 1.0f; // 1.0 = linear, <1.0 = log, >1.0 = exp
 
   protected static class Voice {
     public ChuckUGen ugen;
@@ -66,6 +67,19 @@ public class MidiPoly extends ChuckUGen {
     this.tuningMap = null;
   }
 
+  /**
+   * ChucK API: set velocity curve power (default 1.0). 1.0 = linear, 2.0 = exponential, 0.5 =
+   * logarithmic.
+   */
+  public float curve(float c) {
+    this.velocityCurve = Math.max(0.01f, c);
+    return velocityCurve;
+  }
+
+  public float curve() {
+    return velocityCurve;
+  }
+
   protected void initPool() {
     ugenLock.lock();
     try {
@@ -102,7 +116,11 @@ public class MidiPoly extends ChuckUGen {
     int channel = msg.data1 & 0x0F;
 
     if (status == 0x90 && velocity > 0) {
-      noteOn(note, velocity / 127.0f, channel);
+      float velNorm = velocity / 127.0f;
+      if (velocityCurve != 1.0f) {
+        velNorm = (float) Math.pow(velNorm, velocityCurve);
+      }
+      noteOn(note, velNorm, channel);
     } else if (status == 0x80 || (status == 0x90 && velocity == 0)) {
       noteOff(note, channel);
     }

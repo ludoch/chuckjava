@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.prefs.Preferences;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
@@ -28,6 +29,7 @@ public class ControlSurface extends VBox {
   private final Map<String, ControlRow> rows = new HashMap<>();
   private final Timeline timeline;
   private final VBox rowContainer;
+  private final Preferences prefs = Preferences.userNodeForPackage(ControlSurface.class);
 
   public ControlSurface() {
     setSpacing(10);
@@ -67,6 +69,10 @@ public class ControlSurface extends VBox {
             "-fx-background-color: lightgreen; -fx-font-size: 10; -fx-padding: 2 4;");
         row.learnBtn.setTooltip(new Tooltip("Mapped to CC " + cc + " (Ch " + (channel + 1) + ")"));
         row.midiLabel.setText("CC " + cc);
+
+        // Persist mapping
+        prefs.putInt("midi.learn.chan." + row.key, channel);
+        prefs.putInt("midi.learn.cc." + row.key, cc);
       }
       if (row.mappedChannel == channel && row.mappedCc == cc) {
         row.onMidiCc(val);
@@ -141,6 +147,10 @@ public class ControlSurface extends VBox {
       this.key = key;
       this.isInt = isInt;
 
+      // Load persisted mapping
+      this.mappedChannel = prefs.getInt("midi.learn.chan." + key, -1);
+      this.mappedCc = prefs.getInt("midi.learn.cc." + key, -1);
+
       Label nameLabel = new Label(key);
       nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 11;");
 
@@ -149,7 +159,16 @@ public class ControlSurface extends VBox {
 
       learnBtn = new Button("L");
       learnBtn.setStyle("-fx-font-size: 10; -fx-padding: 2 4;");
-      learnBtn.setTooltip(new Tooltip("MIDI Learn (Click, then move a controller)"));
+
+      if (mappedChannel >= 0) {
+        learnBtn.setStyle("-fx-background-color: lightgreen; -fx-font-size: 10; -fx-padding: 2 4;");
+        learnBtn.setTooltip(
+            new Tooltip("Mapped to CC " + mappedCc + " (Ch " + (mappedChannel + 1) + ")"));
+        midiLabel.setText("CC " + mappedCc);
+      } else {
+        learnBtn.setTooltip(new Tooltip("MIDI Learn (Click, then move a controller)"));
+      }
+
       learnBtn.setOnAction(
           e -> {
             isLearning = !isLearning;
@@ -181,6 +200,10 @@ public class ControlSurface extends VBox {
             learnBtn.setStyle("-fx-font-size: 10; -fx-padding: 2 4;");
             learnBtn.setTooltip(new Tooltip("MIDI Learn"));
             midiLabel.setText("");
+
+            // Clear persistence
+            prefs.remove("midi.learn.chan." + key);
+            prefs.remove("midi.learn.cc." + key);
           });
       ctxMenu.getItems().add(unmapItem);
       learnBtn.setContextMenu(ctxMenu);
