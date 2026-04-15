@@ -22,15 +22,11 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.chuck.audio.ChuckAudio;
 import org.chuck.audio.analysis.FFT;
-import org.chuck.audio.util.Gain;
 import org.chuck.audio.util.Scope;
 import org.chuck.core.ChuckShred;
 import org.chuck.core.ChuckVM;
 
-/**
- * Main IDE class for ChucK-Java. Restored with full UI logic, modular components, and corrected
- * audio routing.
- */
+/** Main IDE class for ChucK-Java. Restored with corrected audio routing and VU monitors. */
 public class ChuckIDE extends Application {
   private final Preferences prefs = Preferences.userNodeForPackage(ChuckIDE.class);
   private Stage stage;
@@ -58,9 +54,6 @@ public class ChuckIDE extends Application {
   private MidiRecorder midiRecorder = new MidiRecorder();
   private Circle midiActivityIndicator;
   private Timeline midiActivityTimeline;
-
-  // Master Gain
-  private Gain masterGain;
 
   // State
   private boolean lockdownMode = false;
@@ -112,17 +105,8 @@ public class ChuckIDE extends Application {
         new java.io.PrintStream(new ConsoleOutputStream(this::print)),
         new java.io.PrintStream(new ConsoleOutputStream(this::print)));
 
-    // Correct Audio Routing:
-    // In ChucK-Java, dacChannels are the sinks. We must connect them to something
-    // that pulls (like blackhole) OR let the hardware engine pull from them.
-    // To implement a Master Gain, we intercept the dac channels.
-    masterGain = new Gain();
-    masterGain.setGain(prefs.getFloat("audio.masterGain", 0.8f));
-
-    // Connect DAC channels through master gain to blackhole to ensure they are ticked
-    vm.getDacChannel(0).chuckTo(masterGain);
-    vm.getDacChannel(1).chuckTo(masterGain);
-    masterGain.chuckTo(vm.blackhole);
+    // Use built-in master gain in ChuckAudio
+    audio.setMasterGain(prefs.getFloat("audio.masterGain", 0.8f));
 
     editorSupport = new EditorSupport(prefs, stage);
   }
@@ -198,15 +182,16 @@ public class ChuckIDE extends Application {
 
     setupMidiMonitors();
 
-    // Master Gain Slider
-    Slider masterGainSlider = new Slider(0, 1.0, masterGain.getGain());
+    // Master Gain Slider (interacts with ChuckAudio)
+    Slider masterGainSlider = new Slider(0, 1.0, prefs.getFloat("audio.masterGain", 0.8f));
     masterGainSlider.setOrientation(Orientation.VERTICAL);
     masterGainSlider.setShowTickLabels(true);
+    masterGainSlider.setTooltip(new Tooltip("Master Volume"));
     masterGainSlider
         .valueProperty()
         .addListener(
             (obs, old, val) -> {
-              masterGain.setGain(val.floatValue());
+              audio.setMasterGain(val.floatValue());
               prefs.putFloat("audio.masterGain", val.floatValue());
             });
     VBox masterBox = new VBox(5, new Label("Vol"), masterGainSlider);
@@ -472,6 +457,10 @@ public class ChuckIDE extends Application {
         if (sequencerPanel != null) {
           sequencerPanel.setStep((int) vm.getGlobalInt("seq_current_step"));
         }
+
+        // Update VU meters frequently for smoothness
+        statusBar.updateVUMeters();
+
         if (now - lastTextUpdate > 100_000_000L) {
           statusBar.updateVMText();
           statusBar.updateCpuLoad();
