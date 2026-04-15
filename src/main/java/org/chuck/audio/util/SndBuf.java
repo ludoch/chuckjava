@@ -176,7 +176,9 @@ public class SndBuf extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
-    if (samples.length == 0 || pos >= samples.length || pos < 0) {
+    if (samples.length == 0) return 0.0f;
+
+    if (pos >= samples.length || pos < 0) {
       if (loop && samples.length > 0) {
         pos = pos % samples.length;
         if (pos < 0) pos += samples.length;
@@ -193,6 +195,14 @@ public class SndBuf extends ChuckUGen {
     float s0 = samples[i0];
     float s1 = samples[i1];
     float out = s0 + (s1 - s0) * frac;
+
+    // Click prevention: fade out in the last 1ms (approx 44 samples)
+    if (!loop && rate > 0 && pos > samples.length - 44) {
+      double remaining = samples.length - 1 - pos;
+      if (remaining < 44) {
+        out *= (float) (remaining / 44.0);
+      }
+    }
 
     pos += rate;
 

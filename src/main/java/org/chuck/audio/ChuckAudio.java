@@ -613,6 +613,8 @@ public class ChuckAudio {
 
                     while (running) {
                       long startTime = System.nanoTime();
+                      boolean isIdle = (vm.getActiveShredCount() == 0);
+
                       long elapsed = startTime - lastBufferTimeNanos;
                       long drift = elapsed - expectedBufferNanos;
                       if (drift > 0) {
@@ -656,54 +658,58 @@ public class ChuckAudio {
                       double sumSq = 0;
                       float[] bufPeak = new float[numChannels];
 
-                      if (useBlockPath) {
-                        // ── Phase 2: Non-interleaved SIMD block path ────────────────
-                        // advanceTime fills dacBuffers[channel][sample] via the topologically-
-                        // sorted SIMD kernel. Gain is applied per-sample in the write loop below,
-                        // with smoothedGain advanced analytically over the block to preserve
-                        // zipper-noise suppression at per-buffer granularity.
-                        vm.advanceTime(dacBuffers, 0, effBuf);
-
-                        // Advance smoothedGain exponentially over the whole block
-                        float gainStart = smoothedGain;
-                        for (int step = 0; step < effBuf; step++) {
-                          smoothedGain += gainSmoothAlpha * (targetGain - smoothedGain);
-                        }
-                        float gainEnd = smoothedGain;
-
-                        // Write output: interleave channels and apply linearly-interpolated gain
+                      // ── Idle Optimization ──
+                      if (isIdle && smoothedGain < 0.0001f) {
+                        // Truly idle: output silence and sleep to save CPU
                         for (int i = 0; i < effBuf; i++) {
-                          float g = gainStart + (gainEnd - gainStart) * i / effBuf;
                           for (int c = 0; c < numChannels; c++) {
-                            float sample = dacBuffers[c][i] * g;
-                            sumSq += (double) sample * sample;
-                            float abs = Math.abs(sample);
-                            if (abs > bufPeak[c]) bufPeak[c] = abs;
-                            writeSample(outSeg, fmt, i, c, numChannels, sample);
+                            writeSample(outSeg, fmt, i, c, numChannels, 0.0f);
                           }
                         }
+                        try {
+                          Thread.sleep(5);
+                        } catch (InterruptedException ignored) {}
                       } else {
-                        // ── Per-sample path (used when ADC input is active) ─────────
-                        for (int i = 0; i < effBuf; i++) {
-                          // Feed ADC (always INT16 from input)
-                          if (inBuf != null) {
+                        // Not idle OR fading out
+                        float effectiveTargetGain = isIdle ? 0.0f : targetGain;
+
+                        if (useBlockPath) {
+                          vm.advanceTime(dacBuffers, 0, effBuf);
+                          float gainStart = smoothedGain;
+                          for (int step = 0; step < effBuf; step++) {
+                            smoothedGain += gainSmoothAlpha * (effectiveTargetGain - smoothedGain);
+                          }
+                          float gainEnd = smoothedGain;
+                          for (int i = 0; i < effBuf; i++) {
+                            float g = gainStart + (gainEnd - gainStart) * i / effBuf;
                             for (int c = 0; c < numChannels; c++) {
-                              int inputChan = Math.min(c, numInputChannels - 1);
-                              int idx = (i * numInputChannels + inputChan) * 2;
-                              short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
-                              vm.adc.setInputSample(c, pcm / 32768.0f);
+                              float sample = dacBuffers[c][i] * g;
+                              sumSq += (double) sample * sample;
+                              float abs = Math.abs(sample);
+                              if (abs > bufPeak[c]) bufPeak[c] = abs;
+                              writeSample(outSeg, fmt, i, c, numChannels, sample);
                             }
                           }
-
-                          vm.advanceTime(1);
-                          smoothedGain += gainSmoothAlpha * (targetGain - smoothedGain);
-
-                          for (int c = 0; c < numChannels; c++) {
-                            float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
-                            sumSq += (double) sample * sample;
-                            float abs = Math.abs(sample);
-                            if (abs > bufPeak[c]) bufPeak[c] = abs;
-                            writeSample(outSeg, fmt, i, c, numChannels, sample);
+                        } else {
+                          for (int i = 0; i < effBuf; i++) {
+                            // Feed ADC (always INT16 from input)
+                            if (inBuf != null) {
+                              for (int c = 0; c < numChannels; c++) {
+                                int inputChan = Math.min(c, numInputChannels - 1);
+                                int idx = (i * numInputChannels + inputChan) * 2;
+                                short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
+                                vm.adc.setInputSample(c, pcm / 32768.0f);
+                              }
+                            }
+                            vm.advanceTime(1);
+                            smoothedGain += gainSmoothAlpha * (effectiveTargetGain - smoothedGain);
+                            for (int c = 0; c < numChannels; c++) {
+                              float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
+                              sumSq += (double) sample * sample;
+                              float abs = Math.abs(sample);
+                              if (abs > bufPeak[c]) bufPeak[c] = abs;
+                              writeSample(outSeg, fmt, i, c, numChannels, sample);
+                            }
                           }
                         }
                       }
