@@ -22,9 +22,22 @@ By default, ChucK-Java uses the standard JavaSound MIDI system. For professional
 3.  Check the **Native MIDI Status**. If it shows a 🔴 red dot, you need to provide the `rtmidi` library for your system.
 
 #### **Where to find the library?**
--   **macOS:** Install via Homebrew (`brew install rtmidi`). The file `librtmidi.dylib` will be in `/opt/homebrew/lib` (Apple Silicon) or `/usr/local/lib` (Intel).
--   **Linux:** Install via apt (`sudo apt-get install librtmidi-dev`). The file `librtmidi.so` is usually in `/usr/lib/x86_64-linux-gnu/`.
--   **Windows:** You need `rtmidi.dll`. The easiest way is to copy it from another audio app that uses it (like **Bespoke Synth**, **VCV Rack**, or **SuperCollider**) or use a package manager like `vcpkg`.
+
+-   **macOS (Homebrew):**
+    1.  Run: `brew install rtmidi`
+    2.  The library (`librtmidi.dylib`) is installed in:
+        *   **Apple Silicon:** `/opt/homebrew/lib/`
+        *   **Intel Macs:** `/usr/local/lib/`
+    3.  **Tip:** Use `brew ls --verbose rtmidi | grep dylib` to find the exact location if you're unsure.
+
+-   **Windows (rtmidi.dll):**
+    *   **The "Borrow" Method (Easiest):** Search your computer for `rtmidi.dll`. Many music apps include it. Look in the installation folders of **Bespoke Synth**, **VCV Rack**, or **SuperCollider**.
+    *   **Developer Method:** Use Microsoft's **vcpkg**: `vcpkg install rtmidi:x64-windows`. The DLL will be in `vcpkg/installed/x64-windows/bin/`.
+    *   **Manual Copy:** Once you find the DLL, copy it to a folder (e.g., `C:\rtmidi\`) and point the IDE to that folder.
+
+-   **Linux:**
+    1.  Run: `sudo apt-get install librtmidi-dev` (Debian/Ubuntu) or `sudo dnf install rtmidi-devel` (Fedora).
+    2.  The library (`librtmidi.so`) is usually in `/usr/lib/x86_64-linux-gnu/` or `/usr/local/lib/`.
 
 4.  Once you have the file, click the **...** button in MIDI Preferences and select the **folder** containing the file.
 5.  Click **Refresh Devices**. Once enabled (🟢 green dot), ChucK will automatically prefer native drivers.
