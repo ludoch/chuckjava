@@ -1223,22 +1223,79 @@ while (oin.recv(msg)) {
 
 ## MIDI
 
+ChucK-Java features low-latency native MIDI support via **RtMidi**.
+
+### MidiIn (Input)
+
 ```chuck
 MidiIn min;
 MidiMsg msg;
 
-min.open(0);            // open MIDI device at index 0
+// Discovery
+MidiIn.list() @=> string portNames[]; // static list of all ports
+min.num() => int count;               // number of ports
+min.name(0) => string firstPort;      // name of port at index 0
 
-// Poll for messages (min is an Event)
+// Opening
+min.open(0);                          // open by index
+min.open("Launchpad");                // open by name substring (case-insensitive)
+min.openVirtual("ChucK In");          // create virtual port (macOS/Linux)
+
+// Filtering
+min.ignoreTypes(1, 1, 1);             // ignore Sysex, Time, and Active Sensing
+
+// Polling
 while (min => now) {
     while (min.recv(msg)) {
-        msg.data1           // int: status byte (e.g., 0x90 = note on)
-        msg.data2           // int: note number
-        msg.data3           // int: velocity
+        msg.data1;                    // status byte
+        msg.data2;                    // data 1 (note / CC #)
+        msg.data3;                    // data 2 (velocity / value)
+        msg.when;                     // float: precision native timestamp (seconds)
+        if (msg.size() > 3) { ... }   // handle variable-length Sysex
     }
 }
+```
 
-min.close();
+### MidiOut (Output)
+
+```chuck
+MidiOut mout;
+mout.open(0);
+
+// Convenience methods
+mout.noteOn(0, 60, 127);              // channel, note, velocity
+mout.noteOff(0, 60, 0);
+mout.controlChange(0, 1, 64);         // channel, CC#, value
+mout.pitchBend(0, 8192);              // channel, 14-bit value (0-16383)
+mout.programChange(0, 10);            // channel, program#
+
+// Raw message
+MidiMsg msg;
+0x90 => msg.data1; 60 => msg.data2; 127 => msg.data3;
+mout.send(msg);
+```
+
+### MidiFileOut (Recording)
+
+```chuck
+MidiFileOut mfo;
+mfo.open("performance.mid");
+mfo.write(msg);                       // write message with current timestamp
+mfo.close();                          // finalize and save file
+```
+
+### MidiPoly (High-level Polyphony)
+
+Automatic voice management for MIDI instruments.
+
+```chuck
+MidiIn min => MidiPoly poly => dac;
+poly.setInstrument("Rhodey");         // choose STK instrument or SinOsc/SawOsc/etc.
+poly.voices(12);                      // set max polyphony
+
+while (min => now) {
+    while (min.recv(msg)) poly.onMessage(msg); // auto-dispatches to voices
+}
 ```
 
 ---

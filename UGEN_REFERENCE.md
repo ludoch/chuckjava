@@ -1104,6 +1104,18 @@ Class: `org.chuck.audio.stk.Mandolin`
 ### Methods
 - `pluck(float)` -> void
 
+## MidiPoly
+Description: Automatic high-level voice manager for polyphonic MIDI performance. Manages a pool of UGens and maps incoming MIDI messages to active voices.
+
+Class: `org.chuck.midi.MidiPoly`
+
+### Methods
+- `setInstrument(string)` -> string (e.g. "Rhodey", "Mandolin")
+- `instrument()` -> string
+- `voices(int)` -> int
+- `voices()` -> int
+- `onMessage(MidiMsg)` -> void
+
 ## Mesh2D
 Class: `org.chuck.audio.stk.Mesh2D`
 
