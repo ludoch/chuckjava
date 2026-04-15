@@ -13,6 +13,7 @@ public class RtMidi {
   private static final Logger logger = Logger.getLogger(RtMidi.class.getName());
   private static final Arena globalArena = Arena.ofShared();
   private static boolean available = false;
+  private static boolean tried = false;
 
   // --- Core Function Handles ---
   public static MethodHandle get_port_count;
@@ -106,10 +107,15 @@ public class RtMidi {
   }
 
   public static void reinit() {
-    if (!available) init();
+    if (!available && !tried) {
+      init();
+    }
   }
 
   private static void init() {
+    if (tried) return;
+    tried = true;
+
     String os = System.getProperty("os.name").toLowerCase();
     String libName =
         os.contains("win") ? "rtmidi.dll" : os.contains("mac") ? "librtmidi.dylib" : "librtmidi.so";
