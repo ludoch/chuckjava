@@ -50,6 +50,24 @@ public class MidiNativeTest {
   }
 
   @Test
+  public void testNumAndName() {
+    ChuckVM vm = new ChuckVM(44100);
+    MidiIn min = new MidiIn(vm);
+    int numIn = min.num();
+    assertTrue(numIn >= 0);
+    if (numIn > 0) {
+      assertNotNull(min.name(0));
+    }
+
+    MidiOut mout = new MidiOut();
+    int numOut = mout.num();
+    assertTrue(numOut >= 0);
+    if (numOut > 0) {
+      assertNotNull(mout.name(0));
+    }
+  }
+
+  @Test
   public void testMidiInNative() {
     if (!RtMidi.isAvailable()) return;
 

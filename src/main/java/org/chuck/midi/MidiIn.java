@@ -28,6 +28,19 @@ public class MidiIn extends ChuckEvent {
     driver.open(port, api);
   }
 
+  /** Returns the number of available native MIDI input ports. */
+  public int num() {
+    String[] ports = list();
+    return ports.length;
+  }
+
+  /** Returns the name of the MIDI input port at the given index. */
+  public String name(int index) {
+    String[] ports = list();
+    if (index >= 0 && index < ports.length) return ports[index];
+    return "";
+  }
+
   /**
    * Opens the first native MIDI input port whose name contains the given substring
    * (case-insensitive).

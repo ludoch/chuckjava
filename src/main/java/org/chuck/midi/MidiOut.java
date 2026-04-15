@@ -47,6 +47,19 @@ public class MidiOut extends ChuckObject {
     }
   }
 
+  /** Returns the number of available MIDI output ports. */
+  public int num() {
+    String[] ports = list();
+    return ports.length;
+  }
+
+  /** Returns the name of the MIDI output port at the given index. */
+  public String name(int index) {
+    String[] ports = list();
+    if (index >= 0 && index < ports.length) return ports[index];
+    return "";
+  }
+
   /**
    * Opens the first MIDI output port whose name contains the given substring (case-insensitive).
    */
