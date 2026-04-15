@@ -86,14 +86,24 @@ mpe.bendRange(48); // Set pitch bend range (default 48 semitones)
 Located at the bottom of the IDE, the real-time keyboard visualizes:
 - **Active Notes:** Highlights keys in orange when you play.
 - **Pitch Bend:** A vertical cyan bar on the left shows bend depth.
-- **CC Activity:** The label shows the last moved Control Change (knob/fader).
+- **CC Activity:** A status label showing the last received MIDI message.
+
+### MIDI Monitor Tab
+A dedicated **MIDI** tab in the left panel provides a detailed history of all incoming messages:
+- **Real-time Logging:** View Type (Note On/Off, CC, etc.), Channel, and Data values.
+- **Precision Timestamps:** Messages are logged with high-resolution arrival times.
+- **Diagnostic Tool:** Perfect for verifying your hardware is sending the data you expect.
+
+### Status Bar Tools
+- **MIDI Menu:** A quick-access button in the status bar allows you to view available ports and toggle global monitoring for any device without opening Preferences.
+- **Activity Indicator:** A small circular "LED" in the status bar flashes bright green whenever any MIDI message is received.
 
 ### MIDI Learn (The "L" Button)
 Bind physical knobs to your code without writing a single line of MIDI parsing:
 1.  Declare a `global float` or `global int` in your script.
 2.  Open the **Control** tab on the left panel.
 3.  Click the **"L"** button next to your variable (it turns yellow).
-4.  Move a knob on your keyboard. It's now mapped! (Button turns green).
+4.  Move a knob on your keyboard. It's now mapped! (Button turns green, and the **CC Number** is displayed).
 5.  Right-click the "L" button to unmap.
 
 ---
