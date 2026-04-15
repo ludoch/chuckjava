@@ -1140,7 +1140,53 @@ Class: `org.chuck.midi.MidiClock`
 - `onStop()` -> Event : Signals on Stop message.
 - `bpm()` -> double : Returns the estimated BPM based on clock intervals.
 
-## ModalBar
+## MidiFileIn
+Description: Reads Standard MIDI (.mid) files for sequencing.
+
+Class: `org.chuck.midi.MidiFileIn`
+
+### Methods
+- `open(string)` -> long : Open a MIDI file. Returns 1 on success, 0 on failure.
+- `read(MidiMsg)` -> long : Read next message from the merged track list.
+- `read(MidiMsg, int)` -> long : Read next message from a specific track index.
+- `more()` -> long : Returns 1 if more messages remain, 0 otherwise.
+- `rewind()` -> void : Seek to the beginning of the file.
+- `close()` -> void : Close the file.
+- `numTracks()` -> long : Returns the number of tracks in the file.
+- `size()` -> long : Returns total message count.
+- `tpq()` -> long : Returns Ticks Per Quarter note (resolution).
+- `bpm()` -> double : Returns the initial BPM detected in the file.
+
+## MidiFileOut
+Description: Writes Standard MIDI (.mid) files from ChucK performances.
+
+Class: `org.chuck.midi.MidiFileOut`
+
+### Methods
+- `open(string)` -> int : Open/create a MIDI file for writing.
+- `addTrack()` -> int : Add a new track and return its index.
+- `addTrack(string)` -> int : Add a named track (Format 1).
+- `setBpm(float)` -> void : Set BPM at the current logical time.
+- `setBpm(float, float)` -> void : Set BPM at a specific absolute time (seconds).
+- `setTimeSig(int, int)` -> void : Set Time Signature (e.g. 4, 4).
+- `addMarker(string)` -> void : Add a section marker at the current time.
+- `nrpn(int, int, int)` -> void : Send a 14-bit NRPN sequence (channel, param, value).
+- `write(MidiMsg)` -> void : Write a message to the current track.
+- `write(int, MidiMsg)` -> void : Write a message to a specific track index.
+- `close()` -> void : Finalize and save the file.
+
+## MidiPlayer
+Description: High-level MIDI sequencer for automatic playback.
+
+Class: `org.chuck.midi.MidiPlayer`
+
+### Methods
+- `play()` -> void : Start playback in a background shred.
+- `stop()` -> void : Stop playback and kill the sequencer shred.
+- `speed(float)` -> void : Set playback rate (1.0 is normal).
+- `playing()` -> int : Returns 1 if currently playing.
+
+## Mesh2D
 Class: `org.chuck.audio.stk.Mesh2D`
 
 ### Parameters

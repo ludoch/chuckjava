@@ -50,6 +50,12 @@
 - **MidiFileIn**: Upgraded to support multi-track reading, file metadata (`bpm()`, `tpq()`), and automatic delta-time calculation (`msg.when`).
 - **Precision Timestamps**: Incoming messages now include `msg.when` (seconds) from the native driver for jitter-free alignment.
 
+#### ⚡ Audio Fidelity & Performance
+- **Idle CPU Optimization**: The audio engine automatically detects when the VM is idle (no active shreds). It applies a smooth global fade-out and puts the processing loop into a low-power sleep mode, reducing "doing nothing" CPU usage to near 0%.
+- **Pop/Click Prevention**: `SndBuf` and `SndBuf2` now feature an analytical 1ms fade-out when reaching the end of a sample, preventing abrupt DC-offset jumps that cause speaker pops.
+- **Project Loom Concurrency**: Uses Java Virtual Threads for shreds, allowing thousands of simultaneous oscillators and logic processes with minimal memory overhead.
+- **SIMD Audio Kernel**: Optimized Vector API paths for common UGen operations, utilizing modern CPU instructions for high-density synthesis.
+
 #### 🌐 Network Audio & 3D Spatialization
 - **`Broadcaster`**: Stream your ChucK session live over the network. Run `adc => Broadcaster b => dac; b.format("mp3"); b.start();` and tune in via VLC or browser.
 - **`Spatial3D`**: Binaural panner for headphones, utilizing Head-Related Time/Level Differences (ITD/ILD).
