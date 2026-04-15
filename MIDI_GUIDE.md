@@ -32,8 +32,16 @@ By default, ChucK-Java uses the standard JavaSound MIDI system. For professional
 
 -   **Windows (rtmidi.dll):**
     *   **The "Borrow" Method (Easiest):** Search your computer for `rtmidi.dll`. Many music apps include it. Look in the installation folders of **Bespoke Synth**, **VCV Rack**, or **SuperCollider**.
-    *   **Developer Method:** Use Microsoft's **vcpkg**: `vcpkg install rtmidi:x64-windows`. The DLL will be in `vcpkg/installed/x64-windows/bin/`.
-    *   **Manual Copy:** Once you find the DLL, copy it to a folder (e.g., `C:\rtmidi\`) and point the IDE to that folder.
+    *   **Build from Source (Recommended):** If you have Visual Studio and CMake installed, you can build it in seconds:
+        1.  `git clone https://github.com/thestk/rtmidi.git`
+        2.  `mkdir build && cd build`
+        3.  `cmake .. -DRTMIDI_BUILD_SHARED_LIBS=ON`
+        4.  `cmake --build . --config Release`
+        5.  The `rtmidi.dll` will be in the `Release` folder.
+    *   **Package Managers:**
+        - **vcpkg:** `vcpkg install rtmidi:x64-windows`. The DLL will be in `vcpkg/installed/x64-windows/bin/`.
+        - **MSYS2:** `pacman -S mingw-w64-x86_64-rtmidi`. The DLL will be in `/mingw64/bin/`.
+    *   **Manual Copy:** Once you find the DLL, copy it to the ChucK-Java project root or any folder in your system PATH. Alternatively, point the IDE to its folder in Preferences.
 
 -   **Linux:**
     1.  Run: `sudo apt-get install librtmidi-dev` (Debian/Ubuntu) or `sudo dnf install rtmidi-devel` (Fedora).

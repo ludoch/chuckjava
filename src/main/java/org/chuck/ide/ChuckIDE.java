@@ -2070,6 +2070,36 @@ public class ChuckIDE extends Application {
         e -> getHostServices().showDocument("https://github.com/ludoch/chuckjava"));
     helpMenu.getItems().add(githubItem);
 
+    MenuItem rtMidiHelpItem = new MenuItem("RtMidi (Native MIDI) Setup...");
+    rtMidiHelpItem.setOnAction(
+        e -> {
+          Alert a = new Alert(Alert.AlertType.INFORMATION);
+          a.setTitle("RtMidi Setup Guide");
+          a.setHeaderText("How to get rtmidi.dll for Windows");
+          a.setContentText(
+              """
+                             ChucK-Java uses the native RtMidi library for low-latency MIDI.
+                             If you see a 'rtmidi.dll not found' warning, follow these steps:
+
+                             1. BUILD FROM SOURCE (Recommended if you have CMake/VS):
+                                git clone https://github.com/thestk/rtmidi.git
+                                mkdir build && cd build
+                                cmake .. -DRTMIDI_BUILD_SHARED_LIBS=ON
+                                cmake --build . --config Release
+                                (Find rtmidi.dll in the Release folder)
+
+                             2. VIA PACKAGE MANAGERS:
+                                - vcpkg: 'vcpkg install rtmidi:x64-windows'
+                                - MSYS2: 'pacman -S mingw-w64-x86_64-rtmidi'
+
+                             3. PLACEMENT:
+                                Place rtmidi.dll in the project root or your System32 folder.
+                                Alternatively, set 'midi.libPath' in ChucK-Java preferences.
+                             """);
+          a.getDialogPane().setMinWidth(550);
+          a.showAndWait();
+        });
+    helpMenu.getItems().add(rtMidiHelpItem);
     MenuItem programChangeItem = new MenuItem("Program Change...");
     // ... logic for other menus ...
 
