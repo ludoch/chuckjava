@@ -173,6 +173,92 @@ public class ObjectInstrs {
             s.reg.pushObject(ca);
             return;
           }
+          case "popOut" -> {
+            if (a == 1) ca.popOut(((Number) args[0]).intValue());
+            s.reg.pushObject(ca);
+            return;
+          }
+          case "getKeys" -> {
+            if (a == 1 && args[0] instanceof ChuckArray outArr) {
+              ca.getKeys(outArr);
+            }
+            s.reg.pushObject(ca);
+            return;
+          }
+          case "isInMap" -> {
+            String key =
+                args[0] instanceof ChuckString cs ? cs.toString() : String.valueOf(args[0]);
+            s.reg.push(ca.isInMap(key));
+            return;
+          }
+          case "find" -> {
+            // array.find(val) — linear search returning index or -1
+            long foundIdx = -1L;
+            for (int i2 = 0; i2 < ca.size(); i2++) {
+              if (ca.isObjectAt(i2)) {
+                Object elem = ca.getObject(i2);
+                if (args[0] != null && args[0].equals(elem)) {
+                  foundIdx = i2;
+                  break;
+                }
+              } else if (ca.isDoubleAt(i2)) {
+                if (args[0] instanceof Number n && ca.getFloat(i2) == n.doubleValue()) {
+                  foundIdx = i2;
+                  break;
+                }
+              } else {
+                if (args[0] instanceof Number n && ca.getInt(i2) == n.longValue()) {
+                  foundIdx = i2;
+                  break;
+                }
+              }
+            }
+            s.reg.push(foundIdx);
+            return;
+          }
+          case "shuffle" -> {
+            for (int i2 = ca.size() - 1; i2 > 0; i2--) {
+              int j2 = (int) (Math.random() * (i2 + 1));
+              // swap i2 and j2 via temporary using existing methods
+              if (ca.isObjectAt(i2) || ca.isObjectAt(j2)) {
+                Object tmp = ca.getObject(i2);
+                ca.setObject(i2, ca.getObject(j2));
+                ca.setObject(j2, tmp);
+              } else if (ca.isDoubleAt(i2) || ca.isDoubleAt(j2)) {
+                double tmp = ca.getFloat(i2);
+                ca.setFloat(i2, ca.getFloat(j2));
+                ca.setFloat(j2, tmp);
+              } else {
+                long tmp = ca.getInt(i2);
+                ca.setInt(i2, ca.getInt(j2));
+                ca.setInt(j2, tmp);
+              }
+            }
+            s.reg.pushObject(ca);
+            return;
+          }
+          case "reverse" -> {
+            int left = 0, right = ca.size() - 1;
+            while (left < right) {
+              if (ca.isObjectAt(left) || ca.isObjectAt(right)) {
+                Object tmp = ca.getObject(left);
+                ca.setObject(left, ca.getObject(right));
+                ca.setObject(right, tmp);
+              } else if (ca.isDoubleAt(left) || ca.isDoubleAt(right)) {
+                double tmp = ca.getFloat(left);
+                ca.setFloat(left, ca.getFloat(right));
+                ca.setFloat(right, tmp);
+              } else {
+                long tmp = ca.getInt(left);
+                ca.setInt(left, ca.getInt(right));
+                ca.setInt(right, tmp);
+              }
+              left++;
+              right--;
+            }
+            s.reg.pushObject(ca);
+            return;
+          }
         }
       }
 
@@ -256,6 +342,8 @@ public class ObjectInstrs {
 
         String key = (fullKey != null) ? fullKey : (mName + ":" + a);
         String fallbackKey = mName + ":" + a;
+        // Constructor call pattern: CallMethod("ClassName", argc) — also try @construct
+        String ctorKey = mName.equals(className) ? ("@construct:" + a) : null;
         ChuckCode target = null;
         boolean isStatic = false;
         String t = className;
@@ -280,6 +368,11 @@ public class ObjectInstrs {
           if (desc.staticMethods().containsKey(fallbackKey)) {
             target = desc.staticMethods().get(fallbackKey);
             isStatic = true;
+            break;
+          }
+          if (ctorKey != null && desc.methods().containsKey(ctorKey)) {
+            target = desc.methods().get(ctorKey);
+            isStatic = false;
             break;
           }
           t = desc.parentName();
@@ -521,6 +614,11 @@ public class ObjectInstrs {
       if (uo != null) {
         target = uo.methods.get(key);
         if (target == null) target = uo.methods.get(fallbackKey);
+        // Constructor call: CallMethod("ClassName", argc) — resolve to @construct
+        if (target == null && mName.equals(uo.className)) {
+          String ctorKey = "@construct:" + a;
+          target = uo.methods.get(ctorKey);
+        }
         if (target == null) {
           UserClassDescriptor d = vm.getUserClass(uo.className);
           if (d != null) {

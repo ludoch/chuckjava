@@ -307,13 +307,59 @@ public class ChuckArray extends ChuckObject {
     types.add((byte) 2);
   }
 
-  // Associative access
+  // Associative access — all three maps share a single key namespace in ChucK
   public void setAssocInt(String key, long value) {
     assocInt.put(key, value);
+    assocFloat.remove(key);
+    assocObject.remove(key);
   }
 
   public long getAssocInt(String key) {
+    if (assocFloat.containsKey(key)) return (long) assocFloat.get(key).doubleValue();
+    if (assocObject.containsKey(key)) return 0L;
     return assocInt.getOrDefault(key, 0L);
+  }
+
+  public void setAssocFloat(String key, double value) {
+    assocFloat.put(key, value);
+    assocInt.remove(key);
+    assocObject.remove(key);
+  }
+
+  public double getAssocFloat(String key) {
+    if (assocFloat.containsKey(key)) return assocFloat.get(key);
+    if (assocInt.containsKey(key)) return (double) assocInt.get(key);
+    return 0.0;
+  }
+
+  public void setAssocObject(String key, Object value) {
+    assocObject.put(key, value);
+    assocInt.remove(key);
+    assocFloat.remove(key);
+  }
+
+  public Object getAssocObject(String key) {
+    return assocObject.get(key);
+  }
+
+  /** ChucK API: {@code a.getKeys(outArr)} — fills {@code outArr} with all associative keys. */
+  public ChuckArray getKeys(ChuckArray outArr) {
+    if (outArr == null) return outArr;
+    java.util.Set<String> keys = new java.util.LinkedHashSet<>();
+    keys.addAll(assocInt.keySet());
+    keys.addAll(assocFloat.keySet());
+    keys.addAll(assocObject.keySet());
+    for (String k : keys) outArr.appendObject(new ChuckString(k));
+    return outArr;
+  }
+
+  /** ChucK API: {@code a.isInMap(key)} — returns 1 if key exists, 0 otherwise. */
+  public long isInMap(String key) {
+    return (assocInt.containsKey(key)
+            || assocFloat.containsKey(key)
+            || assocObject.containsKey(key))
+        ? 1L
+        : 0L;
   }
 
   /** Remove first element. */

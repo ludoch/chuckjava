@@ -3,6 +3,7 @@ package org.chuck.ide;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javafx.application.Platform;
+import javafx.scene.control.Label;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;

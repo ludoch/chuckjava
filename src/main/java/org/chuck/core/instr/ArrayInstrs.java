@@ -6,15 +6,33 @@ public class ArrayInstrs {
   public static class GetArrayInt implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      long idx = s.reg.popLong();
-      Object raw = s.reg.popObject();
-      if (raw instanceof ChuckArray a) {
-        int i = a.resolveIndex(idx);
-        if (a.isObjectAt(i)) s.reg.pushObject(a.getObject(i));
-        else if (a.isDoubleAt(i)) s.reg.push(a.getFloat(i));
-        else s.reg.push(a.getInt(i));
+      // Index may be a string key (associative) or an integer
+      if (s.reg.isObject(0)) {
+        Object keyObj = s.reg.popObject();
+        Object raw = s.reg.popObject();
+        String key =
+            keyObj instanceof org.chuck.core.ChuckString cs
+                ? cs.toString()
+                : String.valueOf(keyObj);
+        if (raw instanceof ChuckArray a) {
+          Object assocVal = a.getAssocObject(key);
+          if (assocVal != null) s.reg.pushObject(assocVal);
+          else if (a.isInMap(key) == 1L) {
+            double fv = a.getAssocFloat(key);
+            s.reg.push(fv);
+          } else s.reg.push(0L);
+        } else s.reg.push(0L);
       } else {
-        s.reg.push(0L);
+        long idx = s.reg.popLong();
+        Object raw = s.reg.popObject();
+        if (raw instanceof ChuckArray a) {
+          int i = a.resolveIndex(idx);
+          if (a.isObjectAt(i)) s.reg.pushObject(a.getObject(i));
+          else if (a.isDoubleAt(i)) s.reg.push(a.getFloat(i));
+          else s.reg.push(a.getInt(i));
+        } else {
+          s.reg.push(0L);
+        }
       }
     }
   }
@@ -22,24 +40,48 @@ public class ArrayInstrs {
   public static class SetArrayInt implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      long idx = s.reg.popLong();
-      Object raw = s.reg.popObject();
-      if (!(raw instanceof ChuckArray a)) {
-        return; // Value stays on stack
-      }
-      int i = a.resolveIndex(idx);
+      // Index may be a string key (associative) or an integer
       if (s.reg.isObject(0)) {
-        Object val = s.reg.popObject();
-        a.setObject(i, val);
-        s.reg.pushObject(val);
-      } else if (s.reg.isDouble(0)) {
-        double val = s.reg.popAsDouble();
-        a.setFloat(i, val);
-        s.reg.push(val);
+        Object keyObj = s.reg.popObject();
+        Object raw = s.reg.popObject();
+        if (!(raw instanceof ChuckArray a)) return;
+        String key =
+            keyObj instanceof org.chuck.core.ChuckString cs
+                ? cs.toString()
+                : String.valueOf(keyObj);
+        if (s.reg.isObject(0)) {
+          Object val = s.reg.popObject();
+          a.setAssocObject(key, val);
+          s.reg.pushObject(val);
+        } else if (s.reg.isDouble(0)) {
+          double val = s.reg.popAsDouble();
+          a.setAssocFloat(key, val);
+          s.reg.push(val);
+        } else {
+          long val = s.reg.popLong();
+          a.setAssocInt(key, val);
+          s.reg.push(val);
+        }
       } else {
-        long val = s.reg.popLong();
-        a.setInt(i, val);
-        s.reg.push(val);
+        long idx = s.reg.popLong();
+        Object raw = s.reg.popObject();
+        if (!(raw instanceof ChuckArray a)) {
+          return; // Value stays on stack
+        }
+        int i = a.resolveIndex(idx);
+        if (s.reg.isObject(0)) {
+          Object val = s.reg.popObject();
+          a.setObject(i, val);
+          s.reg.pushObject(val);
+        } else if (s.reg.isDouble(0)) {
+          double val = s.reg.popAsDouble();
+          a.setFloat(i, val);
+          s.reg.push(val);
+        } else {
+          long val = s.reg.popLong();
+          a.setInt(i, val);
+          s.reg.push(val);
+        }
       }
     }
   }

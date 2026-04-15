@@ -6,18 +6,22 @@ import java.util.Map;
 import java.util.Set;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.application.Platform;
 import javafx.geometry.Insets;
+import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
+import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import org.chuck.core.ChuckVM;
+import org.chuck.midi.ChuckMidiNative;
 
 /**
  * A control surface for ChucK global variables. Polls the VM for global ints and floats and
- * provides sliders to control them.
+ * provides sliders to control them. Supports MIDI Learn for auto-mapping CC messages.
  */
 public class ControlSurface extends VBox {
   private ChuckVM vm;
@@ -39,6 +43,34 @@ public class ControlSurface extends VBox {
 
     timeline = new Timeline(new KeyFrame(Duration.millis(100), e -> update()));
     timeline.setCycleCount(Timeline.INDEFINITE);
+
+    // Global MIDI Monitor for Learn feature
+    ChuckMidiNative.addMonitor(
+        (device, msg) -> {
+          int status = msg.data1 & 0xF0;
+          if (status == 0xB0) { // Control Change
+            int channel = msg.data1 & 0x0F;
+            int cc = msg.data2;
+            int val = msg.data3;
+            Platform.runLater(() -> handleMidiCc(channel, cc, val));
+          }
+        });
+  }
+
+  private void handleMidiCc(int channel, int cc, int val) {
+    for (ControlRow row : rows.values()) {
+      if (row.isLearning) {
+        row.mappedChannel = channel;
+        row.mappedCc = cc;
+        row.isLearning = false;
+        row.learnBtn.setStyle(
+            "-fx-background-color: lightgreen; -fx-font-size: 10; -fx-padding: 2 4;");
+        row.learnBtn.setTooltip(new Tooltip("Mapped to CC " + cc + " (Ch " + (channel + 1) + ")"));
+      }
+      if (row.mappedChannel == channel && row.mappedCc == cc) {
+        row.onMidiCc(val);
+      }
+    }
   }
 
   public void setVm(ChuckVM vm) {
@@ -97,12 +129,55 @@ public class ControlSurface extends VBox {
     private final Label valueLabel;
     private boolean isDragging = false;
 
+    // MIDI Learn State
+    boolean isLearning = false;
+    int mappedChannel = -1;
+    int mappedCc = -1;
+    final Button learnBtn;
+
     public ControlRow(String key, boolean isInt, double initialValue) {
       this.key = key;
       this.isInt = isInt;
 
       Label nameLabel = new Label(key);
       nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 11;");
+
+      learnBtn = new Button("L");
+      learnBtn.setStyle("-fx-font-size: 10; -fx-padding: 2 4;");
+      learnBtn.setTooltip(new Tooltip("MIDI Learn (Click, then move a controller)"));
+      learnBtn.setOnAction(
+          e -> {
+            isLearning = !isLearning;
+            if (isLearning) {
+              learnBtn.setStyle(
+                  "-fx-background-color: yellow; -fx-font-size: 10; -fx-padding: 2 4;");
+            } else {
+              // Cancel learning, but keep mapping if it exists
+              if (mappedChannel >= 0) {
+                learnBtn.setStyle(
+                    "-fx-background-color: lightgreen; -fx-font-size: 10; -fx-padding: 2 4;");
+              } else {
+                learnBtn.setStyle("-fx-font-size: 10; -fx-padding: 2 4;");
+              }
+            }
+          });
+
+      // Context menu to unmap
+      javafx.scene.control.ContextMenu ctxMenu = new javafx.scene.control.ContextMenu();
+      javafx.scene.control.MenuItem unmapItem = new javafx.scene.control.MenuItem("Unmap MIDI");
+      unmapItem.setOnAction(
+          e -> {
+            mappedChannel = -1;
+            mappedCc = -1;
+            isLearning = false;
+            learnBtn.setStyle("-fx-font-size: 10; -fx-padding: 2 4;");
+            learnBtn.setTooltip(new Tooltip("MIDI Learn"));
+          });
+      ctxMenu.getItems().add(unmapItem);
+      learnBtn.setContextMenu(ctxMenu);
+
+      HBox header = new HBox(5, nameLabel, learnBtn);
+      header.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
       double min = 0;
       double max = 1.0;
@@ -148,7 +223,7 @@ public class ControlSurface extends VBox {
               });
 
       HBox controls = new HBox(5, slider, valueLabel);
-      node = new VBox(2, nameLabel, controls);
+      node = new VBox(2, header, controls);
       node.setPadding(new Insets(5, 0, 5, 0));
       node.setStyle("-fx-border-color: #ddd; -fx-border-width: 0 0 1 0;");
     }
@@ -165,6 +240,22 @@ public class ControlSurface extends VBox {
         } else {
           valueLabel.setText(String.format("%.3f", value));
         }
+      }
+    }
+
+    public void onMidiCc(int val) {
+      double pct = val / 127.0;
+      double newVal = slider.getMin() + pct * (slider.getMax() - slider.getMin());
+      slider.setValue(newVal);
+
+      // Push to VM immediately
+      if (isInt) {
+        long v = (long) newVal;
+        vm.setGlobalInt(key, v);
+        valueLabel.setText(String.valueOf(v));
+      } else {
+        vm.setGlobalFloat(key, newVal);
+        valueLabel.setText(String.format("%.3f", newVal));
       }
     }
   }

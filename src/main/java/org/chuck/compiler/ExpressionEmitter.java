@@ -196,7 +196,9 @@ public class ExpressionEmitter {
           for (ChuckAST.Exp arg : call.args()) {
             this.emitExpression(arg, code);
           }
-          code.addInstruction(new ObjectInstrs.CallMethod(e.type(), argCount));
+          List<String> ctorArgTypes = call.args().stream().map(parent::getExprType).toList();
+          String ctorKey = parent.getMethodKey(e.type(), ctorArgTypes);
+          code.addInstruction(new ObjectInstrs.CallMethod(e.type(), argCount, ctorKey));
         } else {
           if (e.callArgs() instanceof ChuckAST.CallExp call) {
             for (ChuckAST.Exp arg : call.args()) {
