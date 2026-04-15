@@ -1,6 +1,5 @@
 package org.chuck.ide;
 
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import javafx.application.Platform;
 import javafx.scene.control.Label;
@@ -16,7 +15,7 @@ public class PianoKeyboard extends Pane {
 
   private final Rectangle[] keys = new Rectangle[NUM_KEYS];
   private final boolean[] isBlack = new boolean[NUM_KEYS];
-  private final Set<Integer> activeNotes = ConcurrentHashMap.newKeySet();
+  private final ConcurrentHashMap<Integer, Color> activeNotes = new ConcurrentHashMap<>();
 
   // CC & Pitch Bend state
   private final double[] ccValues = new double[128];
@@ -88,23 +87,29 @@ public class PianoKeyboard extends Pane {
   }
 
   public void onMidiMessage(MidiMsg msg) {
+    onMidiMessage("In", msg);
+  }
+
+  public void onMidiMessage(String source, MidiMsg msg) {
     int status = msg.data1 & 0xF0;
     int chan = msg.data1 & 0x0F;
     int note = msg.data2;
     int velocity = msg.data3;
 
+    Color highlight = source.equals("In") ? Color.ORANGE : Color.LIGHTBLUE;
+
     if (status == 0x90 && velocity > 0) {
-      noteOn(note);
+      noteOn(note, highlight);
     } else if (status == 0x80 || (status == 0x90 && velocity == 0)) {
       noteOff(note);
     } else if (status == 0xB0) {
       ccValues[note] = velocity / 127.0;
-      updateInfo("CC " + note + ": " + velocity + " (Ch " + (chan + 1) + ")");
+      updateInfo(source + " CC " + note + ": " + velocity + " (Ch " + (chan + 1) + ")");
     } else if (status == 0xE0) {
       int val = (velocity << 7) | note;
       pitchBendNormalized = val / 16383.0;
       updatePitchBendUI();
-      updateInfo("Pitch Bend: " + val + " (Ch " + (chan + 1) + ")");
+      updateInfo(source + " Pitch Bend: " + val + " (Ch " + (chan + 1) + ")");
     }
   }
 
@@ -121,11 +126,11 @@ public class PianoKeyboard extends Pane {
         });
   }
 
-  private void noteOn(int note) {
+  private void noteOn(int note, Color color) {
     int idx = note - START_NOTE;
     if (idx >= 0 && idx < NUM_KEYS) {
-      activeNotes.add(note);
-      updateKeyColor(idx, true);
+      activeNotes.put(note, color);
+      updateKeyColor(idx, color);
     }
   }
 
@@ -133,15 +138,15 @@ public class PianoKeyboard extends Pane {
     int idx = note - START_NOTE;
     if (idx >= 0 && idx < NUM_KEYS) {
       activeNotes.remove(note);
-      updateKeyColor(idx, false);
+      updateKeyColor(idx, null);
     }
   }
 
-  private void updateKeyColor(int idx, boolean active) {
+  private void updateKeyColor(int idx, Color color) {
     Platform.runLater(
         () -> {
-          if (active) {
-            keys[idx].setFill(Color.ORANGE);
+          if (color != null) {
+            keys[idx].setFill(color);
           } else {
             keys[idx].setFill(isBlack[idx] ? Color.BLACK : Color.WHITE);
           }

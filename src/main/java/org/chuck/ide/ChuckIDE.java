@@ -805,6 +805,7 @@ public class ChuckIDE extends Application {
 
     org.chuck.midi.ChuckMidiOutNative.addMonitor(
         (device, msg) -> {
+          pianoKeyboard.onMidiMessage("Out", msg);
           if (midiMonitor != null) midiMonitor.onMidiMessage("Out", msg);
           if (midiRecorder != null) midiRecorder.onMidiMessage("Out", msg);
           if (midiActivityIndicator != null) {
@@ -847,19 +848,42 @@ public class ChuckIDE extends Application {
 
           Menu inMenu = new Menu("Input Monitor");
           String[] inPorts = org.chuck.midi.MidiIn.list();
+          String[] outPorts = org.chuck.midi.MidiOut.list();
+
           for (int i = 0; i < inPorts.length; i++) {
             final int portIdx = i;
-            javafx.scene.control.CheckMenuItem item =
-                new javafx.scene.control.CheckMenuItem(inPorts[i]);
-            item.setOnAction(
+            final String inName = inPorts[i];
+            Menu portMenu = new Menu(inName);
+
+            javafx.scene.control.CheckMenuItem monitorItem =
+                new javafx.scene.control.CheckMenuItem("Monitor");
+            monitorItem.setOnAction(
                 ae -> {
-                  if (item.isSelected()) org.chuck.midi.ChuckMidiNative.openGlobalMonitor(portIdx);
+                  if (monitorItem.isSelected())
+                    org.chuck.midi.ChuckMidiNative.openGlobalMonitor(portIdx);
                 });
-            inMenu.getItems().add(item);
+            portMenu.getItems().add(monitorItem);
+
+            Menu thruMenu = new Menu("Thru to...");
+            for (int j = 0; j < outPorts.length; j++) {
+              final int outIdx = j;
+              javafx.scene.control.CheckMenuItem thruItem =
+                  new javafx.scene.control.CheckMenuItem(outPorts[j]);
+              thruItem.setOnAction(
+                  ae -> {
+                    if (thruItem.isSelected()) {
+                      org.chuck.midi.MidiOut mout = new org.chuck.midi.MidiOut();
+                      mout.open(outIdx);
+                      org.chuck.midi.ChuckMidiNative.addThruRoute(inName, mout);
+                    }
+                  });
+              thruMenu.getItems().add(thruItem);
+            }
+            portMenu.getItems().add(thruMenu);
+            inMenu.getItems().add(portMenu);
           }
 
           Menu outMenu = new Menu("Output Monitor / Sync");
-          String[] outPorts = org.chuck.midi.MidiOut.list();
           for (int i = 0; i < outPorts.length; i++) {
             final int portIdx = i;
             javafx.scene.control.CheckMenuItem item =
@@ -903,6 +927,12 @@ public class ChuckIDE extends Application {
           if (syncBtn.isSelected()) midiClockOut.start();
           else midiClockOut.stop();
         });
+
+    javafx.scene.control.Button panicBtn = new javafx.scene.control.Button("!");
+    panicBtn.setStyle(
+        "-fx-font-size: 10; -fx-padding: 1 5; -fx-font-weight: bold; -fx-text-fill: red;");
+    panicBtn.setTooltip(new Tooltip("MIDI Panic (All Notes Off)"));
+    panicBtn.setOnAction(e -> midiClockOut.panic());
 
     statusLabel = new Label("  Ready");
 
@@ -953,6 +983,7 @@ public class ChuckIDE extends Application {
             bpmLabel,
             bpmField,
             syncBtn,
+            panicBtn,
             new Separator(Orientation.VERTICAL),
             statusLabel,
             statusSpacer,

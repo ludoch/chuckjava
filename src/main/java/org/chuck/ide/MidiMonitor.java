@@ -102,8 +102,72 @@ public class MidiMonitor extends VBox {
     Tab ccTab = new Tab("CC Grid", ccScroll);
     ccTab.setClosable(false);
 
-    tabs.getTabs().addAll(logTab, ccTab);
+    // --- Tab 3: Mappings ---
+    TableView<MappingEntry> mapTable = new TableView<>();
+    mapTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+
+    TableColumn<MappingEntry, String> varCol = new TableColumn<>("Variable");
+    varCol.setCellValueFactory(new PropertyValueFactory<>("variable"));
+
+    TableColumn<MappingEntry, String> mapMidiCol = new TableColumn<>("MIDI Binding");
+    mapMidiCol.setCellValueFactory(new PropertyValueFactory<>("midiBinding"));
+
+    mapTable.getColumns().addAll(varCol, mapMidiCol);
+    VBox.setVgrow(mapTable, Priority.ALWAYS);
+
+    Tab mapTab = new Tab("Mappings", mapTable);
+    mapTab.setClosable(false);
+    mapTab.setOnSelectionChanged(
+        e -> {
+          if (mapTab.isSelected()) {
+            mapTable.setItems(loadMappings());
+          }
+        });
+
+    tabs.getTabs().addAll(logTab, ccTab, mapTab);
     getChildren().add(tabs);
+  }
+
+  private ObservableList<MappingEntry> loadMappings() {
+    ObservableList<MappingEntry> list = FXCollections.observableArrayList();
+    try {
+      java.util.prefs.Preferences prefs =
+          java.util.prefs.Preferences.userNodeForPackage(ControlSurface.class);
+      String[] keys = prefs.keys();
+      java.util.Set<String> varNames = new java.util.HashSet<>();
+      for (String k : keys) {
+        if (k.startsWith("midi.learn.cc.")) {
+          varNames.add(k.substring("midi.learn.cc.".length()));
+        }
+      }
+      for (String var : varNames) {
+        int cc = prefs.getInt("midi.learn.cc." + var, -1);
+        int chan = prefs.getInt("midi.learn.chan." + var, -1);
+        if (cc >= 0) {
+          list.add(new MappingEntry(var, "CC " + cc + " (Ch " + (chan + 1) + ")"));
+        }
+      }
+    } catch (Exception ignored) {
+    }
+    return list;
+  }
+
+  public static class MappingEntry {
+    private final String variable;
+    private final String midiBinding;
+
+    public MappingEntry(String v, String m) {
+      this.variable = v;
+      this.midiBinding = m;
+    }
+
+    public String getVariable() {
+      return variable;
+    }
+
+    public String getMidiBinding() {
+      return midiBinding;
+    }
   }
 
   public void onMidiMessage(String source, MidiMsg msg) {

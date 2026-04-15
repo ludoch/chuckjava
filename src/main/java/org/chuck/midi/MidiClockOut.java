@@ -64,6 +64,28 @@ public class MidiClockOut {
     running = false;
   }
 
+  /** Sends All Notes Off and Reset All Controllers to all ports. */
+  public void panic() {
+    for (int chan = 0; chan < 16; chan++) {
+      // All Notes Off (CC 123)
+      MidiMsg m1 = new MidiMsg();
+      m1.data1 = 0xB0 | chan;
+      m1.data2 = 123;
+      m1.data3 = 0;
+
+      // Reset All Controllers (CC 121)
+      MidiMsg m2 = new MidiMsg();
+      m2.data1 = 0xB0 | chan;
+      m2.data2 = 121;
+      m2.data3 = 0;
+
+      for (MidiOut out : outputs) {
+        out.send(m1);
+        out.send(m2);
+      }
+    }
+  }
+
   public boolean isRunning() {
     return running;
   }

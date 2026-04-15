@@ -3,6 +3,7 @@ package org.chuck.midi;
 import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -29,6 +30,18 @@ public class ChuckMidiNative {
 
   public static void removeMonitor(MidiMonitor monitor) {
     monitors.remove(monitor);
+  }
+
+  private static final ConcurrentHashMap<String, List<MidiOut>> thruRoutes =
+      new ConcurrentHashMap<>();
+
+  public static void addThruRoute(String inputName, MidiOut output) {
+    thruRoutes.computeIfAbsent(inputName, k -> new CopyOnWriteArrayList<>()).add(output);
+  }
+
+  public static void removeThruRoute(String inputName, MidiOut output) {
+    List<MidiOut> list = thruRoutes.get(inputName);
+    if (list != null) list.remove(output);
   }
 
   // --- Shared Port Management ---
@@ -65,6 +78,16 @@ public class ChuckMidiNative {
         msg.when = timestamp;
         msg.setData(raw);
         monitor.onMessage(name, msg);
+      }
+
+      List<MidiOut> targets = thruRoutes.get(name);
+      if (targets != null) {
+        MidiMsg msg = new MidiMsg();
+        msg.when = timestamp;
+        msg.setData(raw);
+        for (MidiOut out : targets) {
+          out.send(msg);
+        }
       }
     }
 
