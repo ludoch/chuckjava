@@ -196,8 +196,9 @@ public class SndBuf extends ChuckUGen {
     float s1 = samples[i1];
     float out = s0 + (s1 - s0) * frac;
 
-    // Click prevention: fade out in the last 1ms (approx 44 samples)
-    if (!loop && rate > 0 && pos > samples.length - 44) {
+    // Click prevention: fade out in the last 1ms (approx 44 samples).
+    // Only applies to arrays long enough that the fade zone is meaningful.
+    if (!loop && rate > 0 && samples.length > 44 && pos > samples.length - 44) {
       double remaining = samples.length - 1 - pos;
       if (remaining < 44) {
         out *= (float) (remaining / 44.0);
