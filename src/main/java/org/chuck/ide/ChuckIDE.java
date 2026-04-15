@@ -24,10 +24,9 @@ import org.chuck.audio.ChuckAudio;
 import org.chuck.audio.analysis.FFT;
 import org.chuck.audio.util.Gain;
 import org.chuck.audio.util.Scope;
-import org.chuck.core.ChuckShred;
 import org.chuck.core.ChuckVM;
 
-/** Main IDE class for ChucK-Java. Restored with full UI logic and modular components. */
+/** Main IDE class for ChucK-Java. Refactored into components with consolidated layout. */
 public class ChuckIDE extends Application {
   private final Preferences prefs = Preferences.userNodeForPackage(ChuckIDE.class);
   private Stage stage;
@@ -80,8 +79,14 @@ public class ChuckIDE extends Application {
     initVM();
     setupUI(primaryStage);
 
-    // Initial tab
-    addNewTab("Untitled.ck", "");
+    // Default script
+    addNewTab(
+        "Untitled.ck",
+        "/* Default SinOsc script */\n"
+            + "SinOsc s => dac;\n"
+            + "0.5 => s.gain;\n"
+            + "440 => s.freq;\n"
+            + "1::second => now;\n");
 
     visualizerPanel.start();
     startAnimationTimer();
@@ -117,7 +122,7 @@ public class ChuckIDE extends Application {
     MenuBar menuBar = createMenuBar(primaryStage);
     ToolBar toolBar = createToolBar();
 
-    // ── LEFT PANEL ──
+    // ── LEFT PANEL: Consolidated utility tabs ──
     projectBrowser = new IDEProjectBrowser(new File("."), this::loadFileIntoEditor, this::print);
     Tab projectTab = new Tab("Project", projectBrowser);
     projectTab.setClosable(false);
@@ -142,7 +147,7 @@ public class ChuckIDE extends Application {
     leftTabPane = new TabPane(projectTab, seqTab, shredsTab, midiTab, settingsTab);
     leftTabPane.setPrefWidth(320);
 
-    // ── CENTER PANEL ──
+    // ── CENTER PANEL: Editor tabs ──
     tabPane = new TabPane();
     statusBar = new StatusBar(vm, audio, prefSampleRate);
     tabPane
@@ -155,7 +160,7 @@ public class ChuckIDE extends Application {
               }
             });
 
-    // ── BOTTOM PANEL ──
+    // ── BOTTOM PANEL: Console, Visualizers, Piano ──
     outputArea = new TextArea();
     outputArea.setEditable(false);
     outputArea.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 12;");
@@ -178,6 +183,7 @@ public class ChuckIDE extends Application {
 
     setupMidiMonitors();
 
+    // Master Gain
     Slider masterGainSlider = new Slider(0, 1.0, masterGain.getGain());
     masterGainSlider.setOrientation(Orientation.VERTICAL);
     masterGainSlider.setShowTickLabels(true);
@@ -192,6 +198,7 @@ public class ChuckIDE extends Application {
     masterBox.setPadding(new Insets(5));
     masterBox.setAlignment(javafx.geometry.Pos.CENTER);
 
+    // Layout Assembly
     SplitPane mainSplit = new SplitPane(leftTabPane, tabPane);
     mainSplit.setDividerPositions(0.25);
 
@@ -337,12 +344,53 @@ public class ChuckIDE extends Application {
         m,
         "1. Getting Started",
         "First steps with SinOsc",
-        "/* Welcome! */\nSinOsc s => dac;\n0.5 => s.gain;\n1::second => now;");
+        "/* Welcome to ChucK-Java! */\n"
+            + "SinOsc s => dac;\n"
+            + "0.5 => s.gain;\n"
+            + "1::second => now;");
     addTutorialStep(
         m,
         "2. Melody and Scales",
         "Sequence with arrays",
-        "/* Melody loop */\nSinOsc s => dac;\n[60, 62, 64, 65, 67] @=> int scale[];\nfor(0=>int i;;i++) {\n  scale[i%scale.cap()] => Std.mtof => s.freq;\n  200::ms => now;\n}");
+        "/* Music often uses scales. */\n"
+            + "SinOsc s => dac;\n"
+            + "0.5 => s.gain;\n"
+            + "[60, 62, 64, 65, 67, 69, 71, 72] @=> int major[];\n"
+            + "for(0 => int i; ; i++) {\n"
+            + "  major[i % major.cap()] => Std.mtof => s.freq;\n"
+            + "  200::ms => now;\n"
+            + "}");
+    addTutorialStep(
+        m,
+        "3. Functions",
+        "Modularizing your code",
+        "/* Functions in ChucK */\n"
+            + "SinOsc s => dac;\n"
+            + "fun void play(int note, dur d) {\n"
+            + "  note => Std.mtof => s.freq;\n"
+            + "  d => now;\n"
+            + "}\n"
+            + "while(true) { play(60, 500::ms); play(67, 500::ms); }");
+    addTutorialStep(
+        m,
+        "4. Strong Timing",
+        "The power of 'now'",
+        "/* Advance time with precision. */\n"
+            + "Impulse i => dac;\n"
+            + "while(true) {\n"
+            + "  1.0 => i.next;\n"
+            + "  100::ms => now;\n"
+            + "}");
+    addTutorialStep(
+        m,
+        "5. Concurrent Audio",
+        "Sporking shreds",
+        "/* Parallel execution */\n"
+            + "fun void saw() { SawOsc s => dac; 0.2 => s.gain; while(true) { 60 => Std.mtof => s.freq; 1::second => now; } }\n"
+            + "fun void sine() { SinOsc s => dac; 0.2 => s.gain; while(true) { 67 => Std.mtof => s.freq; 1::second => now; } }\n"
+            + "spork ~ saw();\n"
+            + "spork ~ sine();\n"
+            + "1::week => now;");
     return m;
   }
 
@@ -382,11 +430,7 @@ public class ChuckIDE extends Application {
       int id = vm.run(code, name);
       if (id > 0) {
         et.setLastSporkedShredId(id);
-        ChuckShred s = vm.getShred(id);
-        if (s != null) {
-          if (!args.isEmpty()) s.setArgs(args.split("\\s+"));
-          shredListView.getItems().add(new ShredInfo(id, name, s));
-        }
+        shredListView.getItems().add(new ShredInfo(id, name, vm.getShred(id)));
       }
     }
   }
