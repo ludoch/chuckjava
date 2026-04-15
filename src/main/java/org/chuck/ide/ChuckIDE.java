@@ -5,24 +5,27 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.prefs.Preferences;
+import javafx.animation.KeyFrame;
+import javafx.animation.Timeline;
 import javafx.application.Application;
 import javafx.application.Platform;
-import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.input.*;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
+import javafx.scene.shape.Circle;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
+import javafx.util.Duration;
 import org.chuck.audio.ChuckAudio;
 import org.chuck.audio.analysis.FFT;
 import org.chuck.audio.util.Gain;
 import org.chuck.audio.util.Scope;
-import org.chuck.core.ChuckShred;
 import org.chuck.core.ChuckVM;
 
-/** Main IDE class for ChucK-Java. Refactored into components but fully restored with all logic. */
+/** Main IDE class for ChucK-Java. Restored with full UI logic and modular components. */
 public class ChuckIDE extends Application {
   private final Preferences prefs = Preferences.userNodeForPackage(ChuckIDE.class);
   private Stage stage;
@@ -49,10 +52,11 @@ public class ChuckIDE extends Application {
   private PianoKeyboard pianoKeyboard;
   private MidiMonitor midiMonitor;
   private MidiRecorder midiRecorder = new MidiRecorder();
+  private Circle midiActivityIndicator;
+  private Timeline midiActivityTimeline;
 
   // Master Gain
   private Gain masterGain;
-  private Slider masterGainSlider;
 
   // State
   private boolean lockdownMode = false;
@@ -148,7 +152,7 @@ public class ChuckIDE extends Application {
     Tab midiTab = new Tab("MIDI", midiMonitor);
     midiTab.setClosable(false);
 
-    PreferencesTab prefsTabComp = new PreferencesTab(prefs, this::applyPreferences);
+    PreferencesTab prefsTabComp = new PreferencesTab(prefs);
     Tab settingsTab = new Tab("Settings", prefsTabComp);
     settingsTab.setClosable(false);
 
@@ -169,10 +173,18 @@ public class ChuckIDE extends Application {
 
     pianoKeyboard = new PianoKeyboard();
     pianoKeyboard.setPrefHeight(100);
+
+    // MIDI Activity Circle
+    midiActivityIndicator = new Circle(5, Color.DARKRED);
+    midiActivityTimeline =
+        new Timeline(
+            new KeyFrame(Duration.ZERO, e -> midiActivityIndicator.setFill(Color.LIME)),
+            new KeyFrame(Duration.millis(50), e -> midiActivityIndicator.setFill(Color.DARKRED)));
+
     setupMidiMonitors();
 
     // ── Master Gain Slider ──
-    masterGainSlider = new Slider(0, 1.0, masterGain.getGain());
+    Slider masterGainSlider = new Slider(0, 1.0, masterGain.getGain());
     masterGainSlider.setOrientation(Orientation.VERTICAL);
     masterGainSlider.setShowTickLabels(true);
     masterGainSlider.setTooltip(new Tooltip("Master Volume"));
@@ -209,11 +221,7 @@ public class ChuckIDE extends Application {
 
     primaryStage.setScene(scene);
     primaryStage.show();
-  }
-
-  private void applyPreferences() {
-    loadPreferences();
-    print("Preferences applied.\n");
+    print("ChucK-Java Engine Online — JDK 25 | Project Loom | Panama\n");
   }
 
   private void addNewTab(String title, String content) {
@@ -239,13 +247,12 @@ public class ChuckIDE extends Application {
         et.setFile(f);
       }
     } catch (IOException e) {
-      print("Error loading file: " + e.getMessage());
+      print("Error loading file: " + e.getMessage() + "\n");
     }
   }
 
   private MenuBar createMenuBar(Stage stage) {
     MenuBar mb = new MenuBar();
-
     Menu fileMenu = new Menu("_File");
     MenuItem newItem = new MenuItem("New");
     newItem.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN));
@@ -271,21 +278,14 @@ public class ChuckIDE extends Application {
     Menu examplesMenu = new Menu("_Examples");
     loadExamples(new File("examples"), examplesMenu);
 
-    Menu helpMenu = new Menu("_Help");
-    MenuItem aboutItem = new MenuItem("About ChucK-Java");
-    aboutItem.setOnAction(
-        e -> {
-          Alert a =
-              new Alert(
-                  Alert.AlertType.INFORMATION,
-                  "ChucK-Java IDE\nJDK 25 + Project Loom + Panama\nBased on Princeton ChucK.");
-          a.show();
-        });
-    helpMenu.getItems().add(aboutItem);
-
     mb.getMenus()
         .addAll(
-            fileMenu, new Menu("_Edit"), new Menu("_View"), tutorialMenu, examplesMenu, helpMenu);
+            fileMenu,
+            new Menu("_Edit"),
+            new Menu("_View"),
+            tutorialMenu,
+            examplesMenu,
+            new Menu("_Help"));
     return mb;
   }
 
@@ -321,7 +321,7 @@ public class ChuckIDE extends Application {
           et.setFile(f);
           et.setSaved();
         } catch (IOException e) {
-          print("Error saving: " + e.getMessage());
+          print("Error saving: " + e.getMessage() + "\n");
         }
       }
     }
@@ -355,13 +355,11 @@ public class ChuckIDE extends Application {
 
   private ToolBar createToolBar() {
     Button addBtn = new Button("Add Shred");
-    addBtn.setTooltip(new Tooltip("Compile and run (Ctrl+Enter)"));
     addBtn.setStyle("-fx-background-color: #b8f0b8; -fx-font-weight: bold;");
     addBtn.setOnAction(e -> addShred());
     addShredBtnRef = addBtn;
 
     Button replaceBtn = new Button("Replace Shred");
-    replaceBtn.setTooltip(new Tooltip("Replace last sporked (Ctrl+Shift+Enter)"));
     replaceBtn.setOnAction(e -> replaceShred());
     replaceBtnRef = replaceBtn;
 
@@ -376,15 +374,10 @@ public class ChuckIDE extends Application {
     if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et) {
       String code = et.getEditor().getText();
       String name = et.getText().replaceFirst("^\\* ", "");
-      String args = et.getArguments();
       int id = vm.run(code, name);
       if (id > 0) {
         et.setLastSporkedShredId(id);
-        ChuckShred s = vm.getShred(id);
-        if (s != null) {
-          if (!args.isEmpty()) s.setArgs(args.split("\\s+"));
-          shredListView.getItems().add(new ShredInfo(id, name, s));
-        }
+        shredListView.getItems().add(new ShredInfo(id, name, vm.getShred(id)));
       }
     }
   }
@@ -462,6 +455,7 @@ public class ChuckIDE extends Application {
     org.chuck.midi.ChuckMidiNative.addMonitor(
         (dev, msg) -> {
           pianoKeyboard.onMidiMessage(msg);
+          if (midiActivityTimeline != null) midiActivityTimeline.playFromStart();
           if (midiMonitor != null) midiMonitor.onMidiMessage(dev, msg);
           if (midiRecorder != null) midiRecorder.onMidiMessage(dev, msg);
         });
