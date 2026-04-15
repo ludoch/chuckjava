@@ -1370,6 +1370,13 @@ public class ExpressionEmitter {
           if (bt == null
               && dot.base() instanceof ChuckAST.IdExp id
               && parent.getUserClassRegistry().containsKey(id.name())) bt = id.name();
+          if (bt == null) {
+            // Type unknown (e.g. chained call: fft.upchuck().cvals()) — emit base then call by name
+            this.emitExpression(dot.base(), code);
+            for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
+            code.addInstruction(new ObjectInstrs.CallMethod(dot.member(), argc));
+            return;
+          }
           if (bt != null) {
             // Specialization for built-in UGen method calls (single arg)
             if (argc == 1 && (parent.isKnownUGenType(bt) || parent.isSubclassOfUGen(bt))) {
