@@ -668,7 +668,8 @@ public class ChuckAudio {
                         }
                         try {
                           Thread.sleep(5);
-                        } catch (InterruptedException ignored) {}
+                        } catch (InterruptedException ignored) {
+                        }
                       } else {
                         // Not idle OR fading out
                         float effectiveTargetGain = isIdle ? 0.0f : targetGain;
