@@ -774,6 +774,13 @@ public class ChuckIDE extends Application {
     outputArea.setPrefHeight(110);
     outputArea.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 12;");
 
+    // --- Piano Keyboard Monitor ---
+    PianoKeyboard pianoKeyboard = new PianoKeyboard();
+    org.chuck.midi.ChuckMidiNative.addMonitor((device, msg) -> pianoKeyboard.onMidiMessage(msg));
+
+    VBox consoleAndMidi = new VBox(2, outputArea, pianoKeyboard);
+    VBox.setVgrow(outputArea, Priority.ALWAYS);
+
     Button clearConsoleBtn = new Button("Clear");
     clearConsoleBtn.setOnAction(e -> clearConsole());
 
@@ -801,7 +808,7 @@ public class ChuckIDE extends Application {
             new Separator(Orientation.VERTICAL),
             cpuLabel);
     statusBar.setStyle("-fx-background-color: #ddd; -fx-padding: 2;");
-    VBox bottomPanel = new VBox(outputArea, statusBar);
+    VBox bottomPanel = new VBox(consoleAndMidi, statusBar);
 
     // ── Layout ──
     SplitPane hSplit = new SplitPane(leftPanel, tabPane, rightPanel);

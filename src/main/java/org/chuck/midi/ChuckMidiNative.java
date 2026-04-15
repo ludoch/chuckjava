@@ -13,6 +13,23 @@ import org.chuck.core.ChuckVM;
 public class ChuckMidiNative {
   private static final Logger logger = Logger.getLogger(ChuckMidiNative.class.getName());
 
+  /** Functional interface for monitoring MIDI messages globally in the IDE. */
+  @FunctionalInterface
+  public interface MidiMonitor {
+    void onMessage(String deviceName, MidiMsg msg);
+  }
+
+  private static final java.util.List<MidiMonitor> monitors =
+      new java.util.concurrent.CopyOnWriteArrayList<>();
+
+  public static void addMonitor(MidiMonitor monitor) {
+    monitors.add(monitor);
+  }
+
+  public static void removeMonitor(MidiMonitor monitor) {
+    monitors.remove(monitor);
+  }
+
   private final ChuckVM vm;
   private final ChuckEvent event;
   private final Arena arena;
@@ -20,6 +37,7 @@ public class ChuckMidiNative {
 
   private MemorySegment midiInPtr = MemorySegment.NULL;
   private MemorySegment callbackStub = null;
+  private String openedName = "unopened";
 
   // Callback Descriptor: void callback(double timestamp, const unsigned char* message, size_t
   // messageSize, void* userData)
@@ -85,6 +103,7 @@ public class ChuckMidiNative {
       RtMidi.set_error_callback.invoke(midiInPtr, errorStub, MemorySegment.NULL);
 
       MemorySegment portName = arena.allocateFrom("ChucK-Java Input");
+      openedName = RtMidi.getPortName(midiInPtr, portNumber);
       RtMidi.open_port.invoke(midiInPtr, portNumber, portName);
 
       logger.info("Native MIDI Input opened port " + portNumber + " (API=" + api + ")");
@@ -123,6 +142,7 @@ public class ChuckMidiNative {
       RtMidi.in_set_callback.invoke(midiInPtr, callbackStub, MemorySegment.NULL);
 
       RtMidi.open_virtual_port.invoke(midiInPtr, portName);
+      openedName = name;
       logger.info("Native Virtual MIDI Input created: " + name);
     } catch (Throwable t) {
       logger.log(Level.SEVERE, "Failed to create virtual MIDI input", t);
@@ -138,6 +158,11 @@ public class ChuckMidiNative {
     byte[] raw = new byte[(int) size];
     MemorySegment.copy(message, ValueLayout.JAVA_BYTE, 0, raw, 0, (int) size);
     msg.setData(raw);
+
+    // Notify global monitors (for IDE visualization)
+    for (MidiMonitor monitor : monitors) {
+      monitor.onMessage(openedName, msg);
+    }
 
     queue.addLast(msg);
     event.broadcast(vm);

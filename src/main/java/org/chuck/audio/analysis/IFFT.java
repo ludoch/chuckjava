@@ -35,9 +35,66 @@ public class IFFT extends UAna {
     this.readPos = 0;
   }
 
+  /** ChucK API: {@code ifft.size()} getter. */
+  public long size() {
+    return size;
+  }
+
+  /** ChucK API: {@code ifft.size(n)} method-call setter. */
+  public long size(long n) {
+    setSize((int) n);
+    return n;
+  }
+
+  /** ChucK API: {@code n => ifft.size} property-setter. */
+  public double size(double n) {
+    setSize((int) n);
+    return n;
+  }
+
   /** Set a custom synthesis window from a {@code ChuckArray} of coefficients. */
   public ChuckArray window(ChuckArray coeffs) {
     return coeffs; // IFFT synthesis window — accepted for API compatibility
+  }
+
+  /**
+   * ChucK API: {@code ifft.transform(s)} — manually load a complex spectrum into the IFFT for
+   * synthesis, bypassing the need for an upstream FFT connection.
+   */
+  public ChuckArray transform(ChuckArray arr) {
+    if (arr == null) return arr;
+    List<Complex> spectrum = new ArrayList<>(arr.size());
+    for (int i = 0; i < arr.size(); i++) {
+      Object elem = arr.getObject(i);
+      if (elem instanceof ChuckArray ca) {
+        spectrum.add(new Complex((float) ca.getFloat(0), (float) ca.getFloat(1)));
+      } else {
+        spectrum.add(new Complex(0f, 0f));
+      }
+    }
+    // Store in lastBlob and trigger the IFFT computation
+    lastBlob.setCvals(spectrum);
+    computeUAnaFromBlob(lastBlob);
+    return arr;
+  }
+
+  /** Run IFFT from a pre-filled blob (used by transform()). */
+  private void computeUAnaFromBlob(UAnaBlob blob) {
+    List<Complex> cvals = blob.getCvals();
+    if (cvals.isEmpty()) return;
+    double[] re = new double[size];
+    double[] im = new double[size];
+    int bins = Math.min(cvals.size(), size / 2);
+    for (int i = 0; i < bins; i++) {
+      Complex c = cvals.get(i);
+      re[i] = c.re();
+      im[i] = c.im();
+      if (i > 0 && i < size - i) {
+        re[size - i] = c.re();
+        im[size - i] = -c.im();
+      }
+    }
+    runIFFT(re, im);
   }
 
   @Override
@@ -58,33 +115,12 @@ public class IFFT extends UAna {
         break;
       }
     }
-
     if (inputBlob == null) return;
+    computeUAnaFromBlob(inputBlob);
+  }
 
-    List<Complex> cvals = inputBlob.getCvals();
-    if (cvals.isEmpty()) return;
-
-    // Prepare full spectrum (reconstruct negative frequencies for real signal)
-    double[] re = new double[size];
-    double[] im = new double[size];
-
-    int bins = Math.min(cvals.size(), size / 2);
-    for (int i = 0; i < bins; i++) {
-      Complex c = cvals.get(i);
-      re[i] = c.re();
-      im[i] = c.im();
-      // Conjugate symmetry for real output
-      if (i > 0 && i < size - i) {
-        re[size - i] = c.re();
-        im[size - i] = -c.im();
-      }
-    }
-
-    // In-place Inverse FFT
-    // 1. Swap real and imaginary parts (or use conjugate)
-    // 2. Perform forward FFT
-    // 3. Swap again and scale by 1/N
-
+  /** Shared IFFT kernel: butterfly + scale + fill output buffer. */
+  private void runIFFT(double[] re, double[] im) {
     // Bit-reversal permutation
     int bits = Integer.numberOfTrailingZeros(size);
     for (int i = 0; i < size; i++) {
@@ -98,12 +134,10 @@ public class IFFT extends UAna {
         im[j] = tmp;
       }
     }
-
     // FFT stages (inverse uses positive angle)
     for (int len = 2; len <= size; len <<= 1) {
-      double ang = 2.0 * Math.PI / len; // Positive for Inverse
-      double wRe = Math.cos(ang);
-      double wIm = Math.sin(ang);
+      double ang = 2.0 * Math.PI / len;
+      double wRe = Math.cos(ang), wIm = Math.sin(ang);
       for (int i = 0; i < size; i += len) {
         double curRe = 1.0, curIm = 0.0;
         for (int j = 0; j < len / 2; j++) {
@@ -121,22 +155,12 @@ public class IFFT extends UAna {
         }
       }
     }
-
     // Scale by 1/N and copy to output buffer
-    for (int i = 0; i < size; i++) {
-      buffer[i] = (float) (re[i] / size);
-    }
-
-    // Reset read position to start of new frame
+    for (int i = 0; i < size; i++) buffer[i] = (float) (re[i] / size);
     readPos = 0;
-
-    // IFFT doesn't produce its own blob for downstream UAnas in standard ChucK,
-    // but we can store the time-domain samples if needed.
-    // ChucK IFFT => UAnaBlob gives time domain samples.
-    List<Complex> timeDomain = new ArrayList<>(size);
-    for (int i = 0; i < size; i++) {
-      timeDomain.add(new Complex(buffer[i], 0));
-    }
-    lastBlob.setCvals(timeDomain);
+    // Store time-domain samples in blob
+    List<Complex> td = new ArrayList<>(size);
+    for (int i = 0; i < size; i++) td.add(new Complex(buffer[i], 0));
+    lastBlob.setCvals(td);
   }
 }

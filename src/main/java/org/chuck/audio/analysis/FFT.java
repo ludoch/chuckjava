@@ -50,6 +50,65 @@ public class FFT extends UAna {
     return size;
   }
 
+  /** ChucK API: {@code fft.size()} getter. */
+  public long size() {
+    return size;
+  }
+
+  /** ChucK API: {@code fft.size(n)} method-call setter. */
+  public long size(long n) {
+    setSize((int) n);
+    return n;
+  }
+
+  /** ChucK API: {@code n => fft.size} property-setter (SetMemberIntByName uses double). */
+  public double size(double n) {
+    setSize((int) n);
+    return n;
+  }
+
+  /** ChucK API: {@code fft.cval(n)} — returns complex bin n as a {@code complex} ChuckArray. */
+  public ChuckArray cval(long n) {
+    List<Complex> cv = lastBlob.getCvals();
+    int idx = (int) n;
+    ChuckArray res = new ChuckArray("complex", new double[] {0.0, 0.0});
+    if (idx >= 0 && idx < cv.size()) {
+      Complex c = cv.get(idx);
+      res.setFloat(0, c.re());
+      res.setFloat(1, c.im());
+    }
+    return res;
+  }
+
+  /**
+   * ChucK API: {@code fft.spectrum(s)} — fills a pre-allocated {@code complex[]} array with the
+   * current spectrum. Each element {@code s[i]} must already be a {@code complex} ChuckArray.
+   */
+  public ChuckArray spectrum(ChuckArray arr) {
+    if (arr == null) return arr;
+    List<Complex> cv = lastBlob.getCvals();
+    int n = Math.min(arr.size(), cv.size());
+    for (int i = 0; i < n; i++) {
+      Complex c = cv.get(i);
+      Object elem = arr.getObject(i);
+      if (elem instanceof ChuckArray ca) {
+        ca.setFloat(0, c.re());
+        ca.setFloat(1, c.im());
+      } else {
+        ChuckArray ca2 = new ChuckArray("complex", new double[] {c.re(), c.im()});
+        arr.setObject(i, ca2);
+      }
+    }
+    return arr;
+  }
+
+  /** ChucK API: {@code fft.fval(n)} — returns magnitude of bin n. */
+  public double fval(long n) {
+    float[] fv = lastBlob.getFvals();
+    int idx = (int) n;
+    return (idx >= 0 && idx < fv.length) ? fv[idx] : 0.0;
+  }
+
   public void setWindow(int type) {
     this.windowType = type;
     buildWindow();

@@ -2106,6 +2106,20 @@
     "allDeclaredConstructors": true
   },
   {
+    "name": "org.chuck.audio.analysis.FFT",
+    "allPublicMethods": true,
+    "allDeclaredMethods": true,
+    "allPublicConstructors": true,
+    "allDeclaredConstructors": true
+  },
+  {
+    "name": "org.chuck.audio.analysis.IFFT",
+    "allPublicMethods": true,
+    "allDeclaredMethods": true,
+    "allPublicConstructors": true,
+    "allDeclaredConstructors": true
+  },
+  {
     "name": "org.chuck.audio.analysis.Windowing",
     "allPublicMethods": true,
     "allDeclaredMethods": true,
