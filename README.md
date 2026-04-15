@@ -24,7 +24,8 @@
 | **MidiPoly** | High-level automatic voice management for polyphonic MIDI instruments. | ✅ New |
 | **MIDI Learn** | Bind physical MIDI knobs to IDE global sliders with a single click. | ✅ New |
 | **MIDI Monitor** | Real-time 88-key piano keyboard in IDE with CC and Pitch Bend visualization. | ✅ New |
-| **MidiFileOut** | Record generative MIDI performances to standard `.mid` files. | ✅ New |
+| **MidiFileOut** | Record generative MIDI to multi-track `.mid` files with tempo maps. | ✅ New |
+| **MidiPlayer** | High-level MIDI sequencer. Connects directly to `MidiPoly` (`file => player => poly;`). | ✅ New |
 | **Device Probing** | Robust audio/MIDI device discovery with native port names. | ✅ Fixed |
 | **Precision Time** | Sample-accurate MIDI timestamps (`msg.when`) for high-jitter protection. | ✅ Fixed |
 
@@ -33,12 +34,14 @@
 #### 🎹 Advanced MIDI & Musician Features
 - **Native RtMidi Support**: Low-latency native MIDI drivers via Project Panama (ASIO, CoreMIDI, ALSA, JACK). Replaces the 1ms polling loop with a true native callback model.
 - **Native Port Sharing**: Run multiple `MidiIn` and `MidiOut` objects on the same physical hardware port safely (prevents "Device Busy" errors).
-- **`MidiPoly`**: Automatic high-level voice management. Map MIDI to STK instruments or custom UGens with zero manual sporking. Supports instrument selection, voice stealing, polyphonic pools, and custom microtonal tuning maps (`tuning(float[])`).
+- **`MidiPoly`**: Automatic high-level voice management. Map MIDI to STK instruments or custom UGens with zero manual sporking. Supports instrument selection, voice stealing, polyphonic pools, and custom microtonal tuning maps (`tuning(float[])`). Supports direct connections: `MidiIn min => MidiPoly poly;`.
+- **`MidiPlayer`**: A high-level MIDI sequencer. Load a `MidiFileIn`, connect it to an instrument (`player => poly`), and call `player.play()` for automatic, sample-accurate playback.
 - **`MidiMpe`**: Full MIDI Polyphonic Expression (MPE) support for per-note pitch bend and channel pressure.
 - **`MidiClock`**: Dedicated class for tracking MIDI 24ppq clock, start, stop, and continue messages, allowing tight transport sync (`onBeat()`, `onSixteenth()`, etc.).
 - **IDE MIDI Visualizer**: Real-time 88-key piano keyboard showing Note-On/Off, CC, and Pitch Bend movements.
 - **MIDI Learn**: Bind physical knobs and faders to ChucK global variables with a single click in the "Control" tab.
-- **MidiFileOut**: Record generative MIDI performances directly to standard `.mid` files.
+- **MidiFileOut**: Record generative MIDI performances directly to standard `.mid` files. Supports **SMF Format 1** (multi-track), Tempo Maps, Section Markers, and 14-bit NRPN high-resolution sweeps.
+- **MidiFileIn**: Upgraded to support multi-track reading, file metadata (`bpm()`, `tpq()`), and automatic delta-time calculation (`msg.when`).
 - **Precision Timestamps**: Incoming messages now include `msg.when` (seconds) from the native driver for jitter-free alignment.
 
 #### 🌐 Network Audio & 3D Spatialization

@@ -1280,8 +1280,26 @@ mout.send(msg);
 ```chuck
 MidiFileOut mfo;
 mfo.open("performance.mid");
-mfo.write(msg);                       // write message with current timestamp
-mfo.close();                          // finalize and save file
+mfo.setBpm(120.0);                          // automatic tempo map translation
+int trk = mfo.addTrack("Synth");            // Format 1 multitrack
+mfo.write(trk, msg);                        // write to specific track
+mfo.close();                                // finalize and save file
+```
+
+### MidiFileIn & MidiPlayer (Playback)
+
+```chuck
+MidiFileIn min;
+MidiPlayer player;
+min.open("song.mid");
+
+<<< "BPM:", min.bpm(), "Tracks:", min.numTracks() >>>;
+
+// Play automatically via a synth
+MidiPoly poly => dac;
+min => player => poly;
+player.play();
+1::minute => now;
 ```
 
 ### MidiPoly (High-level Polyphony)
@@ -1289,19 +1307,21 @@ mfo.close();                          // finalize and save file
 Automatic voice management for MIDI instruments.
 
 ```chuck
-MidiIn min => MidiPoly poly => dac;
-poly.setInstrument("Rhodey");         // choose STK instrument or SinOsc/SawOsc/etc.
-poly.voices(12);                      // set max polyphony
+MidiIn min;
+MidiPoly poly => dac;
+
+min => poly;                                // direct auto-dispatch!
+
+poly.setInstrument("Rhodey");               // choose STK instrument or SinOsc/SawOsc/etc.
+poly.voices(12);                            // set max polyphony
 
 // Microtonal Tuning
 float myScale[128];
 // ... populate myScale with frequencies in Hz ...
-poly.tuning(myScale);                 // override standard 12-TET
-// poly.standardTuning();             // revert to default
+poly.tuning(myScale);                       // override standard 12-TET
+// poly.standardTuning();                   // revert to default
 
-while (min => now) {
-    while (min.recv(msg)) poly.onMessage(msg); // auto-dispatches to voices
-}
+1::week => now;
 ```
 
 ### MidiMpe (MIDI Polyphonic Expression)
@@ -1309,13 +1329,14 @@ while (min => now) {
 Advanced voice management for MPE controllers (like Roli Seaboard, LinnStrument). Notes are mapped by channel instead of note number.
 
 ```chuck
-MidiIn min => MidiMpe mpe => dac;
-mpe.setInstrument("Moog");
-mpe.bendRange(48);                    // Set MPE pitch bend range in semitones (default 48)
+MidiIn min;
+MidiMpe mpe => dac;
+min => mpe;
 
-while (min => now) {
-    while (min.recv(msg)) mpe.onMessage(msg); // Handles per-note pitch bend and pressure
-}
+mpe.setInstrument("Moog");
+mpe.bendRange(48);                          // Set MPE pitch bend range in semitones (default 48)
+
+1::week => now;
 ```
 
 ### MidiClock (Transport Synchronization)

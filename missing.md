@@ -227,7 +227,9 @@ All functions below are now implemented in `MathInstrs.MathFunc` (2026-04-06).
 | `OscIn` / `OscOut` / `OscMsg` / `OscBundle` | ✅ Done | |
 | `Hid` / `HidMsg` | ✅ Done | |
 | `SerialIO` | ✅ Done | |
-| `MidiFileIn` | ✅ Done — `open(string)`, `read(MidiMsg)`, `more()`, `rewind()`, `close()`, `size()`, `numTracks()`, `resolution()` | |
+| `MidiFileIn` | ✅ Done — `open(string)`, `read(MidiMsg, [track])`, `more()`, `rewind()`, `close()`, `size()`, `numTracks()`, `resolution()`, `tpq()`, `bpm()` | |
+| `MidiFileOut` | ✅ Done — Record generative performances to SMF 1 files (`addTrack`, `setBpm`, markers, nrpn) | |
+| `MidiPlayer` | ✅ Done — Auto-sequencer (`MidiFileIn` => `MidiPlayer` => `MidiPoly`) | |
 | `HidOut` | ✅ Done (stub) — `open(num)`, `send(HidMsg)`, `close()`, `name()`, `num()` — always returns 0 (native HID output requires platform libs) | |
 
 ---

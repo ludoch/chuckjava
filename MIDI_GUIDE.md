@@ -47,7 +47,11 @@ if( min.open("KeyStep") ) {
 Writing polyphonic logic manually (voice arrays, note-tracking) is complex. ChucK-Java provides `MidiPoly` to handle this for you.
 
 ```chuck
-MidiIn min => MidiPoly poly => dac;
+MidiIn min;
+MidiPoly poly => dac;
+
+// Connect MidiIn directly to MidiPoly for automatic voice management!
+min => poly;
 
 // Choose any STK instrument (Rhodey, Wurley, Mandolin, Sitar, etc.)
 poly.setInstrument("Rhodey");
@@ -56,24 +60,22 @@ poly.voices(12); // Support up to 12 simultaneous notes
 // Optional: Custom microtonal tuning
 // float myScale[128]; ... poly.tuning(myScale);
 
-while( min => now ) {
-    while( min.recv(msg) ) {
-        poly.onMessage(msg); // Auto-dispatches to voices
-    }
-}
+// The voices are triggered automatically. Just wait!
+1::week => now;
 ```
 
 ### MPE (MIDI Polyphonic Expression)
 If you have an MPE controller (Roli Seaboard, LinnStrument), use `MidiMpe` instead of `MidiPoly`. It handles per-note pitch bend and channel pressure automatically:
 
 ```chuck
-MidiIn min => MidiMpe mpe => dac;
+MidiIn min;
+MidiMpe mpe => dac;
+min => mpe;
+
 mpe.setInstrument("Moog");
 mpe.bendRange(48); // Set pitch bend range (default 48 semitones)
 
-while(min => now) {
-    while(min.recv(msg)) mpe.onMessage(msg);
-}
+1::week => now;
 ```
 
 ---
@@ -126,18 +128,41 @@ while(clock.onBeat() => now) {
 }
 ```
 
-### MIDI File Recording
-Use `MidiFileOut` to save your generative performances.
+### MIDI File Recording & Sequencing
+Use `MidiFileOut` to save your generative performances, now with full multi-track and tempo map support.
 
 ```chuck
 MidiFileOut mfo;
 mfo.open("my_composition.mid");
 
+// Setup track and tempo
+mfo.setBpm(120.0);
+mfo.addMarker("Intro");
+int track1 = mfo.addTrack("Synth Lead");
+
 // Inside your loop:
-mfo.write(msg);
+mfo.write(track1, msg);
+
+// Optional: High-res 14-bit sweep
+mfo.nrpn(track1, 0, 100, 8192, 1.5); // (track, channel, param, value, timestamp)
 
 // At the end:
 mfo.close();
+```
+
+To easily play back `.mid` files, use the new `MidiPlayer` sequencer:
+
+```chuck
+MidiFileIn file;
+MidiPlayer player;
+MidiPoly poly => dac;
+
+// Load file and connect to instrument
+file.open("my_composition.mid");
+file => player => poly;
+
+// Auto-play!
+player.play();
 ```
 
 ### Filtering Data

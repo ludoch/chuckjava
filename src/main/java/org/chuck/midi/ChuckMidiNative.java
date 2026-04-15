@@ -51,6 +51,13 @@ public class ChuckMidiNative {
         msg.setData(raw);
         sub.queue.addLast(msg);
         sub.event.broadcast(sub.vm);
+
+        // Forward to MidiPoly targets connected via 'min => poly'
+        if (sub.event instanceof MidiIn min) {
+          for (MidiPoly target : min.getTargets()) {
+            target.onMessage(msg);
+          }
+        }
       }
 
       for (MidiMonitor monitor : monitors) {

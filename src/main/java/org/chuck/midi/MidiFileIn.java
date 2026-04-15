@@ -9,41 +9,86 @@ import org.chuck.core.ChuckObject;
 import org.chuck.core.ChuckType;
 
 /**
- * ChucK MidiFileIn — reads Standard MIDI (.mid) files for sequencing. Usage in ChucK: MidiFileIn
- * mf; MidiMsg msg; mf.open("song.mid"); while (mf.more()) { mf.read(msg); <<< msg.data1, msg.data2,
- * msg.data3 >>>; } mf.close();
+ * ChucK MidiFileIn — reads Standard MIDI (.mid) files for sequencing. Supports multi-track reading
+ * and provides timing information.
  */
 public class MidiFileIn extends ChuckObject {
   private Sequence sequence;
-  private final List<TimedMessage> messages = new ArrayList<>();
-  private int cursor = 0;
+  private List<List<TimedMessage>> trackMessages = new ArrayList<>();
+  private List<TimedMessage> mergedMessages = new ArrayList<>();
+  private int[] trackCursors;
+  private int mergedCursor = 0;
   private boolean opened = false;
+  private double bpm = 120.0;
 
-  private record TimedMessage(long tick, byte[] data) {}
+  private static class TimedMessage {
+    long tick;
+    byte[] data;
+    double deltaSeconds; // time since previous message in the same track
+
+    TimedMessage(long tick, byte[] data) {
+      this.tick = tick;
+      this.data = data;
+    }
+  }
 
   public MidiFileIn() {
     super(ChuckType.OBJECT);
   }
 
-  /**
-   * Open a MIDI file. Returns 1 on success, 0 on failure. All tracks are merged into a single
-   * chronologically sorted message list.
-   */
   public long open(String filename) {
     try {
       sequence = MidiSystem.getSequence(new File(filename));
-      messages.clear();
-      cursor = 0;
-      for (Track track : sequence.getTracks()) {
+      trackMessages.clear();
+      mergedMessages.clear();
+
+      int resolution = sequence.getResolution(); // Ticks per quarter
+      double currentBpm = 120.0;
+      this.bpm = 120.0;
+      boolean bpmSet = false;
+
+      Track[] tracks = sequence.getTracks();
+      trackCursors = new int[tracks.length];
+
+      for (int t = 0; t < tracks.length; t++) {
+        Track track = tracks[t];
+        List<TimedMessage> messages = new ArrayList<>();
+        long lastTick = 0;
+
         for (int i = 0; i < track.size(); i++) {
           MidiEvent ev = track.get(i);
           MidiMessage mm = ev.getMessage();
-          if (mm instanceof ShortMessage || mm instanceof SysexMessage) {
-            messages.add(new TimedMessage(ev.getTick(), mm.getMessage()));
+
+          // Check for tempo meta event
+          if (mm instanceof MetaMessage meta && meta.getType() == 0x51) {
+            byte[] data = meta.getData();
+            int mspq = ((data[0] & 0xFF) << 16) | ((data[1] & 0xFF) << 8) | (data[2] & 0xFF);
+            currentBpm = 60000000.0 / mspq;
+            if (!bpmSet) {
+              this.bpm = currentBpm;
+              bpmSet = true;
+            }
+          }
+
+          if (mm instanceof ShortMessage
+              || mm instanceof SysexMessage
+              || mm instanceof MetaMessage) {
+            TimedMessage tm = new TimedMessage(ev.getTick(), mm.getMessage());
+
+            // Calculate delta time in seconds (approximate using current BPM)
+            // Note: Accurate delta requires a full tempo map. For now, we use a simple approach.
+            double secondsPerTick = 60.0 / (currentBpm * resolution);
+            tm.deltaSeconds = (tm.tick - lastTick) * secondsPerTick;
+
+            messages.add(tm);
+            mergedMessages.add(tm);
+            lastTick = tm.tick;
           }
         }
+        trackMessages.add(messages);
       }
-      messages.sort(Comparator.comparingLong(TimedMessage::tick));
+
+      mergedMessages.sort(Comparator.comparingLong(tm -> tm.tick));
       opened = true;
       return 1L;
     } catch (Exception e) {
@@ -51,47 +96,68 @@ public class MidiFileIn extends ChuckObject {
     }
   }
 
-  /** Read the next MIDI message into msg. Returns 1 if a message was read, 0 if EOF. */
+  /** Read the next MIDI message from the merged list into msg. */
   public long read(MidiMsg msg) {
-    if (!opened || cursor >= messages.size()) return 0L;
-    byte[] data = messages.get(cursor++).data();
-    msg.data1 = data.length > 0 ? (data[0] & 0xFF) : 0;
-    msg.data2 = data.length > 1 ? (data[1] & 0xFF) : 0;
-    msg.data3 = data.length > 2 ? (data[2] & 0xFF) : 0;
+    if (!opened || mergedCursor >= mergedMessages.size()) return 0L;
+    return fillMsg(msg, mergedMessages.get(mergedCursor++));
+  }
+
+  /** Read the next MIDI message from a specific track into msg. */
+  public long read(MidiMsg msg, int trackIndex) {
+    if (!opened || trackIndex < 0 || trackIndex >= trackMessages.size()) return 0L;
+    List<TimedMessage> messages = trackMessages.get(trackIndex);
+    int cursor = trackCursors[trackIndex];
+    if (cursor >= messages.size()) return 0L;
+
+    long res = fillMsg(msg, messages.get(cursor));
+    trackCursors[trackIndex]++;
+    return res;
+  }
+
+  private long fillMsg(MidiMsg msg, TimedMessage tm) {
+    byte[] data = tm.data;
+    msg.setData(data);
+    msg.when = tm.deltaSeconds; // Return delta time in seconds
     return 1L;
   }
 
-  /** Rewind to the beginning of the file. */
   public void rewind() {
-    cursor = 0;
+    mergedCursor = 0;
+    if (trackCursors != null) {
+      for (int i = 0; i < trackCursors.length; i++) trackCursors[i] = 0;
+    }
   }
 
-  /** Close the file and free resources. */
   public void close() {
     sequence = null;
-    messages.clear();
+    trackMessages.clear();
+    mergedMessages.clear();
     opened = false;
-    cursor = 0;
+    mergedCursor = 0;
   }
 
-  /** Returns 1 if there are more messages to read, 0 if at EOF. */
   public long more() {
-    return (opened && cursor < messages.size()) ? 1L : 0L;
+    return (opened && mergedCursor < mergedMessages.size()) ? 1L : 0L;
   }
 
-  /** Total number of MIDI messages across all tracks. */
   public long size() {
-    return messages.size();
+    return mergedMessages.size();
   }
 
-  /** Number of tracks in the file. */
   public long numTracks() {
-    return sequence != null ? sequence.getTracks().length : 0L;
+    return trackMessages.size();
   }
 
-  /** Tick resolution (pulses per quarter note) of the file. */
   public long resolution() {
     return sequence != null ? sequence.getResolution() : 0L;
+  }
+
+  public long tpq() {
+    return resolution();
+  }
+
+  public double bpm() {
+    return bpm;
   }
 
   public boolean isOpened() {

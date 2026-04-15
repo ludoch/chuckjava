@@ -10,6 +10,9 @@ public class MidiIn extends ChuckEvent {
   private final ConcurrentLinkedDeque<MidiMsg> queue = new ConcurrentLinkedDeque<>();
   private String openedName = "unopened";
 
+  private final java.util.List<MidiPoly> targets =
+      new java.util.concurrent.CopyOnWriteArrayList<>();
+
   public MidiIn(ChuckVM vm) {
     this.driver = new ChuckMidiNative(vm, this, this.queue);
 
@@ -19,6 +22,14 @@ public class MidiIn extends ChuckEvent {
     boolean ignoreSysex = prefs.getBoolean("midi.ignoreSysex", false);
     boolean ignoreTime = prefs.getBoolean("midi.ignoreTime", true);
     driver.ignoreTypes(ignoreSysex, ignoreTime, true); // sense=true by default
+  }
+
+  public void connect(MidiPoly p) {
+    if (p != null) targets.add(p);
+  }
+
+  public java.util.List<MidiPoly> getTargets() {
+    return targets;
   }
 
   public void open(int port) {

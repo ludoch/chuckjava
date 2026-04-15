@@ -332,7 +332,19 @@ public class StatementEmitter {
               case null -> List.of();
               default -> List.of();
             };
-        if (isUserClass && !ctorArgs.isEmpty()) {
+        // Emit constructor call if: explicit callArgs present (even zero-arg "()")
+        // OR class defines a zero-arg @construct (Foo f; should call @construct()).
+        boolean hasExplicitCallArgs = s.callArgs() != null;
+        boolean hasZeroArgCtor =
+            isUserClass
+                && !hasExplicitCallArgs
+                && parent.getUserClassRegistry().containsKey(s.type())
+                && parent
+                    .getUserClassRegistry()
+                    .get(s.type())
+                    .methods()
+                    .containsKey(s.type() + ":0");
+        if (isUserClass && !s.isReference() && (hasExplicitCallArgs || hasZeroArgCtor)) {
           if (parent.isInPreCtor()) {
             code.addInstruction(new StackInstrs.PushThis());
             code.addInstruction(

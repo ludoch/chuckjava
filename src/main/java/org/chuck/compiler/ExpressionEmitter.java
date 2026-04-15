@@ -134,7 +134,21 @@ public class ExpressionEmitter {
               case null -> List.of();
               default -> List.of();
             };
-        if (isUserClass && !isBuiltinPseudoClass && !ctorArgsList.isEmpty()) {
+        boolean hasExplicitCallArgsE = e.callArgs() != null;
+        boolean hasZeroArgCtorE =
+            isUserClass
+                && !isBuiltinPseudoClass
+                && !hasExplicitCallArgsE
+                && parent.getUserClassRegistry().containsKey(e.type())
+                && parent
+                    .getUserClassRegistry()
+                    .get(e.type())
+                    .methods()
+                    .containsKey(e.type() + ":0");
+        if (isUserClass
+            && !isBuiltinPseudoClass
+            && !e.isReference()
+            && (hasExplicitCallArgsE || hasZeroArgCtorE)) {
           argCount = ctorArgsList.size();
           if (parent.isInPreCtor()) {
             code.addInstruction(new StackInstrs.PushThis());
@@ -1004,7 +1018,6 @@ public class ExpressionEmitter {
                 && (parent.getCurrentClassFields().contains(e.name())
                     || parent.hasInstanceField(parent.getCurrentClass(), e.name()));
         if (isField) {
-          code.addInstruction(new StackInstrs.PushThis());
           code.addInstruction(new FieldInstrs.GetUserField(e.name()));
         } else if (localOffset != null) {
           if ("int".equals(varType)) code.addInstruction(new VarInstrs.LoadLocalInt(localOffset));

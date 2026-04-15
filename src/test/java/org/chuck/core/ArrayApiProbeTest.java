@@ -95,6 +95,16 @@ public class ArrayApiProbeTest {
   }
 
   @Test
+  void probe_ctorStringPrint() {
+    String r =
+        run(
+            "class Foo { 1 => int n; fun @construct() { 13 => n; <<< \"hello:\", n >>>; } } Foo f;"
+                + " <<< f.n >>>;");
+    System.out.println("[ctorStr] " + r);
+    assertTrue(r.contains("hello:"), "ctor string print: " + r);
+  }
+
+  @Test
   void probe_newAtRef() {
     String r = run("class Bar { int v; } new Bar @=> Bar @ b; 5 => b.v; <<< b.v >>>;");
     System.out.println("[newAtRef] " + r);

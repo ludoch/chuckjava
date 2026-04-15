@@ -497,6 +497,8 @@ public class ChuckShred implements Comparable<ChuckShred> {
     ChuckCode savedCode = this.code;
     int savedPc = this.pc;
     int savedFp = this.framePointer;
+    int savedMemSp = this.mem.getSp();
+    int savedRegSp = this.reg.getSp();
 
     this.code = code;
     this.pc = 0;
@@ -517,6 +519,8 @@ public class ChuckShred implements Comparable<ChuckShred> {
       this.code = savedCode;
       this.pc = savedPc;
       this.framePointer = savedFp;
+      this.mem.setSp(savedMemSp);
+      this.reg.setSp(savedRegSp);
     }
   }
 

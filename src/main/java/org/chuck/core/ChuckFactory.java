@@ -73,13 +73,6 @@ public class ChuckFactory {
             s.thisStack.push(uo);
             vm.executeSynchronous(desc.preCtorCode(), s);
             s.thisStack.pop();
-          } else {
-          }
-          ChuckCode ctorCode = desc.methods().get(cls + ":0");
-          if (ctorCode != null) {
-            s.thisStack.push(uo);
-            vm.executeSynchronous(ctorCode, s);
-            s.thisStack.pop();
           }
         }
       }
@@ -106,6 +99,8 @@ public class ChuckFactory {
           case "MidiIn" -> new org.chuck.midi.MidiIn(vm);
           case "MidiOut" -> new MidiOut();
           case "MidiFileIn" -> new MidiFileIn();
+          case "MidiFileOut" -> new org.chuck.midi.MidiFileOut();
+          case "MidiPlayer" -> new org.chuck.midi.MidiPlayer();
           case "Hid" -> new org.chuck.hid.Hid();
           case "HidOut" -> new HidOut();
           case "ConsoleInput" -> new ConsoleInput();
