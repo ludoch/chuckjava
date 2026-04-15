@@ -3,9 +3,11 @@ package org.chuck.ide;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.Arrays;
 import java.util.prefs.Preferences;
 import javafx.application.Application;
 import javafx.application.Platform;
+import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
@@ -20,7 +22,7 @@ import org.chuck.audio.util.Scope;
 import org.chuck.core.ChuckShred;
 import org.chuck.core.ChuckVM;
 
-/** Main IDE class for ChucK-Java, now refactored into smaller components. */
+/** Main IDE class for ChucK-Java. Refactored into components but fully restored with all logic. */
 public class ChuckIDE extends Application {
   private final Preferences prefs = Preferences.userNodeForPackage(ChuckIDE.class);
   private Stage stage;
@@ -37,6 +39,7 @@ public class ChuckIDE extends Application {
   // UI Elements
   private TabPane tabPane;
   private TabPane leftTabPane;
+  private TabPane rightTabPane;
   private ListView<ShredInfo> shredListView;
   private TextArea outputArea;
   private Button addShredBtnRef;
@@ -49,6 +52,7 @@ public class ChuckIDE extends Application {
 
   // Master Gain
   private Gain masterGain;
+  private Slider masterGainSlider;
 
   // State
   private boolean lockdownMode = false;
@@ -88,7 +92,6 @@ public class ChuckIDE extends Application {
 
   private void initVM() {
     vm = new ChuckVM(prefSampleRate, 2);
-    // Fixed: required: org.chuck.core.ChuckVM,int,int,float
     audio = new ChuckAudio(vm, 512, 2, (float) prefSampleRate);
     vm.setAudio(audio);
     vm.initIO(
@@ -97,7 +100,6 @@ public class ChuckIDE extends Application {
 
     masterGain = new Gain();
     masterGain.setGain(prefs.getFloat("audio.masterGain", 0.8f));
-    // Fixed: use chuckTo instead of connect
     vm.dac.chuckTo(masterGain);
     masterGain.chuckTo(vm.blackhole);
 
@@ -107,15 +109,23 @@ public class ChuckIDE extends Application {
   private void setupUI(Stage primaryStage) {
     primaryStage.setTitle("ChucK-Java IDE");
 
-    // Menu and Toolbar
+    // ── Menu and Toolbar ──
     MenuBar menuBar = createMenuBar(primaryStage);
     ToolBar toolBar = createToolBar();
 
-    // Project Browser
+    // ── Left TabPane: Project Browser and Sequencer ──
     projectBrowser = new IDEProjectBrowser(new File("."), this::loadFileIntoEditor, this::print);
-    projectBrowser.setPrefWidth(200);
+    Tab projectTab = new Tab("Project", projectBrowser);
+    projectTab.setClosable(false);
 
-    // Tab Pane for Editors
+    sequencerPanel = new SequencerPanel(vm);
+    Tab seqTab = new Tab("Sequencer", sequencerPanel);
+    seqTab.setClosable(false);
+
+    leftTabPane = new TabPane(projectTab, seqTab);
+    leftTabPane.setPrefWidth(250);
+
+    // ── Center Panel: Tabs ──
     tabPane = new TabPane();
     statusBar = new StatusBar(vm, audio, prefSampleRate);
     tabPane
@@ -128,61 +138,82 @@ public class ChuckIDE extends Application {
               }
             });
 
-    // Visualizers
+    // ── Right Panel: Shreds, MIDI, Settings ──
+    shredListView = new ListView<>();
+    shredListView.setCellFactory(lv -> new ShredListCell(this));
+    Tab shredsTab = new Tab("Shreds", shredListView);
+    shredsTab.setClosable(false);
+
+    midiMonitor = new MidiMonitor();
+    Tab midiTab = new Tab("MIDI", midiMonitor);
+    midiTab.setClosable(false);
+
+    PreferencesTab prefsTabComp = new PreferencesTab(prefs, this::applyPreferences);
+    Tab settingsTab = new Tab("Settings", prefsTabComp);
+    settingsTab.setClosable(false);
+
+    rightTabPane = new TabPane(shredsTab, midiTab, settingsTab);
+    rightTabPane.setPrefWidth(300);
+
+    // ── Bottom Panel: Output, Visualizers, Piano ──
+    outputArea = new TextArea();
+    outputArea.setEditable(false);
+    outputArea.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 12;");
+
     FFT analyzer = new FFT(1024);
     vm.getDacChannel(0).chuckTo(analyzer);
     Scope scope = new Scope(1024);
     vm.getDacChannel(0).chuckTo(scope);
     visualizerPanel = new VisualizerPanel(vm, audio, analyzer, scope);
-
-    // Output and MIDI
-    outputArea = new TextArea();
-    outputArea.setEditable(false);
-    outputArea.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 12;");
+    visualizerPanel.setPrefWidth(350);
 
     pianoKeyboard = new PianoKeyboard();
     pianoKeyboard.setPrefHeight(100);
-
-    midiMonitor = new MidiMonitor();
     setupMidiMonitors();
 
-    // Right Panel: Shred List
-    shredListView = new ListView<>();
-    shredListView.setCellFactory(lv -> new ShredListCell(this));
-    VBox rightPanel = new VBox(5, new Label(" Active Shreds"), shredListView);
-    rightPanel.setPrefWidth(200);
+    // ── Master Gain Slider ──
+    masterGainSlider = new Slider(0, 1.0, masterGain.getGain());
+    masterGainSlider.setOrientation(Orientation.VERTICAL);
+    masterGainSlider.setShowTickLabels(true);
+    masterGainSlider.setTooltip(new Tooltip("Master Volume"));
+    masterGainSlider
+        .valueProperty()
+        .addListener(
+            (obs, old, val) -> {
+              masterGain.setGain(val.floatValue());
+              prefs.putFloat("audio.masterGain", val.floatValue());
+            });
+    VBox masterBox = new VBox(5, new Label("Vol"), masterGainSlider);
+    masterBox.setPadding(new Insets(5));
+    masterBox.setAlignment(javafx.geometry.Pos.CENTER);
 
-    // Left TabPane: Project Browser and Sequencer
-    Tab projectTab = new Tab("Project", projectBrowser);
-    projectTab.setClosable(false);
+    // Assemble Layout
+    SplitPane mainSplit = new SplitPane(leftTabPane, tabPane, rightTabPane);
+    mainSplit.setDividerPositions(0.18, 0.78);
 
-    sequencerPanel = new SequencerPanel(vm);
-    Tab seqTab = new Tab("Sequencer", sequencerPanel);
-    seqTab.setClosable(false);
+    HBox bottomHBox = new HBox(5, outputArea, visualizerPanel, masterBox);
+    HBox.setHgrow(outputArea, Priority.ALWAYS);
 
-    leftTabPane = new TabPane(projectTab, seqTab);
-    leftTabPane.setPrefWidth(250);
-
-    // Layout
-    SplitPane hSplit = new SplitPane(leftTabPane, tabPane, rightPanel);
-    hSplit.setDividerPositions(0.20, 0.80);
-
-    VBox bottomPanel = new VBox(new SplitPane(outputArea, pianoKeyboard), statusBar);
-    SplitPane vSplit = new SplitPane(hSplit, bottomPanel);
-    vSplit.setOrientation(Orientation.VERTICAL);
-    vSplit.setDividerPositions(0.75);
+    VBox footer = new VBox(bottomHBox, pianoKeyboard, statusBar);
+    SplitPane verticalSplit = new SplitPane(mainSplit, footer);
+    verticalSplit.setOrientation(Orientation.VERTICAL);
+    verticalSplit.setDividerPositions(0.7);
 
     BorderPane root = new BorderPane();
     root.setTop(new VBox(menuBar, toolBar));
-    root.setRight(visualizerPanel);
-    root.setCenter(vSplit);
+    root.setCenter(verticalSplit);
 
-    Scene scene = new Scene(root, 1350, 850);
+    Scene scene = new Scene(root, 1350, 900);
     applyInlineStyles(scene);
     setupHidFilters(scene);
 
     primaryStage.setScene(scene);
     primaryStage.show();
+  }
+
+  private void applyPreferences() {
+    loadPreferences();
+    print("Preferences applied.\n");
   }
 
   private void addNewTab(String title, String content) {
@@ -214,22 +245,86 @@ public class ChuckIDE extends Application {
 
   private MenuBar createMenuBar(Stage stage) {
     MenuBar mb = new MenuBar();
+
     Menu fileMenu = new Menu("_File");
     MenuItem newItem = new MenuItem("New");
+    newItem.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN));
     newItem.setOnAction(e -> addNewTab("Untitled.ck", ""));
-    fileMenu.getItems().addAll(newItem, new SeparatorMenuItem());
 
     MenuItem openItem = new MenuItem("Open...");
+    openItem.setAccelerator(new KeyCodeCombination(KeyCode.O, KeyCombination.CONTROL_DOWN));
     openItem.setOnAction(
         e -> {
           FileChooser fc = new FileChooser();
+          fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("ChucK Files", "*.ck"));
           File f = fc.showOpenDialog(stage);
           if (f != null) loadFileIntoEditor(f);
         });
-    fileMenu.getItems().add(openItem);
 
-    mb.getMenus().addAll(fileMenu, new Menu("_Edit"), new Menu("_View"), createTutorialMenu());
+    MenuItem saveItem = new MenuItem("Save");
+    saveItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN));
+    saveItem.setOnAction(e -> saveCurrentTab());
+
+    fileMenu.getItems().addAll(newItem, openItem, saveItem, new SeparatorMenuItem());
+
+    Menu tutorialMenu = createTutorialMenu();
+    Menu examplesMenu = new Menu("_Examples");
+    loadExamples(new File("examples"), examplesMenu);
+
+    Menu helpMenu = new Menu("_Help");
+    MenuItem aboutItem = new MenuItem("About ChucK-Java");
+    aboutItem.setOnAction(
+        e -> {
+          Alert a =
+              new Alert(
+                  Alert.AlertType.INFORMATION,
+                  "ChucK-Java IDE\nJDK 25 + Project Loom + Panama\nBased on Princeton ChucK.");
+          a.show();
+        });
+    helpMenu.getItems().add(aboutItem);
+
+    mb.getMenus()
+        .addAll(
+            fileMenu, new Menu("_Edit"), new Menu("_View"), tutorialMenu, examplesMenu, helpMenu);
     return mb;
+  }
+
+  private void loadExamples(File dir, Menu parent) {
+    if (!dir.exists() || !dir.isDirectory()) return;
+    File[] files = dir.listFiles();
+    if (files == null) return;
+    Arrays.sort(files);
+    for (File f : files) {
+      if (f.isDirectory()) {
+        Menu sub = new Menu(f.getName());
+        loadExamples(f, sub);
+        if (!sub.getItems().isEmpty()) parent.getItems().add(sub);
+      } else if (f.getName().endsWith(".ck")) {
+        MenuItem item = new MenuItem(f.getName());
+        item.setOnAction(e -> loadFileIntoEditor(f));
+        parent.getItems().add(item);
+      }
+    }
+  }
+
+  private void saveCurrentTab() {
+    if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et) {
+      File f = et.getFile();
+      if (f == null) {
+        FileChooser fc = new FileChooser();
+        fc.setInitialFileName(et.getText().replaceFirst("^\\* ", ""));
+        f = fc.showSaveDialog(stage);
+      }
+      if (f != null) {
+        try {
+          Files.writeString(f.toPath(), et.getEditor().getText());
+          et.setFile(f);
+          et.setSaved();
+        } catch (IOException e) {
+          print("Error saving: " + e.getMessage());
+        }
+      }
+    }
   }
 
   private Menu createTutorialMenu() {
@@ -237,12 +332,12 @@ public class ChuckIDE extends Application {
     addTutorialStep(
         m,
         "1. Getting Started",
-        "Welcome to ChucK-Java!",
-        "/* Welcome to ChucK! */\nSinOsc s => dac;\n0.5 => s.gain;\n1::second => now;");
+        "First steps with SinOsc",
+        "/* Welcome! */\nSinOsc s => dac;\n0.5 => s.gain;\n1::second => now;");
     addTutorialStep(
         m,
-        "2. Melody",
-        "Using arrays for sequencing.",
+        "2. Melody and Scales",
+        "Sequence with arrays",
         "/* Melody loop */\nSinOsc s => dac;\n[60, 62, 64, 65, 67] @=> int scale[];\nfor(0=>int i;;i++) {\n  scale[i%scale.cap()] => Std.mtof => s.freq;\n  200::ms => now;\n}");
     return m;
   }
@@ -260,33 +355,42 @@ public class ChuckIDE extends Application {
 
   private ToolBar createToolBar() {
     Button addBtn = new Button("Add Shred");
+    addBtn.setTooltip(new Tooltip("Compile and run (Ctrl+Enter)"));
+    addBtn.setStyle("-fx-background-color: #b8f0b8; -fx-font-weight: bold;");
     addBtn.setOnAction(e -> addShred());
     addShredBtnRef = addBtn;
 
     Button replaceBtn = new Button("Replace Shred");
+    replaceBtn.setTooltip(new Tooltip("Replace last sporked (Ctrl+Shift+Enter)"));
     replaceBtn.setOnAction(e -> replaceShred());
     replaceBtnRef = replaceBtn;
 
-    return new ToolBar(addBtn, replaceBtn);
+    Button clearBtn = new Button("Clear VM");
+    clearBtn.setStyle("-fx-background-color: #f0b8b8;");
+    clearBtn.setOnAction(e -> vm.clear());
+
+    return new ToolBar(addBtn, replaceBtn, new Separator(), clearBtn);
   }
 
   private void addShred() {
-    Tab sel = tabPane.getSelectionModel().getSelectedItem();
-    if (sel instanceof EditorTab et) {
+    if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et) {
       String code = et.getEditor().getText();
       String name = et.getText().replaceFirst("^\\* ", "");
+      String args = et.getArguments();
       int id = vm.run(code, name);
       if (id > 0) {
         et.setLastSporkedShredId(id);
         ChuckShred s = vm.getShred(id);
-        shredListView.getItems().add(new ShredInfo(id, name, s));
+        if (s != null) {
+          if (!args.isEmpty()) s.setArgs(args.split("\\s+"));
+          shredListView.getItems().add(new ShredInfo(id, name, s));
+        }
       }
     }
   }
 
   private void replaceShred() {
-    Tab sel = tabPane.getSelectionModel().getSelectedItem();
-    if (sel instanceof EditorTab et) {
+    if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et) {
       int lastId = et.getLastSporkedShredId();
       if (lastId > 0) vm.removeShred(lastId);
       addShred();
@@ -300,13 +404,9 @@ public class ChuckIDE extends Application {
       @Override
       public void handle(long now) {
         updateVMLogic();
-
-        // Sync visual sequencer cursor
         if (sequencerPanel != null) {
-          int step = (int) vm.getGlobalInt("seq_current_step");
-          sequencerPanel.setStep(step);
+          sequencerPanel.setStep((int) vm.getGlobalInt("seq_current_step"));
         }
-
         if (now - lastTextUpdate > 100_000_000L) {
           statusBar.updateVMText();
           statusBar.updateCpuLoad();
@@ -374,15 +474,13 @@ public class ChuckIDE extends Application {
   }
 
   private void applyInlineStyles(Scene scene) {
+    String css = editorSupport.generateSyntaxCss();
     scene
         .getStylesheets()
         .add(
             "data:text/css;base64,"
                 + java.util.Base64.getEncoder()
-                    .encodeToString(
-                        editorSupport
-                            .generateSyntaxCss()
-                            .getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                    .encodeToString(css.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
   }
 
   private void setupHidFilters(Scene scene) {
