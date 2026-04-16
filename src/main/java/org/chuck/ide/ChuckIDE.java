@@ -3,7 +3,9 @@ package org.chuck.ide;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.prefs.Preferences;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
@@ -26,9 +28,7 @@ import org.chuck.audio.util.Gain;
 import org.chuck.audio.util.Scope;
 import org.chuck.core.ChuckVM;
 
-/**
- * Main IDE class for ChucK-Java. Restored with all logic, menus, and fixed audio engine startup.
- */
+/** Main IDE class for ChucK-Java. Refactored into components with full UI logic restored. */
 public class ChuckIDE extends Application {
   private final Preferences prefs = Preferences.userNodeForPackage(ChuckIDE.class);
   private Stage stage;
@@ -49,6 +49,7 @@ public class ChuckIDE extends Application {
   private TextArea outputArea;
   private Button addShredBtnRef;
   private Button replaceBtnRef;
+  private Menu recentMenu;
 
   // MIDI
   private PianoKeyboard pianoKeyboard;
@@ -64,7 +65,9 @@ public class ChuckIDE extends Application {
   private boolean lockdownMode = false;
   private int stallFrameCount = 0;
   private long lastVmTimeSample = -1;
-  private static final int STALL_FRAMES_LOCKDOWN = 60; // ~1 second at 60fps
+  private static final int STALL_FRAMES_LOCKDOWN = 60;
+  private static final int MAX_RECENT = 10;
+  private final List<String> recentFiles = new ArrayList<>();
 
   // Editor Preferences
   private int prefFontSize = 13;
@@ -90,7 +93,6 @@ public class ChuckIDE extends Application {
             + "440 => s.freq;\n"
             + "1::second => now;\n");
 
-    // Start background systems
     if (audio != null) audio.start();
     visualizerPanel.start();
     startAnimationTimer();
@@ -102,6 +104,12 @@ public class ChuckIDE extends Application {
     prefUseSpaces = prefs.getBoolean("editor.useSpaces", true);
     prefTabWidth = prefs.getInt("editor.tabWidth", 4);
     prefSampleRate = prefs.getInt("audio.srate", 44100);
+
+    recentFiles.clear();
+    for (int i = 0; i < MAX_RECENT; i++) {
+      String path = prefs.get("recent." + i, null);
+      if (path != null) recentFiles.add(path);
+    }
   }
 
   private void initVM() {
@@ -112,9 +120,7 @@ public class ChuckIDE extends Application {
         new java.io.PrintStream(new ConsoleOutputStream(this::print)),
         new java.io.PrintStream(new ConsoleOutputStream(this::print)));
 
-    // Set initial master gain
     audio.setMasterGain(prefs.getFloat("audio.masterGain", 0.8f));
-
     editorSupport = new EditorSupport(prefs, stage);
   }
 
@@ -133,16 +139,28 @@ public class ChuckIDE extends Application {
     Tab seqTab = new Tab("Sequencer", sequencerPanel);
     seqTab.setClosable(false);
 
+    shredListView = new ListView<>();
+    shredListView.setCellFactory(lv -> new ShredListCell(this));
+    Tab shredsTab = new Tab("Shreds", shredListView);
+    shredsTab.setClosable(false);
+
     midiMonitor = new MidiMonitor();
     Tab midiTab = new Tab("MIDI", midiMonitor);
     midiTab.setClosable(false);
 
     PreferencesTab prefsTabComp = new PreferencesTab(prefs);
+    prefsTabComp.setOnEditorSettingsChanged(this::applyPreferences);
+    prefsTabComp.setAudioRestartHandler(
+        (sr, bs, out, in) -> {
+          print(
+              "Audio settings changed. Please restart IDE to apply sample rate/buffer changes.\n");
+          audio.setMasterGain(prefs.getFloat("audio.masterGain", 0.8f));
+        });
     Tab settingsTab = new Tab("Settings", prefsTabComp);
     settingsTab.setClosable(false);
 
-    leftTabPane = new TabPane(projectTab, seqTab, midiTab, settingsTab);
-    leftTabPane.setPrefWidth(300);
+    leftTabPane = new TabPane(projectTab, seqTab, shredsTab, midiTab, settingsTab);
+    leftTabPane.setPrefWidth(320);
 
     // ── CENTER PANEL ──
     tabPane = new TabPane();
@@ -158,11 +176,6 @@ public class ChuckIDE extends Application {
             });
 
     // ── RIGHT PANEL ──
-    shredListView = new ListView<>();
-    shredListView.setCellFactory(lv -> new ShredListCell(this));
-    VBox shredBox = new VBox(5, new Label(" Active Shreds"), shredListView);
-    VBox.setVgrow(shredListView, Priority.ALWAYS);
-
     FFT analyzer = new FFT(1024);
     vm.getDacChannel(0).chuckTo(analyzer);
     Scope scope = new Scope(1024);
@@ -170,7 +183,7 @@ public class ChuckIDE extends Application {
     visualizerPanel = new VisualizerPanel(vm, audio, analyzer, scope);
     visualizerPanel.setPrefHeight(300);
 
-    VBox rightPanel = new VBox(5, shredBox, visualizerPanel);
+    VBox rightPanel = new VBox(5, new Label(" Visualizers"), visualizerPanel);
     rightPanel.setPrefWidth(350);
     rightPanel.setPadding(new Insets(5));
 
@@ -190,7 +203,6 @@ public class ChuckIDE extends Application {
 
     setupMidiMonitors();
 
-    // Master Volume
     Slider masterGainSlider = new Slider(0, 1.0, prefs.getFloat("audio.masterGain", 0.8f));
     masterGainSlider.setOrientation(Orientation.VERTICAL);
     masterGainSlider.setShowTickLabels(true);
@@ -230,7 +242,16 @@ public class ChuckIDE extends Application {
 
   private void applyPreferences() {
     loadPreferences();
-    print("Preferences updated.\n");
+    // Update all tabs with new font size
+    for (Tab t : tabPane.getTabs()) {
+      if (t instanceof EditorTab et) {
+        et.getEditor()
+            .setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: " + prefFontSize + ";");
+      }
+    }
+    // Re-apply styles
+    applyInlineStyles(stage.getScene());
+    print("Preferences applied.\n");
   }
 
   private void addNewTab(String title, String content) {
@@ -255,15 +276,28 @@ public class ChuckIDE extends Application {
       if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et) {
         et.setFile(f);
       }
+      addToRecentFiles(f.getAbsolutePath());
     } catch (IOException e) {
       print("Error loading file: " + e.getMessage() + "\n");
     }
   }
 
+  private void addToRecentFiles(String path) {
+    recentFiles.remove(path);
+    recentFiles.add(0, path);
+    if (recentFiles.size() > MAX_RECENT) {
+      recentFiles.subList(MAX_RECENT, recentFiles.size()).clear();
+    }
+    for (int i = 0; i < MAX_RECENT; i++) {
+      if (i < recentFiles.size()) prefs.put("recent." + i, recentFiles.get(i));
+      else prefs.remove("recent." + i);
+    }
+    updateRecentMenu();
+  }
+
   private MenuBar createMenuBar(Stage stage) {
     MenuBar mb = new MenuBar();
 
-    // File Menu
     Menu fileMenu = new Menu("_File");
     MenuItem newItem = new MenuItem("New");
     newItem.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN));
@@ -279,13 +313,15 @@ public class ChuckIDE extends Application {
           if (f != null) loadFileIntoEditor(f);
         });
 
+    recentMenu = new Menu("Open Recent");
+    updateRecentMenu();
+
     MenuItem saveItem = new MenuItem("Save");
     saveItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN));
     saveItem.setOnAction(e -> saveCurrentTab());
 
-    fileMenu.getItems().addAll(newItem, openItem, saveItem, new SeparatorMenuItem());
+    fileMenu.getItems().addAll(newItem, openItem, recentMenu, saveItem, new SeparatorMenuItem());
 
-    // Edit & View Menus
     Menu editMenu = new Menu("_Edit");
     MenuItem undoItem = new MenuItem("Undo");
     undoItem.setAccelerator(new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN));
@@ -294,14 +330,32 @@ public class ChuckIDE extends Application {
           if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et)
             et.getEditor().undo();
         });
-    editMenu.getItems().addAll(undoItem, new MenuItem("Redo"), new SeparatorMenuItem());
+    MenuItem redoItem = new MenuItem("Redo");
+    redoItem.setAccelerator(new KeyCodeCombination(KeyCode.Y, KeyCombination.CONTROL_DOWN));
+    redoItem.setOnAction(
+        e -> {
+          if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et)
+            et.getEditor().redo();
+        });
+    editMenu.getItems().addAll(undoItem, redoItem, new SeparatorMenuItem());
 
     Menu viewMenu = new Menu("_View");
-    CheckMenuItem showVisualizers = new CheckMenuItem("Show Visualizers");
-    showVisualizers.setSelected(true);
-    viewMenu.getItems().add(showVisualizers);
+    MenuItem zoomIn = new MenuItem("Zoom In");
+    zoomIn.setAccelerator(new KeyCodeCombination(KeyCode.EQUALS, KeyCombination.CONTROL_DOWN));
+    zoomIn.setOnAction(
+        e -> {
+          prefFontSize++;
+          applyPreferences();
+        });
+    MenuItem zoomOut = new MenuItem("Zoom Out");
+    zoomOut.setAccelerator(new KeyCodeCombination(KeyCode.MINUS, KeyCombination.CONTROL_DOWN));
+    zoomOut.setOnAction(
+        e -> {
+          prefFontSize = Math.max(8, prefFontSize - 1);
+          applyPreferences();
+        });
+    viewMenu.getItems().addAll(zoomIn, zoomOut);
 
-    // Tutorial & Examples
     Menu tutorialMenu = createTutorialMenu();
     Menu examplesMenu = new Menu("_Examples");
     loadExamples(new File("examples"), examplesMenu);
@@ -320,6 +374,17 @@ public class ChuckIDE extends Application {
 
     mb.getMenus().addAll(fileMenu, editMenu, viewMenu, tutorialMenu, examplesMenu, helpMenu);
     return mb;
+  }
+
+  private void updateRecentMenu() {
+    if (recentMenu == null) return;
+    recentMenu.getItems().clear();
+    for (String path : recentFiles) {
+      File f = new File(path);
+      MenuItem item = new MenuItem(f.getName());
+      item.setOnAction(e -> loadFileIntoEditor(f));
+      recentMenu.getItems().add(item);
+    }
   }
 
   private void loadExamples(File dir, Menu parent) {
@@ -352,6 +417,7 @@ public class ChuckIDE extends Application {
           Files.writeString(f.toPath(), et.getEditor().getText());
           et.setFile(f);
           et.setSaved();
+          addToRecentFiles(f.getAbsolutePath());
         } catch (IOException e) {
           print("Error saving: " + e.getMessage() + "\n");
         }
@@ -365,12 +431,44 @@ public class ChuckIDE extends Application {
         m,
         "1. Getting Started",
         "First steps with SinOsc",
-        "/* Welcome! */\nSinOsc s => dac;\n0.5 => s.gain;\n1::second => now;");
+        "/* Welcome to ChucK-Java! In this step, we connect a Unit Generator (SinOsc)\n"
+            + "   to the audio output (dac), set its frequency and gain, and wait for 1 second. */\n\n"
+            + "SinOsc s => dac;\n0.5 => s.gain;\n440 => s.freq;\n1::second => now;");
+
     addTutorialStep(
         m,
         "2. Melody and Scales",
         "Sequence with arrays",
-        "/* Melody loop */\nSinOsc s => dac;\n[60, 62, 64, 65, 67] @=> int scale[];\nfor(0=>int i;;i++) {\n  scale[i%scale.cap()] => Std.mtof => s.freq;\n  200::ms => now;\n}");
+        "/* Music often uses scales. Here we use an array to define a melody\n"
+            + "   and another to define the major scale intervals. */\n\n"
+            + "SinOsc s => dac;\n0.5 => s.gain;\n[60, 62, 64, 65, 67, 69, 71, 72] @=> int major[];\n"
+            + "for(0 => int i; ; i++) {\n  major[i % major.cap()] => Std.mtof => s.freq;\n  200::ms => now;\n}");
+
+    addTutorialStep(
+        m,
+        "3. Functions",
+        "Modularizing your code",
+        "/* Functions allow you to reuse logic. */\n\n"
+            + "SinOsc s => dac;\nfun void play(int note, dur d) {\n  note => Std.mtof => s.freq;\n  d => now;\n}\n"
+            + "while(true) { play(60, 500::ms); play(67, 500::ms); }");
+
+    addTutorialStep(
+        m,
+        "4. Strong Timing",
+        "The power of 'now'",
+        "/* ChucK's strongest feature is 'strong timing'.\n"
+            + "   We can advance time by precise durations. */\n\n"
+            + "Impulse i => dac;\nwhile(true) {\n  1.0 => i.next;\n  100::ms => now;\n}");
+
+    addTutorialStep(
+        m,
+        "5. Concurrent Audio",
+        "Sporking shreds",
+        "/* Parallel execution with spork. */\n\n"
+            + "fun void saw() { SawOsc s => dac; 0.2 => s.gain; while(true) { 60 => Std.mtof => s.freq; 1::second => now; } }\n"
+            + "fun void sine() { SinOsc s => dac; 0.2 => s.gain; while(true) { 67 => Std.mtof => s.freq; 1::second => now; } }\n"
+            + "spork ~ saw();\nspork ~ sine();\n1::week => now;");
+
     return m;
   }
 
@@ -379,7 +477,10 @@ public class ChuckIDE extends Application {
     item.setOnAction(
         e -> {
           addNewTab(title.replace(" ", "_") + ".ck", code);
-          Alert a = new Alert(Alert.AlertType.INFORMATION, desc);
+          Alert a = new Alert(Alert.AlertType.INFORMATION);
+          a.setTitle("Tutorial: " + title);
+          a.setHeaderText(null);
+          a.setContentText(desc);
           a.show();
         });
     menu.getItems().add(item);
@@ -406,6 +507,7 @@ public class ChuckIDE extends Application {
     if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et) {
       String code = et.getEditor().getText();
       String name = et.getText().replaceFirst("^\\* ", "");
+      String args = et.getArguments();
       int id = vm.run(code, name);
       if (id > 0) {
         et.setLastSporkedShredId(id);
@@ -432,9 +534,7 @@ public class ChuckIDE extends Application {
         if (sequencerPanel != null) {
           sequencerPanel.setStep((int) vm.getGlobalInt("seq_current_step"));
         }
-
         statusBar.updateVUMeters();
-
         if (now - lastTextUpdate > 100_000_000L) {
           statusBar.updateVMText();
           statusBar.updateCpuLoad();
@@ -448,7 +548,6 @@ public class ChuckIDE extends Application {
   private void updateVMLogic() {
     long nowSample = vm.getCurrentTime();
     boolean shredsActive = !shredListView.getItems().isEmpty();
-
     if (shredsActive) {
       if (nowSample == lastVmTimeSample) {
         if (++stallFrameCount >= STALL_FRAMES_LOCKDOWN) enterLockdown();
