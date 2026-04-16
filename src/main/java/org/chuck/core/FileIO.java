@@ -60,6 +60,10 @@ public class FileIO extends ChuckObject implements AutoCloseable {
     }
   }
 
+  public boolean isEof() {
+    return eof;
+  }
+
   public boolean good() {
     if (file == null || eof) return false;
     if ((mode & WRITE) != 0) return true;

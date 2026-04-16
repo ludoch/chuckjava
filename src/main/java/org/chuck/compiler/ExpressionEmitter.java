@@ -479,8 +479,21 @@ public class ExpressionEmitter {
             this.emitExpression(e.lhs(), code);
             parent.emitChuckTarget(resolvedDecl, code, e.op());
           } else {
-            this.emitExpression(e.lhs(), code);
-            parent.emitChuckTarget(e.rhs(), code, e.op());
+            // FileIO/IO => variable: read from file into variable, push good() as bool
+            String lhsType = parent.getExprType(e.lhs());
+            if (e.op() == ChuckAST.Operator.CHUCK
+                && ("FileIO".equals(lhsType) || "IO".equals(lhsType))
+                && e.rhs() instanceof ChuckAST.IdExp rhsId) {
+              String rhsType = parent.getVarTypeByName(rhsId.name());
+              if (rhsType == null) rhsType = "float";
+              Integer localOffset = parent.getLocalOffset(rhsId.name());
+              String varName = (localOffset == null) ? rhsId.name() : null;
+              this.emitExpression(e.lhs(), code);
+              code.addInstruction(new MiscInstrs.FileIOReadTo(varName, localOffset, rhsType));
+            } else {
+              this.emitExpression(e.lhs(), code);
+              parent.emitChuckTarget(e.rhs(), code, e.op());
+            }
           }
         } else if (e.op() == ChuckAST.Operator.UNCHUCK) {
           this.emitExpression(e.lhs(), code);

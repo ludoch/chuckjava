@@ -457,6 +457,12 @@ public class ObjectInstrs {
               } else if (pts[i] == float.class || pts[i] == Float.class) {
                 coe[i] = d.floatValue();
                 score += 2;
+              } else if (pts[i] == long.class || pts[i] == Long.class) {
+                coe[i] = d.longValue();
+                score += 1;
+              } else if (pts[i] == int.class || pts[i] == Integer.class) {
+                coe[i] = d.intValue();
+                score += 1;
               } else {
                 valid = false;
                 break;
@@ -506,8 +512,11 @@ public class ObjectInstrs {
               s.reg.pushObject(null);
             } else {
               Class<?> rt = bestMethod.getReturnType();
-              if (rt == int.class || rt == long.class || rt == Integer.class || rt == Long.class)
-                s.reg.push(((Number) res).longValue());
+              if (rt == boolean.class || rt == Boolean.class) s.reg.push(((Boolean) res) ? 1L : 0L);
+              else if (rt == int.class
+                  || rt == long.class
+                  || rt == Integer.class
+                  || rt == Long.class) s.reg.push(((Number) res).longValue());
               else if (rt == float.class
                   || rt == double.class
                   || rt == Float.class
@@ -1178,6 +1187,12 @@ public class ObjectInstrs {
               } else if (pts[i] == float.class || pts[i] == Float.class) {
                 coe[i] = d.floatValue();
                 score += 2;
+              } else if (pts[i] == long.class || pts[i] == Long.class) {
+                coe[i] = d.longValue();
+                score += 1;
+              } else if (pts[i] == int.class || pts[i] == Integer.class) {
+                coe[i] = d.intValue();
+                score += 1;
               } else {
                 valid = false;
                 break;

@@ -63,6 +63,7 @@ public class TypeInferenceEngine {
         String t0 = getExprType(e.elements().get(0));
         yield (t0 != null ? t0 : "int") + "[]";
       }
+      case ChuckAST.CastExp e -> e.targetType();
       case ChuckAST.DeclExp e -> e.type();
       case ChuckAST.TypeofExp _ -> "Type";
       case ChuckAST.ArrayAccessExp e -> {

@@ -58,6 +58,11 @@ public class ChuckVM {
     return audio != null ? audio.getMaxDriftMs() : 0.0;
   }
 
+  // Cached preference: whether to use parallel shred execution
+  private static final boolean PARALLEL_ENGINE =
+      Preferences.userNodeForPackage(org.chuck.ide.ChuckIDE.class)
+          .getBoolean("engine.parallel", false);
+
   // Shred management
   private final PriorityQueue<ChuckShred> shreduler = new PriorityQueue<>();
   private final Map<Integer, ChuckShred> activeShreds = new ConcurrentHashMap<>();
@@ -66,6 +71,10 @@ public class ChuckVM {
   private final ReentrantLock shredulerLock = new ReentrantLock();
   private final Condition shredulerCondition = shredulerLock.newCondition();
   private int nextShredId = 1;
+
+  // Count of virtual threads currently executing a shred (including finally cleanup)
+  private final java.util.concurrent.atomic.AtomicInteger liveThreadCount =
+      new java.util.concurrent.atomic.AtomicInteger(0);
 
   // Audio configuration
   private final int sampleRate;
@@ -384,9 +393,12 @@ public class ChuckVM {
             }
           });
 
+      ChuckANTLRParser.ProgramContext programCtx = parser.program();
+      if (parser.getNumberOfSyntaxErrors() > 0) return -1;
+
       ChuckASTVisitor visitor = new ChuckASTVisitor();
       @SuppressWarnings("unchecked")
-      List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
+      List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(programCtx);
 
       ChuckEmitter emitter = new ChuckEmitter(userClassRegistry);
       ChuckEmitter.EmitResult result = emitter.emitWithDocs(ast, name, getGlobalTypeMap());
@@ -473,6 +485,7 @@ public class ChuckVM {
     shred.setWakeTime(now.get());
     schedule(shred);
 
+    liveThreadCount.incrementAndGet();
     Thread.ofVirtual()
         .start(
             () -> {
@@ -487,6 +500,7 @@ public class ChuckVM {
                 shred.broadcast(this);
                 deadShreds.add(shred);
                 if (deadShreds.size() > 50) deadShreds.remove(0);
+                liveThreadCount.decrementAndGet();
               }
             });
 
@@ -502,6 +516,7 @@ public class ChuckVM {
     shred.setWakeTime(now.get());
     schedule(shred);
 
+    liveThreadCount.incrementAndGet();
     Thread.ofVirtual()
         .start(
             () -> {
@@ -520,6 +535,7 @@ public class ChuckVM {
                 shred.broadcast(this);
                 deadShreds.add(shred);
                 if (deadShreds.size() > 50) deadShreds.remove(0);
+                liveThreadCount.decrementAndGet();
               }
             });
 
@@ -587,9 +603,7 @@ public class ChuckVM {
 
   public void advanceTime(long samples) {
     long targetTime = now.get() + samples;
-    boolean parallel =
-        Preferences.userNodeForPackage(org.chuck.ide.ChuckIDE.class)
-            .getBoolean("engine.parallel", false);
+    boolean parallel = PARALLEL_ENGINE;
 
     while (now.get() < targetTime) {
       long currentTime = now.get();
@@ -776,6 +790,34 @@ public class ChuckVM {
     }
     for (ChuckShred s : shreds) {
       s.cleanup(this);
+    }
+  }
+
+  /**
+   * Aborts all active shreds and waits for their virtual threads to exit. Use this for clean
+   * teardown in tests or when the VM will no longer be used, so the GC can reclaim all memory.
+   */
+  public void shutdown() {
+    java.util.List<ChuckShred> shreds = new java.util.ArrayList<>(activeShreds.values());
+    activeShreds.clear();
+    shredulerLock.lock();
+    try {
+      shreduler.clear();
+    } finally {
+      shredulerLock.unlock();
+    }
+    for (ChuckShred s : shreds) {
+      s.abort();
+    }
+    // Wait up to 2 seconds for all virtual threads to exit their finally blocks
+    long deadline = System.currentTimeMillis() + 2000;
+    while (liveThreadCount.get() > 0 && System.currentTimeMillis() < deadline) {
+      try {
+        Thread.sleep(5);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        break;
+      }
     }
   }
 

@@ -27,6 +27,8 @@ import org.chuck.audio.analysis.FFT;
 import org.chuck.audio.util.Gain;
 import org.chuck.audio.util.Scope;
 import org.chuck.core.ChuckVM;
+import org.chuck.midi.ChuckMidiNative;
+import org.chuck.midi.ChuckMidiOutNative;
 
 /**
  * Main IDE class for ChucK-Java. Refactored into components with full logic and all UI features
@@ -106,7 +108,7 @@ public class ChuckIDE extends Application {
     primaryStage.setOnCloseRequest(
         e -> {
           if (audio != null) audio.stop();
-          if (vm != null) vm.clear();
+          if (vm != null) vm.shutdown();
           Platform.exit();
           System.exit(0);
         });
@@ -130,6 +132,8 @@ public class ChuckIDE extends Application {
     vm = new ChuckVM(prefSampleRate, 2);
     audio = new ChuckAudio(vm, 512, 2, (float) prefSampleRate);
     vm.setAudio(audio);
+
+    vm.addPrintListener(this::print);
     vm.initIO(
         new java.io.PrintStream(new ConsoleOutputStream(this::print)),
         new java.io.PrintStream(new ConsoleOutputStream(this::print)));
@@ -140,6 +144,17 @@ public class ChuckIDE extends Application {
 
   private void setupUI(Stage primaryStage) {
     primaryStage.setTitle("ChucK-Java IDE");
+
+    // Pre-initialize components used by MenuBar
+    outputArea = new TextArea();
+    outputArea.setEditable(false);
+    outputArea.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 12;");
+
+    pianoKeyboard = new PianoKeyboard();
+    pianoKeyboard.setPrefHeight(100);
+
+    statusBar = new StatusBar(vm, audio, prefSampleRate);
+    tabPane = new TabPane();
 
     MenuBar menuBar = createMenuBar(primaryStage);
     ToolBar toolBar = createToolBar();
@@ -176,8 +191,6 @@ public class ChuckIDE extends Application {
     leftTabPane.setPrefWidth(320);
 
     // ── CENTER PANEL ──
-    tabPane = new TabPane();
-    statusBar = new StatusBar(vm, audio, prefSampleRate);
     tabPane
         .getSelectionModel()
         .selectedItemProperty()
@@ -206,13 +219,6 @@ public class ChuckIDE extends Application {
     rightPanel.setPadding(new Insets(5));
 
     // ── BOTTOM PANEL ──
-    outputArea = new TextArea();
-    outputArea.setEditable(false);
-    outputArea.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 12;");
-
-    pianoKeyboard = new PianoKeyboard();
-    pianoKeyboard.setPrefHeight(100);
-
     midiActivityIndicator = new Circle(5, Color.DARKRED);
     midiActivityTimeline =
         new Timeline(
@@ -314,6 +320,7 @@ public class ChuckIDE extends Application {
   private MenuBar createMenuBar(Stage stage) {
     MenuBar mb = new MenuBar();
 
+    // File Menu
     Menu fileMenu = new Menu("_File");
     MenuItem newItem = new MenuItem("New");
     newItem.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN));
@@ -338,6 +345,7 @@ public class ChuckIDE extends Application {
 
     fileMenu.getItems().addAll(newItem, openItem, recentMenu, saveItem, new SeparatorMenuItem());
 
+    // Edit Menu
     Menu editMenu = new Menu("_Edit");
     MenuItem undoItem = new MenuItem("Undo");
     undoItem.setAccelerator(new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN));
@@ -360,7 +368,6 @@ public class ChuckIDE extends Application {
           if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et)
             et.getEditor().selectAll();
         });
-
     editMenu
         .getItems()
         .addAll(
@@ -372,6 +379,7 @@ public class ChuckIDE extends Application {
             new MenuItem("Copy"),
             new MenuItem("Paste"));
 
+    // View Menu
     Menu viewMenu = new Menu("_View");
     MenuItem zoomIn = new MenuItem("Zoom In");
     zoomIn.setAccelerator(new KeyCodeCombination(KeyCode.EQUALS, KeyCombination.CONTROL_DOWN));
@@ -399,17 +407,26 @@ public class ChuckIDE extends Application {
             footer.getChildren().remove(pianoKeyboard);
           }
         });
-
     viewMenu.getItems().addAll(zoomIn, zoomOut, new SeparatorMenuItem(), showKeyboard);
+
+    Menu tutorialMenu = createTutorialMenu();
+    Menu examplesMenu = new Menu("_Examples");
+    loadExamples(new File("examples"), examplesMenu);
 
     Menu helpMenu = new Menu("_Help");
     MenuItem githubItem = new MenuItem("GitHub Repository");
     githubItem.setOnAction(
         e -> getHostServices().showDocument("https://github.com/ludoch/chuckjava"));
-
     MenuItem rtMidiHelp = new MenuItem("RtMidi Setup...");
-    rtMidiHelp.setOnAction(e -> showRtMidiHelp());
-
+    rtMidiHelp.setOnAction(
+        e -> {
+          Alert a = new Alert(Alert.AlertType.INFORMATION);
+          a.setTitle("RtMidi Setup");
+          a.setHeaderText("Native MIDI Support");
+          a.setContentText(
+              "Ensure 'rtmidi.dll' (Windows), librtmidi (Linux), or built-in CoreMIDI (macOS) is available.");
+          a.show();
+        });
     MenuItem aboutItem = new MenuItem("About ChucK-Java");
     aboutItem.setOnAction(
         e -> {
@@ -421,21 +438,8 @@ public class ChuckIDE extends Application {
         });
     helpMenu.getItems().addAll(githubItem, rtMidiHelp, aboutItem);
 
-    mb.getMenus()
-        .addAll(
-            fileMenu, editMenu, viewMenu, createTutorialMenu(), new Menu("_Examples"), helpMenu);
-    loadExamples(new File("examples"), mb.getMenus().get(4));
-
+    mb.getMenus().addAll(fileMenu, editMenu, viewMenu, tutorialMenu, examplesMenu, helpMenu);
     return mb;
-  }
-
-  private void showRtMidiHelp() {
-    Alert a = new Alert(Alert.AlertType.INFORMATION);
-    a.setTitle("RtMidi Setup");
-    a.setHeaderText("Native MIDI Support");
-    a.setContentText(
-        "ChucK-Java prefers RtMidi for low latency. On Windows, ensure 'rtmidi.dll' is in your project root or PATH.");
-    a.show();
   }
 
   private void updateRecentMenu() {
@@ -492,41 +496,38 @@ public class ChuckIDE extends Application {
     addTutorialStep(
         m,
         "1. Getting Started",
-        "First steps with SinOsc",
-        "/* Welcome to ChucK-Java! In this step, we connect a Unit Generator (SinOsc)\n"
-            + "   to the audio output (dac), set its frequency and gain, and wait for 1 second. */\n\n"
+        "Learn the basics of SinOsc sound generation.",
+        "/* Tutorial 1: Sound Generation\n   Connect a sine wave to the soundcard (dac). */\n\n"
             + "SinOsc s => dac;\n0.5 => s.gain;\n440 => s.freq;\n1::second => now;");
 
     addTutorialStep(
         m,
         "2. Melody and Scales",
-        "Sequence with arrays",
-        "/* Music often uses scales. Here we use an array to define a melody\n"
-            + "   and another to define the major scale intervals. */\n\n"
+        "Sequence notes using an array.",
+        "/* Tutorial 2: Sequencing\n   Loop through a major scale. */\n\n"
             + "SinOsc s => dac;\n0.5 => s.gain;\n[60, 62, 64, 65, 67, 69, 71, 72] @=> int major[];\n"
             + "for(0 => int i; ; i++) {\n  major[i % major.cap()] => Std.mtof => s.freq;\n  200::ms => now;\n}");
 
     addTutorialStep(
         m,
         "3. Functions",
-        "Modularizing your code",
-        "/* Functions allow you to reuse logic. */\n\n"
+        "Clean up your code with custom functions.",
+        "/* Tutorial 3: Functions\n   Abstract note playing into a reusable block. */\n\n"
             + "SinOsc s => dac;\nfun void play(int note, dur d) {\n  note => Std.mtof => s.freq;\n  d => now;\n}\n"
             + "while(true) { play(60, 500::ms); play(67, 500::ms); }");
 
     addTutorialStep(
         m,
         "4. Strong Timing",
-        "The power of 'now'",
-        "/* ChucK's strongest feature is 'strong timing'.\n"
-            + "   We can advance time by precise durations. */\n\n"
+        "Control time with sample-accuracy.",
+        "/* Tutorial 4: Precision Timing\n   Using Impulse to create rhythmic clicks. */\n\n"
             + "Impulse i => dac;\nwhile(true) {\n  1.0 => i.next;\n  100::ms => now;\n}");
 
     addTutorialStep(
         m,
         "5. Concurrent Audio",
-        "Sporking shreds",
-        "/* Parallel execution with spork. */\n\n"
+        "Run multiple sounds in parallel with spork.",
+        "/* Tutorial 5: Concurrency\n   Using 'spork' to run multiple oscillators at once. */\n\n"
             + "fun void saw() { SawOsc s => dac; 0.2 => s.gain; while(true) { 60 => Std.mtof => s.freq; 1::second => now; } }\n"
             + "fun void sine() { SinOsc s => dac; 0.2 => s.gain; while(true) { 67 => Std.mtof => s.freq; 1::second => now; } }\n"
             + "spork ~ saw();\nspork ~ sine();\n1::week => now;");
@@ -653,19 +654,19 @@ public class ChuckIDE extends Application {
     Platform.runLater(
         () -> {
           outputArea.appendText(s);
-          if (outputArea.getText().length() > 10000) outputArea.deleteText(0, 2000);
+          if (outputArea.getText().length() > 20000) outputArea.deleteText(0, 5000);
         });
   }
 
   private void setupMidiMonitors() {
-    org.chuck.midi.ChuckMidiNative.addMonitor(
+    ChuckMidiNative.addMonitor(
         (dev, msg) -> {
           pianoKeyboard.onMidiMessage(msg);
           if (midiActivityTimeline != null) midiActivityTimeline.playFromStart();
           if (midiMonitor != null) midiMonitor.onMidiMessage(dev, msg);
           if (midiRecorder != null) midiRecorder.onMidiMessage(dev, msg);
         });
-    org.chuck.midi.ChuckMidiOutNative.addMonitor(
+    ChuckMidiOutNative.addMonitor(
         (dev, msg) -> {
           pianoKeyboard.onMidiMessage("Out", msg);
           if (midiMonitor != null) midiMonitor.onMidiMessage("Out", msg);

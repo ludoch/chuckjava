@@ -301,7 +301,12 @@ public class FieldInstrs {
         Class<?> clazz = Class.forName(className);
         java.lang.reflect.Field f = clazz.getField(fieldName);
         Object val = f.get(null);
-        if (val instanceof Number num) s.reg.push(num.doubleValue());
+        if (val instanceof Integer i) s.reg.push((long) i.intValue());
+        else if (val instanceof Long l) s.reg.push(l);
+        else if (val instanceof Double d) s.reg.push(d);
+        else if (val instanceof Float fv) s.reg.push((double) fv);
+        else if (val instanceof Boolean b) s.reg.push(b ? 1L : 0L);
+        else if (val instanceof Number num) s.reg.push(num.doubleValue());
         else if (val instanceof ChuckObject co) s.reg.pushObject(co);
         else if (val instanceof String str) s.reg.pushObject(new ChuckString(str));
         else s.reg.pushObject(val);

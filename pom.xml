@@ -12,6 +12,11 @@
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <antlr4.version>4.13.2</antlr4.version>
+        <skipUnitTests>false</skipUnitTests>
+        <!-- Skip the 533-test integration suite by default; enable with -DskipIntegrationTests=false -->
+        <skipIntegrationTests>true</skipIntegrationTests>
+        <!-- Heap size for the forked test JVM -->
+        <surefireArgLine>-Xmx4g</surefireArgLine>
     </properties>
 
     <dependencies>
@@ -413,17 +418,48 @@
                     </execution>
                 </executions>
             </plugin>
-            <!-- Surefire plugin for running tests -->
+            <!-- Surefire plugin for running tests.
+                 Unit tests (default):    mvn test
+                 Integration tests only:  mvn test -DskipUnitTests=true  -DskipIntegrationTests=false
+                 All tests:               mvn test -DskipIntegrationTests=false -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.5.5</version>
-                <configuration>
-                    <argLine>--enable-preview --add-modules jdk.incubator.vector -Xmx2g -Xms128m</argLine>
-                    <excludes>
-                        <exclude>**/ChucKIntegrationTest.java</exclude>
-                    </excludes>
-                </configuration>
+                <executions>
+                    <!-- Disable the built-in default-test execution so only our named executions run -->
+                    <execution>
+                        <id>default-test</id>
+                        <phase>none</phase>
+                    </execution>
+                    <!-- Unit tests: all tests except the slow 533-test integration suite -->
+                    <execution>
+                        <id>unit-tests</id>
+                        <phase>test</phase>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <argLine>--enable-preview --add-modules jdk.incubator.vector -Xmx2g -Xms128m</argLine>
+                            <excludes>
+                                <exclude>**/ChucKIntegrationTest.java</exclude>
+                            </excludes>
+                            <skipTests>${skipUnitTests}</skipTests>
+                        </configuration>
+                    </execution>
+                    <!-- Integration test execution: ChucKIntegrationTest (533 .ck file tests).
+                         Skipped by default; enable with: -DskipIntegrationTests=false -->
+                    <execution>
+                        <id>integration-tests</id>
+                        <phase>test</phase>
+                        <goals><goal>test</goal></goals>
+                        <configuration>
+                            <argLine>--enable-preview --add-modules jdk.incubator.vector -Xmx4g -Xms256m</argLine>
+                            <includes>
+                                <include>**/ChucKIntegrationTest.java</include>
+                            </includes>
+                            <skipTests>${skipIntegrationTests}</skipTests>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
             <!-- Exec plugin for running the application -->
             <plugin>
