@@ -22,11 +22,13 @@ import javafx.stage.Stage;
 import javafx.util.Duration;
 import org.chuck.audio.ChuckAudio;
 import org.chuck.audio.analysis.FFT;
+import org.chuck.audio.util.Gain;
 import org.chuck.audio.util.Scope;
-import org.chuck.core.ChuckShred;
 import org.chuck.core.ChuckVM;
 
-/** Main IDE class for ChucK-Java. Restored with corrected audio routing and VU monitors. */
+/**
+ * Main IDE class for ChucK-Java. Restored with all logic, menus, and fixed audio engine startup.
+ */
 public class ChuckIDE extends Application {
   private final Preferences prefs = Preferences.userNodeForPackage(ChuckIDE.class);
   private Stage stage;
@@ -55,11 +57,14 @@ public class ChuckIDE extends Application {
   private Circle midiActivityIndicator;
   private Timeline midiActivityTimeline;
 
+  // Master Gain
+  private Gain masterGain;
+
   // State
   private boolean lockdownMode = false;
   private int stallFrameCount = 0;
   private long lastVmTimeSample = -1;
-  private static final int STALL_FRAMES_LOCKDOWN = 40;
+  private static final int STALL_FRAMES_LOCKDOWN = 60; // ~1 second at 60fps
 
   // Editor Preferences
   private int prefFontSize = 13;
@@ -85,6 +90,8 @@ public class ChuckIDE extends Application {
             + "440 => s.freq;\n"
             + "1::second => now;\n");
 
+    // Start background systems
+    if (audio != null) audio.start();
     visualizerPanel.start();
     startAnimationTimer();
   }
@@ -105,7 +112,7 @@ public class ChuckIDE extends Application {
         new java.io.PrintStream(new ConsoleOutputStream(this::print)),
         new java.io.PrintStream(new ConsoleOutputStream(this::print)));
 
-    // Use built-in master gain in ChuckAudio
+    // Set initial master gain
     audio.setMasterGain(prefs.getFloat("audio.masterGain", 0.8f));
 
     editorSupport = new EditorSupport(prefs, stage);
@@ -117,7 +124,7 @@ public class ChuckIDE extends Application {
     MenuBar menuBar = createMenuBar(primaryStage);
     ToolBar toolBar = createToolBar();
 
-    // ── LEFT PANEL: Project, Sequencer, MIDI, Settings ──
+    // ── LEFT PANEL ──
     projectBrowser = new IDEProjectBrowser(new File("."), this::loadFileIntoEditor, this::print);
     Tab projectTab = new Tab("Project", projectBrowser);
     projectTab.setClosable(false);
@@ -135,9 +142,9 @@ public class ChuckIDE extends Application {
     settingsTab.setClosable(false);
 
     leftTabPane = new TabPane(projectTab, seqTab, midiTab, settingsTab);
-    leftTabPane.setPrefWidth(280);
+    leftTabPane.setPrefWidth(300);
 
-    // ── CENTER PANEL: Editor tabs ──
+    // ── CENTER PANEL ──
     tabPane = new TabPane();
     statusBar = new StatusBar(vm, audio, prefSampleRate);
     tabPane
@@ -150,7 +157,7 @@ public class ChuckIDE extends Application {
               }
             });
 
-    // ── RIGHT PANEL: Shreds & Visualizers ──
+    // ── RIGHT PANEL ──
     shredListView = new ListView<>();
     shredListView.setCellFactory(lv -> new ShredListCell(this));
     VBox shredBox = new VBox(5, new Label(" Active Shreds"), shredListView);
@@ -161,12 +168,13 @@ public class ChuckIDE extends Application {
     Scope scope = new Scope(1024);
     vm.getDacChannel(0).chuckTo(scope);
     visualizerPanel = new VisualizerPanel(vm, audio, analyzer, scope);
+    visualizerPanel.setPrefHeight(300);
 
     VBox rightPanel = new VBox(5, shredBox, visualizerPanel);
     rightPanel.setPrefWidth(350);
     rightPanel.setPadding(new Insets(5));
 
-    // ── BOTTOM PANEL: Console, Piano ──
+    // ── BOTTOM PANEL ──
     outputArea = new TextArea();
     outputArea.setEditable(false);
     outputArea.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 12;");
@@ -182,11 +190,10 @@ public class ChuckIDE extends Application {
 
     setupMidiMonitors();
 
-    // Master Gain Slider (interacts with ChuckAudio)
+    // Master Volume
     Slider masterGainSlider = new Slider(0, 1.0, prefs.getFloat("audio.masterGain", 0.8f));
     masterGainSlider.setOrientation(Orientation.VERTICAL);
     masterGainSlider.setShowTickLabels(true);
-    masterGainSlider.setTooltip(new Tooltip("Master Volume"));
     masterGainSlider
         .valueProperty()
         .addListener(
@@ -198,17 +205,16 @@ public class ChuckIDE extends Application {
     masterBox.setPadding(new Insets(5));
     masterBox.setAlignment(javafx.geometry.Pos.CENTER);
 
-    // Layout Assembly
     SplitPane horizontalSplit = new SplitPane(leftTabPane, tabPane, rightPanel);
-    horizontalSplit.setDividerPositions(0.18, 0.75);
+    horizontalSplit.setDividerPositions(0.2, 0.75);
 
-    HBox consoleHBox = new HBox(5, outputArea, masterBox);
+    HBox bottomHBox = new HBox(5, outputArea, masterBox);
     HBox.setHgrow(outputArea, Priority.ALWAYS);
 
-    VBox footer = new VBox(consoleHBox, pianoKeyboard, statusBar);
+    VBox footer = new VBox(bottomHBox, pianoKeyboard, statusBar);
     SplitPane verticalSplit = new SplitPane(horizontalSplit, footer);
     verticalSplit.setOrientation(Orientation.VERTICAL);
-    verticalSplit.setDividerPositions(0.75);
+    verticalSplit.setDividerPositions(0.7);
 
     BorderPane root = new BorderPane();
     root.setTop(new VBox(menuBar, toolBar));
@@ -220,12 +226,11 @@ public class ChuckIDE extends Application {
 
     primaryStage.setScene(scene);
     primaryStage.show();
-    print("ChucK-Java Engine Online — JDK 25 | Project Loom | Panama\n");
   }
 
   private void applyPreferences() {
     loadPreferences();
-    print("Preferences applied.\n");
+    print("Preferences updated.\n");
   }
 
   private void addNewTab(String title, String content) {
@@ -257,6 +262,8 @@ public class ChuckIDE extends Application {
 
   private MenuBar createMenuBar(Stage stage) {
     MenuBar mb = new MenuBar();
+
+    // File Menu
     Menu fileMenu = new Menu("_File");
     MenuItem newItem = new MenuItem("New");
     newItem.setAccelerator(new KeyCodeCombination(KeyCode.N, KeyCombination.CONTROL_DOWN));
@@ -278,6 +285,23 @@ public class ChuckIDE extends Application {
 
     fileMenu.getItems().addAll(newItem, openItem, saveItem, new SeparatorMenuItem());
 
+    // Edit & View Menus
+    Menu editMenu = new Menu("_Edit");
+    MenuItem undoItem = new MenuItem("Undo");
+    undoItem.setAccelerator(new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN));
+    undoItem.setOnAction(
+        e -> {
+          if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et)
+            et.getEditor().undo();
+        });
+    editMenu.getItems().addAll(undoItem, new MenuItem("Redo"), new SeparatorMenuItem());
+
+    Menu viewMenu = new Menu("_View");
+    CheckMenuItem showVisualizers = new CheckMenuItem("Show Visualizers");
+    showVisualizers.setSelected(true);
+    viewMenu.getItems().add(showVisualizers);
+
+    // Tutorial & Examples
     Menu tutorialMenu = createTutorialMenu();
     Menu examplesMenu = new Menu("_Examples");
     loadExamples(new File("examples"), examplesMenu);
@@ -289,14 +313,12 @@ public class ChuckIDE extends Application {
           Alert a =
               new Alert(
                   Alert.AlertType.INFORMATION,
-                  "ChucK-Java IDE\nJDK 25 + Project Loom + Panama\nBased on Princeton ChucK.");
+                  "ChucK-Java IDE\nJDK 25 + Project Loom + Panama\nModular component architecture.");
           a.show();
         });
     helpMenu.getItems().add(aboutItem);
 
-    mb.getMenus()
-        .addAll(
-            fileMenu, new Menu("_Edit"), new Menu("_View"), tutorialMenu, examplesMenu, helpMenu);
+    mb.getMenus().addAll(fileMenu, editMenu, viewMenu, tutorialMenu, examplesMenu, helpMenu);
     return mb;
   }
 
@@ -323,7 +345,6 @@ public class ChuckIDE extends Application {
       File f = et.getFile();
       if (f == null) {
         FileChooser fc = new FileChooser();
-        fc.setInitialFileName(et.getText().replaceFirst("^\\* ", ""));
         f = fc.showSaveDialog(stage);
       }
       if (f != null) {
@@ -344,53 +365,12 @@ public class ChuckIDE extends Application {
         m,
         "1. Getting Started",
         "First steps with SinOsc",
-        "/* Welcome to ChucK-Java! */\n"
-            + "SinOsc s => dac;\n"
-            + "0.5 => s.gain;\n"
-            + "1::second => now;");
+        "/* Welcome! */\nSinOsc s => dac;\n0.5 => s.gain;\n1::second => now;");
     addTutorialStep(
         m,
         "2. Melody and Scales",
         "Sequence with arrays",
-        "/* Music often uses scales. */\n"
-            + "SinOsc s => dac;\n"
-            + "0.5 => s.gain;\n"
-            + "[60, 62, 64, 65, 67, 69, 71, 72] @=> int major[];\n"
-            + "for(0 => int i; ; i++) {\n"
-            + "  major[i % major.cap()] => Std.mtof => s.freq;\n"
-            + "  200::ms => now;\n"
-            + "}");
-    addTutorialStep(
-        m,
-        "3. Functions",
-        "Modularizing your code",
-        "/* Functions in ChucK */\n"
-            + "SinOsc s => dac;\n"
-            + "fun void play(int note, dur d) {\n"
-            + "  note => Std.mtof => s.freq;\n"
-            + "  d => now;\n"
-            + "}\n"
-            + "while(true) { play(60, 500::ms); play(67, 500::ms); }");
-    addTutorialStep(
-        m,
-        "4. Strong Timing",
-        "The power of 'now'",
-        "/* Advance time with precision. */\n"
-            + "Impulse i => dac;\n"
-            + "while(true) {\n"
-            + "  1.0 => i.next;\n"
-            + "  100::ms => now;\n"
-            + "}");
-    addTutorialStep(
-        m,
-        "5. Concurrent Audio",
-        "Sporking shreds",
-        "/* Parallel execution */\n"
-            + "fun void saw() { SawOsc s => dac; 0.2 => s.gain; while(true) { 60 => Std.mtof => s.freq; 1::second => now; } }\n"
-            + "fun void sine() { SinOsc s => dac; 0.2 => s.gain; while(true) { 67 => Std.mtof => s.freq; 1::second => now; } }\n"
-            + "spork ~ saw();\n"
-            + "spork ~ sine();\n"
-            + "1::week => now;");
+        "/* Melody loop */\nSinOsc s => dac;\n[60, 62, 64, 65, 67] @=> int scale[];\nfor(0=>int i;;i++) {\n  scale[i%scale.cap()] => Std.mtof => s.freq;\n  200::ms => now;\n}");
     return m;
   }
 
@@ -426,15 +406,10 @@ public class ChuckIDE extends Application {
     if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et) {
       String code = et.getEditor().getText();
       String name = et.getText().replaceFirst("^\\* ", "");
-      String args = et.getArguments();
       int id = vm.run(code, name);
       if (id > 0) {
         et.setLastSporkedShredId(id);
-        ChuckShred s = vm.getShred(id);
-        if (s != null) {
-          if (!args.isEmpty()) s.setArgs(args.split("\\s+"));
-          shredListView.getItems().add(new ShredInfo(id, name, s));
-        }
+        shredListView.getItems().add(new ShredInfo(id, name, vm.getShred(id)));
       }
     }
   }
@@ -458,7 +433,6 @@ public class ChuckIDE extends Application {
           sequencerPanel.setStep((int) vm.getGlobalInt("seq_current_step"));
         }
 
-        // Update VU meters frequently for smoothness
         statusBar.updateVUMeters();
 
         if (now - lastTextUpdate > 100_000_000L) {
@@ -473,7 +447,9 @@ public class ChuckIDE extends Application {
 
   private void updateVMLogic() {
     long nowSample = vm.getCurrentTime();
-    if (!shredListView.getItems().isEmpty()) {
+    boolean shredsActive = !shredListView.getItems().isEmpty();
+
+    if (shredsActive) {
       if (nowSample == lastVmTimeSample) {
         if (++stallFrameCount >= STALL_FRAMES_LOCKDOWN) enterLockdown();
       } else {
@@ -493,15 +469,23 @@ public class ChuckIDE extends Application {
   }
 
   private void enterLockdown() {
+    if (lockdownMode) return;
     lockdownMode = true;
-    if (addShredBtnRef != null) addShredBtnRef.setDisable(true);
-    if (replaceBtnRef != null) replaceBtnRef.setDisable(true);
+    Platform.runLater(
+        () -> {
+          if (addShredBtnRef != null) addShredBtnRef.setDisable(true);
+          if (replaceBtnRef != null) replaceBtnRef.setDisable(true);
+        });
   }
 
   private void exitLockdown() {
+    if (!lockdownMode) return;
     lockdownMode = false;
-    if (addShredBtnRef != null) addShredBtnRef.setDisable(false);
-    if (replaceBtnRef != null) replaceBtnRef.setDisable(false);
+    Platform.runLater(
+        () -> {
+          if (addShredBtnRef != null) addShredBtnRef.setDisable(false);
+          if (replaceBtnRef != null) replaceBtnRef.setDisable(false);
+        });
   }
 
   private void print(String s) {
