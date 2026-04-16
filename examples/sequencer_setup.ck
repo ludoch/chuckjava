@@ -28,8 +28,8 @@ while(true) {
     Machine.setGlobalInt("seq_current_step", step % 16);
     
     // B. Pattern Logic: Read the grid from the IDE
-    if (Machine.getGlobalObject("seq_pattern") $ ChuckArray != null) {
-        Machine.getGlobalObject("seq_pattern") $ ChuckArray @=> ChuckArray data;
+    if (Machine.getGlobalObject("seq_pattern") $ Array != null) {
+        Machine.getGlobalObject("seq_pattern") $ Array @=> Array data;
         
         // Loop through rows (we have 4 samples connected, but grid has 8 rows)
         for(0 => int r; r < kit.cap(); r++) {

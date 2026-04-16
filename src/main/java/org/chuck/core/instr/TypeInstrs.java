@@ -89,6 +89,13 @@ public class TypeInstrs {
     }
   }
 
+  public static class CastToObject implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      // Logic-wise it's already an object on stack, but we might want to check the type later
+    }
+  }
+
   public static class EnsureFloat implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {

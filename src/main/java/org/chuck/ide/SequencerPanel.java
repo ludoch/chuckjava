@@ -232,8 +232,8 @@ public class SequencerPanel extends VBox {
             Machine.setGlobalInt("seq_current_step", step % 16);
 
             // Read patterns from the IDE's shared array
-            if (Machine.getGlobalObject("seq_pattern") $ ChuckArray != null) {
-                Machine.getGlobalObject("seq_pattern") $ ChuckArray @=> ChuckArray data;
+            if (Machine.getGlobalObject("seq_pattern") $ Array != null) {
+                Machine.getGlobalObject("seq_pattern") $ Array @=> Array data;
 
                 for(0 => int r; r < 8; r++) {
                     // Calculate index: Row * 16 steps + current step

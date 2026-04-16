@@ -1647,6 +1647,11 @@ public class ExpressionEmitter {
           case "string" -> code.addInstruction(new TypeInstrs.CastToString());
           case "complex" -> code.addInstruction(new TypeInstrs.CastToComplex());
           case "polar" -> code.addInstruction(new TypeInstrs.CastToPolar());
+          default -> {
+            if (parent.isObjectType(e.targetType())) {
+              code.addInstruction(new TypeInstrs.CastToObject());
+            }
+          }
         }
       }
       case ChuckAST.TypeofExp e -> {

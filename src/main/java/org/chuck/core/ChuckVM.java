@@ -352,8 +352,37 @@ public class ChuckVM {
     try {
       CharStream input = CharStreams.fromString(source);
       ChuckANTLRLexer lexer = new ChuckANTLRLexer(input);
+      lexer.removeErrorListeners();
+      lexer.addErrorListener(
+          new BaseErrorListener() {
+            @Override
+            public void syntaxError(
+                Recognizer<?, ?> recognizer,
+                Object offendingSymbol,
+                int line,
+                int charPositionInLine,
+                String msg,
+                RecognitionException e) {
+              print(String.format("Lexer error: line %d:%d %s\n", line, charPositionInLine, msg));
+            }
+          });
+
       CommonTokenStream tokens = new CommonTokenStream(lexer);
       ChuckANTLRParser parser = new ChuckANTLRParser(tokens);
+      parser.removeErrorListeners();
+      parser.addErrorListener(
+          new BaseErrorListener() {
+            @Override
+            public void syntaxError(
+                Recognizer<?, ?> recognizer,
+                Object offendingSymbol,
+                int line,
+                int charPositionInLine,
+                String msg,
+                RecognitionException e) {
+              print(String.format("Parser error: line %d:%d %s\n", line, charPositionInLine, msg));
+            }
+          });
 
       ChuckASTVisitor visitor = new ChuckASTVisitor();
       @SuppressWarnings("unchecked")

@@ -150,6 +150,49 @@ public class MachineCall implements ChuckInstr {
       // silent()/realtime() already handled in emitter; keep here for dynamic dispatch
       case "silent" -> s.reg.push(1L);
       case "realtime" -> s.reg.push(0L);
+      case "setGlobalInt" -> {
+        if (args.length > 1 && args[0] != null) {
+          String name = String.valueOf(args[0]);
+          long val = ((Number) args[1]).longValue();
+          vm.setGlobalInt(name, val);
+        }
+        s.reg.push(0L);
+      }
+      case "setGlobalFloat" -> {
+        if (args.length > 1 && args[0] != null) {
+          String name = String.valueOf(args[0]);
+          double val = (Double) args[1];
+          vm.setGlobalFloat(name, val);
+        }
+        s.reg.push(0L);
+      }
+      case "getGlobalInt" -> {
+        if (args.length > 0 && args[0] != null) {
+          s.reg.push(vm.getGlobalInt(String.valueOf(args[0])));
+        } else {
+          s.reg.push(0L);
+        }
+      }
+      case "getGlobalFloat" -> {
+        if (args.length > 0 && args[0] != null) {
+          s.reg.push(vm.getGlobalFloat(String.valueOf(args[0])));
+        } else {
+          s.reg.push(0.0);
+        }
+      }
+      case "getGlobalObject" -> {
+        if (args.length > 0 && args[0] != null) {
+          s.reg.pushObject(vm.getGlobalObject(String.valueOf(args[0])));
+        } else {
+          s.reg.pushObject(null);
+        }
+      }
+      case "setGlobalObject" -> {
+        if (args.length > 1 && args[0] != null) {
+          vm.setGlobalObject(String.valueOf(args[0]), args[1]);
+        }
+        s.reg.push(0L);
+      }
       default -> s.reg.push(0L);
     }
   }

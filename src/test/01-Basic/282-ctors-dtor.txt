@@ -1,0 +1,6 @@
+2 2 15 72 1320
+destructor: 1320
+destructor: 72
+destructor: 15
+destructor: 2
+destructor: 2

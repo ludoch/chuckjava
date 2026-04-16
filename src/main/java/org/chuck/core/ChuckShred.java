@@ -574,7 +574,7 @@ public class ChuckShred implements Comparable<ChuckShred> {
     }
   }
 
-  /** Synchronous execution of a code block (e.g. for ChuGen.tick). */
+  /** Synchronous execution of a code block (e.g. for pre-ctor, static init). */
   public void executeSynchronous(ChuckVM vm, ChuckCode code) {
     if (code == null) return;
     ChuckCode savedCode = this.code;
@@ -586,10 +586,18 @@ public class ChuckShred implements Comparable<ChuckShred> {
     this.code = code;
     this.pc = 0;
     this.framePointer = mem.getSp();
+    int startFp = this.framePointer;
 
     try {
-      while (this.code == code && pc < code.getNumInstructions() && !isDone) {
-        MethodHandle handle = code.getHandle(pc);
+      while (!isDone && this.code != null) {
+        if (pc >= this.code.getNumInstructions()) {
+          // End of current code — if back at or below the starting frame, we're done
+          if (framePointer <= startFp) break;
+          // Otherwise we're in a nested call, synthesize an implicit return
+          new org.chuck.core.instr.ControlInstrs.ReturnMethod().execute(vm, this);
+          continue;
+        }
+        MethodHandle handle = this.code.getHandle(pc);
         if (handle == null) break;
         int oldPc = pc;
         ChuckCode oldC = this.code;
@@ -597,7 +605,7 @@ public class ChuckShred implements Comparable<ChuckShred> {
         if (this.code == oldC && pc == oldPc) pc++;
       }
     } catch (Throwable t) {
-      isDone = true;
+      // swallow — restore state in finally
     } finally {
       this.code = savedCode;
       this.pc = savedPc;

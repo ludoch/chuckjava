@@ -1,21 +1,19 @@
-"Base ctor" :(string)
-"Parent ctor" :(string)
-"Child ctor" :(string)
-"test start" :(string)
-"super.Parent() - expecting parent ctor" :(string)
-"Parent ctor" :(string)
-"super.Base() - expecting base ctor" :(string)
-"Base ctor" :(string)
-"super.not_overridden() - expecting base not_overridden" :(string)
-"Base not_overridden" :(string)
-"super.overridden() - expecting parent overridden" :(string)
-"Parent overridden" :(string)
-"this.overridden() - expecting child overridden" :(string)
-"Child overridden" :(string)
-"super.not_overridden_by_child() - expecting parent not_overridden_by_child" :(string)
-"Parent not_overridden_by_child" :(string)
-"this.bubble_up() - expecting child bubble_up / parent bubble_up / base bubble_up" :(string)
-"Child bubble_up" :(string)
-"Parent bubble_up" :(string)
-"Base bubble_up" :(string)
-"test complete" :(string)
+Child ctor
+test start
+super.Parent() - expecting parent ctor
+Parent ctor
+super.Base() - expecting base ctor
+Base ctor
+super.not_overridden() - expecting base not_overridden
+Base not_overridden
+super.overridden() - expecting parent overridden
+Parent overridden
+this.overridden() - expecting child overridden
+Child overridden
+super.not_overridden_by_child() - expecting parent not_overridden_by_child
+Parent not_overridden_by_child
+this.bubble_up() - expecting child bubble_up / parent bubble_up / base bubble_up
+Child bubble_up
+Parent bubble_up
+Base bubble_up
+test complete

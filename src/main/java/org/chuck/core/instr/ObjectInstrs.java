@@ -681,15 +681,9 @@ public class ObjectInstrs {
       for (int depth = 0; depth < 16 && t != null; depth++) {
         UserClassDescriptor desc = vm.getUserClass(t);
         if (desc == null) break;
-        String key = mName + ":" + a;
-        if (desc.methods().containsKey(key)) {
-          target = desc.methods().get(key);
-          break;
-        }
-        if (desc.staticMethods().containsKey(key)) {
-          target = desc.staticMethods().get(key);
-          break;
-        }
+        target = findByNameAndArgCount(desc.methods(), mName, a);
+        if (target == null) target = findByNameAndArgCount(desc.staticMethods(), mName, a);
+        if (target != null) break;
         t = desc.parentName();
       }
       if (target != null) {
@@ -697,13 +691,14 @@ public class ObjectInstrs {
         s.mem.push((long) (s.getPc() + 1));
         s.mem.push((long) s.getFramePointer());
         s.mem.push((long) s.reg.getSp());
-        s.setFramePointer(s.mem.getSp());
+        // Push args back to reg so MoveArgs can transfer them to the frame locals
         for (int i = 0; i < a; i++) {
           Object arg = args[i];
-          if (arg instanceof ChuckObject co) s.mem.pushObject(co);
-          else if (isD[i]) s.mem.push((Double) arg);
-          else s.mem.push((Long) arg);
+          if (arg instanceof ChuckObject co) s.reg.pushObject(co);
+          else if (isD[i]) s.reg.push((Double) arg);
+          else s.reg.push((Long) arg);
         }
+        s.setFramePointer(s.mem.getSp());
         s.thisStack.push(uo);
         s.setCode(target);
         s.setPc(0);
@@ -1400,5 +1395,25 @@ public class ObjectInstrs {
       }
       s.reg.push(val);
     }
+  }
+
+  /**
+   * Find a method by name and arg count, handling both count-based ("name:0") and type-based
+   * ("name:int,float") keys.
+   */
+  static ChuckCode findByNameAndArgCount(Map<String, ChuckCode> methods, String name, int argc) {
+    // Fast path: count-based key ("name:0", "name:1", etc.)
+    String countKey = name + ":" + argc;
+    if (methods.containsKey(countKey)) return methods.get(countKey);
+    // Scan for type-based keys with the right arg count
+    String prefix = name + ":";
+    for (Map.Entry<String, ChuckCode> e : methods.entrySet()) {
+      String k = e.getKey();
+      if (!k.startsWith(prefix)) continue;
+      String typePart = k.substring(prefix.length());
+      int parts = typePart.isEmpty() ? 0 : typePart.split(",").length;
+      if (parts == argc) return e.getValue();
+    }
+    return null;
   }
 }
