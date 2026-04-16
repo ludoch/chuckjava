@@ -410,7 +410,14 @@ public class ChuckIDE extends Application {
 
     MenuItem detachSeq = new MenuItem("Detach Sequencer...");
     detachSeq.setOnAction(
-        e -> sequencerPanel.setRotate(0)); // placeholder for actual detachment if not done in panel
+        e -> {
+          for (Tab t : leftTabPane.getTabs()) {
+            if (t.getText().equals("Sequencer")) {
+              sequencerPanel.detachWindow(t, leftTabPane);
+              break;
+            }
+          }
+        });
 
     viewMenu.getItems().addAll(zoomIn, zoomOut, new SeparatorMenuItem(), showKeyboard, detachSeq);
 

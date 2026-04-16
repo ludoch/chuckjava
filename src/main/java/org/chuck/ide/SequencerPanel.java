@@ -9,6 +9,7 @@ import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Orientation;
 import javafx.geometry.Pos;
+import javafx.scene.Node;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
@@ -30,6 +31,7 @@ public class SequencerPanel extends VBox {
   private final int COLS = 16;
   private final ToggleButton[][] grid = new ToggleButton[ROWS][COLS];
   private final Circle[] cursors = new Circle[COLS];
+  private Stage detachedStage;
 
   // Real sample mapping
   private final String[] drumNames = {
@@ -69,7 +71,7 @@ public class SequencerPanel extends VBox {
 
     Button detachBtn = new Button("Detach ⧉");
     detachBtn.setStyle("-fx-font-size: 10; -fx-base: #444;");
-    detachBtn.setOnAction(e -> detachWindow());
+    detachBtn.setOnAction(e -> detachWindowInternal());
 
     header.getChildren().addAll(title, spacer1, detachBtn);
 
@@ -201,24 +203,44 @@ public class SequencerPanel extends VBox {
     }
   }
 
-  private void detachWindow() {
-    Stage popup = new Stage();
-    popup.setTitle("ChucK Sequencer Detached");
+  public void detachWindow(Tab parentTab, TabPane parentPane) {
+    if (detachedStage != null) {
+      detachedStage.toFront();
+      return;
+    }
 
-    // Copy existing state to new panel or move this one?
-    // Safer to just create a new window with a wrapper if needed,
-    // but for now let's just show a notification or move this.
-    // For simplicity, we'll just open a new stage with this panel.
-    Pane parent = (Pane) getParent();
-    if (parent != null) parent.getChildren().remove(this);
+    detachedStage = new Stage();
+    detachedStage.setTitle("ChucK Sequencer Detached");
 
-    Scene scene = new Scene(this, 600, 350);
-    popup.setScene(scene);
-    popup.setOnCloseRequest(
+    // Remove from tab UI
+    parentTab.setContent(new StackPane(new Label("Sequencer is detached in a separate window.")));
+
+    Scene scene = new Scene(this, 600, 380);
+    detachedStage.setScene(scene);
+
+    detachedStage.setOnCloseRequest(
         e -> {
-          // ... re-attach logic would go here
+          parentTab.setContent(this);
+          detachedStage = null;
+          parentPane.getSelectionModel().select(parentTab);
         });
-    popup.show();
+
+    detachedStage.show();
+  }
+
+  private void detachWindowInternal() {
+    Node p = getParent();
+    while (p != null && !(p instanceof TabPane)) {
+      p = p.getParent();
+    }
+    if (p instanceof TabPane tp) {
+      for (Tab t : tp.getTabs()) {
+        if (t.getContent() == this) {
+          detachWindow(t, tp);
+          return;
+        }
+      }
+    }
   }
 
   private void savePattern() {
