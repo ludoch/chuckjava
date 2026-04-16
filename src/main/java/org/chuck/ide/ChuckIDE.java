@@ -89,7 +89,7 @@ public class ChuckIDE extends Application {
     initVM();
     setupUI(primaryStage);
 
-    // Default script
+    // Initial tab
     addNewTab(
         "Untitled.ck",
         "/* Default SinOsc script */\n"
