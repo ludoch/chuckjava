@@ -28,7 +28,10 @@ import org.chuck.audio.util.Gain;
 import org.chuck.audio.util.Scope;
 import org.chuck.core.ChuckVM;
 
-/** Main IDE class for ChucK-Java. Refactored into components with full UI logic restored. */
+/**
+ * Main IDE class for ChucK-Java. Refactored into components with full logic and all UI features
+ * restored.
+ */
 public class ChuckIDE extends Application {
   private final Preferences prefs = Preferences.userNodeForPackage(ChuckIDE.class);
   private Stage stage;
@@ -41,6 +44,7 @@ public class ChuckIDE extends Application {
   private StatusBar statusBar;
   private IDEProjectBrowser projectBrowser;
   private SequencerPanel sequencerPanel;
+  private ControlSurface controlSurface;
 
   // UI Elements
   private TabPane tabPane;
@@ -50,9 +54,10 @@ public class ChuckIDE extends Application {
   private Button addShredBtnRef;
   private Button replaceBtnRef;
   private Menu recentMenu;
+  private VBox footer;
+  private PianoKeyboard pianoKeyboard;
 
   // MIDI
-  private PianoKeyboard pianoKeyboard;
   private MidiMonitor midiMonitor;
   private MidiRecorder midiRecorder = new MidiRecorder();
   private Circle midiActivityIndicator;
@@ -96,6 +101,15 @@ public class ChuckIDE extends Application {
     if (audio != null) audio.start();
     visualizerPanel.start();
     startAnimationTimer();
+
+    // SHUTDOWN HANDLER
+    primaryStage.setOnCloseRequest(
+        e -> {
+          if (audio != null) audio.stop();
+          if (vm != null) vm.clear();
+          Platform.exit();
+          System.exit(0);
+        });
   }
 
   private void loadPreferences() {
@@ -139,10 +153,10 @@ public class ChuckIDE extends Application {
     Tab seqTab = new Tab("Sequencer", sequencerPanel);
     seqTab.setClosable(false);
 
-    shredListView = new ListView<>();
-    shredListView.setCellFactory(lv -> new ShredListCell(this));
-    Tab shredsTab = new Tab("Shreds", shredListView);
-    shredsTab.setClosable(false);
+    controlSurface = new ControlSurface();
+    controlSurface.setVm(vm);
+    Tab controlTab = new Tab("Control", controlSurface);
+    controlTab.setClosable(false);
 
     midiMonitor = new MidiMonitor();
     Tab midiTab = new Tab("MIDI", midiMonitor);
@@ -150,16 +164,15 @@ public class ChuckIDE extends Application {
 
     PreferencesTab prefsTabComp = new PreferencesTab(prefs);
     prefsTabComp.setOnEditorSettingsChanged(this::applyPreferences);
-    prefsTabComp.setAudioRestartHandler(
+    prefsTabComp.setOnAudioRestart(
         (sr, bs, out, in) -> {
-          print(
-              "Audio settings changed. Please restart IDE to apply sample rate/buffer changes.\n");
+          print("Audio configuration updated. Please restart IDE for hardware changes.\n");
           audio.setMasterGain(prefs.getFloat("audio.masterGain", 0.8f));
         });
     Tab settingsTab = new Tab("Settings", prefsTabComp);
     settingsTab.setClosable(false);
 
-    leftTabPane = new TabPane(projectTab, seqTab, shredsTab, midiTab, settingsTab);
+    leftTabPane = new TabPane(projectTab, seqTab, controlTab, midiTab, settingsTab);
     leftTabPane.setPrefWidth(320);
 
     // ── CENTER PANEL ──
@@ -176,6 +189,11 @@ public class ChuckIDE extends Application {
             });
 
     // ── RIGHT PANEL ──
+    shredListView = new ListView<>();
+    shredListView.setCellFactory(lv -> new ShredListCell(this));
+    VBox shredBox = new VBox(5, new Label(" Active Shreds"), shredListView);
+    VBox.setVgrow(shredListView, Priority.ALWAYS);
+
     FFT analyzer = new FFT(1024);
     vm.getDacChannel(0).chuckTo(analyzer);
     Scope scope = new Scope(1024);
@@ -183,7 +201,7 @@ public class ChuckIDE extends Application {
     visualizerPanel = new VisualizerPanel(vm, audio, analyzer, scope);
     visualizerPanel.setPrefHeight(300);
 
-    VBox rightPanel = new VBox(5, new Label(" Visualizers"), visualizerPanel);
+    VBox rightPanel = new VBox(5, shredBox, visualizerPanel);
     rightPanel.setPrefWidth(350);
     rightPanel.setPadding(new Insets(5));
 
@@ -223,7 +241,7 @@ public class ChuckIDE extends Application {
     HBox bottomHBox = new HBox(5, outputArea, masterBox);
     HBox.setHgrow(outputArea, Priority.ALWAYS);
 
-    VBox footer = new VBox(bottomHBox, pianoKeyboard, statusBar);
+    footer = new VBox(bottomHBox, pianoKeyboard, statusBar);
     SplitPane verticalSplit = new SplitPane(horizontalSplit, footer);
     verticalSplit.setOrientation(Orientation.VERTICAL);
     verticalSplit.setDividerPositions(0.7);
@@ -242,14 +260,12 @@ public class ChuckIDE extends Application {
 
   private void applyPreferences() {
     loadPreferences();
-    // Update all tabs with new font size
     for (Tab t : tabPane.getTabs()) {
       if (t instanceof EditorTab et) {
         et.getEditor()
             .setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: " + prefFontSize + ";");
       }
     }
-    // Re-apply styles
     applyInlineStyles(stage.getScene());
     print("Preferences applied.\n");
   }
@@ -337,7 +353,24 @@ public class ChuckIDE extends Application {
           if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et)
             et.getEditor().redo();
         });
-    editMenu.getItems().addAll(undoItem, redoItem, new SeparatorMenuItem());
+    MenuItem selectAll = new MenuItem("Select All");
+    selectAll.setAccelerator(new KeyCodeCombination(KeyCode.A, KeyCombination.CONTROL_DOWN));
+    selectAll.setOnAction(
+        e -> {
+          if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et)
+            et.getEditor().selectAll();
+        });
+
+    editMenu
+        .getItems()
+        .addAll(
+            undoItem,
+            redoItem,
+            selectAll,
+            new SeparatorMenuItem(),
+            new MenuItem("Cut"),
+            new MenuItem("Copy"),
+            new MenuItem("Paste"));
 
     Menu viewMenu = new Menu("_View");
     MenuItem zoomIn = new MenuItem("Zoom In");
@@ -354,13 +387,29 @@ public class ChuckIDE extends Application {
           prefFontSize = Math.max(8, prefFontSize - 1);
           applyPreferences();
         });
-    viewMenu.getItems().addAll(zoomIn, zoomOut);
 
-    Menu tutorialMenu = createTutorialMenu();
-    Menu examplesMenu = new Menu("_Examples");
-    loadExamples(new File("examples"), examplesMenu);
+    CheckMenuItem showKeyboard = new CheckMenuItem("Show Keyboard");
+    showKeyboard.setSelected(true);
+    showKeyboard.setOnAction(
+        e -> {
+          if (showKeyboard.isSelected()) {
+            if (!footer.getChildren().contains(pianoKeyboard))
+              footer.getChildren().add(1, pianoKeyboard);
+          } else {
+            footer.getChildren().remove(pianoKeyboard);
+          }
+        });
+
+    viewMenu.getItems().addAll(zoomIn, zoomOut, new SeparatorMenuItem(), showKeyboard);
 
     Menu helpMenu = new Menu("_Help");
+    MenuItem githubItem = new MenuItem("GitHub Repository");
+    githubItem.setOnAction(
+        e -> getHostServices().showDocument("https://github.com/ludoch/chuckjava"));
+
+    MenuItem rtMidiHelp = new MenuItem("RtMidi Setup...");
+    rtMidiHelp.setOnAction(e -> showRtMidiHelp());
+
     MenuItem aboutItem = new MenuItem("About ChucK-Java");
     aboutItem.setOnAction(
         e -> {
@@ -370,10 +419,23 @@ public class ChuckIDE extends Application {
                   "ChucK-Java IDE\nJDK 25 + Project Loom + Panama\nModular component architecture.");
           a.show();
         });
-    helpMenu.getItems().add(aboutItem);
+    helpMenu.getItems().addAll(githubItem, rtMidiHelp, aboutItem);
 
-    mb.getMenus().addAll(fileMenu, editMenu, viewMenu, tutorialMenu, examplesMenu, helpMenu);
+    mb.getMenus()
+        .addAll(
+            fileMenu, editMenu, viewMenu, createTutorialMenu(), new Menu("_Examples"), helpMenu);
+    loadExamples(new File("examples"), mb.getMenus().get(4));
+
     return mb;
+  }
+
+  private void showRtMidiHelp() {
+    Alert a = new Alert(Alert.AlertType.INFORMATION);
+    a.setTitle("RtMidi Setup");
+    a.setHeaderText("Native MIDI Support");
+    a.setContentText(
+        "ChucK-Java prefers RtMidi for low latency. On Windows, ensure 'rtmidi.dll' is in your project root or PATH.");
+    a.show();
   }
 
   private void updateRecentMenu() {
