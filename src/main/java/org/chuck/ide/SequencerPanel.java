@@ -32,6 +32,8 @@ public class SequencerPanel extends VBox {
   private final ToggleButton[][] grid = new ToggleButton[ROWS][COLS];
   private final Circle[] cursors = new Circle[COLS];
   private Stage detachedStage;
+  private int lastEngineShredId = -1;
+  private final Label statusLabel = new Label("Engine: Stopped");
 
   // Real sample mapping
   private final String[] drumNames = {
@@ -133,6 +135,8 @@ public class SequencerPanel extends VBox {
     Button clearBtn = new Button("Clear");
     clearBtn.setOnAction(e -> clearGrid());
 
+    statusLabel.setStyle("-fx-text-fill: #888; -fx-font-size: 10;");
+
     HBox controls =
         new HBox(
             8,
@@ -141,7 +145,9 @@ public class SequencerPanel extends VBox {
             randomBtn,
             clearBtn,
             saveBtn,
-            loadBtn);
+            loadBtn,
+            new Separator(Orientation.VERTICAL),
+            statusLabel);
     controls.setAlignment(Pos.CENTER);
 
     getChildren().addAll(header, new Separator(), gridPane, cursorBox, new Separator(), controls);
@@ -285,13 +291,20 @@ public class SequencerPanel extends VBox {
   }
 
   private void launchEngine() {
+    if (lastEngineShredId != -1) {
+      vm.removeShred(lastEngineShredId);
+    }
+
     StringBuilder sb = new StringBuilder();
     sb.append("/* CHUCK GRID SEQUENCER PRO ENGINE */\n");
     sb.append("SndBuf kit[").append(ROWS).append("];\n");
     sb.append("Gain master => dac;\n0.6 => master.gain;\n\n");
 
     for (int i = 0; i < ROWS; i++) {
-      sb.append("\"").append(drumPaths[i]).append("\" => kit[").append(i).append("].read;\n");
+      // Use absolute path for reliability
+      File f = new File(drumPaths[i]);
+      String abs = f.getAbsolutePath().replace("\\", "/");
+      sb.append("\"").append(abs).append("\" => kit[").append(i).append("].read;\n");
       sb.append("kit[").append(i).append("] => master;\n");
       sb.append("kit[").append(i).append("].samples() => kit[").append(i).append("].pos;\n");
     }
@@ -310,7 +323,7 @@ public class SequencerPanel extends VBox {
                 if (Machine.getGlobalObject("seq_probability") $ float[] @=> float probs[]) {
                     for(0 => int r; r < 8; r++) {
                         if (data[r * 16 + (step % 16)] > 0) {
-                            // Check per-track probability (default 1.0)
+                            // Check per-track probability
                             if (Math.randomf() <= probs[r]) {
                                 0 => kit[r].pos;
                             }
@@ -323,6 +336,13 @@ public class SequencerPanel extends VBox {
             step++;
         }
         """);
-    vm.run(sb.toString(), "SequencerEngine.ck");
+    lastEngineShredId = vm.run(sb.toString(), "SequencerEngine.ck");
+    if (lastEngineShredId > 0) {
+      statusLabel.setText("Engine: RUNNING");
+      statusLabel.setStyle("-fx-text-fill: #4CAF50; -fx-font-weight: bold;");
+    } else {
+      statusLabel.setText("Engine: ERROR");
+      statusLabel.setStyle("-fx-text-fill: #F44336;");
+    }
   }
 }
