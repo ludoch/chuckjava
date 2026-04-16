@@ -36,20 +36,22 @@ while(true) {
     // A. Move the green cursor in the IDE
     Machine.setGlobalInt("seq_current_step", step % 16);
     
-    // B. Read grid data and probabilities
-    if (Machine.getGlobalObject("seq_pattern") $ Array != null) {
-        Machine.getGlobalObject("seq_pattern") $ Array @=> Array data;
-        Machine.getGlobalObject("seq_probability") $ Array @=> Array probs;
-        
-        for(0 => int r; r < 8; r++) {
-            // Check if grid pad is ON
-            if (data.getInt(r * 16 + (step % 16)) > 0) {
-                // Apply probability (0.0 to 1.0)
-                1.0 => float p;
-                if (r < probs.cap()) probs.getFloat(r) => p;
-                
-                if (Math.randomf() <= p) {
-                    0 => kit[r].pos; // TRIGGER
+    // B. Read grid data and probabilities from the IDE
+    // Cast the shared objects to the correct array types
+    if (Machine.getGlobalObject("seq_pattern") $ int[] @=> int data[]) {
+        if (Machine.getGlobalObject("seq_probability") $ float[] @=> float probs[]) {
+            
+            for(0 => int r; r < 8; r++) {
+                // Check if grid pad is ON using standard [index] notation
+                if (data[r * 16 + (step % 16)] > 0) {
+                    
+                    // Apply probability (0.0 to 1.0)
+                    1.0 => float p;
+                    if (r < probs.cap()) probs[r] => p;
+                    
+                    if (Math.randomf() <= p) {
+                        0 => kit[r].pos; // TRIGGER
+                    }
                 }
             }
         }

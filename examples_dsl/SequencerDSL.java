@@ -9,7 +9,7 @@ import org.chuck.host.ChuckHost;
  * JAVA DSL VERSION: PRO GRID SEQUENCER
  * -----------------------------------
  * This class mirrors the ChucK sequencer logic using pure Java DSL.
- * It demonstrates real-time interaction with the IDE grid.
+ * It demonstrates real-time interaction with the 8-track IDE grid.
  */
 public class SequencerDSL {
   public static void main(String[] args) throws Exception {
@@ -53,6 +53,7 @@ public class SequencerDSL {
       Object obj = host.getVM().getGlobalObject("seq_pattern");
       if (obj instanceof ChuckArray data) {
         for (int r = 0; r < 8; r++) {
+          // Use standard indexing (data.getInt or data[idx] internally)
           if (data.getInt(r * 16 + (step % 16)) > 0) {
             kit[r].setPos(0); // Trigger!
           }

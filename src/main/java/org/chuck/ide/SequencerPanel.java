@@ -306,15 +306,14 @@ public class SequencerPanel extends VBox {
         while(true) {
             Machine.setGlobalInt("seq_current_step", step % 16);
 
-            if (Machine.getGlobalObject("seq_pattern") $ Array != null) {
-                Machine.getGlobalObject("seq_pattern") $ Array @=> Array data;
-                Machine.getGlobalObject("seq_probability") $ Array @=> Array probs;
-
-                for(0 => int r; r < 8; r++) {
-                    if (data.getInt(r * 16 + (step % 16)) > 0) {
-                        // Check per-track probability (default 1.0)
-                        if (Math.randomf() <= probs.getFloat(r)) {
-                            0 => kit[r].pos;
+            if (Machine.getGlobalObject("seq_pattern") $ int[] @=> int data[]) {
+                if (Machine.getGlobalObject("seq_probability") $ float[] @=> float probs[]) {
+                    for(0 => int r; r < 8; r++) {
+                        if (data[r * 16 + (step % 16)] > 0) {
+                            // Check per-track probability (default 1.0)
+                            if (Math.randomf() <= probs[r]) {
+                                0 => kit[r].pos;
+                            }
                         }
                     }
                 }
