@@ -1,41 +1,56 @@
 /* 
-   PRO SEQUENCER SETUP
-   -------------------
-   This script demonstrates how to read the IDE's Grid Sequencer 
-   using ChucK code. Use this as a template for your own kits.
+   CHUCK GRID SEQUENCER PRO SETUP
+   ------------------------------
+   This script connects the IDE's 8-track visual grid to a real 
+   drum kit. It handles sample loading, visual sync, and 
+   per-track probability for randomness.
 */
 
-// 1. Connection logic
-// We use a bank of SndBufs for maximum "punch"
-SndBuf kick => dac; "examples/data/kick.wav" => kick.read;
-SndBuf snare => dac; "examples/data/snare.wav" => snare.read;
-SndBuf hh => dac; "examples/data/hihat.wav" => hh.read;
-SndBuf hho => dac; "examples/data/hihat-open.wav" => hho.read;
+// 1. Setup Drum Kit (8 tracks)
+SndBuf kit[8];
+Gain master => dac;
+0.6 => master.gain;
 
-// Array of our buffers for easy indexing
-[kick, snare, hh, hho] @=> SndBuf kit[];
+// Load high-quality samples from the data folders
+"examples/data/kick.wav" => kit[0].read;
+"examples/data/snare.wav" => kit[1].read;
+"examples/data/hihat.wav" => kit[2].read;
+"examples/data/hihat-open.wav" => kit[3].read;
+"examples/book/digital-artists/audio/clap_01.wav" => kit[4].read;
+"examples/book/digital-artists/audio/cowbell_01.wav" => kit[5].read;
+"examples/book/digital-artists/audio/click_01.wav" => kit[6].read;
+"examples/data/snare-hop.wav" => kit[7].read;
 
-// Mute them initially
-for(0=>int i; i<kit.cap(); i++) kit[i].samples() => kit[i].pos;
+// Initialize: connect all to master and set to end (silent)
+for(0 => int i; i < 8; i++) {
+    kit[i] => master;
+    kit[i].samples() => kit[i].pos;
+}
 
-// 2. Timing
-125::ms => dur T; // 120 BPM 16th notes
-T - (now % T) => now; // Align to global time
+// 2. Timing logic (120 BPM)
+125::ms => dur T;
+T - (now % T) => now; // Sync to global time
 
 0 => int step;
 while(true) {
-    // A. Visual Sync: Move the green dot in the IDE
+    // A. Move the green cursor in the IDE
     Machine.setGlobalInt("seq_current_step", step % 16);
     
-    // B. Pattern Logic: Read the grid from the IDE
+    // B. Read grid data and probabilities
     if (Machine.getGlobalObject("seq_pattern") $ Array != null) {
         Machine.getGlobalObject("seq_pattern") $ Array @=> Array data;
+        Machine.getGlobalObject("seq_probability") $ Array @=> Array probs;
         
-        // Loop through rows (we have 4 samples connected, but grid has 8 rows)
-        for(0 => int r; r < kit.cap(); r++) {
-            // Check if the pad is active at this step
+        for(0 => int r; r < 8; r++) {
+            // Check if grid pad is ON
             if (data.getInt(r * 16 + (step % 16)) > 0) {
-                0 => kit[r].pos; // PLAY!
+                // Apply probability (0.0 to 1.0)
+                1.0 => float p;
+                if (r < probs.cap()) probs.getFloat(r) => p;
+                
+                if (Math.randomf() <= p) {
+                    0 => kit[r].pos; // TRIGGER
+                }
             }
         }
     }

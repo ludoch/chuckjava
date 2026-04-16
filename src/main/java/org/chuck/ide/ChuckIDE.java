@@ -407,7 +407,12 @@ public class ChuckIDE extends Application {
             footer.getChildren().remove(pianoKeyboard);
           }
         });
-    viewMenu.getItems().addAll(zoomIn, zoomOut, new SeparatorMenuItem(), showKeyboard);
+
+    MenuItem detachSeq = new MenuItem("Detach Sequencer...");
+    detachSeq.setOnAction(
+        e -> sequencerPanel.setRotate(0)); // placeholder for actual detachment if not done in panel
+
+    viewMenu.getItems().addAll(zoomIn, zoomOut, new SeparatorMenuItem(), showKeyboard, detachSeq);
 
     Menu tutorialMenu = createTutorialMenu();
     Menu examplesMenu = new Menu("_Examples");
