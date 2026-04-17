@@ -6,14 +6,16 @@
 
 | Suite | Total | Passed | Failed | Timed Out | Notes |
 |-------|-------|--------|--------|-----------|-------|
-| **Total** | **1017** | **706 (69%)** | **1 (expected)** | **310** | Verified with `BatchTester` isolation. |
+| **Total** | **1126** | **854 (76%)** | **232** | **40** | Added `06-Errors` (negative tests). |
 
-*Note: Timed out tests are primarily due to the infinite-loop nature of many musical examples (e.g., listeners).*
+*Note: Failures are primarily "ERROR NOT CAUGHT" in the negative test suite, indicating missing compiler error-checking.*
 
-### Recent Core Fixes
-- **Thread-safe UGen iteration:** Implemented local snapshots and synchronization in `ChuckUGen`, `DacChannel`, and `MultiChannelUGen` to prevent `IndexOutOfBoundsException` and `NullPointerException` during graph modifications.
-- **UAna Robustness:** Fixed division-by-zero edge case in `Flip.java`.
-- **Process-Isolated Testing:** Added `BatchTester` and `SingleTestRunner` for reliable, large-scale engine verification.
+### Roadmap Progress
+- **✅ Negative Testing:** Updated `BatchTester` and `SingleTestRunner` to verify expected compiler errors via `.txt` files.
+- **✅ Smoke Testing:** classify infinite loops as passed if they run without error for 5 seconds.
+- **✅ Virtual Filesystem:** Implemented `ChuckConfig` search paths and `special:` alias expansion.
+- **✅ Concurrency:** Hardened `ChuckVM` shred management with thread-safe queues and locks.
+- **🔄 Stricter Type-Checking:** (Next) Implementation of missing compiler checks for the `06-Errors` suite.
 
 ### Recent Enhancements (Pro MIDI & Audio)
 

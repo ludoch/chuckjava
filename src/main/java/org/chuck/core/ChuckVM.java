@@ -63,11 +63,10 @@ public class ChuckVM {
       Preferences.userNodeForPackage(org.chuck.ide.ChuckIDE.class)
           .getBoolean("engine.parallel", false);
 
-  // Shred management
   private final PriorityQueue<ChuckShred> shreduler = new PriorityQueue<>();
   private final Map<Integer, ChuckShred> activeShreds = new ConcurrentHashMap<>();
-  private final java.util.List<ChuckShred> deadShreds =
-      java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+  private final java.util.Queue<ChuckShred> deadShreds =
+      new java.util.concurrent.ConcurrentLinkedQueue<>();
   private final ReentrantLock shredulerLock = new ReentrantLock();
   private final Condition shredulerCondition = shredulerLock.newCondition();
   private int nextShredId = 1;
@@ -437,19 +436,20 @@ public class ChuckVM {
         baseFilename = parts[0];
       }
 
-      java.nio.file.Path path = java.nio.file.Paths.get(baseFilename);
-      if (!path.isAbsolute() && caller != null) {
+      java.io.File file = ChuckConfig.resolveFile(baseFilename);
+      if (!file.exists() && caller != null) {
         String callerPath = caller.getCode().getName();
         if (callerPath != null && !callerPath.equals("eval")) {
           java.nio.file.Path callerDir = java.nio.file.Paths.get(callerPath).getParent();
           if (callerDir != null) {
-            path = callerDir.resolve(baseFilename);
+            java.io.File resolvedRelativeToCaller = callerDir.resolve(baseFilename).toFile();
+            if (resolvedRelativeToCaller.exists()) file = resolvedRelativeToCaller;
           }
         }
       }
-      String source = java.nio.file.Files.readString(path);
+      String source = java.nio.file.Files.readString(file.toPath());
 
-      int id = run(source, path.toString());
+      int id = run(source, file.getAbsolutePath());
 
       // Pass arguments if any
       if (id > 0 && parts.length > 1 && baseFilename.equals(parts[0])) {
@@ -502,7 +502,7 @@ public class ChuckVM {
                 shred.cleanup(this);
                 shred.broadcast(this);
                 deadShreds.add(shred);
-                if (deadShreds.size() > 50) deadShreds.remove(0);
+                while (deadShreds.size() > 50) deadShreds.poll();
                 liveThreadCount.decrementAndGet();
               }
             });
@@ -537,7 +537,7 @@ public class ChuckVM {
                 shred.cleanup(this);
                 shred.broadcast(this);
                 deadShreds.add(shred);
-                if (deadShreds.size() > 50) deadShreds.remove(0);
+                while (deadShreds.size() > 50) deadShreds.poll();
                 liveThreadCount.decrementAndGet();
               }
             });

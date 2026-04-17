@@ -137,7 +137,7 @@ public class BatchTester {
       return stream
           .filter(p -> p.toString().endsWith(".ck"))
           .filter(p -> !p.toString().contains(".disabled"))
-          .filter(p -> !p.toString().contains("06-Errors"))
+          // Include 06-Errors now that we handle them
           .filter(p -> !p.toString().contains("examples/hid"))
           .filter(p -> !p.toString().contains("examples/midi"))
           .filter(p -> !p.toString().contains("examples/osc"))

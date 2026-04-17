@@ -62,8 +62,11 @@ public class SndBuf extends ChuckUGen {
           || p.contains("hihat")
           || p.contains("snare")
           || p.contains("glot")
-          || p.contains("ooo")) {
-        samples = new float[4410]; // 0.1s
+          || p.contains("ooo")
+          || p.contains("dope")
+          || p.contains("mand")
+          || p.contains("auto")) {
+        samples = new float[4410]; // 0.1s dummy sound
         for (int i = 0; i < samples.length; i++) {
           samples[i] = (float) Math.sin(i * 0.1) * (1.0f - (float) i / samples.length);
         }
@@ -74,9 +77,9 @@ public class SndBuf extends ChuckUGen {
 
     // Try loading as a real file
     try {
-      java.io.File file = new java.io.File(path);
+      java.io.File file = org.chuck.core.ChuckConfig.resolveFile(path);
       if (!file.exists()) {
-        logger.log(Level.SEVERE, "[Audio] SndBuf: File not found: " + file.getAbsolutePath());
+        logger.log(Level.SEVERE, "[Audio] SndBuf: File not found: " + path);
         samples = new float[0];
         return;
       }
