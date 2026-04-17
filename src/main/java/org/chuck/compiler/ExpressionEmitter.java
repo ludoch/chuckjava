@@ -697,7 +697,8 @@ public class ExpressionEmitter {
                     parent.findStaticFieldOwner(potentialClassName, dot.member());
                 if (actualClassWithField != null) {
                   code.addInstruction(new PushInstrs.PushString(actualClassWithField));
-                  code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
+                  code.addInstruction(
+                      new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
                   return;
                 }
               }
@@ -741,7 +742,8 @@ public class ExpressionEmitter {
                     parent.findStaticFieldOwner(potentialClassName, dot.member());
                 if (actualClassWithField != null) {
                   code.addInstruction(new PushInstrs.PushString(actualClassWithField));
-                  code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
+                  code.addInstruction(
+                      new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
                   return;
                 }
               }
@@ -1224,7 +1226,6 @@ public class ExpressionEmitter {
               code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, e.member()));
               return;
             }
-
           }
           if (Set.of("ADSR", "Adsr").contains(id.name())) {
             code.addInstruction(

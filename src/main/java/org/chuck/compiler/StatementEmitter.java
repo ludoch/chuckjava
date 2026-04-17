@@ -1144,9 +1144,10 @@ public class StatementEmitter {
         if (iterType != null) {
           parent.getLocalTypeScopes().peek().put(s.iterName(), iterType);
         }
-        
+
         if ("float".equals(iterType)) code.addInstruction(new VarInstrs.StoreLocal(iterOffset));
-        else if (org.chuck.core.ChuckLanguage.CORE_DATA_TYPES.contains(iterType)) code.addInstruction(new VarInstrs.StoreLocal(iterOffset));
+        else if (org.chuck.core.ChuckLanguage.CORE_DATA_TYPES.contains(iterType))
+          code.addInstruction(new VarInstrs.StoreLocal(iterOffset));
         else code.addInstruction(new VarInstrs.StoreLocal(iterOffset));
         code.addInstruction(new StackInstrs.Pop());
 

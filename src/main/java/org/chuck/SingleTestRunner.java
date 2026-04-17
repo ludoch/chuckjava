@@ -18,19 +18,20 @@ public class SingleTestRunner {
     String expectation = null;
     boolean isErrorExpectation = false;
     if (Files.exists(Paths.get(expectationFile))) {
-        try {
-            expectation = Files.readString(Paths.get(expectationFile)).trim();
-            // Heuristic: if it contains "error:" or "exception", it's an error test
-            isErrorExpectation = expectation.toLowerCase().contains("error") || 
-                                expectation.toLowerCase().contains("exception");
+      try {
+        expectation = Files.readString(Paths.get(expectationFile)).trim();
+        // Heuristic: if it contains "error:" or "exception", it's an error test
+        isErrorExpectation =
+            expectation.toLowerCase().contains("error")
+                || expectation.toLowerCase().contains("exception");
 
-            // If expectation contains ":(", it likely expects type tags
-            if (expectation.contains(":(")) {
-                System.setProperty("chuck.print.tags", "true");
-            }
-        } catch (Exception ignored) {}
+        // If expectation contains ":(", it likely expects type tags
+        if (expectation.contains(":(")) {
+          System.setProperty("chuck.print.tags", "true");
+        }
+      } catch (Exception ignored) {
+      }
     }
-
 
     StringBuilder actualOutput = new StringBuilder();
     ChuckVM vm = new ChuckVM(sampleRate);
