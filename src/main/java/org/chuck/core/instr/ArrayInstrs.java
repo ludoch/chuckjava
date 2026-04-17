@@ -192,4 +192,15 @@ public class ArrayInstrs {
       a.setFloat(a.resolveIndex(idx), val);
     }
   }
+
+  public static class CopyArray implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      Object rhs = s.reg.popObject();
+      Object lhs = s.reg.peekObject(0);
+      if (lhs instanceof ChuckArray al && rhs instanceof ChuckArray ar) {
+        al.copyFrom(ar);
+      }
+    }
+  }
 }

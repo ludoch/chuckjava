@@ -329,12 +329,7 @@ public class ChuckVM {
   }
 
   public void registerUserClass(String name, UserClassDescriptor desc) {
-    UserClassDescriptor existing = userClassRegistry.get(name);
-    if (existing != null) {
-      desc.staticInts().putAll(existing.staticInts());
-      desc.staticIsDouble().putAll(existing.staticIsDouble());
-      desc.staticObjects().putAll(existing.staticObjects());
-    }
+    if (userClassRegistry.containsKey(name)) return;
     userClassRegistry.put(name, desc);
   }
 

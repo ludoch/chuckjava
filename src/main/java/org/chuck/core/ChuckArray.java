@@ -243,6 +243,23 @@ public class ChuckArray extends ChuckObject {
     }
   }
 
+  public void copyFrom(ChuckArray other) {
+    if (other == null) {
+      clear();
+      return;
+    }
+    clear();
+    for (int i = 0; i < other.size(); i++) {
+      if (other.isObjectAt(i)) appendObject(other.getObject(i));
+      else if (other.isDoubleAt(i)) appendFloat(other.getFloat(i));
+      else appendInt(other.getInt(i));
+    }
+    // Also copy associative maps
+    this.assocInt.putAll(other.assocInt);
+    this.assocFloat.putAll(other.assocFloat);
+    this.assocObject.putAll(other.assocObject);
+  }
+
   public int size() {
     return types.size();
   }
