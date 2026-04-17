@@ -137,9 +137,12 @@ public class SetMemberIntByName implements ChuckInstr {
 
     // Push the value back so the chuck expression can be chained
     if (isObjVal) shred.reg.pushObject(valObj);
-    else if (rawObj instanceof UserObject uo2 && !uo2.isFloatField(memberName))
-      shred.reg.push((long) doubleVal);
-    else shred.reg.push(doubleVal);
+    else {
+      // Check if it should be an int or float based on the field type in UserObject
+      if (rawObj instanceof UserObject uo2 && !uo2.isFloatField(memberName))
+        shred.reg.push((long) doubleVal);
+      else shred.reg.push(doubleVal);
+    }
   }
 
   private boolean tryInvokeObj(Object obj, String setter, Object val) {

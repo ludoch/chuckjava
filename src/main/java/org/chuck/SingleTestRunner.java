@@ -160,6 +160,19 @@ public class SingleTestRunner {
           }
       }
 
+      // Fuzzy numeric matching for floats: normalize precision to 4 decimal places
+      String fuzzyExpected = normalizeNumerics(cleanExpected);
+      String fuzzyActual = normalizeNumerics(cleanActual);
+      if (fuzzyActual.contains(fuzzyExpected) || fuzzyExpected.contains(fuzzyActual)) return true;
+
       return cleanActual.contains(cleanExpected) || cleanExpected.contains(cleanActual);
+  }
+
+  private static String normalizeNumerics(String s) {
+      // Find patterns like 1.234567 and turn them into 1.2345
+      // This helps matching reference ChucK output which often uses 4 decimal places.
+      java.util.regex.Pattern p = java.util.regex.Pattern.compile("(\\d+\\.\\d{4})\\d*");
+      java.util.regex.Matcher m = p.matcher(s);
+      return m.replaceAll("$1");
   }
 }

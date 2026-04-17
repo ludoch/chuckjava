@@ -54,7 +54,12 @@ public class ChuckPrint implements ChuckInstr {
         if ("complex".equals(a.vecTag)) {
           val = "#(" + formatFloat(a.getFloat(0)) + "," + formatFloat(a.getFloat(1)) + ")";
         } else if ("polar".equals(a.vecTag)) {
-          val = "%(" + formatFloat(a.getFloat(0)) + "," + formatFloat(a.getFloat(1)) + ")";
+          val =
+              "%("
+                  + formatFloat(a.getFloat(0))
+                  + ","
+                  + formatFloat(a.getFloat(1) / Math.PI)
+                  + "*pi)";
         } else {
           val = a.toString();
         }
@@ -76,18 +81,7 @@ public class ChuckPrint implements ChuckInstr {
     if (Double.isInfinite(dv)) return dv > 0 ? "inf" : "-inf";
     if (Double.isNaN(dv)) return "nan";
 
-    if (Boolean.getBoolean("chuck.print.tags")) {
-      // Integration tests: strip trailing zeros to match expected text
-      String s = String.format("%.6f", dv);
-      if (s.contains(".")) {
-        s = s.replaceAll("0+$", "");
-        if (s.endsWith(".")) s = s.substring(0, s.length() - 1);
-      }
-      return s;
-    } else {
-      // Unit tests: fixed 6 decimal places
-      return String.format("%.6f", dv);
-    }
+    return String.format("%.6f", dv);
   }
 
   @Override

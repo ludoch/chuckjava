@@ -254,14 +254,19 @@ public class FieldInstrs {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
       UserClassDescriptor d = vm.getUserClass(cName);
-      if (d == null) return;
+      if (d == null) {
+        return;
+      }
       if (s.reg.isObject(0)) {
-        d.staticObjects().put(fName, s.reg.peekObject(0));
+        Object val = s.reg.peekObject(0);
+        d.staticObjects().put(fName, val);
       } else if (s.reg.isDouble(0)) {
-        d.staticInts().put(fName, Double.doubleToRawLongBits(s.reg.peekAsDouble(0)));
+        double val = s.reg.peekAsDouble(0);
+        d.staticInts().put(fName, Double.doubleToRawLongBits(val));
         d.staticIsDouble().put(fName, true);
       } else {
-        d.staticInts().put(fName, s.reg.peekLong(0));
+        long val = s.reg.peekLong(0);
+        d.staticInts().put(fName, val);
         d.staticIsDouble().put(fName, false);
       }
     }

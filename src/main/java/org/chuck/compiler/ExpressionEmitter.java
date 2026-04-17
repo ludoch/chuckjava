@@ -653,7 +653,7 @@ public class ExpressionEmitter {
             }
           }
           if (e.rhs() instanceof ChuckAST.DotExp dot) {
-            String potentialClassName = parent.resolveClassName(dot.base());
+            String potentialClassName = parent.resolveClassName(dot.base(), code);
             if (potentialClassName != null) {
               UserClassDescriptor classDesc = parent.getUserClassRegistry().get(potentialClassName);
               if (classDesc != null
@@ -691,6 +691,16 @@ public class ExpressionEmitter {
               else code.addInstruction(new VarInstrs.SetGlobalObjectOnly(id.name()));
             }
             case ChuckAST.DotExp dot -> {
+              String potentialClassName = parent.resolveClassName(dot.base(), code);
+              if (potentialClassName != null) {
+                String actualClassWithField = parent.findStaticFieldOwner(potentialClassName, dot.member());
+                if (actualClassWithField != null) {
+                  code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
+                  code.addInstruction(new StackInstrs.Pop());
+                  return;
+                }
+              }
+              // If not static, might be a member of an instance
               this.emitExpression(dot.base(), code);
               code.addInstruction(new SetMemberIntByName(dot.member()));
             }
@@ -724,6 +734,16 @@ public class ExpressionEmitter {
               else code.addInstruction(new VarInstrs.SetGlobalObjectOrInt(id.name()));
             }
             case ChuckAST.DotExp dot -> {
+              String potentialClassName = parent.resolveClassName(dot.base(), code);
+              if (potentialClassName != null) {
+                String actualClassWithField = parent.findStaticFieldOwner(potentialClassName, dot.member());
+                if (actualClassWithField != null) {
+                  code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
+                  code.addInstruction(new StackInstrs.Pop());
+                  return;
+                }
+              }
+              // If not static, might be a member of an instance
               this.emitExpression(dot.base(), code);
               code.addInstruction(new SetMemberIntByName(dot.member()));
             }
@@ -1125,14 +1145,12 @@ public class ExpressionEmitter {
           code.addInstruction(new FieldInstrs.GetFieldByName(e.member()));
           return;
         }
-        String potentialClassName = parent.resolveClassName(e.base());
+        String potentialClassName = parent.resolveClassName(e.base(), code);
         if (potentialClassName != null) {
-          UserClassDescriptor classDesc = parent.getUserClassRegistry().get(potentialClassName);
-          if (classDesc != null
-              && (classDesc.staticInts().containsKey(e.member())
-                  || classDesc.staticObjects().containsKey(e.member()))) {
-            parent.checkAccess(potentialClassName, e.member(), false, e.line(), e.column());
-            code.addInstruction(new FieldInstrs.GetStatic(potentialClassName, e.member()));
+          String actualClassWithField = parent.findStaticFieldOwner(potentialClassName, e.member());
+          if (actualClassWithField != null) {
+            parent.checkAccess(actualClassWithField, e.member(), false, e.line(), e.column());
+            code.addInstruction(new FieldInstrs.GetStatic(actualClassWithField, e.member()));
             return;
           }
         }
@@ -1197,16 +1215,12 @@ public class ExpressionEmitter {
         }
         if (e.base() instanceof ChuckAST.IdExp id) {
           String bt = parent.getExprType(e.base());
-          if (bt != null
-              && parent.getUserClassRegistry().containsKey(bt)
-              && (parent.getUserClassRegistry().get(bt).staticInts().containsKey(e.member())
-                  || parent
-                      .getUserClassRegistry()
-                      .get(bt)
-                      .staticObjects()
-                      .containsKey(e.member()))) {
-            code.addInstruction(new FieldInstrs.GetStatic(bt, e.member()));
-            return;
+          if (bt != null) {
+            String actualClassWithField = parent.findStaticFieldOwner(bt, e.member());
+            if (actualClassWithField != null) {
+              code.addInstruction(new FieldInstrs.GetStatic(actualClassWithField, e.member()));
+              return;
+            }
           }
           if (Set.of("ADSR", "Adsr").contains(id.name())) {
             code.addInstruction(

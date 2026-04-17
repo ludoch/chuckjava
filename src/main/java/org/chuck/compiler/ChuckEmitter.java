@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.chuck.core.AdvanceTime;
+import org.chuck.core.ChuckArray;
 import org.chuck.core.ChuckCode;
 import org.chuck.core.ChuckCompilerException;
 import org.chuck.core.ChuckLanguage;
@@ -557,6 +558,20 @@ public class ChuckEmitter {
     return type.replaceAll("\\[\\]", "");
   }
 
+  String findStaticFieldOwner(String className, String fieldName) {
+    if (className == null) return null;
+    UserClassDescriptor desc = userClassRegistry.get(className);
+    if (desc == null) return null;
+
+    if (desc.staticInts().containsKey(fieldName)
+        || desc.staticObjects().containsKey(fieldName)
+        || desc.staticIsDouble().containsKey(fieldName)) {
+      return className;
+    }
+
+    return findStaticFieldOwner(desc.parentName(), fieldName);
+  }
+
   boolean hasInstanceField(String className, String fieldName) {
     UserClassDescriptor desc = userClassRegistry.get(className);
     while (desc != null) {
@@ -579,9 +594,16 @@ public class ChuckEmitter {
     return false;
   }
 
-  String resolveClassName(ChuckAST.Exp base) {
+  String resolveClassName(ChuckAST.Exp base, ChuckCode code) {
     if (base instanceof ChuckAST.IdExp id) {
-      if (userClassRegistry.containsKey(id.name())) return id.name();
+      if (userClassRegistry.containsKey(id.name())) {
+        String name = id.name();
+        UserClassDescriptor desc = userClassRegistry.get(name);
+        if (code != null) {
+          code.addInstruction(new MiscInstrs.RegisterClass(name, desc));
+        }
+        return name;
+      }
       if (CORE_DATA_TYPES.contains(id.name()) || isKnownUGenType(id.name())) return id.name();
     }
     return null;
@@ -679,7 +701,12 @@ public class ChuckEmitter {
       } else if (type.equals("int")) {
         desc.staticInts().putIfAbsent(staticName, 0L);
       } else {
-        desc.staticObjects().putIfAbsent(staticName, null);
+        if (type.contains("[]")) {
+          String elemType = type.replaceAll("\\[\\]", "");
+          desc.staticObjects().putIfAbsent(staticName, new ChuckArray(elemType, 0));
+        } else {
+          desc.staticObjects().putIfAbsent(staticName, null);
+        }
       }
     }
   }
@@ -977,14 +1004,12 @@ public class ChuckEmitter {
       }
       case ChuckAST.DotExp e -> {
         // Handle static field target: ClassName.staticField
-        String potentialClassName = resolveClassName(e.base());
+        String potentialClassName = resolveClassName(e.base(), code);
         if (potentialClassName != null) {
-          UserClassDescriptor classDesc = userClassRegistry.get(potentialClassName);
-          if (classDesc != null
-              && (classDesc.staticInts().containsKey(e.member())
-                  || classDesc.staticObjects().containsKey(e.member()))) {
-            checkAccess(potentialClassName, e.member(), false, e.line(), e.column());
-            code.addInstruction(new FieldInstrs.SetStatic(potentialClassName, e.member()));
+          String actualClassWithField = findStaticFieldOwner(potentialClassName, e.member());
+          if (actualClassWithField != null) {
+            checkAccess(actualClassWithField, e.member(), false, e.line(), e.column());
+            code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, e.member()));
             return;
           }
         }
