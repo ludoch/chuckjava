@@ -1,8 +1,6 @@
 package org.chuck.midi;
 
 import java.lang.foreign.*;
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -11,8 +9,10 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.chuck.core.ChuckEvent;
 import org.chuck.core.ChuckVM;
+import org.rtmidijava.RtMidi;
+import org.rtmidijava.RtMidiFactory;
 
-/** Enhanced Native MIDI input using RtMidi callback model via FFM. */
+/** Enhanced Native MIDI input using RtMidiJava via FFM. */
 public class ChuckMidiNative {
   private static final Logger logger = Logger.getLogger(ChuckMidiNative.class.getName());
 
@@ -46,17 +46,12 @@ public class ChuckMidiNative {
 
   // --- Shared Port Management ---
   private static class SharedPort {
-    MemorySegment ptr = MemorySegment.NULL;
-    MemorySegment callbackStub = MemorySegment.NULL;
-    MemorySegment errorStub = MemorySegment.NULL;
-    Arena arena;
+    org.rtmidijava.RtMidiIn midiIn;
     String name = "unopened";
     final java.util.List<ChuckMidiNative> subscribers = new CopyOnWriteArrayList<>();
 
-    void onMidiMessage(double timestamp, MemorySegment message, long size, MemorySegment userData) {
-      if (size <= 0) return;
-      byte[] raw = new byte[(int) size];
-      MemorySegment.copy(message, ValueLayout.JAVA_BYTE, 0, raw, 0, (int) size);
+    void onMidiMessage(double timestamp, MemorySegment message) {
+      byte[] raw = message.toArray(ValueLayout.JAVA_BYTE);
 
       for (ChuckMidiNative sub : subscribers) {
         MidiMsg msg = new MidiMsg();
@@ -90,12 +85,6 @@ public class ChuckMidiNative {
         }
       }
     }
-
-    void onNativeError(int type, MemorySegment errorText, MemorySegment userData) {
-      String msg = errorText.getString(0);
-      RtMidi.ErrorType et = RtMidi.ErrorType.fromId(type);
-      logger.log(Level.WARNING, "[RtMidi] " + et + ": " + msg);
-    }
   }
 
   private static final ConcurrentHashMap<String, SharedPort> sharedPorts =
@@ -107,48 +96,18 @@ public class ChuckMidiNative {
   private final ConcurrentLinkedDeque<MidiMsg> queue;
   private SharedPort myPort = null;
 
-  // Callback Descriptor: void callback(double timestamp, const unsigned char* message, size_t
-  // messageSize, void* userData)
-  private static final FunctionDescriptor CALLBACK_DESC =
-      FunctionDescriptor.ofVoid(
-          ValueLayout.JAVA_DOUBLE, // timestamp
-          ValueLayout.ADDRESS, // message buffer
-          ValueLayout.JAVA_LONG, // message size
-          ValueLayout.ADDRESS // user data
-          );
-
   /** Opens a MIDI input port for global monitoring (IDE-level). */
   public static void openGlobalMonitor(int portNumber) {
-    if (!RtMidi.isAvailable()) return;
-
-    String portKey = RtMidi.Api.UNSPECIFIED.id + ":" + portNumber;
+    String portKey = RtMidi.Api.UNSPECIFIED + ":" + portNumber;
     sharedPorts.computeIfAbsent(
         portKey,
         k -> {
           SharedPort sp = new SharedPort();
-          sp.arena = Arena.ofShared();
           try {
-            sp.ptr = (MemorySegment) RtMidi.in_create_default.invoke();
-            if (sp.ptr.equals(MemorySegment.NULL)) return sp;
-
-            MethodHandle onMidiHandle =
-                MethodHandles.lookup()
-                    .findVirtual(
-                        SharedPort.class,
-                        "onMidiMessage",
-                        java.lang.invoke.MethodType.methodType(
-                            void.class,
-                            double.class,
-                            MemorySegment.class,
-                            long.class,
-                            MemorySegment.class));
-            sp.callbackStub =
-                Linker.nativeLinker().upcallStub(onMidiHandle.bindTo(sp), CALLBACK_DESC, sp.arena);
-            RtMidi.in_set_callback.invoke(sp.ptr, sp.callbackStub, MemorySegment.NULL);
-
-            sp.name = RtMidi.getPortName(sp.ptr, portNumber);
-            RtMidi.open_port.invoke(
-                sp.ptr, portNumber, sp.arena.allocateFrom("ChucK-Java Monitor"));
+            sp.midiIn = RtMidiFactory.createDefaultIn();
+            sp.name = sp.midiIn.getPortName(portNumber);
+            sp.midiIn.setFastCallback(sp::onMidiMessage);
+            sp.midiIn.openPort(portNumber, "ChucK-Java Monitor");
 
             logger.info("Global MIDI Monitor opened port " + portNumber + " (" + sp.name + ")");
           } catch (Throwable t) {
@@ -169,9 +128,7 @@ public class ChuckMidiNative {
   }
 
   public void open(int portNumber, RtMidi.Api api) {
-    if (!RtMidi.isAvailable()) return;
-
-    String portKey = api.id + ":" + portNumber;
+    String portKey = api + ":" + portNumber;
 
     try {
       SharedPort shared =
@@ -179,50 +136,15 @@ public class ChuckMidiNative {
               portKey,
               k -> {
                 SharedPort sp = new SharedPort();
-                sp.arena = Arena.ofShared();
-
                 try {
-                  if (api == RtMidi.Api.UNSPECIFIED) {
-                    sp.ptr = (MemorySegment) RtMidi.in_create_default.invoke();
-                  } else {
-                    MemorySegment clientName = sp.arena.allocateFrom("ChucK-Java Input");
-                    sp.ptr = (MemorySegment) RtMidi.in_create.invoke(api.id, clientName, 1024);
-                  }
+                  sp.midiIn =
+                      (api == RtMidi.Api.UNSPECIFIED)
+                          ? RtMidiFactory.createDefaultIn()
+                          : RtMidiFactory.createIn(api);
 
-                  if (sp.ptr.equals(MemorySegment.NULL)) return sp;
-
-                  MethodHandle onMidiHandle =
-                      MethodHandles.lookup()
-                          .findVirtual(
-                              SharedPort.class,
-                              "onMidiMessage",
-                              java.lang.invoke.MethodType.methodType(
-                                  void.class,
-                                  double.class,
-                                  MemorySegment.class,
-                                  long.class,
-                                  MemorySegment.class));
-                  sp.callbackStub =
-                      Linker.nativeLinker()
-                          .upcallStub(onMidiHandle.bindTo(sp), CALLBACK_DESC, sp.arena);
-                  RtMidi.in_set_callback.invoke(sp.ptr, sp.callbackStub, MemorySegment.NULL);
-
-                  MethodHandle onErrorHandle =
-                      MethodHandles.lookup()
-                          .findVirtual(
-                              SharedPort.class,
-                              "onNativeError",
-                              java.lang.invoke.MethodType.methodType(
-                                  void.class, int.class, MemorySegment.class, MemorySegment.class));
-                  sp.errorStub =
-                      Linker.nativeLinker()
-                          .upcallStub(
-                              onErrorHandle.bindTo(sp), RtMidi.ERROR_CALLBACK_DESC, sp.arena);
-                  RtMidi.set_error_callback.invoke(sp.ptr, sp.errorStub, MemorySegment.NULL);
-
-                  MemorySegment portNameStr = sp.arena.allocateFrom("ChucK-Java Input");
-                  sp.name = RtMidi.getPortName(sp.ptr, portNumber);
-                  RtMidi.open_port.invoke(sp.ptr, portNumber, portNameStr);
+                  sp.name = sp.midiIn.getPortName(portNumber);
+                  sp.midiIn.setFastCallback(sp::onMidiMessage);
+                  sp.midiIn.openPort(portNumber, "ChucK-Java Input");
 
                   logger.info(
                       "Native MIDI Input opened shared port " + portNumber + " (API=" + api + ")");
@@ -232,7 +154,7 @@ public class ChuckMidiNative {
                 return sp;
               });
 
-      if (!shared.ptr.equals(MemorySegment.NULL)) {
+      if (shared.midiIn != null && shared.midiIn.isPortOpen()) {
         this.myPort = shared;
         shared.subscribers.add(this);
       }
@@ -242,32 +164,11 @@ public class ChuckMidiNative {
   }
 
   public void openVirtual(String name) {
-    if (!RtMidi.isAvailable()) return;
-
-    // Virtual ports are generally not shared in the same way as hardware ports,
-    // but we still wrap them in a SharedPort object for consistency.
     try {
       SharedPort sp = new SharedPort();
-      sp.arena = Arena.ofShared();
-      sp.ptr = (MemorySegment) RtMidi.in_create_default.invoke();
-      MemorySegment portNameStr = sp.arena.allocateFrom(name);
-
-      MethodHandle onMidiHandle =
-          MethodHandles.lookup()
-              .findVirtual(
-                  SharedPort.class,
-                  "onMidiMessage",
-                  java.lang.invoke.MethodType.methodType(
-                      void.class,
-                      double.class,
-                      MemorySegment.class,
-                      long.class,
-                      MemorySegment.class));
-      sp.callbackStub =
-          Linker.nativeLinker().upcallStub(onMidiHandle.bindTo(sp), CALLBACK_DESC, sp.arena);
-      RtMidi.in_set_callback.invoke(sp.ptr, sp.callbackStub, MemorySegment.NULL);
-
-      RtMidi.open_virtual_port.invoke(sp.ptr, portNameStr);
+      sp.midiIn = RtMidiFactory.createDefaultIn();
+      sp.midiIn.setFastCallback(sp::onMidiMessage);
+      sp.midiIn.openVirtualPort(name);
       sp.name = name;
       logger.info("Native Virtual MIDI Input created: " + name);
 
@@ -279,23 +180,16 @@ public class ChuckMidiNative {
   }
 
   public void ignoreTypes(boolean midiSysex, boolean midiTime, boolean midiSense) {
-    if (myPort == null || myPort.ptr.equals(MemorySegment.NULL)) return;
-    try {
-      RtMidi.in_ignore_types.invoke(myPort.ptr, midiSysex, midiTime, midiSense);
-    } catch (Throwable t) {
-    }
+    if (myPort == null || myPort.midiIn == null) return;
+    myPort.midiIn.ignoreTypes(midiSysex, midiTime, midiSense);
   }
 
   public void close() {
     if (myPort != null) {
       myPort.subscribers.remove(this);
-
-      // We don't automatically close the shared native pointer here unless subscribers == 0.
-      // But for simplicity and safety against leaks in hot-reloading,
-      // we'll keep the port open for the lifetime of the JVM if it's a shared physical port.
-      // Virtual ports could be closed if we tracked them separately.
-      if (myPort.subscribers.isEmpty() && myPort.name.startsWith("Virtual:")) {
-        // close virtual
+      if (myPort.subscribers.isEmpty()) {
+        myPort.midiIn.closePort();
+        sharedPorts.values().remove(myPort);
       }
       myPort = null;
     }

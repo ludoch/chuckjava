@@ -602,6 +602,7 @@ public class ChuckAudio {
                     MemorySegment outSeg = arena.allocate(bytesPerBuffer);
                     byte[] outBuf = new byte[bytesPerBuffer];
                     byte[] inBuf = inputLine != null ? new byte[inBytesPerBuffer] : null;
+                    float[] bufPeak = new float[numChannels];
 
                     // Phase 2 (non-interleaved block path): pre-allocated DAC output buffers.
                     // Used when no ADC input is needed — avoids per-sample loop overhead.
@@ -656,7 +657,7 @@ public class ChuckAudio {
                       }
 
                       double sumSq = 0;
-                      float[] bufPeak = new float[numChannels];
+                      for (int c = 0; c < numChannels; c++) bufPeak[c] = 0;
 
                       // ── Idle Optimization ──
                       if (isIdle && smoothedGain < 0.0001f) {

@@ -407,9 +407,6 @@ public class ChuckIDE extends Application {
     githubItem.setOnAction(
         e -> getHostServices().showDocument("https://github.com/ludoch/chuckjava"));
 
-    MenuItem rtMidiHelp = new MenuItem("RtMidi Setup...");
-    rtMidiHelp.setOnAction(e -> showRtMidiHelp());
-
     MenuItem aboutItem = new MenuItem("About ChucK-Java");
     aboutItem.setOnAction(
         e -> {
@@ -419,7 +416,7 @@ public class ChuckIDE extends Application {
                   "ChucK-Java IDE\nJDK 25 + Project Loom + Panama\nModular component architecture.");
           a.show();
         });
-    helpMenu.getItems().addAll(githubItem, rtMidiHelp, aboutItem);
+    helpMenu.getItems().addAll(githubItem, aboutItem);
 
     mb.getMenus()
         .addAll(
@@ -427,15 +424,6 @@ public class ChuckIDE extends Application {
     loadExamples(new File("examples"), mb.getMenus().get(4));
 
     return mb;
-  }
-
-  private void showRtMidiHelp() {
-    Alert a = new Alert(Alert.AlertType.INFORMATION);
-    a.setTitle("RtMidi Setup");
-    a.setHeaderText("Native MIDI Support");
-    a.setContentText(
-        "ChucK-Java prefers RtMidi for low latency. On Windows, ensure 'rtmidi.dll' is in your project root or PATH.");
-    a.show();
   }
 
   private void updateRecentMenu() {

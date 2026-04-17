@@ -14,7 +14,19 @@
         <antlr4.version>4.13.2</antlr4.version>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>github</id>
+            <url>https://maven.pkg.github.com/ludoch/rtmidijava</url>
+        </repository>
+    </repositories>
+
     <dependencies>
+        <dependency>
+            <groupId>org.rtmidijava</groupId>
+            <artifactId>rtmidijava</artifactId>
+            <version>1.0.0</version>
+        </dependency>
         <!-- ANTLR4 Runtime -->
         <dependency>
             <groupId>org.antlr</groupId>

@@ -149,6 +149,9 @@ public class ChuckVM {
   private final java.util.List<TimeoutEntry> pendingTimeouts =
       new java.util.concurrent.CopyOnWriteArrayList<>();
 
+  // Optimization: pre-allocated list for ready shreds
+  private final List<ChuckShred> readyShredsInternal = new ArrayList<>(128);
+
   public ChuckVM(int sampleRate) {
     this(sampleRate, 2);
   }
@@ -564,19 +567,22 @@ public class ChuckVM {
   }
 
   private void fireTimeouts(long currentTime) {
-    pendingTimeouts.removeIf(
-        t -> {
-          if (currentTime < t.wakeTime()) return false;
-          if (t.waitingShred().isWaiting()
-              && (t.waitingShred().getEventWaitingOn() == t.event()
-                  || t.waitingShred().getEventWaitingOn() == null)) {
-            t.event().removeWaitingShred(t.waitingShred());
-            t.waitingShred().setEventWaitingOn(null);
-            t.waitingShred().setWakeTime(currentTime);
-            t.waitingShred().resume(this);
-          }
-          return true;
-        });
+    // Avoid removeIf which can allocate/lambda
+    for (int i = 0; i < pendingTimeouts.size(); i++) {
+      TimeoutEntry t = pendingTimeouts.get(i);
+      if (currentTime >= t.wakeTime()) {
+        pendingTimeouts.remove(i);
+        i--; // Adjust index
+        if (t.waitingShred().isWaiting()
+            && (t.waitingShred().getEventWaitingOn() == t.event()
+                || t.waitingShred().getEventWaitingOn() == null)) {
+          t.event().removeWaitingShred(t.waitingShred());
+          t.waitingShred().setEventWaitingOn(null);
+          t.waitingShred().setWakeTime(currentTime);
+          t.waitingShred().resume(this);
+        }
+      }
+    }
   }
 
   public void executeSynchronous(ChuckCode code, ChuckShred shred) {
@@ -604,24 +610,24 @@ public class ChuckVM {
 
       int safety = 0;
       while (safety++ < 1000) {
-        List<ChuckShred> ready = new ArrayList<>();
+        readyShredsInternal.clear();
         shredulerLock.lock();
         try {
           while (!shreduler.isEmpty() && shreduler.peek().getWakeTime() <= currentTime) {
-            ready.add(shreduler.poll());
+            readyShredsInternal.add(shreduler.poll());
           }
-          if (!ready.isEmpty()) {
+          if (!readyShredsInternal.isEmpty()) {
             updateNextWakeTime();
           }
         } finally {
           shredulerLock.unlock();
         }
 
-        if (ready.isEmpty()) break;
+        if (readyShredsInternal.isEmpty()) break;
 
-        if (parallel && ready.size() > 1) {
+        if (parallel && readyShredsInternal.size() > 1) {
           final Phaser phaser = new Phaser(1);
-          for (ChuckShred nextShred : ready) {
+          for (ChuckShred nextShred : readyShredsInternal) {
             updateJitter(currentTime, nextShred);
             phaser.register();
             nextShred.onNextPark(phaser::arriveAndDeregister);
@@ -629,7 +635,7 @@ public class ChuckVM {
           }
           phaser.arriveAndAwaitAdvance();
         } else {
-          for (ChuckShred nextShred : ready) {
+          for (ChuckShred nextShred : readyShredsInternal) {
             updateJitter(currentTime, nextShred);
             nextShred.resume(this, true);
           }

@@ -6,9 +6,38 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.chuck.core.ChuckObject;
 import org.chuck.core.ChuckType;
 
-/** Base class for Unit Generators. */
+/** Base class for Unit Generators. Optimized for zero per-sample allocations. */
 public abstract class ChuckUGen extends ChuckObject {
-  protected final List<ChuckUGen> sources = new ArrayList<>();
+  // Optimization: Use array instead of ArrayList for hot path
+  protected ChuckUGen[] sourcesArray = new ChuckUGen[4];
+  protected int sourcesCount = 0;
+
+  // Backward compatibility: some subclasses use 'sources' directly.
+  // We keep it as a getter-like field or just accept the tiny overhead of syncing it.
+  protected final List<ChuckUGen> sources =
+      new java.util.AbstractList<>() {
+        @Override
+        public ChuckUGen get(int index) {
+          ugenLock.lock();
+          try {
+            if (index < 0 || index >= sourcesCount) throw new IndexOutOfBoundsException();
+            return sourcesArray[index];
+          } finally {
+            ugenLock.unlock();
+          }
+        }
+
+        @Override
+        public int size() {
+          ugenLock.lock();
+          try {
+            return sourcesCount;
+          } finally {
+            ugenLock.unlock();
+          }
+        }
+      };
+
   protected final List<ChuckUGen> targets = new ArrayList<>();
   protected final ReentrantLock ugenLock = new ReentrantLock();
 
@@ -69,10 +98,16 @@ public abstract class ChuckUGen extends ChuckObject {
     if (src != null) {
       ugenLock.lock();
       try {
-        if (!sources.contains(src)) {
-          sources.add(src);
-          invalidateVmGraph();
+        for (int i = 0; i < sourcesCount; i++) {
+          if (sourcesArray[i] == src) return;
         }
+        if (sourcesCount == sourcesArray.length) {
+          ChuckUGen[] newArr = new ChuckUGen[sourcesArray.length * 2];
+          System.arraycopy(sourcesArray, 0, newArr, 0, sourcesCount);
+          sourcesArray = newArr;
+        }
+        sourcesArray[sourcesCount++] = src;
+        invalidateVmGraph();
       } finally {
         ugenLock.unlock();
       }
@@ -83,8 +118,13 @@ public abstract class ChuckUGen extends ChuckObject {
     if (src != null) {
       ugenLock.lock();
       try {
-        if (sources.remove(src)) {
-          invalidateVmGraph();
+        for (int i = 0; i < sourcesCount; i++) {
+          if (sourcesArray[i] == src) {
+            System.arraycopy(sourcesArray, i + 1, sourcesArray, i, sourcesCount - i - 1);
+            sourcesArray[--sourcesCount] = null;
+            invalidateVmGraph();
+            return;
+          }
         }
       } finally {
         ugenLock.unlock();
@@ -176,9 +216,9 @@ public abstract class ChuckUGen extends ChuckObject {
 
     try {
       float sum = 0.0f;
-      List<ChuckUGen> srcs = getSources();
-      for (ChuckUGen src : srcs) {
-        sum += src.tick(systemTime);
+      // Optimization: use array directly
+      for (int i = 0; i < sourcesCount; i++) {
+        sum += sourcesArray[i].tick(systemTime);
       }
 
       lastOut = compute(sum, systemTime) * gain;
@@ -284,18 +324,13 @@ public abstract class ChuckUGen extends ChuckObject {
   }
 
   public List<ChuckUGen> getSources() {
-    ugenLock.lock();
-    try {
-      return new ArrayList<>(sources);
-    } finally {
-      ugenLock.unlock();
-    }
+    return sources;
   }
 
   public int getNumSources() {
     ugenLock.lock();
     try {
-      return sources.size();
+      return sourcesCount;
     } finally {
       ugenLock.unlock();
     }
@@ -308,36 +343,35 @@ public abstract class ChuckUGen extends ChuckObject {
   private int isConnectedTo(ChuckUGen target, int depth) {
     if (depth > 5) return 0;
     ugenLock.lock();
-    List<ChuckUGen> targetList;
     try {
-      if (targets.contains(target)) return 1;
-      targetList = new ArrayList<>(targets);
+      for (int i = 0; i < sourcesCount; i++) {
+        if (sourcesArray[i] == target) return 1;
+      }
+      // Recursively check
+      for (int i = 0; i < sourcesCount; i++) {
+        if (sourcesArray[i].isConnectedTo(target, depth + 1) == 1) return 1;
+      }
     } finally {
       ugenLock.unlock();
-    }
-    // Check if any of our targets connects to the target (recursive)
-    for (ChuckUGen t : targetList) {
-      if (t.isConnectedTo(target, depth + 1) == 1) return 1;
-    }
-    // Also check input channels of target
-    if (target != null && target.inputChannels != null) {
-      for (ChuckUGen in : target.inputChannels) {
-        if (in != null && this.isConnectedTo(in, depth + 1) == 1) return 1;
-      }
     }
     return 0;
   }
 
   public void clearSources() {
-    List<ChuckUGen> copy;
+    ChuckUGen[] copy;
+    int count;
     ugenLock.lock();
     try {
-      copy = new ArrayList<>(sources);
-      sources.clear();
+      copy = new ChuckUGen[sourcesCount];
+      System.arraycopy(sourcesArray, 0, copy, 0, sourcesCount);
+      count = sourcesCount;
+      for (int i = 0; i < sourcesCount; i++) sourcesArray[i] = null;
+      sourcesCount = 0;
     } finally {
       ugenLock.unlock();
     }
-    for (ChuckUGen src : copy) {
+    for (int i = 0; i < count; i++) {
+      ChuckUGen src = copy[i];
       src.ugenLock.lock();
       try {
         src.targets.remove(this);

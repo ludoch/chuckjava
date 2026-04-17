@@ -4,11 +4,10 @@ import java.util.List;
 import javax.sound.midi.*;
 import org.chuck.core.ChuckObject;
 import org.chuck.core.ChuckType;
+import org.rtmidijava.RtMidi;
+import org.rtmidijava.RtMidiFactory;
 
-/**
- * MidiOut: Support for sending MIDI messages. Uses native RtMidi if available, falls back to
- * javax.sound.midi.
- */
+/** MidiOut: Support for sending MIDI messages. Uses native RtMidiJava for low latency. */
 public class MidiOut extends ChuckObject {
   private ChuckMidiOut javaDriver;
   private ChuckMidiOutNative nativeDriver;
@@ -16,9 +15,7 @@ public class MidiOut extends ChuckObject {
 
   public MidiOut() {
     super(ChuckType.OBJECT);
-    if (RtMidi.isAvailable()) {
-      nativeDriver = new ChuckMidiOutNative();
-    }
+    nativeDriver = new ChuckMidiOutNative();
     javaDriver = new ChuckMidiOut();
   }
 
@@ -29,10 +26,7 @@ public class MidiOut extends ChuckObject {
 
   public int open(int port, RtMidi.Api api) {
     openedName = name(port);
-    if (nativeDriver != null) {
-      return nativeDriver.open(port, api) ? 1 : 0;
-    }
-    return javaDriver.open(port) ? 1 : 0;
+    return nativeDriver.open(port, api) ? 1 : 0;
   }
 
   /** Returns the number of available MIDI output ports. */
@@ -63,42 +57,29 @@ public class MidiOut extends ChuckObject {
 
   /** Lists all available MIDI output port names. */
   public static String[] list() {
-    if (RtMidi.isAvailable()) {
-      try (java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofConfined()) {
-        java.lang.foreign.MemorySegment out =
-            (java.lang.foreign.MemorySegment) RtMidi.out_create_default.invoke();
-        if (out.equals(java.lang.foreign.MemorySegment.NULL)) return new String[0];
-
-        int count = (int) RtMidi.get_port_count.invoke(out);
-        String[] names = new String[count];
-        for (int i = 0; i < count; i++) {
-          names[i] = RtMidi.getPortName(out, i);
-        }
-        RtMidi.out_free.invoke(out);
-        return names;
-      } catch (Throwable t) {
+    try {
+      org.rtmidijava.RtMidiOut out = RtMidiFactory.createDefaultOut();
+      int count = out.getPortCount();
+      String[] names = new String[count];
+      for (int i = 0; i < count; i++) {
+        names[i] = out.getPortName(i);
       }
+      out.closePort();
+      return names;
+    } catch (Throwable t) {
+      // Fallback: list JavaSound devices
+      List<String> javaPorts = ChuckMidiOut.listOutputDevices();
+      return javaPorts.toArray(new String[0]);
     }
-
-    // Fallback: list JavaSound devices
-    List<String> javaPorts = ChuckMidiOut.listOutputDevices();
-    return javaPorts.toArray(new String[0]);
   }
 
   /** Virtual ports are only supported by the native driver (macOS/Linux). */
   public int openVirtual(String name) {
-    if (nativeDriver != null) {
-      return nativeDriver.openVirtual(name) ? 1 : 0;
-    }
-    return 0;
+    return nativeDriver.openVirtual(name) ? 1 : 0;
   }
 
   public void send(MidiMsg msg) {
-    if (nativeDriver != null) {
-      nativeDriver.send(msg);
-    } else {
-      javaDriver.send(msg);
-    }
+    nativeDriver.send(msg);
   }
 
   /** Sends a Note On message. */
@@ -175,14 +156,12 @@ public class MidiOut extends ChuckObject {
   }
 
   public void close() {
-    if (nativeDriver != null) {
-      nativeDriver.close();
-    }
+    nativeDriver.close();
     javaDriver.close();
   }
 
   public boolean isNative() {
-    return nativeDriver != null;
+    return true;
   }
 
   /** Returns the name of the currently opened port, or "unopened". */
@@ -192,6 +171,6 @@ public class MidiOut extends ChuckObject {
 
   /** Returns all compiled native MIDI APIs for the current platform. */
   public static java.util.List<RtMidi.Api> getCompiledApis() {
-    return RtMidi.getCompiledApis();
+    return java.util.Arrays.asList(RtMidi.Api.values());
   }
 }

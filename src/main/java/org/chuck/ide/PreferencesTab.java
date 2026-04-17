@@ -13,7 +13,7 @@ import javafx.scene.shape.Circle;
 import org.chuck.audio.ChuckAudio;
 import org.chuck.midi.MidiIn;
 import org.chuck.midi.MidiOut;
-import org.chuck.midi.RtMidi;
+import org.rtmidijava.RtMidi;
 
 /**
  * A tab component for the ChucK-Java IDE that manages Audio, Visualizer, and Editor preferences.
@@ -142,92 +142,27 @@ public class PreferencesTab extends ScrollPane {
     grid.setPadding(new Insets(10));
 
     // Status Row
-    boolean nativeOk = RtMidi.isAvailable();
-    Circle statusDot = new Circle(6, nativeOk ? Color.GREEN : Color.RED);
-    Label statusLabel =
-        new Label(
-            nativeOk
-                ? "Native MIDI (RtMidi) Active"
-                : "Native MIDI Not Found (JavaSound Fallback)");
+    Circle statusDot = new Circle(6, Color.GREEN);
+    Label statusLabel = new Label("Native MIDI (FFM) Active");
     HBox statusBox = new HBox(8, statusDot, statusLabel);
     statusBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
 
-    // Library Path Row
-    TextField libPathField = new TextField(prefs.get("midi.libPath", ""));
-    libPathField.setPromptText("Path to rtmidi.dll / .so / .dylib");
-    Button browseBtn = new Button("...");
-    browseBtn.setOnAction(
-        e -> {
-          javafx.stage.DirectoryChooser dc = new javafx.stage.DirectoryChooser();
-          dc.setTitle("Select RtMidi Library Directory");
-          java.io.File folder = dc.showDialog(getScene().getWindow());
-          if (folder != null) {
-            libPathField.setText(folder.getAbsolutePath());
-            prefs.put("midi.libPath", folder.getAbsolutePath());
-          }
-        });
-
-    Button helpBtn = new Button("?");
-    helpBtn.setTooltip(new Tooltip("How to get RtMidi?"));
-    helpBtn.setOnAction(
-        e -> {
-          Alert alert = new Alert(Alert.AlertType.INFORMATION);
-          alert.setTitle("RtMidi Setup Help");
-          alert.setHeaderText("How to get the Native MIDI Library");
-
-          String os = System.getProperty("os.name").toLowerCase();
-          String instructions = "";
-          if (os.contains("mac")) {
-            instructions =
-                "macOS Setup:\n"
-                    + "1. Install Homebrew (brew.sh)\n"
-                    + "2. Run: brew install rtmidi\n"
-                    + "3. The library is usually in /opt/homebrew/lib (Silicon) or /usr/local/lib (Intel).\n"
-                    + "4. Browse to that folder and select it.";
-          } else if (os.contains("win")) {
-            instructions =
-                "Windows Setup:\n"
-                    + "1. Download a pre-compiled rtmidi.dll (e.g., from a reputable project like Bespoke Synth or VCV Rack).\n"
-                    + "2. OR use 'vcpkg install rtmidi:x64-windows' if you have vcpkg.\n"
-                    + "3. Place the DLL in a folder and browse to it here.";
-          } else {
-            instructions =
-                "Linux Setup:\n"
-                    + "1. Run: sudo apt-get install librtmidi-dev (or equivalent)\n"
-                    + "2. The library is usually in /usr/lib/x86_64-linux-gnu/\n"
-                    + "3. Browse to that folder and select it.";
-          }
-
-          TextArea area = new TextArea(instructions);
-          area.setEditable(false);
-          area.setWrapText(true);
-          area.setPrefHeight(150);
-          alert.getDialogPane().setContent(area);
-          alert.showAndWait();
-        });
-
-    libPathField.textProperty().addListener((obs, ov, nv) -> prefs.put("midi.libPath", nv));
-    HBox pathBox = new HBox(5, libPathField, browseBtn, helpBtn);
-    javafx.scene.layout.HBox.setHgrow(libPathField, javafx.scene.layout.Priority.ALWAYS);
-
-    // API Selection (Native only)
+    // API Selection
     ChoiceBox<RtMidi.Api> apiBox = new ChoiceBox<>();
-    if (nativeOk) {
-      apiBox.setItems(FXCollections.observableArrayList(RtMidi.getCompiledApis()));
-      apiBox.getItems().add(0, RtMidi.Api.UNSPECIFIED);
-
-      int savedApiId = prefs.getInt("midi.api", RtMidi.Api.UNSPECIFIED.id);
-      apiBox.setValue(RtMidi.Api.fromId(savedApiId));
-      apiBox
-          .getSelectionModel()
-          .selectedItemProperty()
-          .addListener(
-              (obs, ov, nv) -> {
-                if (nv != null) prefs.putInt("midi.api", nv.id);
-              });
+    apiBox.setItems(FXCollections.observableArrayList(RtMidi.Api.values()));
+    int savedApiId = prefs.getInt("midi.api", RtMidi.Api.UNSPECIFIED.ordinal());
+    if (savedApiId >= 0 && savedApiId < RtMidi.Api.values().length) {
+      apiBox.setValue(RtMidi.Api.values()[savedApiId]);
     } else {
-      apiBox.setDisable(true);
+      apiBox.setValue(RtMidi.Api.UNSPECIFIED);
     }
+    apiBox
+        .getSelectionModel()
+        .selectedItemProperty()
+        .addListener(
+            (obs, ov, nv) -> {
+              if (nv != null) prefs.putInt("midi.api", nv.ordinal());
+            });
 
     // Input Device List (Read-only discovery)
     ListView<String> inList = new ListView<>(FXCollections.observableArrayList(MidiIn.list()));
@@ -240,21 +175,8 @@ public class PreferencesTab extends ScrollPane {
     Button refreshBtn = new Button("Refresh Devices");
     refreshBtn.setOnAction(
         e -> {
-          RtMidi.reinit();
           inList.setItems(FXCollections.observableArrayList(MidiIn.list()));
           outList.setItems(FXCollections.observableArrayList(MidiOut.list()));
-
-          // Update status label/dot if it changed
-          boolean nowOk = RtMidi.isAvailable();
-          statusDot.setFill(nowOk ? Color.GREEN : Color.RED);
-          statusLabel.setText(
-              nowOk ? "Native MIDI (RtMidi) Active" : "Native MIDI Not Found (JavaSound Fallback)");
-          if (nowOk && apiBox.isDisabled()) {
-            apiBox.setDisable(false);
-            apiBox.setItems(FXCollections.observableArrayList(RtMidi.getCompiledApis()));
-            apiBox.getItems().add(0, RtMidi.Api.UNSPECIFIED);
-            apiBox.setValue(RtMidi.Api.UNSPECIFIED);
-          }
         });
 
     // Filters
@@ -269,19 +191,17 @@ public class PreferencesTab extends ScrollPane {
     timeCb.selectedProperty().addListener((obs, ov, nv) -> prefs.putBoolean("midi.ignoreTime", nv));
 
     grid.add(statusBox, 0, 0, 2, 1);
-    grid.add(new Label("Native Lib Path:"), 0, 1);
-    grid.add(pathBox, 1, 1);
-    grid.add(new Label("Preferred API:"), 0, 2);
-    grid.add(apiBox, 1, 2);
-    grid.add(new Label("Input Ports:"), 0, 3);
-    grid.add(inList, 1, 3);
-    grid.add(new Label("Output Ports:"), 0, 4);
-    grid.add(outList, 1, 4);
-    grid.add(refreshBtn, 1, 5);
+    grid.add(new Label("Preferred API:"), 0, 1);
+    grid.add(apiBox, 1, 1);
+    grid.add(new Label("Input Ports:"), 0, 2);
+    grid.add(inList, 1, 2);
+    grid.add(new Label("Output Ports:"), 0, 3);
+    grid.add(outList, 1, 3);
+    grid.add(refreshBtn, 1, 4);
 
     HBox filters = new HBox(15, sysexCb, timeCb);
-    grid.add(new Label("Filters:"), 0, 6);
-    grid.add(filters, 1, 6);
+    grid.add(new Label("Filters:"), 0, 5);
+    grid.add(filters, 1, 5);
 
     TitledPane pane = new TitledPane("MIDI Settings", grid);
     pane.setCollapsible(false);
@@ -294,15 +214,14 @@ public class PreferencesTab extends ScrollPane {
     grid.setVgap(8);
     grid.setPadding(new Insets(10));
 
-    boolean nativeOk = RtMidi.isAvailable();
     String os = System.getProperty("os.name").toLowerCase();
-    boolean supportsVirtual = nativeOk && (os.contains("mac") || os.contains("linux"));
+    boolean supportsVirtual = (os.contains("mac") || os.contains("linux"));
 
     Label infoLabel =
         new Label(
             supportsVirtual
                 ? "Create virtual ports for other apps to see."
-                : "Virtual ports not supported on Windows JavaSound.");
+                : "Virtual ports not supported on Windows.");
     infoLabel.setStyle("-fx-font-style: italic; -fx-text-fill: #666;");
 
     TextField nameField = new TextField("ChucK-Java");

@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import org.chuck.core.ChuckEvent;
 import org.chuck.core.ChuckVM;
+import org.rtmidijava.RtMidi;
+import org.rtmidijava.RtMidiFactory;
 
 /** The ChucK MidiIn object. Support native RtMidi via ChuckMidiNative. */
 public class MidiIn extends ChuckEvent {
@@ -21,7 +23,7 @@ public class MidiIn extends ChuckEvent {
 
     // Auto-apply preferences from IDE
     java.util.prefs.Preferences prefs =
-        java.util.prefs.Preferences.userNodeForPackage(RtMidi.class);
+        java.util.prefs.Preferences.userNodeForPackage(MidiIn.class);
     boolean ignoreSysex = prefs.getBoolean("midi.ignoreSysex", false);
     boolean ignoreTime = prefs.getBoolean("midi.ignoreTime", true);
     driver.ignoreTypes(ignoreSysex, ignoreTime, true); // sense=true by default
@@ -37,20 +39,12 @@ public class MidiIn extends ChuckEvent {
 
   public void open(int port) {
     openedName = name(port);
-    if (RtMidi.isAvailable()) {
-      driver.open(port);
-    } else {
-      javaDriver.open(port);
-    }
+    driver.open(port);
   }
 
   public void open(int port, RtMidi.Api api) {
     openedName = name(port);
-    if (RtMidi.isAvailable()) {
-      driver.open(port, api);
-    } else {
-      javaDriver.open(port);
-    }
+    driver.open(port, api);
   }
 
   /** Returns the name of the currently opened port, or "unopened". */
@@ -88,73 +82,56 @@ public class MidiIn extends ChuckEvent {
 
   /** Lists all available MIDI input port names. */
   public static String[] list() {
-    if (RtMidi.isAvailable()) {
-      try (java.lang.foreign.Arena arena = java.lang.foreign.Arena.ofConfined()) {
-        java.lang.foreign.MemorySegment in =
-            (java.lang.foreign.MemorySegment) RtMidi.in_create_default.invoke();
-        if (in.equals(java.lang.foreign.MemorySegment.NULL)) return new String[0];
-
-        int count = (int) RtMidi.get_port_count.invoke(in);
-        String[] names = new String[count];
-        for (int i = 0; i < count; i++) {
-          names[i] = RtMidi.getPortName(in, i);
-        }
-        RtMidi.in_free.invoke(in);
-        return names;
-      } catch (Throwable t) {
-        // fall through to JavaSound if native call fails
+    try {
+      org.rtmidijava.RtMidiIn in = RtMidiFactory.createDefaultIn();
+      int count = in.getPortCount();
+      String[] names = new String[count];
+      for (int i = 0; i < count; i++) {
+        names[i] = in.getPortName(i);
       }
+      in.closePort();
+      return names;
+    } catch (Throwable t) {
+      // Fallback to JavaSound
+      List<String> javaPorts = ChuckMidi.listInputDevices();
+      return javaPorts.toArray(new String[0]);
     }
-
-    // Fallback to JavaSound
-    List<String> javaPorts = ChuckMidi.listInputDevices();
-    return javaPorts.toArray(new String[0]);
   }
 
   public void openVirtual(String name) {
-    if (RtMidi.isAvailable()) {
-      driver.openVirtual(name);
-    }
+    driver.openVirtual(name);
   }
 
   public void ignoreTypes(boolean midiSysex, boolean midiTime, boolean midiSense) {
-    if (RtMidi.isAvailable()) {
-      driver.ignoreTypes(midiSysex, midiTime, midiSense);
-    }
+    driver.ignoreTypes(midiSysex, midiTime, midiSense);
   }
 
   public boolean recv(MidiMsg msg) {
-    if (RtMidi.isAvailable()) {
-      MidiMsg m = queue.pollFirst();
-      if (m != null) {
-        msg.data1 = m.data1;
-        msg.data2 = m.data2;
-        msg.data3 = m.data3;
-        msg.when = m.when;
-        msg.setData(m.getData());
-        return true;
-      }
-    } else {
-      return javaDriver.recv(msg);
+    MidiMsg m = queue.pollFirst();
+    if (m != null) {
+      msg.data1 = m.data1;
+      msg.data2 = m.data2;
+      msg.data3 = m.data3;
+      msg.when = m.when;
+      msg.setData(m.getData());
+      return true;
     }
     return false;
   }
 
   public void close() {
-    if (RtMidi.isAvailable()) {
-      driver.close();
-    } else {
-      javaDriver.close();
-    }
+    driver.close();
+    javaDriver.close();
   }
 
   public boolean isNative() {
-    return RtMidi.isAvailable();
+    return true;
   }
 
   /** Returns all compiled native MIDI APIs for the current platform. */
   public static java.util.List<RtMidi.Api> getCompiledApis() {
-    return RtMidi.getCompiledApis();
+    // Return common ones for now
+    return java.util.Arrays.asList(RtMidi.Api.values());
   }
 
   // Expose the event for 'min => now'
