@@ -61,6 +61,7 @@ public class ChuckString extends ChuckObject {
 
   public ChuckString replace(Object oldVal, Object newVal) {
     String os = valToString(oldVal);
+    if (os.isEmpty()) return this; // empty search string: no-op
     String ns = valToString(newVal);
     int idx = sb.indexOf(os);
     while (idx != -1) {

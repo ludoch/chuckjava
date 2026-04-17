@@ -109,4 +109,77 @@ public class MiscInstrs {
       s.reg.pushObject(disj);
     }
   }
+
+  /**
+   * Reads from a FileIO/IO into a variable. Used to compile {@code while(fio => val)} correctly.
+   *
+   * <p>Pre-checks {@code fio.good()} before reading; pushes 1 if good (read performed), 0 if EOF.
+   */
+  public static class FileIOReadTo implements ChuckInstr {
+    final String varName; // null for locals
+    final Integer localOffset; // null for globals
+    final String type; // "float", "int", "string"
+
+    public FileIOReadTo(String varName, Integer localOffset, String type) {
+      this.varName = varName;
+      this.localOffset = localOffset;
+      this.type = type;
+    }
+
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      Object obj = s.reg.popObject();
+      if (!(obj instanceof FileIO fio) || !fio.good()) {
+        s.reg.push(0L);
+        return;
+      }
+
+      switch (type) {
+        case "int" -> {
+          long v = fio.readInt();
+          if (fio.isEof()) {
+            s.reg.push(0L);
+            return;
+          }
+          if (localOffset != null) {
+            int idx = s.getFramePointer() + localOffset;
+            s.mem.setData(idx, v);
+            if (idx >= s.mem.getSp()) s.mem.setSp(idx + 1);
+          } else if (varName != null) {
+            vm.setGlobalInt(varName, v);
+          }
+        }
+        case "string" -> {
+          String v = fio.readString();
+          if (fio.isEof()) {
+            s.reg.push(0L);
+            return;
+          }
+          ChuckString cs = new ChuckString(v);
+          if (localOffset != null) {
+            int idx = s.getFramePointer() + localOffset;
+            s.mem.setRef(idx, cs);
+            if (idx >= s.mem.getSp()) s.mem.setSp(idx + 1);
+          } else if (varName != null) {
+            vm.setGlobalObject(varName, cs);
+          }
+        }
+        default -> { // float
+          double v = fio.readFloat();
+          if (fio.isEof()) {
+            s.reg.push(0L);
+            return;
+          }
+          if (localOffset != null) {
+            int idx = s.getFramePointer() + localOffset;
+            s.mem.setData(idx, v);
+            if (idx >= s.mem.getSp()) s.mem.setSp(idx + 1);
+          } else if (varName != null) {
+            vm.setGlobalFloat(varName, v);
+          }
+        }
+      }
+      s.reg.push(1L); // successful read
+    }
+  }
 }

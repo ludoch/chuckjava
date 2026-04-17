@@ -115,8 +115,10 @@ public class ChuckStack {
       Object o = popObject();
       return switch (o) {
         case null -> 0L;
+        case Boolean b -> b ? 1L : 0L;
         case ChuckDuration cd -> (long) cd.samples();
         case Number n -> n.longValue();
+        case FileIO fio -> fio.good() ? 1L : 0L;
         default -> 1L;
       };
     }

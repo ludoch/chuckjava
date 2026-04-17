@@ -19,6 +19,11 @@ public class ChucKIntegrationTest {
   // Tracks modification times of .txt files before each test runs
   private static final Map<String, FileTime> txtModTimeBefore = new ConcurrentHashMap<>();
 
+  static {
+    long maxMb = Runtime.getRuntime().maxMemory() / (1024 * 1024);
+    System.err.println("[ChucKIntegrationTest] Max heap: " + maxMb + " MB");
+  }
+
   @TestFactory
   Stream<DynamicTest> chuckTests() throws IOException {
     Path testRoot = Paths.get("src/test");
@@ -66,8 +71,13 @@ public class ChucKIntegrationTest {
   }
 
   private void runTest(Path ckFile) throws Exception {
+    // Hint GC before each test to reclaim memory from the previous VM
+    System.gc();
+    long freeMb = Runtime.getRuntime().freeMemory() / (1024 * 1024);
+    long totalMb = Runtime.getRuntime().totalMemory() / (1024 * 1024);
+    long usedMb = totalMb - freeMb;
     String source = Files.readString(ckFile);
-    System.out.println(ckFile);
+    System.out.println("[mem " + usedMb + "MB used] " + ckFile);
     // Record .txt file modification time before running the VM
     Path txtFilePre = ckFile.resolveSibling(ckFile.getFileName().toString().replace(".ck", ".txt"));
     String txtKey = txtFilePre.toAbsolutePath().toString();
@@ -102,14 +112,6 @@ public class ChucKIntegrationTest {
             });
     vm.initIO(capturePs, capturePs);
 
-    // Capture stdout and stderr
-    java.io.PrintStream oldOut = System.out;
-    java.io.PrintStream oldErr = System.err;
-    java.io.ByteArrayOutputStream capture = new java.io.ByteArrayOutputStream();
-    java.io.PrintStream ps = new java.io.PrintStream(capture);
-    System.setOut(ps);
-    System.setErr(ps);
-
     try {
       boolean expectTags = false;
       if (Files.exists(txtFilePre)) {
@@ -140,9 +142,9 @@ public class ChucKIntegrationTest {
       // Give a little extra time for the last output to be collected
       Thread.sleep(50);
     } finally {
-      System.setOut(oldOut);
-      System.setErr(oldErr);
       System.clearProperty("chuck.print.tags");
+      // Abort all remaining shreds so virtual threads can terminate and the VM can be GC'd
+      vm.shutdown();
     }
 
     String result = output.toString();
