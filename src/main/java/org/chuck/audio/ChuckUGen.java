@@ -9,8 +9,8 @@ import org.chuck.core.ChuckType;
 /** Base class for Unit Generators. Optimized for zero per-sample allocations. */
 public abstract class ChuckUGen extends ChuckObject {
   // Optimization: Use array instead of ArrayList for hot path
-  protected ChuckUGen[] sourcesArray = new ChuckUGen[4];
-  protected int sourcesCount = 0;
+  protected volatile ChuckUGen[] sourcesArray = new ChuckUGen[4];
+  protected volatile int sourcesCount = 0;
 
   // Backward compatibility: some subclasses use 'sources' directly.
   // We keep it as a getter-like field or just accept the tiny overhead of syncing it.
@@ -20,7 +20,9 @@ public abstract class ChuckUGen extends ChuckObject {
         public ChuckUGen get(int index) {
           ugenLock.lock();
           try {
-            if (index < 0 || index >= sourcesCount) throw new IndexOutOfBoundsException();
+            if (index < 0 || index >= sourcesCount) {
+              throw new IndexOutOfBoundsException("Index " + index + ", count " + sourcesCount);
+            }
             return sourcesArray[index];
           } finally {
             ugenLock.unlock();
@@ -216,9 +218,11 @@ public abstract class ChuckUGen extends ChuckObject {
 
     try {
       float sum = 0.0f;
-      // Optimization: use array directly
-      for (int i = 0; i < sourcesCount; i++) {
-        sum += sourcesArray[i].tick(systemTime);
+      // Snapshot volatile fields to avoid race conditions during iteration
+      final ChuckUGen[] sources = this.sourcesArray;
+      final int count = this.sourcesCount;
+      for (int i = 0; i < count; i++) {
+        sum += sources[i].tick(systemTime);
       }
 
       lastOut = compute(sum, systemTime) * gain;

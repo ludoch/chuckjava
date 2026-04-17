@@ -46,8 +46,11 @@ public class DacChannel extends ChuckUGen {
 
     try {
       float sum = 0.0f;
-      java.util.List<ChuckUGen> srcs = getSources();
-      for (ChuckUGen src : srcs) {
+      final ChuckUGen[] sources = this.sourcesArray;
+      final int count = this.sourcesCount;
+      for (int i = 0; i < count; i++) {
+        ChuckUGen src = sources[i];
+        if (src == null) continue;
         // Tick the source first (pull-based graph), then read channel-specific output
         float val = src.tick(systemTime);
         if (src.getNumOutputs() > 1) {
@@ -81,8 +84,11 @@ public class DacChannel extends ChuckUGen {
       float masterGain) {
     float[] block = new float[length];
     // Summon audio from sources into block
-    java.util.List<ChuckUGen> srcs = getSources();
-    for (ChuckUGen src : srcs) {
+    final ChuckUGen[] sources = this.sourcesArray;
+    final int count = this.sourcesCount;
+    for (int s = 0; s < count; s++) {
+      ChuckUGen src = sources[s];
+      if (src == null) continue;
       float[] temp = new float[length];
       src.tick(temp, 0, length, systemTime);
       // SIMD Addition: block += temp
@@ -150,8 +156,11 @@ public class DacChannel extends ChuckUGen {
     java.util.Arrays.fill(blockCache, 0, length, 0.0f);
 
     // Vectorized summing from all sources
-    java.util.List<ChuckUGen> srcs = getSources();
-    for (ChuckUGen src : srcs) {
+    final ChuckUGen[] sources = this.sourcesArray;
+    final int count = this.sourcesCount;
+    for (int s = 0; s < count; s++) {
+      ChuckUGen src = sources[s];
+      if (src == null) continue;
       float[] temp = new float[length];
       src.tick(temp, 0, length, systemTime);
 

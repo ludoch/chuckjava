@@ -55,9 +55,13 @@ public abstract class MultiChannelUGen extends ChuckUGen {
     try {
       // 3. Sum inputs from mono sources
       float sum = 0.0f;
-      java.util.List<ChuckUGen> srcs = getSources();
-      for (ChuckUGen src : srcs) {
-        sum += src.tick(systemTime);
+      final ChuckUGen[] sources = this.sourcesArray;
+      final int count = this.sourcesCount;
+      for (int i = 0; i < count; i++) {
+        ChuckUGen src = sources[i];
+        if (src != null) {
+          sum += src.tick(systemTime);
+        }
       }
 
       // 4. Compute multi-channel samples

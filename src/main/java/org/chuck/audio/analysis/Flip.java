@@ -25,6 +25,7 @@ public class Flip extends UAna {
   }
 
   public void setSize(int n) {
+    if (n <= 0) n = 1;
     this.size = n;
     this.buffer = new float[n];
     this.pos = 0;
@@ -36,8 +37,10 @@ public class Flip extends UAna {
 
   @Override
   protected float compute(float input, long systemTime) {
-    buffer[pos % size] = input;
-    pos++;
+    if (size > 0) {
+      buffer[pos % size] = input;
+      pos++;
+    }
     return input;
   }
 

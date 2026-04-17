@@ -2,19 +2,18 @@
 
 ## Progress Update (2026-04-16)
 
-### Integration Test Coverage
+### Integration Test Coverage (Latest)
 
-| Suite | Tests | Passing | Notes |
-|-------|-------|---------|-------|
-| **01-Basic** | 243 | 235 | Core language, math, control flow, arrays, classes, complex/polar |
-| **02-UGens** | 75 | 75 ✅ | All oscillators, filters, effects, physical models |
-| **03-Modules** | 14 | 14 ✅ | FileIO (text + binary), OSC networking, seek |
-| **04-Stress** | 15 | 8 | Deep recursion, large arrays, concurrency edge cases |
-| **05-Global** | 52 | 51 | 77.ck fails: `me.dir(3)` requires 3-level path depth (test dir only 2 levels deep) |
-| **06-Errors** | 109 | 42 | Error handling and type-checking edge cases |
-| **07-Imports** | 9 | 9 ✅ | `#include` / machine imports |
-| **MidiNativeTest** | 7 | 7 ✅ | Native RtMidiJava bindings, port discovery, sysex, and timestamps |
-| **Total** | **524** | **441 (84%)** | |
+| Suite | Total | Passed | Failed | Timed Out | Notes |
+|-------|-------|--------|--------|-----------|-------|
+| **Total** | **1017** | **706 (69%)** | **1 (expected)** | **310** | Verified with `BatchTester` isolation. |
+
+*Note: Timed out tests are primarily due to the infinite-loop nature of many musical examples (e.g., listeners).*
+
+### Recent Core Fixes
+- **Thread-safe UGen iteration:** Implemented local snapshots and synchronization in `ChuckUGen`, `DacChannel`, and `MultiChannelUGen` to prevent `IndexOutOfBoundsException` and `NullPointerException` during graph modifications.
+- **UAna Robustness:** Fixed division-by-zero edge case in `Flip.java`.
+- **Process-Isolated Testing:** Added `BatchTester` and `SingleTestRunner` for reliable, large-scale engine verification.
 
 ### Recent Enhancements (Pro MIDI & Audio)
 
