@@ -50,37 +50,31 @@ public class ArrayInstrs {
                 ? cs.toString()
                 : String.valueOf(keyObj);
         if (s.reg.isObject(0)) {
-          Object val = s.reg.popObject();
+          Object val = s.reg.peekObject(0);
           a.setAssocObject(key, val);
-          s.reg.pushObject(val);
         } else if (s.reg.isDouble(0)) {
-          double val = s.reg.popAsDouble();
+          double val = s.reg.peekAsDouble(0);
           a.setAssocFloat(key, val);
-          s.reg.push(val);
         } else {
-          long val = s.reg.popLong();
+          long val = s.reg.peekLong(0);
           a.setAssocInt(key, val);
-          s.reg.push(val);
         }
       } else {
         long idx = s.reg.popLong();
         Object raw = s.reg.popObject();
         if (!(raw instanceof ChuckArray a)) {
-          return; // Value stays on stack
+          return;
         }
         int i = a.resolveIndex(idx);
         if (s.reg.isObject(0)) {
-          Object val = s.reg.popObject();
+          Object val = s.reg.peekObject(0);
           a.setObject(i, val);
-          s.reg.pushObject(val);
         } else if (s.reg.isDouble(0)) {
-          double val = s.reg.popAsDouble();
+          double val = s.reg.peekAsDouble(0);
           a.setFloat(i, val);
-          s.reg.push(val);
         } else {
-          long val = s.reg.popLong();
+          long val = s.reg.peekLong(0);
           a.setInt(i, val);
-          s.reg.push(val);
         }
       }
     }

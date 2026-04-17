@@ -469,17 +469,7 @@ public class ChuckEmitter {
   String getVarType(ChuckAST.Exp exp) {
     return switch (exp) {
       case ChuckAST.IdExp id -> {
-        String type = null;
-        for (int i = localTypeScopes.size() - 1; i >= 0; i--) {
-          type = localTypeScopes.get(i).get(id.name());
-          if (type != null) break;
-        }
-        if (type == null && currentClass != null) {
-          type = getFieldType(currentClass, id.name());
-        }
-        if (type == null) {
-          type = globalVarTypes.get(id.name());
-        }
+        String type = getVarTypeByName(id.name());
         yield type;
       }
       default -> null;
@@ -595,15 +585,10 @@ public class ChuckEmitter {
     return false;
   }
 
-  String resolveClassName(ChuckAST.Exp base, ChuckCode code) {
+  String resolveClassName(ChuckAST.Exp base) {
     if (base instanceof ChuckAST.IdExp id) {
       if (userClassRegistry.containsKey(id.name())) {
-        String name = id.name();
-        UserClassDescriptor desc = userClassRegistry.get(name);
-        if (code != null) {
-          code.addInstruction(new MiscInstrs.RegisterClass(name, desc));
-        }
-        return name;
+        return id.name();
       }
       if (CORE_DATA_TYPES.contains(id.name()) || isKnownUGenType(id.name())) return id.name();
     }
@@ -774,9 +759,6 @@ public class ChuckEmitter {
       if (desc != null) {
         code.addInstruction(new MiscInstrs.RegisterClass(s.name(), desc));
       }
-      for (ChuckAST.Stmt inner : s.body()) {
-        registerClassesToCode(inner, code);
-      }
     }
   }
 
@@ -802,7 +784,9 @@ public class ChuckEmitter {
         statements.stream()
             .anyMatch(s -> !(s instanceof ChuckAST.BlockStmt bs && bs.statements().isEmpty()));
     if (!hasContent) {
-      throw new ChuckCompilerException("syntax error\n(empty file)", programName, 1, 1);
+      ChuckCode empty = new ChuckCode(programName);
+      empty.addInstruction(new org.chuck.core.instr.ControlInstrs.ReturnFunc());
+      return new EmitResult(empty, new HashMap<>(), new HashMap<>(), new HashMap<>());
     }
 
     for (ChuckAST.Stmt stmt : statements) registerClassNames(stmt);
@@ -825,12 +809,16 @@ public class ChuckEmitter {
     emptyArrayVars.clear();
 
     ChuckCode code = new ChuckCode(programName);
-    code.addInstruction(new VarInstrs.MoveArgs(0));
 
+    // 1. Register all classes first so static initializers run
     for (ChuckAST.Stmt stmt : statements) {
       registerClassesToCode(stmt, code);
     }
 
+    // 2. Initial setup
+    code.addInstruction(new VarInstrs.MoveArgs(0));
+
+    // 3. Then emit the rest of the program
     resetMaxLocalCount();
     Map<String, String> globalDocsMap = new HashMap<>();
     for (ChuckAST.Stmt stmt : statements) {
@@ -986,32 +974,44 @@ public class ChuckEmitter {
         } else {
           // @=> Assignment (or => value assignment for non-UGens)
           Integer localOffset = getLocalOffset(e.name());
-          if (localOffset != null) {
-            if ("int".equals(type)) code.addInstruction(new VarInstrs.StoreLocalInt(localOffset));
-            else if ("float".equals(type))
-              code.addInstruction(new VarInstrs.StoreLocalFloat(localOffset));
-            else code.addInstruction(new VarInstrs.StoreLocal(localOffset));
-          } else if (currentClass != null
-              && (currentClassFields.contains(e.name())
-                  || hasInstanceField(currentClass, e.name()))) {
-            code.addInstruction(new FieldInstrs.SetUserField(e.name()));
-          } else {
-            if ("int".equals(type)) code.addInstruction(new VarInstrs.SetGlobalInt(e.name()));
-            else if ("float".equals(type))
-              code.addInstruction(new VarInstrs.SetGlobalFloat(e.name()));
-            else code.addInstruction(new VarInstrs.SetGlobalObjectOrInt(e.name()));
+          if (code != null) {
+            if (localOffset != null) {
+              if ("int".equals(type)) code.addInstruction(new VarInstrs.StoreLocalInt(localOffset));
+              else if ("float".equals(type))
+                code.addInstruction(new VarInstrs.StoreLocalFloat(localOffset));
+              else code.addInstruction(new VarInstrs.StoreLocal(localOffset));
+            } else if (currentClass != null
+                && (currentClassFields.contains(e.name())
+                    || hasInstanceField(currentClass, e.name()))) {
+              code.addInstruction(new FieldInstrs.SetUserField(e.name()));
+            } else {
+              if ("int".equals(type)) code.addInstruction(new VarInstrs.SetGlobalInt(e.name()));
+              else if ("float".equals(type))
+                code.addInstruction(new VarInstrs.SetGlobalFloat(e.name()));
+              else code.addInstruction(new VarInstrs.SetGlobalObjectOrInt(e.name()));
+            }
           }
         }
       }
       case ChuckAST.DotExp e -> {
+        String baseType = getExprType(e.base());
+        if (baseType != null && isVecType(baseType)) {
+          if (code != null) {
+            emitExpression(e.base(), code);
+            code.addInstruction(new FieldInstrs.SetFieldByName(e.member()));
+          }
+          return;
+        }
         // Handle static field target: ClassName.staticField
-        String potentialClassName = resolveClassName(e.base(), code);
+        String potentialClassName = resolveClassName(e.base());
         if (potentialClassName != null) {
           String actualClassWithField = findStaticFieldOwner(potentialClassName, e.member());
           if (actualClassWithField != null) {
             checkAccess(actualClassWithField, e.member(), false, e.line(), e.column());
-            code.addInstruction(new PushInstrs.PushString(actualClassWithField));
-            code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, e.member()));
+            if (code != null) {
+              code.addInstruction(new PushInstrs.PushString(actualClassWithField));
+              code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, e.member()));
+            }
             return;
           }
         }
@@ -1069,27 +1069,33 @@ public class ChuckEmitter {
           }
         } else {
           // Vector or Object field write: val => v.x / v.y / obj.member
-          emitExpression(e.base(), code);
-          String baseType = getExprType(e.base());
-          if (baseType != null && userClassRegistry.containsKey(baseType)) {
-            checkAccess(baseType, e.member(), false, e.line(), e.column());
+          if (code != null) {
+            emitExpression(e.base(), code);
+            baseType = getExprType(e.base());
+            if (baseType != null && userClassRegistry.containsKey(baseType)) {
+              checkAccess(baseType, e.member(), false, e.line(), e.column());
+            }
+            code.addInstruction(new SetMemberIntByName(e.member()));
           }
-          code.addInstruction(new SetMemberIntByName(e.member()));
         }
       }
       case ChuckAST.ArrayAccessExp e -> {
-        emitExpression(e.base(), code);
-        for (int i = 0; i < e.indices().size() - 1; i++) {
-          emitExpression(e.indices().get(i), code);
-          code.addInstruction(new ArrayInstrs.GetArrayInt());
+        if (code != null) {
+          emitExpression(e.base(), code);
+          for (int i = 0; i < e.indices().size() - 1; i++) {
+            emitExpression(e.indices().get(i), code);
+            code.addInstruction(new ArrayInstrs.GetArrayInt());
+          }
+          emitExpression(e.indices().get(e.indices().size() - 1), code);
+          code.addInstruction(new ArrayInstrs.SetArrayInt());
         }
-        emitExpression(e.indices().get(e.indices().size() - 1), code);
-        code.addInstruction(new ArrayInstrs.SetArrayInt());
       }
       case ChuckAST.DeclExp e -> {
         if (inPreCtor) {
-          code.addInstruction(new StackInstrs.PushThis());
-          code.addInstruction(new SetMemberIntByName(e.name()));
+          if (code != null) {
+            code.addInstruction(new StackInstrs.PushThis());
+            code.addInstruction(new SetMemberIntByName(e.name()));
+          }
           return;
         }
         String type = e.type();
@@ -1100,37 +1106,90 @@ public class ChuckEmitter {
                 || type.equals("complex")
                 || type.equals("polar");
 
+        boolean forceGlobal = e.isGlobal();
+        boolean useGlobal = forceGlobal || localScopes.size() == 1;
+        
+        Integer localOffset = (forceGlobal || useGlobal) ? null : getLocalOffset(e.name());
+        boolean isField = false;
+        
+        if (localOffset == null && currentClass != null && !isInStaticFuncContext()) {
+            isField = currentClassFields.contains(e.name()) || hasInstanceField(currentClass, e.name());
+        }
+
+        if (localOffset == null && !forceGlobal && !useGlobal && !isField && !localScopes.isEmpty()) {
+          // New local variable
+          Map<String, Integer> scope = localScopes.peek();
+          localOffset = localCount;
+          setLocalCount(localOffset + 1);
+          scope.put(e.name(), localOffset);
+          localTypeScopes.peek().put(e.name(), type);
+        }
+
         if (isPrimitive) {
-          // source => int N;
-          // 1. emitExpression(e) pushes N (value 0)
-          // 2. Pop N(0)
-          // 3. Store source into N (leaves source on stack)
-          emitExpression(e, code);
-          code.addInstruction(new StackInstrs.Pop());
-          Integer localOffset = getLocalOffset(e.name());
-          if (localOffset != null) {
-            code.addInstruction(new VarInstrs.StoreLocal(localOffset));
-          } else {
-            code.addInstruction(new VarInstrs.SetGlobalObjectOrInt(e.name()));
+          // 1. emitExpression(e) pushes value (0)
+          // 2. Pop it
+          // 3. Store the CHUCK result into the variable
+          if (code != null) {
+            emitExpression(e, code);
+            code.addInstruction(new StackInstrs.Pop());
+            if (localOffset != null) {
+              if ("int".equals(type)) code.addInstruction(new VarInstrs.StoreLocalInt(localOffset));
+              else if ("float".equals(type))
+                code.addInstruction(new VarInstrs.StoreLocalFloat(localOffset));
+              else code.addInstruction(new VarInstrs.StoreLocal(localOffset));
+            } else if (isField) {
+              code.addInstruction(new StackInstrs.PushThis());
+              code.addInstruction(new SetMemberIntByName(e.name()));
+            } else if (currentClass != null && hasStaticField(currentClass, e.name())) {
+              code.addInstruction(new PushInstrs.PushString(currentClass));
+              code.addInstruction(new FieldInstrs.SetStatic(currentClass, e.name()));
+            } else {
+              if ("int".equals(type)) code.addInstruction(new VarInstrs.SetGlobalInt(e.name()));
+              else if ("float".equals(type))
+                code.addInstruction(new VarInstrs.SetGlobalFloat(e.name()));
+              else code.addInstruction(new VarInstrs.SetGlobalObjectOrInt(e.name()));
+            }
           }
         } else {
-          emitExpression(e, code); // Pushes new object 'target'
-          // Stack is now: [..., source, target]
-
-          if (isUGen && op == ChuckAST.Operator.CHUCK) {
-            code.addInstruction(new org.chuck.core.ChuckTo());
+          if (op == ChuckAST.Operator.AT_CHUCK) {
+            // For `@=> DeclExp`, we just want to store the source into the new variable,
+            // NOT instantiate a new object first.
+            // But we still need to register the variable in the scope (done above).
+            if (code != null) {
+              if (localOffset != null) {
+                code.addInstruction(new VarInstrs.StoreLocal(localOffset));
+              } else if (isField) {
+                code.addInstruction(new StackInstrs.PushThis());
+                code.addInstruction(new SetMemberIntByName(e.name()));
+              } else if (currentClass != null && hasStaticField(currentClass, e.name())) {
+                code.addInstruction(new PushInstrs.PushString(currentClass));
+                code.addInstruction(new FieldInstrs.SetStatic(currentClass, e.name()));
+              } else {
+                code.addInstruction(new VarInstrs.SetGlobalObjectOrInt(e.name()));
+              }
+            }
           } else {
-            code.addInstruction(new StackInstrs.Pop());
-            // Now save the source object to its variable (overwriting the newly created one)
-            // Wait! If it was source => Mesh2D m;
-            // ChucK creates a Mesh2D m, THEN connects source to it.
-            // BUT if it was source @=> Mesh2D m;
-            // ChucK should probably just set m = source.
-            Integer localOffset = getLocalOffset(e.name());
-            if (localOffset != null) {
-              code.addInstruction(new VarInstrs.StoreLocal(localOffset));
-            } else {
-              code.addInstruction(new VarInstrs.SetGlobalObjectOrInt(e.name()));
+            // Regular `=>`
+            if (code != null) {
+              if (isUGen) {
+                emitExpression(e, code); // Pushes new UGen 'target'
+                code.addInstruction(new org.chuck.core.ChuckTo());
+              } else {
+                // If not UGen, we just store it (reference assignment)
+                // Wait, in ChucK '1.0 => float f' is primitive (handled above)
+                // 'string s' is usually @=>. But if `=>` is used on object decl:
+                if (localOffset != null) {
+                  code.addInstruction(new VarInstrs.StoreLocal(localOffset));
+                } else if (isField) {
+                  code.addInstruction(new StackInstrs.PushThis());
+                  code.addInstruction(new SetMemberIntByName(e.name()));
+                } else if (currentClass != null && hasStaticField(currentClass, e.name())) {
+                  code.addInstruction(new PushInstrs.PushString(currentClass));
+                  code.addInstruction(new FieldInstrs.SetStatic(currentClass, e.name()));
+                } else {
+                  code.addInstruction(new VarInstrs.SetGlobalObjectOrInt(e.name()));
+                }
+              }
             }
           }
         }

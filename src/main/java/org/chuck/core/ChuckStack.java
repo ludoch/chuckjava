@@ -255,4 +255,16 @@ public class ChuckStack {
   public boolean isDoubleAt(int idx) {
     return isDouble[idx];
   }
+
+  public void setIsDouble(int idx, boolean b) {
+    isDouble[idx] = b;
+  }
+
+  public Object peekObjectAt(int idx) {
+    return objects[idx];
+  }
+
+  public long peekLongAt(int idx) {
+    return primitives[idx];
+  }
 }

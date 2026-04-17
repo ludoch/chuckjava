@@ -37,7 +37,7 @@ public abstract class Osc extends ChuckUGen {
   /** ChucK-style method call: osc.freq(440) */
   @org.chuck.core.doc("Set the frequency in Hz.")
   public double freq(double f) {
-    this.freq = f;
+    setFreq(f);
     return f;
   }
 
@@ -129,7 +129,8 @@ public abstract class Osc extends ChuckUGen {
 
   @Override
   public void setData(int index, long value) {
-    super.setData(index, value);
+    super.setDataInternal(index, value);
+    triggerDataHook(index, value);
   }
 
   @Override

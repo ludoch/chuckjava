@@ -6,20 +6,17 @@
 
 | Suite | Total | Passed | Failed | Timed Out | Notes |
 |-------|-------|--------|--------|-----------|-------|
-| **Total** | **1126** | **1043 (93%)** | **45** | **38** | Normalized nulls, tags, and foreach. |
+| **Total** | **1126** | **1043 (93%)** | **45** | **38** | Synchronous eval and static persistence. |
 
-*Note: Remaining failures are primarily minor output differences or edge cases in array append/casting.*
+*Note: Remaining failures are primarily physical models and minor scientific notation differences.*
 
-### Roadmap Progress
-- **✅ Negative Testing:** 100% resolution of compiler error tests.
-- **✅ Smoke Testing:** Infinite loops verified as stable.
-- **✅ Virtual Filesystem:** Global search paths and `special:` aliases functional.
-- **✅ Output Normalization:** Floats, complex, and polar formatting match reference ChucK.
-- **✅ Object Representation:** Corrected `null` formatting to match C++ ChucK.
-- **✅ ForEach Hardening:** Improved emission and type-tracking for loop iterators.
-- **🔄 Array Append Precision:** (Next) Resolving persistent issues in cross-type array appends (e.g., int into float array).
+### Session Improvements (Final)
+- **Machine.eval Synchronicity:** Successfully transitioned `eval` to a synchronous model, enabling full context sharing (locals, classes, globals) between the caller and the eval block.
+- **Static Persistence:** Improved the class registration model to preserve static field values across `eval` calls and re-registrations.
+- **Object Model Hardening:** Refined stack management for assignments and pseudo-class (vector/complex/polar) member access.
+- **Thread-Safety:** Hardened UGen graph traversal against concurrent modifications.
 
-
+## Features
 ### Recent Enhancements (Pro MIDI & Audio)
 
 | Feature | Description | Status |

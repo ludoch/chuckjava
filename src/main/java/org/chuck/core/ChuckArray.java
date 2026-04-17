@@ -27,9 +27,6 @@ public class ChuckArray extends ChuckObject {
 
   public ChuckArray(ChuckType type, int size) {
     super(type);
-    if (Boolean.getBoolean("chuck.debug.array")) {
-      System.out.println("[DEBUG] New ChuckArray size=" + size);
-    }
     for (int i = 0; i < size; i++) {
       intData.add(0L);
       floatData.add(0.0);
@@ -40,23 +37,24 @@ public class ChuckArray extends ChuckObject {
 
   public ChuckArray(String elementTypeName, int size) {
     super(ChuckType.ARRAY);
-    this.elementTypeName = elementTypeName;
-    if (Boolean.getBoolean("chuck.debug.array")) {
-      System.out.println("[DEBUG] New ChuckArray type=" + elementTypeName + " size=" + size);
+    if (elementTypeName != null) {
+      this.elementTypeName = elementTypeName.replaceAll("\\[\\]", "");
+    } else {
+      this.elementTypeName = null;
     }
     this.vecTag =
-        (elementTypeName != null
-                && (elementTypeName.startsWith("vec")
-                    || elementTypeName.equals("complex")
-                    || elementTypeName.equals("polar")))
-            ? elementTypeName
+        (this.elementTypeName != null
+                && (this.elementTypeName.startsWith("vec")
+                    || this.elementTypeName.equals("complex")
+                    || this.elementTypeName.equals("polar")))
+            ? this.elementTypeName
             : null;
     for (int i = 0; i < size; i++) {
       intData.add(0L);
       floatData.add(0.0);
       objectData.add(null);
-      if ("int".equals(elementTypeName)) types.add((byte) 0);
-      else if ("float".equals(elementTypeName)) types.add((byte) 1);
+      if ("int".equals(this.elementTypeName)) types.add((byte) 0);
+      else if ("float".equals(this.elementTypeName)) types.add((byte) 1);
       else types.add((byte) 2);
     }
   }
@@ -64,7 +62,7 @@ public class ChuckArray extends ChuckObject {
   public ChuckArray(String tag, double[] vals) {
     super(ChuckType.ARRAY);
     this.vecTag = tag;
-    this.elementTypeName = tag;
+    this.elementTypeName = tag != null ? tag.replaceAll("\\[\\]", "") : null;
     for (double v : vals) {
       floatData.add(v);
       intData.add(0L);

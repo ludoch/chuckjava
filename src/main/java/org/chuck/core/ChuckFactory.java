@@ -91,7 +91,13 @@ public class ChuckFactory {
 
     ChuckObject res =
         switch (t) {
-          case "string" -> new ChuckString("");
+          case "string" -> {
+            String init = "";
+            if (argc > 0 && args != null && args[0] != null) {
+              init = String.valueOf(args[0]);
+            }
+            yield new ChuckString(init);
+          }
           case "vec2" -> new ChuckArray("vec2", 2);
           case "vec3" -> new ChuckArray("vec3", 3);
           case "vec4" -> new ChuckArray("vec4", 4);

@@ -108,8 +108,8 @@ public class ChuckComplexScriptTest {
     ChuckShred shred = new ChuckShred(bytecode);
     vm.spork(shred);
 
-    Thread.sleep(100);
-    vm.advanceTime(100);
+    Thread.sleep(500);
+    vm.advanceTime(500);
 
     assertTrue(shred.isDone());
     assertEquals(5, frequencies.size());

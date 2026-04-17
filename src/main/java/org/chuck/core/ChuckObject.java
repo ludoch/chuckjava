@@ -33,20 +33,25 @@ public class ChuckObject {
     if (index < data.length) {
       data[index] = value;
       isDouble[index] = false;
+      triggerDataHook(index, value);
     }
   }
 
   public void setData(int index, double value) {
     if (index < data.length) {
-      // CRITICAL: Set the flag FIRST so any subclass overriding setData(int, long)
-      // sees the correct type when calling getDataAsDouble().
       isDouble[index] = true;
       data[index] = Double.doubleToRawLongBits(value);
-
-      // Still trigger the long variant for subclass hooks, but we must
-      // avoid it clearing the flag we just set.
-      // We'll call a private internal setter or just manually trigger the hook.
       triggerDataHook(index, data[index]);
+    }
+  }
+
+  /**
+   * Internal data setter that doesn't reset the isDouble flag. Used by subclasses in their hooks
+   * if they need to pass-through to super.
+   */
+  public void setDataInternal(int index, long value) {
+    if (index < data.length) {
+      data[index] = value;
     }
   }
 

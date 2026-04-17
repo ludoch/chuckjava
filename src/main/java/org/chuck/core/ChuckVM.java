@@ -87,6 +87,7 @@ public class ChuckVM {
   private final Map<String, String> globalDocs = new ConcurrentHashMap<>();
   private final Map<String, String> globalFunctionDocs = new ConcurrentHashMap<>();
   private final Map<String, UserClassDescriptor> userClassRegistry = new ConcurrentHashMap<>();
+  private final Map<String, ChuckCode> globalFunctions = new ConcurrentHashMap<>();
   private final Set<String> staticInitializedClasses =
       java.util.concurrent.ConcurrentHashMap.newKeySet();
 
@@ -329,7 +330,13 @@ public class ChuckVM {
   }
 
   public void registerUserClass(String name, UserClassDescriptor desc) {
-    if (userClassRegistry.containsKey(name)) return;
+    UserClassDescriptor old = userClassRegistry.get(name);
+    if (old != null) {
+      // Preserve static field values
+      desc.staticInts().putAll(old.staticInts());
+      desc.staticIsDouble().putAll(old.staticIsDouble());
+      desc.staticObjects().putAll(old.staticObjects());
+    }
     userClassRegistry.put(name, desc);
   }
 
@@ -355,6 +362,14 @@ public class ChuckVM {
   }
 
   public int run(String source, String name) {
+    return run(source, name, false, null);
+  }
+
+  public int run(String source, String name, boolean synchronous) {
+    return run(source, name, synchronous, null);
+  }
+
+  public int run(String source, String name, boolean synchronous, ChuckShred caller) {
     try {
       final List<String> errors = new java.util.ArrayList<>();
       final List<Integer> errorLines = new java.util.ArrayList<>();
@@ -398,13 +413,28 @@ public class ChuckVM {
       @SuppressWarnings("unchecked")
       List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(programCtx);
 
-      ChuckEmitter emitter = new ChuckEmitter(userClassRegistry);
+      ChuckEmitter emitter = new ChuckEmitter(userClassRegistry, globalFunctions);
       ChuckEmitter.EmitResult result = emitter.emitWithDocs(ast, name, getGlobalTypeMap());
+
+      // Register public functions/operators
+      globalFunctions.putAll(emitter.getPublicFunctions());
 
       // Register docs
       result.globalDocs().forEach(this::setGlobalDoc);
       result.functionDocs().forEach(this::setGlobalFunctionDoc);
 
+      if (synchronous) {
+        if (caller != null) {
+          caller.executeSynchronous(this, result.code());
+          return caller.getId();
+        } else {
+          ChuckShred shred = new ChuckShred(result.code());
+          int sid = shred.getId();
+          activeShreds.put(sid, shred);
+          shred.executeSynchronous(this, result.code());
+          return sid;
+        }
+      }
       ChuckShred shred = new ChuckShred(result.code());
       return spork(shred);
     } catch (Exception e) {
@@ -464,7 +494,11 @@ public class ChuckVM {
   }
 
   public int eval(String code) {
-    return run(code, "eval");
+    return evalWithCaller(code, null);
+  }
+
+  public int evalWithCaller(String code, ChuckShred caller) {
+    return run(code, "eval", true, caller);
   }
 
   public int replace(int id, String filename) {
@@ -743,8 +777,12 @@ public class ChuckVM {
     ChuckShred.resetIdCounter();
   }
 
-  public int eval(String source, ChuckArray argArr) {
-    int id = run(source, "eval");
+  public int evalWithArgs(String source, ChuckArray argArr) {
+    return evalWithArgs(source, argArr, null);
+  }
+
+  public int evalWithArgs(String source, ChuckArray argArr, ChuckShred caller) {
+    int id = run(source, "eval", true, caller);
     if (id > 0 && argArr != null) {
       ChuckShred shred = activeShreds.get(id);
       if (shred != null) {

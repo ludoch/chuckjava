@@ -40,20 +40,7 @@ public class ChuckObjectPool {
     }
 
     public ChuckString allocString(String val) {
-      if (strIdx >= BLOCK_SIZE) {
-        if (strBlockIdx >= strBlocks.size()) {
-          ChuckString[] block = new ChuckString[BLOCK_SIZE];
-          for (int i = 0; i < BLOCK_SIZE; i++) {
-            block[i] = new ChuckString("");
-          }
-          strBlocks.add(block);
-        }
-        strBlockIdx++;
-        strIdx = 0;
-      }
-      ChuckString s = strBlocks.get(strBlockIdx - 1)[strIdx++];
-      s.setValue(val);
-      return s;
+      return new ChuckString(val);
     }
 
     public void reset() {
@@ -90,11 +77,11 @@ public class ChuckObjectPool {
     return new ChuckDuration(samples);
   }
 
+  private static final java.util.concurrent.ConcurrentHashMap<String, ChuckString> STRING_INTERN_MAP = new java.util.concurrent.ConcurrentHashMap<>();
+
   public static ChuckString getString(String val) {
-    if (ChuckShred.CURRENT_SHRED.isBound()) {
-      return ChuckShred.CURRENT_SHRED.get().getAllocator().allocString(val);
-    }
-    return new ChuckString(val);
+    if (val == null) val = "";
+    return STRING_INTERN_MAP.computeIfAbsent(val, ChuckString::new);
   }
 
   public static void releaseDuration(ChuckDuration d) {

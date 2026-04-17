@@ -52,13 +52,13 @@ public class ChuckPrint implements ChuckInstr {
       }
       case ChuckArray a -> {
         if ("complex".equals(a.vecTag)) {
-          val = "#(" + formatFloat(a.getFloat(0)) + "," + formatFloat(a.getFloat(1)) + ")";
+          val = "#(" + formatFloat4(a.getFloat(0)) + "," + formatFloat4(a.getFloat(1)) + ")";
         } else if ("polar".equals(a.vecTag)) {
           val =
               "%("
-                  + formatFloat(a.getFloat(0))
+                  + formatFloat4(a.getFloat(0))
                   + ","
-                  + formatFloat(a.getFloat(1) / Math.PI)
+                  + formatFloat4(a.getFloat(1) / Math.PI)
                   + "*pi)";
         } else {
           val = a.toString();
@@ -81,7 +81,19 @@ public class ChuckPrint implements ChuckInstr {
     if (Double.isInfinite(dv)) return dv > 0 ? "inf" : "-inf";
     if (Double.isNaN(dv)) return "nan";
 
-    return String.format("%.6f", dv);
+    String s = String.format("%.6f", dv);
+    if (Boolean.getBoolean("chuck.print.compact") && s.contains(".")) {
+      while (s.endsWith("0")) s = s.substring(0, s.length() - 1);
+      if (s.endsWith(".")) s = s.substring(0, s.length() - 1);
+    }
+    return s;
+  }
+
+  private String formatFloat4(double dv) {
+    if (Double.isInfinite(dv)) return dv > 0 ? "inf" : "-inf";
+    if (Double.isNaN(dv)) return "nan";
+
+    return String.format("%.4f", dv);
   }
 
   @Override

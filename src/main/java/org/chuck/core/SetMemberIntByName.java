@@ -45,11 +45,15 @@ public class SetMemberIntByName implements ChuckInstr {
     Object valObj = null;
     double doubleVal = 0;
     boolean isObjVal = shred.reg.isObject(0);
+    boolean isDoubleVal = false;
 
     if (isObjVal) {
       valObj = shred.reg.popObject();
-    } else {
+    } else if (shred.reg.isDouble(0)) {
       doubleVal = shred.reg.popAsDouble();
+      isDoubleVal = true;
+    } else {
+      doubleVal = (double) shred.reg.popLong();
     }
 
     // Build conventional setter name: "freq" -> "setFreq"
@@ -137,12 +141,7 @@ public class SetMemberIntByName implements ChuckInstr {
 
     // Push the value back so the chuck expression can be chained
     if (isObjVal) shred.reg.pushObject(valObj);
-    else {
-      // Check if it should be an int or float based on the field type in UserObject
-      if (rawObj instanceof UserObject uo2 && !uo2.isFloatField(memberName))
-        shred.reg.push((long) doubleVal);
-      else shred.reg.push(doubleVal);
-    }
+    else shred.reg.push(doubleVal);
   }
 
   private boolean tryInvokeObj(Object obj, String setter, Object val) {

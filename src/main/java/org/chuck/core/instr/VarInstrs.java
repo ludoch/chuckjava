@@ -46,13 +46,16 @@ public class VarInstrs {
         if (obj instanceof ChuckString cs) {
           obj = new ChuckString(cs.toString());
         }
-        s.mem.setRef(idx, (ChuckObject) obj);
+        s.mem.setRef(idx, obj);
+        s.mem.setIsDouble(idx, false);
       } else if (s.reg.isDouble(0)) {
         double val = s.reg.peekAsDouble(0);
-        s.mem.setData(idx, val);
+        s.mem.setData(idx, Double.doubleToRawLongBits(val));
+        s.mem.setIsDouble(idx, true);
       } else {
         long val = s.reg.peekLong(0);
         s.mem.setData(idx, val);
+        s.mem.setIsDouble(idx, false);
       }
       if (idx >= s.mem.getSp()) s.mem.setSp(idx + 1);
     }
@@ -239,7 +242,12 @@ public class VarInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      s.reg.push(s.mem.getData(s.getFramePointer() + offset));
+      int idx = s.getFramePointer() + offset;
+      if (s.mem.isObjectAt(idx)) {
+        s.reg.pushObject(s.mem.getRef(idx));
+      } else {
+        s.reg.push(s.mem.getData(idx));
+      }
     }
   }
 
@@ -252,7 +260,14 @@ public class VarInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      s.reg.push(Double.longBitsToDouble(s.mem.getData(s.getFramePointer() + offset)));
+      int idx = s.getFramePointer() + offset;
+      if (s.mem.isObjectAt(idx)) {
+        s.reg.pushObject(s.mem.getRef(idx));
+      } else if (s.mem.isDoubleAt(idx)) {
+        s.reg.push(Double.longBitsToDouble(s.mem.getData(idx)));
+      } else {
+        s.reg.push((double) s.mem.getData(idx));
+      }
     }
   }
 
@@ -270,8 +285,22 @@ public class VarInstrs {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
       int idx = s.getFramePointer() + offset;
-      s.mem.setData(idx, s.reg.peekLong(0));
+      if (s.reg.isObject(0)) {
+        s.mem.setRef(idx, s.reg.peekObject(0));
+        s.mem.setIsDouble(idx, false);
+      } else if (s.reg.isDouble(0)) {
+        s.mem.setData(idx, (long) s.reg.peekAsDouble(0));
+        s.mem.setIsDouble(idx, false);
+      } else {
+        s.mem.setData(idx, s.reg.peekLong(0));
+        s.mem.setIsDouble(idx, false);
+      }
       if (idx >= s.mem.getSp()) s.mem.setSp(idx + 1);
+    }
+
+    @Override
+    public String toString() {
+      return "StoreLocalInt(" + offset + ")";
     }
   }
 
@@ -285,8 +314,22 @@ public class VarInstrs {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
       int idx = s.getFramePointer() + offset;
-      s.mem.setData(idx, s.reg.peekAsDouble(0));
+      if (s.reg.isObject(0)) {
+        s.mem.setRef(idx, s.reg.peekObject(0));
+        s.mem.setIsDouble(idx, false);
+      } else if (s.reg.isDouble(0)) {
+        s.mem.setData(idx, Double.doubleToRawLongBits(s.reg.peekAsDouble(0)));
+        s.mem.setIsDouble(idx, true);
+      } else {
+        s.mem.setData(idx, Double.doubleToRawLongBits((double) s.reg.peekLong(0)));
+        s.mem.setIsDouble(idx, true);
+      }
       if (idx >= s.mem.getSp()) s.mem.setSp(idx + 1);
+    }
+
+    @Override
+    public String toString() {
+      return "StoreLocalFloat(" + offset + ")";
     }
   }
 

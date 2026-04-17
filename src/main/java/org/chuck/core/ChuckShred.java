@@ -577,6 +577,14 @@ public class ChuckShred implements Comparable<ChuckShred> {
   /** Synchronous execution of a code block (e.g. for pre-ctor, static init). */
   public void executeSynchronous(ChuckVM vm, ChuckCode code) {
     if (code == null) return;
+    if (CURRENT_SHRED.isBound() && CURRENT_SHRED.get() == this) {
+      executeSynchronousInternal(vm, code);
+    } else {
+      ScopedValue.where(CURRENT_SHRED, this).run(() -> executeSynchronousInternal(vm, code));
+    }
+  }
+
+  private void executeSynchronousInternal(ChuckVM vm, ChuckCode code) {
     ChuckCode savedCode = this.code;
     int savedPc = this.pc;
     int savedFp = this.framePointer;
@@ -585,11 +593,14 @@ public class ChuckShred implements Comparable<ChuckShred> {
 
     this.code = code;
     this.pc = 0;
+    // Set frame pointer above current stack pointer to protect caller's locals
     this.framePointer = mem.getSp();
     int startFp = this.framePointer;
+    // Reserve space for new locals
+    mem.setSp(startFp + code.getStackSize());
 
     try {
-      while (!isDone && this.code != null) {
+      while (this.code != null) {
         if (pc >= this.code.getNumInstructions()) {
           // End of current code — if back at or below the starting frame, we're done
           if (framePointer <= startFp) break;
@@ -601,11 +612,18 @@ public class ChuckShred implements Comparable<ChuckShred> {
         if (handle == null) break;
         int oldPc = pc;
         ChuckCode oldC = this.code;
-        handle.invokeExact(vm, this);
+        try {
+          handle.invokeExact(vm, this);
+        } catch (Throwable e) {
+          int line = this.code.getLineNumber(pc);
+          vm.print(
+              String.format(
+                  "[chuck]:(EXCEPTION in sync code) %s on line[%d] in %s\n",
+                  e.getMessage(), line, this.code.getName()));
+          break;
+        }
         if (this.code == oldC && pc == oldPc) pc++;
       }
-    } catch (Throwable t) {
-      // swallow — restore state in finally
     } finally {
       this.code = savedCode;
       this.pc = savedPc;

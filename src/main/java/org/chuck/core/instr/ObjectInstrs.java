@@ -103,6 +103,30 @@ public class ObjectInstrs {
         className = "Event";
       }
 
+      if (obj instanceof ChuckShred sh) {
+        switch (mName) {
+          case "args" -> {
+            String[] sargs = sh.args();
+            ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sargs.length);
+            for (int i = 0; i < sargs.length; i++) arr.setObject(i, new ChuckString(sargs[i]));
+            s.reg.pushObject(arr);
+            return;
+          }
+          case "numArgs" -> {
+            s.reg.push((long) sh.args().length);
+            return;
+          }
+          case "id" -> {
+            s.reg.push((long) sh.getId());
+            return;
+          }
+          case "done" -> {
+            s.reg.push(sh.isDone() ? 1L : 0L);
+            return;
+          }
+        }
+      }
+
       if (obj instanceof ChuckEvent ce) {
         switch (mName) {
           case "timeout" -> {
@@ -755,20 +779,6 @@ public class ObjectInstrs {
         return;
       }
 
-      // Reuse an already-instantiated local variable only when it is a live user object
-      // (UserObject, ChuckArray, ChuckString) — never when the slot contains a saved
-      // return-frame value (ChuckCode, Long, etc.) that happens to share the same address.
-      if (s.mem.isObjectAt(fp + o)) {
-        Object existing = s.mem.getRef(fp + o);
-        if (existing instanceof UserObject
-            || existing instanceof ChuckArray
-            || existing instanceof ChuckString
-            || (existing instanceof ChuckObject && !(existing instanceof ChuckCode))) {
-          s.reg.pushObject(existing);
-          return;
-        }
-      }
-
       Object obj = null;
       if (ar) {
         int sz = ((Number) args[0]).intValue();
@@ -779,7 +789,7 @@ public class ObjectInstrs {
                 case "vec3" -> new ChuckArray(ChuckType.ARRAY, 3);
                 case "vec4" -> new ChuckArray(ChuckType.ARRAY, 4);
                 case "complex", "polar" -> new ChuckArray(ChuckType.ARRAY, 2);
-                default -> null;
+                default -> new ChuckArray(t, 0);
               };
           if (ca != null) ca.vecTag = t;
           obj = ca;
@@ -789,10 +799,11 @@ public class ObjectInstrs {
           obj = ChuckFactory.buildMultiDimArray(dims, 0, t, vm, s, rm);
         } else {
           ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
-          arr.elementTypeName = t;
+          String elemType = (t != null) ? t.replaceAll("\\[\\]", "") : null;
+          arr.elementTypeName = elemType;
           for (int i = 0; i < sz; i++) {
             ChuckObject elem =
-                ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+                ChuckFactory.instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
             if (elem != null) {
               arr.setObject(i, elem);
               if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
@@ -888,6 +899,14 @@ public class ObjectInstrs {
           return;
         }
       }
+      if (vm.isGlobalInt(n)) {
+        s.reg.push(vm.getGlobalInt(n));
+        return;
+      }
+      if (vm.isGlobalDouble(n)) {
+        s.reg.push(vm.getGlobalFloat(n));
+        return;
+      }
       Object obj = null;
       if (ar) {
         int sz = ((Number) args[0]).intValue();
@@ -898,7 +917,7 @@ public class ObjectInstrs {
                 case "vec3" -> new ChuckArray(ChuckType.ARRAY, 3);
                 case "vec4" -> new ChuckArray(ChuckType.ARRAY, 4);
                 case "complex", "polar" -> new ChuckArray(ChuckType.ARRAY, 2);
-                default -> null;
+                default -> new ChuckArray(t, 0);
               };
           if (ca != null) ca.vecTag = t;
           obj = ca;
@@ -908,10 +927,11 @@ public class ObjectInstrs {
           obj = ChuckFactory.buildMultiDimArray(dims, 0, t, vm, s, rm);
         } else {
           ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
-          arr.elementTypeName = t;
+          String elemType = (t != null) ? t.replaceAll("\\[\\]", "") : null;
+          arr.elementTypeName = elemType;
           for (int i = 0; i < sz; i++) {
             ChuckObject elem =
-                ChuckFactory.instantiateType(t, 0, null, vm.getSampleRate(), vm, s, rm);
+                ChuckFactory.instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
             if (elem != null) {
               arr.setObject(i, elem);
               if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
@@ -1308,7 +1328,7 @@ public class ObjectInstrs {
                   case "vec3" -> new ChuckArray(ChuckType.ARRAY, 3);
                   case "vec4" -> new ChuckArray(ChuckType.ARRAY, 4);
                   case "complex", "polar" -> new ChuckArray(ChuckType.ARRAY, 2);
-                  default -> null;
+                  default -> new ChuckArray(t, 0);
                 };
             if (ca != null) ca.vecTag = t;
             obj = ca;

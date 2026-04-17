@@ -32,6 +32,10 @@ public class BatchTester {
     List<String> failures = Collections.synchronizedList(new ArrayList<>());
 
     String classpath = System.getProperty("java.class.path");
+    if (!classpath.contains("target/classes")) {
+        classpath = "target/classes:" + classpath;
+    }
+    final String finalClasspath = classpath;
 
     // Increased parallelism since memory is isolated per process
     ExecutorService executor =
@@ -66,7 +70,7 @@ public class BatchTester {
                       "--add-modules",
                       "jdk.incubator.vector",
                       "-cp",
-                      classpath,
+                      finalClasspath,
                       "org.chuck.SingleTestRunner",
                       path);
 

@@ -303,7 +303,8 @@ public class StatementEmitter {
         boolean isUserClassElem = parent.getUserClassRegistry().containsKey(elemTypeS);
         boolean isObject = parent.isObjectType(s.type());
         boolean forceGlobal = s.isGlobal();
-        boolean useGlobal = forceGlobal; // Top-level vars are shred-local by default in ChucK
+        boolean useGlobal =
+            forceGlobal || parent.getLocalScopes().size() == 1; // Top-level vars are global
         // Compile-time check: detect global type conflicts
         if (useGlobal) {
           String prevType = parent.getGlobalVarTypes().get(s.name());
@@ -475,15 +476,21 @@ public class StatementEmitter {
               parent.setLocalCount(offset + 1);
               scope.put(s.name(), offset);
             }
-            code.addInstruction(
-                new ObjectInstrs.InstantiateSetAndPushLocal(
-                    s.type(),
-                    offset,
-                    argCount,
-                    s.isReference(),
-                    isArrayDecl,
-                    parent.getUserClassRegistry()));
-            code.addInstruction(new StackInstrs.Pop());
+            if (code != null) {
+              String fullType = s.type();
+              if (isArrayDecl && !fullType.endsWith("[]")) {
+                  fullType += "[]";
+              }
+              code.addInstruction(
+                  new ObjectInstrs.InstantiateSetAndPushLocal(
+                      fullType,
+                      offset,
+                      argCount,
+                      s.isReference(),
+                      isArrayDecl,
+                      parent.getUserClassRegistry()));
+              code.addInstruction(new StackInstrs.Pop());
+            }
           }
         }
       }
@@ -978,54 +985,38 @@ public class StatementEmitter {
                 && bexp2.rhs() instanceof ChuckAST.DeclExp rDecl2) {
               // e.g. 1 => static int S;
               parent.emitExpression(bexp2.lhs(), staticInitCodeLocal);
+              staticInitCodeLocal.addInstruction(new PushInstrs.PushString(s.name()));
               staticInitCodeLocal.addInstruction(new FieldInstrs.SetStatic(s.name(), fName));
               staticInitCodeLocal.addInstruction(new StackInstrs.Pop()); // clean up
             } else if (bodyStmt instanceof ChuckAST.DeclStmt ds) {
-              // e.g. static int S; or static SinOsc S;
-              ChuckAST.DeclExp declExp =
-                  new ChuckAST.DeclExp(
-                      ds.type(),
-                      ds.name(),
-                      ds.arraySizes(),
-                      ds.callArgs(),
-                      ds.isReference(),
-                      false,
-                      false,
-                      ds.isConst(),
-                      ChuckAST.AccessModifier.PUBLIC,
-                      null,
-                      ds.line(),
-                      ds.column());
-              parent.getLocalScopes().push(new java.util.HashMap<>());
-              parent.getLocalTypeScopes().push(new java.util.HashMap<>());
-              parent.emitExpression(declExp, staticInitCodeLocal);
-              parent.getLocalScopes().pop();
-              parent.getLocalTypeScopes().pop();
-              staticInitCodeLocal.addInstruction(new FieldInstrs.SetStatic(s.name(), fName));
-              staticInitCodeLocal.addInstruction(new StackInstrs.Pop()); // clean up
+              // e.g. static int S; or static SinOsc S; or static string S("hello");
+              String type = ds.type();
+              boolean isUGen = parent.isKnownUGenType(type) || parent.isSubclassOfUGen(type);
+              boolean isObject = !org.chuck.core.ChuckLanguage.PRIMITIVE_TYPES.contains(type);
+              
+              if (isUGen || (isObject && ds.callArgs() != null)) {
+                // Instantiate and set static object field
+                // For strings with args, we need to handle specially or use the generic instantiate logic
+                int argCount = 0;
+                if (ds.callArgs() != null) {
+                    if (ds.callArgs() instanceof ChuckAST.CallExp ce) {
+                        for (ChuckAST.Exp arg : ce.args()) parent.emitExpression(arg, staticInitCodeLocal);
+                        argCount = ce.args().size();
+                    } else {
+                        parent.emitExpression(ds.callArgs(), staticInitCodeLocal);
+                        argCount = 1;
+                    }
+                }
+                
+                staticInitCodeLocal.addInstruction(new ObjectInstrs.InstantiateSetAndPushGlobal(type, "@static_init_" + s.name() + "_" + fName + "_" + new java.util.Random().nextInt(1000000), argCount, false, false, parent.getUserClassRegistry()));
+                staticInitCodeLocal.addInstruction(new PushInstrs.PushString(s.name()));
+                staticInitCodeLocal.addInstruction(new FieldInstrs.SetStatic(s.name(), fName));
+                staticInitCodeLocal.addInstruction(new StackInstrs.Pop());
+              }
             } else if (bodyStmt instanceof ChuckAST.ExpStmt es3
                 && es3.exp() instanceof ChuckAST.DeclExp rDecl3) {
-              ChuckAST.DeclExp rDecl3m =
-                  new ChuckAST.DeclExp(
-                      rDecl3.type(),
-                      rDecl3.name(),
-                      rDecl3.arraySizes(),
-                      rDecl3.callArgs(),
-                      rDecl3.isReference(),
-                      false,
-                      false,
-                      rDecl3.isConst(),
-                      ChuckAST.AccessModifier.PUBLIC,
-                      null,
-                      rDecl3.line(),
-                      rDecl3.column());
-              parent.getLocalScopes().push(new java.util.HashMap<>());
-              parent.getLocalTypeScopes().push(new java.util.HashMap<>());
-              parent.emitExpression(rDecl3m, staticInitCodeLocal);
-              parent.getLocalScopes().pop();
-              parent.getLocalTypeScopes().pop();
-              staticInitCodeLocal.addInstruction(new FieldInstrs.SetStatic(s.name(), fName));
-              staticInitCodeLocal.addInstruction(new StackInstrs.Pop()); // clean up
+              // e.g. static float b[];
+              // Do NOT emit a SetStatic here if it's just a declaration.
             }
           }
         }

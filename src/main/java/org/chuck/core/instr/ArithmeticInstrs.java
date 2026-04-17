@@ -23,6 +23,13 @@ public class ArithmeticInstrs {
           s.reg.pushObject(s.getDuration(ld.samples() + rd.samples()));
         } else if (l instanceof ChuckArray la
             && r instanceof ChuckArray ra
+            && la.vecTag != null
+            && la.vecTag.equals(ra.vecTag)) {
+          double[] res = new double[la.size()];
+          for (int i = 0; i < res.length; i++) res[i] = la.getFloat(i) + ra.getFloat(i);
+          s.reg.pushObject(new ChuckArray(la.vecTag, res));
+        } else if (l instanceof ChuckArray la
+            && r instanceof ChuckArray ra
             && "complex".equals(la.vecTag)
             && "complex".equals(ra.vecTag)) {
           s.reg.pushObject(
@@ -50,7 +57,7 @@ public class ArithmeticInstrs {
         double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
         s.reg.push(l + r);
       } else {
-        long r = s.reg.popLong(), l = s.reg.popLong();
+        long r = s.reg.popAsLong(), l = s.reg.popAsLong();
         s.reg.push(l + r);
       }
     }
@@ -64,6 +71,13 @@ public class ArithmeticInstrs {
         Object r = s.reg.pop(), l = s.reg.pop();
         if (l instanceof ChuckDuration ld && r instanceof ChuckDuration rd) {
           s.reg.pushObject(s.getDuration(ld.samples() - rd.samples()));
+        } else if (l instanceof ChuckArray la
+            && r instanceof ChuckArray ra
+            && la.vecTag != null
+            && la.vecTag.equals(ra.vecTag)) {
+          double[] res = new double[la.size()];
+          for (int i = 0; i < res.length; i++) res[i] = la.getFloat(i) - ra.getFloat(i);
+          s.reg.pushObject(new ChuckArray(la.vecTag, res));
         } else if (l instanceof ChuckArray la
             && r instanceof ChuckArray ra
             && "complex".equals(la.vecTag)
@@ -107,6 +121,15 @@ public class ArithmeticInstrs {
         Object r = s.reg.pop(), l = s.reg.pop();
         if (l instanceof ChuckArray la
             && r instanceof ChuckArray ra
+            && la.vecTag != null
+            && la.vecTag.equals(ra.vecTag)) {
+          double[] res = new double[la.size()];
+          for (int i = 0; i < res.length; i++) {
+             res[i] = la.getFloat(i) * ra.getFloat(i);
+          }
+          s.reg.pushObject(new ChuckArray(la.vecTag, res));
+        } else if (l instanceof ChuckArray la
+            && r instanceof ChuckArray ra
             && "complex".equals(la.vecTag)
             && "complex".equals(ra.vecTag)) {
           double lre = la.getFloat(0), lim = la.getFloat(1);
@@ -131,7 +154,7 @@ public class ArithmeticInstrs {
         double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
         s.reg.push(l * r);
       } else {
-        long r = s.reg.popLong(), l = s.reg.popLong();
+        long r = s.reg.popAsLong(), l = s.reg.popAsLong();
         s.reg.push(l * r);
       }
     }
@@ -144,6 +167,16 @@ public class ArithmeticInstrs {
       if (s.reg.isObject(0) || s.reg.isObject(1)) {
         Object r = s.reg.pop(), l = s.reg.pop();
         if (l instanceof ChuckArray la
+            && r instanceof ChuckArray ra
+            && la.vecTag != null
+            && la.vecTag.equals(ra.vecTag)) {
+          double[] res = new double[la.size()];
+          for (int i = 0; i < res.length; i++) {
+             double d = ra.getFloat(i);
+             res[i] = (d == 0) ? 0 : la.getFloat(i) / d;
+          }
+          s.reg.pushObject(new ChuckArray(la.vecTag, res));
+        } else if (l instanceof ChuckArray la
             && r instanceof ChuckArray ra
             && "complex".equals(la.vecTag)
             && "complex".equals(ra.vecTag)) {
@@ -178,7 +211,7 @@ public class ArithmeticInstrs {
         double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
         s.reg.push(l / r);
       } else {
-        long r = s.reg.popLong(), l = s.reg.popLong();
+        long r = s.reg.popAsLong(), l = s.reg.popAsLong();
         if (r == 0) s.reg.push(0L);
         else s.reg.push(l / r);
       }
@@ -193,7 +226,7 @@ public class ArithmeticInstrs {
         double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
         s.reg.push(l % r);
       } else {
-        long r = s.reg.popLong(), l = s.reg.popLong();
+        long r = s.reg.popAsLong(), l = s.reg.popAsLong();
         if (r == 0) s.reg.push(0L);
         else s.reg.push(l % r);
       }
@@ -211,7 +244,7 @@ public class ArithmeticInstrs {
       } else if (s.reg.isDouble(0)) {
         s.reg.push(-s.reg.popAsDouble());
       } else {
-        s.reg.push(-s.reg.popLong());
+        s.reg.push(-s.reg.popAsLong());
       }
     }
   }

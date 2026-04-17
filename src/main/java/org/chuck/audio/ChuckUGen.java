@@ -222,7 +222,10 @@ public abstract class ChuckUGen extends ChuckObject {
       final ChuckUGen[] sources = this.sourcesArray;
       final int count = this.sourcesCount;
       for (int i = 0; i < count; i++) {
-        sum += sources[i].tick(systemTime);
+        ChuckUGen src = sources[i];
+        if (src != null) {
+          sum += src.tick(systemTime);
+        }
       }
 
       lastOut = compute(sum, systemTime) * gain;

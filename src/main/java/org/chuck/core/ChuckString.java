@@ -36,26 +36,33 @@ public class ChuckString extends ChuckObject {
   }
 
   public ChuckString substring(long start) {
-    return getStringFromPool(sb.substring((int) start));
+    int s = Math.max(0, Math.min(sb.length(), (int) start));
+    return new ChuckString(sb.substring(s));
   }
 
-  public ChuckString substring(long start, long end) {
-    return getStringFromPool(sb.substring((int) start, (int) end));
+  public ChuckString substring(long start, long len) {
+    int s = Math.max(0, Math.min(sb.length(), (int) start));
+    int e = Math.max(s, Math.min(sb.length(), s + (int) len));
+    return new ChuckString(sb.substring(s, e));
   }
 
   public ChuckString insert(long offset, Object val) {
-    sb.insert((int) offset, valToString(val));
+    int off = Math.max(0, Math.min(sb.length(), (int) offset));
+    sb.insert(off, valToString(val));
     return this;
   }
 
   public ChuckString erase(long start, long len) {
-    sb.delete((int) start, (int) (start + len));
+    int s = Math.max(0, Math.min(sb.length(), (int) start));
+    int e = Math.max(s, Math.min(sb.length(), s + (int) len));
+    sb.delete(s, e);
     return this;
   }
 
   public ChuckString replace(long start, Object val) {
     String s = valToString(val);
-    sb.replace((int) start, (int) (start + s.length()), s);
+    int sIdx = Math.max(0, Math.min(sb.length(), (int) start));
+    sb.replace(sIdx, sb.length(), s);
     return this;
   }
 
@@ -72,7 +79,9 @@ public class ChuckString extends ChuckObject {
   }
 
   public ChuckString replace(long start, long len, Object val) {
-    sb.replace((int) start, (int) (start + len), valToString(val));
+    int sIdx = Math.max(0, Math.min(sb.length(), (int) start));
+    int eIdx = Math.max(sIdx, Math.min(sb.length(), sIdx + (int) len));
+    sb.replace(sIdx, eIdx, valToString(val));
     return this;
   }
 
@@ -81,7 +90,8 @@ public class ChuckString extends ChuckObject {
   }
 
   public long find(Object val, long start) {
-    return sb.indexOf(valToString(val), (int) start);
+    int s = Math.max(0, Math.min(sb.length(), (int) start));
+    return sb.indexOf(valToString(val), s);
   }
 
   public long rfind(Object val) {
@@ -89,37 +99,34 @@ public class ChuckString extends ChuckObject {
   }
 
   public long rfind(Object val, long start) {
-    return sb.lastIndexOf(valToString(val), (int) start);
+    int s = Math.max(0, Math.min(sb.length(), (int) start));
+    return sb.lastIndexOf(valToString(val), s);
   }
 
   public ChuckString lower() {
-    return getStringFromPool(sb.toString().toLowerCase());
+    return new ChuckString(sb.toString().toLowerCase());
   }
 
   public ChuckString upper() {
-    return getStringFromPool(sb.toString().toUpperCase());
+    return new ChuckString(sb.toString().toUpperCase());
   }
 
   public ChuckString trim() {
-    return getStringFromPool(sb.toString().trim());
+    return new ChuckString(sb.toString().trim());
   }
 
   public ChuckString ltrim() {
     String s = sb.toString();
     int i = 0;
     while (i < s.length() && Character.isWhitespace(s.charAt(i))) i++;
-    return getStringFromPool(s.substring(i));
+    return new ChuckString(s.substring(i));
   }
 
   public ChuckString rtrim() {
     String s = sb.toString();
     int i = s.length() - 1;
     while (i >= 0 && Character.isWhitespace(s.charAt(i))) i--;
-    return getStringFromPool(s.substring(0, i + 1));
-  }
-
-  private ChuckString getStringFromPool(String s) {
-    return new ChuckString(s);
+    return new ChuckString(s.substring(0, i + 1));
   }
 
   /** Returns the directory path if the string is a file path. */
@@ -129,7 +136,7 @@ public class ChuckString extends ChuckObject {
     // Standardize to forward slashes and ensure trailing slash if not empty
     result = result.replace('\\', '/');
     if (!result.isEmpty() && !result.endsWith("/")) result += "/";
-    return getStringFromPool(result);
+    return new ChuckString(result);
   }
 
   @Override
@@ -139,6 +146,7 @@ public class ChuckString extends ChuckObject {
 
   private static String valToString(Object val) {
     if (val == null) return "null";
+    if (val instanceof ChuckString cs) return cs.sb.toString();
     return val.toString();
   }
 }

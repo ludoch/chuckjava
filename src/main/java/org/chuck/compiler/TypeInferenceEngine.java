@@ -58,6 +58,13 @@ public class TypeInferenceEngine {
       case ChuckAST.StringExp _ -> "string";
       case ChuckAST.ComplexLit _ -> "complex";
       case ChuckAST.PolarLit _ -> "polar";
+      case ChuckAST.VectorLitExp e -> {
+        int n = e.elements().size();
+        if (n == 2) yield "vec2";
+        if (n == 3) yield "vec3";
+        if (n == 4) yield "vec4";
+        yield "vec" + n;
+      }
       case ChuckAST.ArrayLitExp e -> {
         if (e.elements().isEmpty()) yield "int[]";
         String t0 = getExprType(e.elements().get(0));

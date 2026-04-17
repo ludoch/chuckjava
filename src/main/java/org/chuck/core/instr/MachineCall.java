@@ -61,7 +61,7 @@ public class MachineCall implements ChuckInstr {
       }
       case "eval" -> {
         String src = args.length > 0 ? String.valueOf(args[0]) : "";
-        long id = vm.eval(src);
+        long id = vm.evalWithCaller(src, s);
         s.reg.push(id);
         s.yield(0);
       }
@@ -138,7 +138,7 @@ public class MachineCall implements ChuckInstr {
       case "evalWithArgs" -> {
         String src = args.length > 0 ? String.valueOf(args[0]) : "";
         ChuckArray argArr = args.length > 1 && args[1] instanceof ChuckArray a ? a : null;
-        long id = vm.eval(src, argArr);
+        long id = vm.evalWithArgs(src, argArr, s);
         s.reg.push(id);
         s.yield(0);
       }

@@ -35,7 +35,7 @@ public class SingleTestRunner {
 
     StringBuilder actualOutput = new StringBuilder();
     ChuckVM vm = new ChuckVM(sampleRate);
-    vm.addPrintListener(text -> actualOutput.append(text).append("\n"));
+    vm.addPrintListener(text -> actualOutput.append(text));
 
     try {
       String source = Files.readString(Paths.get(path));

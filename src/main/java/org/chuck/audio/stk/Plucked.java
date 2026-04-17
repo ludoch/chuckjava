@@ -35,7 +35,8 @@ public class Plucked extends ChuckUGen {
     if (index == 0) { // freq
       setFreq(Double.longBitsToDouble(value));
     }
-    super.setData(index, value);
+    super.setDataInternal(index, value);
+    triggerDataHook(index, value);
   }
 
   public void noteOn(float velocity) {

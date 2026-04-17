@@ -47,6 +47,7 @@ public class ChuckTypeMethodsTest {
             + "    <<< m[i].name() >>>; "
             + "    <<< m[i].numArgs() >>>; "
             + "    <<< m[i].returnType() >>>; "
+            + "    10 => now; "
             + "}";
 
     List<String> out = runChuck(code);
