@@ -99,6 +99,15 @@ Ensure you run with `--enable-native-access=ALL-UNNAMED`.
 
 ---
 
+## 📚 Documentation
+
+- **[Java DSL Guide](JAVA_DSL.md)**: Learn how to write ChucK code in pure Java.
+- **[UGen Reference](UGEN_REFERENCE.md)**: Detailed list of available Unit Generators and their parameters.
+- **[MIDI Guide](MIDI_GUIDE.md)**: How to use MIDI input, output, and polyphony.
+- **[Language Specification](LANGUAGE.md)**: Deep dive into the ChucK-Java language features.
+
+---
+
 ## 🎹 Implemented Unit Generators (UGens)
 
 ### Oscillators
