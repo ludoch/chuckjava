@@ -252,4 +252,22 @@ public class DslExamplesTest {
     double maxRms = runAndMeasure(vm, 5.0);
     assertTrue(maxRms > 0.001, "WurleyDSL produced no sound (maxRms=" + maxRms + ")");
   }
+
+  @Test
+  public void testDslDemo() throws Exception {
+    ChuckVM vm = new ChuckVM(SAMPLE_RATE);
+    vm.spork(ChuckDSL.load(Paths.get("examples_dsl/DslDemo.java")));
+
+    double maxRms = runAndMeasure(vm, 2.0);
+    assertTrue(maxRms > 0.001, "DslDemo produced no sound (maxRms=" + maxRms + ")");
+  }
+
+  @Test
+  public void testPolyphonyDSL() throws Exception {
+    ChuckVM vm = new ChuckVM(SAMPLE_RATE);
+    vm.spork(ChuckDSL.load(Paths.get("examples_dsl/PolyphonyDSL.java")));
+
+    double maxRms = runAndMeasure(vm, 3.0);
+    assertTrue(maxRms > 0.001, "PolyphonyDSL produced no sound (maxRms=" + maxRms + ")");
+  }
 }
