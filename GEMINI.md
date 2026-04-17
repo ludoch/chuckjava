@@ -31,6 +31,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle.
 -   **CI/CD:**
     -   `unit-tests.yml`: For fast JVM unit tests (on-demand).
     -   `native-build.yml`: For expensive GraalVM native builds (on-demand or on release).
+    -   `maven-publish.yml`: For publishing the Maven artifact to GitHub Packages (on-demand).
 
 ## Project-Specific Commands
 
@@ -49,6 +50,9 @@ mvn -Pnative package -DskipTests
 
 # Build IDE bundle
 mvn -Pide-bundle package -DskipTests
+
+# Publish Maven artifact (requires GITHUB_TOKEN and proper settings.xml)
+mvn deploy -DskipTests
 ```
 
 ## Critical Files
