@@ -16,6 +16,7 @@ import org.chuck.core.instr.ArrayInstrs;
 import org.chuck.core.instr.FieldInstrs;
 import org.chuck.core.instr.MathInstrs;
 import org.chuck.core.instr.MiscInstrs;
+import org.chuck.core.instr.PushInstrs;
 import org.chuck.core.instr.StackInstrs;
 import org.chuck.core.instr.UgenInstrs;
 import org.chuck.core.instr.VarInstrs;
@@ -1009,6 +1010,7 @@ public class ChuckEmitter {
           String actualClassWithField = findStaticFieldOwner(potentialClassName, e.member());
           if (actualClassWithField != null) {
             checkAccess(actualClassWithField, e.member(), false, e.line(), e.column());
+            code.addInstruction(new PushInstrs.PushString(actualClassWithField));
             code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, e.member()));
             return;
           }

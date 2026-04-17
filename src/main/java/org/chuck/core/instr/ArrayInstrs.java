@@ -113,9 +113,11 @@ public class ArrayInstrs {
   }
 
   public static class NewArray implements ChuckInstr {
+    String t;
     int dims;
 
-    public NewArray(String t, int d) {
+    public NewArray(String type, int d) {
+      t = type;
       dims = d;
     }
 
@@ -123,7 +125,7 @@ public class ArrayInstrs {
     public void execute(ChuckVM vm, ChuckShred s) {
       long[] sizes = new long[dims];
       for (int i = dims - 1; i >= 0; i--) sizes[i] = s.reg.popLong();
-      s.reg.pushObject(new ChuckArray(ChuckType.ARRAY, (int) sizes[0]));
+      s.reg.pushObject(new ChuckArray(t, (int) sizes[0]));
     }
   }
 
@@ -142,8 +144,7 @@ public class ArrayInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      ChuckArray a = new ChuckArray(ChuckType.ARRAY, count);
-      a.vecTag = vt;
+      ChuckArray a = new ChuckArray(vt, count);
       for (int i = count - 1; i >= 0; i--) {
         if (s.reg.isObject(0)) a.setObject(i, s.reg.popObject());
         else if (s.reg.isDouble(0)) a.setFloat(i, s.reg.popAsDouble());

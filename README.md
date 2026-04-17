@@ -6,9 +6,9 @@
 
 | Suite | Total | Passed | Failed | Timed Out | Notes |
 |-------|-------|--------|--------|-----------|-------|
-| **Total** | **1126** | **1025 (91%)** | **61** | **40** | Stable 91% pass rate achieved. |
+| **Total** | **1126** | **1027 (91%)** | **61** | **38** | Hardened static field resolution and formatting. |
 
-*Note: Remaining failures are primarily minor output differences or edge cases in static field inheritance.*
+*Note: Remaining failures are primarily edge cases in static array reference updates (e.g., 116.ck).*
 
 ### Roadmap Progress
 - **✅ Negative Testing:** 100% resolution of compiler error tests.
@@ -16,7 +16,8 @@
 - **✅ Virtual Filesystem:** Global search paths and `special:` aliases functional.
 - **✅ Output Normalization:** Floats, complex, and polar formatting match reference ChucK.
 - **✅ Static Field Hardening (Phase 1):** Improved inherited field resolution and persistent class registry in VM.
-- **🔄 Static Field Hardening (Phase 2):** (Next) Finalizing static array reference updates across multiple shreds.
+- **✅ Static Field Hardening (Phase 2):** Corrected stack behavior for `SetStatic` and ensured proper array initialization.
+- **🔄 Static Array Reference Tracking:** (Next) Resolving persistent issues in cross-shred static array visibility.
 
 ### Recent Enhancements (Pro MIDI & Audio)
 
