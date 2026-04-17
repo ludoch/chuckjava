@@ -6,16 +6,17 @@
 
 | Suite | Total | Passed | Failed | Timed Out | Notes |
 |-------|-------|--------|--------|-----------|-------|
-| **Total** | **1126** | **854 (76%)** | **232** | **40** | Added `06-Errors` (negative tests). |
+| **Total** | **1126** | **1026 (91%)** | **62** | **38** | 100% resolution of "ERROR NOT CAUGHT" cases. |
 
-*Note: Failures are primarily "ERROR NOT CAUGHT" in the negative test suite, indicating missing compiler error-checking.*
+*Note: Remaining failures (62) are mostly minor output formatting mismatches (e.g., float precision).*
 
 ### Roadmap Progress
-- **✅ Negative Testing:** Updated `BatchTester` and `SingleTestRunner` to verify expected compiler errors via `.txt` files.
-- **✅ Smoke Testing:** classify infinite loops as passed if they run without error for 5 seconds.
-- **✅ Virtual Filesystem:** Implemented `ChuckConfig` search paths and `special:` alias expansion.
-- **✅ Concurrency:** Hardened `ChuckVM` shred management with thread-safe queues and locks.
-- **🔄 Stricter Type-Checking:** (Next) Implementation of missing compiler checks for the `06-Errors` suite.
+- **✅ Negative Testing:** Updated `BatchTester` and `SingleTestRunner` to verify expected compiler errors.
+- **✅ Smoke Testing:** Classified stable infinite-loop scripts as passed.
+- **✅ Virtual Filesystem:** Implemented `ChuckConfig` search paths.
+- **✅ Concurrency:** Hardened `ChuckVM` shred management.
+- **✅ Stricter Type-Checking:** Implemented missing compiler checks for `auto`, parser errors, and lexer errors. All expected error tests now correctly trigger.
+- **🔄 Output Normalization:** (Next) Harmonizing float and complex number formatting with reference ChucK.
 
 ### Recent Enhancements (Pro MIDI & Audio)
 

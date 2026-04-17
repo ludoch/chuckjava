@@ -361,29 +361,27 @@ public class ExpressionEmitter {
       case ChuckAST.BinaryExp e -> {
         if (e.op() == ChuckAST.Operator.CHUCK || e.op() == ChuckAST.Operator.AT_CHUCK) {
           if (e.rhs() instanceof ChuckAST.DeclExp rDecl && rDecl.type().equals("auto")) {
-            if (e.lhs() instanceof ChuckAST.IdExp(String n, int _, int _)) {
-              if (n.equals("null")) {
-                throw new org.chuck.core.ChuckCompilerException(
-                    "cannot infer 'auto' type from 'null'",
-                    parent.getCurrentFile(),
-                    e.line(),
-                    e.column());
-              }
-              if (n.equals("void")) {
-                throw new org.chuck.core.ChuckCompilerException(
-                    "cannot infer 'auto' type from 'void'",
-                    parent.getCurrentFile(),
-                    e.line(),
-                    e.column());
-              }
-              String lhsType = parent.getVarTypeByName(n);
-              if ("auto".equals(lhsType)) {
-                throw new org.chuck.core.ChuckCompilerException(
-                    "cannot infer 'auto' type from another 'auto' variable",
-                    parent.getCurrentFile(),
-                    e.line(),
-                    e.column());
-              }
+            String inferredLhsType = parent.getTypeInferenceEngine().getExprType(e.lhs());
+            if ("void".equals(inferredLhsType)) {
+              throw new org.chuck.core.ChuckCompilerException(
+                  "cannot infer 'auto' type from 'void'",
+                  parent.getCurrentFile(),
+                  e.line(),
+                  e.column());
+            }
+            if ("null".equals(inferredLhsType)) {
+              throw new org.chuck.core.ChuckCompilerException(
+                  "cannot infer 'auto' type from 'null'",
+                  parent.getCurrentFile(),
+                  e.line(),
+                  e.column());
+            }
+            if ("auto".equals(inferredLhsType)) {
+              throw new org.chuck.core.ChuckCompilerException(
+                  "cannot infer 'auto' type from another 'auto' variable",
+                  parent.getCurrentFile(),
+                  e.line(),
+                  e.column());
             }
           }
           if (e.op() == ChuckAST.Operator.CHUCK

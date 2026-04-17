@@ -502,12 +502,14 @@ public class ChuckEmitter {
     return null;
   }
 
+  TypeInferenceEngine getTypeInferenceEngine() {
+    return new TypeInferenceEngine(
+        userClassRegistry, globalVarTypes, localTypeScopes, functionReturnTypes, currentClass);
+  }
+
   String getExprType(ChuckAST.Exp exp) {
     if (exp == null) return null;
-    TypeInferenceEngine engine =
-        new TypeInferenceEngine(
-            userClassRegistry, globalVarTypes, localTypeScopes, functionReturnTypes, currentClass);
-    return engine.getExprType(exp);
+    return getTypeInferenceEngine().getExprType(exp);
   }
 
   void flattenStmts(List<ChuckAST.Stmt> input, List<ChuckAST.Stmt> output) {

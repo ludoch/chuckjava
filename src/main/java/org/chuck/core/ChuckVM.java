@@ -361,42 +361,42 @@ public class ChuckVM {
 
   public int run(String source, String name) {
     try {
+      final List<String> errors = new java.util.ArrayList<>();
+      final List<Integer> errorLines = new java.util.ArrayList<>();
+      final List<Integer> errorCols = new java.util.ArrayList<>();
+
+      BaseErrorListener errorListener = new BaseErrorListener() {
+        @Override
+        public void syntaxError(
+            Recognizer<?, ?> recognizer,
+            Object offendingSymbol,
+            int line,
+            int charPositionInLine,
+            String msg,
+            RecognitionException e) {
+          if (errors.isEmpty()) { // Only capture first error
+              errors.add(msg);
+              errorLines.add(line);
+              errorCols.add(charPositionInLine);
+          }
+          print(String.format("Parser error: line %d:%d %s\n", line, charPositionInLine, msg));
+        }
+      };
+
       CharStream input = CharStreams.fromString(source);
       ChuckANTLRLexer lexer = new ChuckANTLRLexer(input);
       lexer.removeErrorListeners();
-      lexer.addErrorListener(
-          new BaseErrorListener() {
-            @Override
-            public void syntaxError(
-                Recognizer<?, ?> recognizer,
-                Object offendingSymbol,
-                int line,
-                int charPositionInLine,
-                String msg,
-                RecognitionException e) {
-              print(String.format("Lexer error: line %d:%d %s\n", line, charPositionInLine, msg));
-            }
-          });
+      lexer.addErrorListener(errorListener);
 
       CommonTokenStream tokens = new CommonTokenStream(lexer);
       ChuckANTLRParser parser = new ChuckANTLRParser(tokens);
       parser.removeErrorListeners();
-      parser.addErrorListener(
-          new BaseErrorListener() {
-            @Override
-            public void syntaxError(
-                Recognizer<?, ?> recognizer,
-                Object offendingSymbol,
-                int line,
-                int charPositionInLine,
-                String msg,
-                RecognitionException e) {
-              print(String.format("Parser error: line %d:%d %s\n", line, charPositionInLine, msg));
-            }
-          });
+      parser.addErrorListener(errorListener);
 
       ChuckANTLRParser.ProgramContext programCtx = parser.program();
-      if (parser.getNumberOfSyntaxErrors() > 0) return -1;
+      if (errors.size() > 0) {
+        throw new ChuckCompilerException(errors.get(0), name, errorLines.get(0), errorCols.get(0));
+      }
 
       ChuckASTVisitor visitor = new ChuckASTVisitor();
       @SuppressWarnings("unchecked")
