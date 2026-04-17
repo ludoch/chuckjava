@@ -65,9 +65,9 @@ public class ChuckPrint implements ChuckInstr {
         }
       }
       case null -> {
-        val = "0";
+        val = "null";
         if (includeTag && Boolean.getBoolean("chuck.print.tags")) {
-          return "0 :(UserObject)";
+          return "null :(UserObject)";
         }
       }
       default -> {

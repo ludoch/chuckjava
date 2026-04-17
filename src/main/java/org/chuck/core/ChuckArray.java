@@ -27,6 +27,9 @@ public class ChuckArray extends ChuckObject {
 
   public ChuckArray(ChuckType type, int size) {
     super(type);
+    if (Boolean.getBoolean("chuck.debug.array")) {
+      System.out.println("[DEBUG] New ChuckArray size=" + size);
+    }
     for (int i = 0; i < size; i++) {
       intData.add(0L);
       floatData.add(0.0);
@@ -38,6 +41,9 @@ public class ChuckArray extends ChuckObject {
   public ChuckArray(String elementTypeName, int size) {
     super(ChuckType.ARRAY);
     this.elementTypeName = elementTypeName;
+    if (Boolean.getBoolean("chuck.debug.array")) {
+      System.out.println("[DEBUG] New ChuckArray type=" + elementTypeName + " size=" + size);
+    }
     this.vecTag =
         (elementTypeName != null
                 && (elementTypeName.startsWith("vec")
@@ -45,7 +51,14 @@ public class ChuckArray extends ChuckObject {
                     || elementTypeName.equals("polar")))
             ? elementTypeName
             : null;
-    if (size > 0) ensureCapacity(size - 1);
+    for (int i = 0; i < size; i++) {
+      intData.add(0L);
+      floatData.add(0.0);
+      objectData.add(null);
+      if ("int".equals(elementTypeName)) types.add((byte) 0);
+      else if ("float".equals(elementTypeName)) types.add((byte) 1);
+      else types.add((byte) 2);
+    }
   }
 
   public ChuckArray(String tag, double[] vals) {
@@ -409,12 +422,13 @@ public class ChuckArray extends ChuckObject {
     }
   }
 
-  // append (<<) support
   public ChuckArray append(long val) {
     if ("float".equals(elementTypeName)) return append((double) val);
     int idx = types.size();
     ensureCapacity(idx);
     intData.set(idx, val);
+    floatData.set(idx, 0.0);
+    objectData.set(idx, null);
     types.set(idx, (byte) 0);
     return this;
   }
@@ -424,6 +438,8 @@ public class ChuckArray extends ChuckObject {
     int idx = types.size();
     ensureCapacity(idx);
     floatData.set(idx, val);
+    intData.set(idx, 0L);
+    objectData.set(idx, null);
     types.set(idx, (byte) 1);
     return this;
   }
@@ -432,6 +448,10 @@ public class ChuckArray extends ChuckObject {
     if ("float".equals(elementTypeName)) {
       if (val instanceof Number n) return append(n.doubleValue());
     }
+    if ("int".equals(elementTypeName)) {
+      if (val instanceof Number n) return append(n.longValue());
+    }
+
     if (val instanceof Long l) return append(l.longValue());
     if (val instanceof Double d) return append(d.doubleValue());
     if (val instanceof Integer i) return append((long) i);
@@ -441,6 +461,8 @@ public class ChuckArray extends ChuckObject {
     ensureCapacity(idx);
     objectData.set(idx, val);
     types.set(idx, (byte) 2);
+    intData.set(idx, 0L);
+    floatData.set(idx, 0.0);
     return this;
   }
 

@@ -6,17 +6,19 @@
 
 | Suite | Total | Passed | Failed | Timed Out | Notes |
 |-------|-------|--------|--------|-----------|-------|
-| **Total** | **1126** | **1025 (91%)** | **61** | **40** | Stable 91% pass rate achieved. |
+| **Total** | **1126** | **1043 (93%)** | **45** | **38** | Normalized nulls, tags, and foreach. |
 
-*Note: Remaining failures are primarily minor output differences or edge cases in static field inheritance.*
+*Note: Remaining failures are primarily minor output differences or edge cases in array append/casting.*
 
 ### Roadmap Progress
 - **✅ Negative Testing:** 100% resolution of compiler error tests.
 - **✅ Smoke Testing:** Infinite loops verified as stable.
 - **✅ Virtual Filesystem:** Global search paths and `special:` aliases functional.
 - **✅ Output Normalization:** Floats, complex, and polar formatting match reference ChucK.
-- **✅ Static Field Hardening (Phase 1):** Improved inherited field resolution and persistent class registry in VM.
-- **🔄 Static Field Hardening (Phase 2):** (Next) Finalizing static array reference updates across multiple shreds.
+- **✅ Object Representation:** Corrected `null` formatting to match C++ ChucK.
+- **✅ ForEach Hardening:** Improved emission and type-tracking for loop iterators.
+- **🔄 Array Append Precision:** (Next) Resolving persistent issues in cross-type array appends (e.g., int into float array).
+
 
 ### Recent Enhancements (Pro MIDI & Audio)
 

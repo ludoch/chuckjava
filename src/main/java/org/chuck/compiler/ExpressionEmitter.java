@@ -696,9 +696,8 @@ public class ExpressionEmitter {
                 String actualClassWithField =
                     parent.findStaticFieldOwner(potentialClassName, dot.member());
                 if (actualClassWithField != null) {
-                  code.addInstruction(
-                      new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
-                  code.addInstruction(new StackInstrs.Pop());
+                  code.addInstruction(new PushInstrs.PushString(actualClassWithField));
+                  code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
                   return;
                 }
               }
@@ -741,9 +740,8 @@ public class ExpressionEmitter {
                 String actualClassWithField =
                     parent.findStaticFieldOwner(potentialClassName, dot.member());
                 if (actualClassWithField != null) {
-                  code.addInstruction(
-                      new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
-                  code.addInstruction(new StackInstrs.Pop());
+                  code.addInstruction(new PushInstrs.PushString(actualClassWithField));
+                  code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
                   return;
                 }
               }
@@ -1222,9 +1220,11 @@ public class ExpressionEmitter {
           if (bt != null) {
             String actualClassWithField = parent.findStaticFieldOwner(bt, e.member());
             if (actualClassWithField != null) {
-              code.addInstruction(new FieldInstrs.GetStatic(actualClassWithField, e.member()));
+              code.addInstruction(new PushInstrs.PushString(actualClassWithField));
+              code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, e.member()));
               return;
             }
+
           }
           if (Set.of("ADSR", "Adsr").contains(id.name())) {
             code.addInstruction(

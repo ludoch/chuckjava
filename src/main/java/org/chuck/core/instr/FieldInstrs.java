@@ -236,38 +236,72 @@ public class FieldInstrs {
       } else if (d.staticIsDouble().getOrDefault(fName, false)) {
         double dv = Double.longBitsToDouble(d.staticInts().getOrDefault(fName, 0L));
         s.reg.push(dv);
+        if (Boolean.getBoolean("chuck.debug.static")) {
+          vm.print("[DEBUG] GetStatic " + cName + "." + fName + " = " + dv + "\n");
+        }
+        return;
       } else {
         long lv = d.staticInts().getOrDefault(fName, 0L);
         s.reg.push(lv);
+        if (Boolean.getBoolean("chuck.debug.static")) {
+          vm.print("[DEBUG] GetStatic " + cName + "." + fName + " = " + lv + "\n");
+        }
+        return;
+      }
+      if (Boolean.getBoolean("chuck.debug.static")) {
+        String logVal =
+            (val instanceof ChuckArray ca) ? "array(size=" + ca.size() + ")" : String.valueOf(val);
+        vm.print("[DEBUG] GetStatic " + cName + "." + fName + " = " + logVal + "\n");
       }
     }
   }
 
   public static class SetStatic implements ChuckInstr {
-    String cName, fName;
+    String fName;
 
     public SetStatic(String c, String f) {
-      cName = c;
       fName = f;
     }
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      UserClassDescriptor d = vm.getUserClass(cName);
+      // Stack: [value, class_name]
+      String classNameOnStack = s.reg.popObject().toString();
+      UserClassDescriptor d = vm.getUserClass(classNameOnStack);
       if (d == null) {
+        if (s.reg.isObject(0)) s.reg.popObject();
+        else s.reg.popAsDouble();
         return;
       }
+      Object valToPush = null;
+      String logVal = "";
       if (s.reg.isObject(0)) {
-        Object val = s.reg.peekObject(0);
+        Object val = s.reg.popObject();
         d.staticObjects().put(fName, val);
+        valToPush = val;
+        logVal =
+            (val instanceof ChuckArray ca) ? "array(size=" + ca.size() + ")" : String.valueOf(val);
       } else if (s.reg.isDouble(0)) {
-        double val = s.reg.peekAsDouble(0);
+        double val = s.reg.popAsDouble();
         d.staticInts().put(fName, Double.doubleToRawLongBits(val));
         d.staticIsDouble().put(fName, true);
+        valToPush = val;
+        logVal = String.valueOf(val);
       } else {
-        long val = s.reg.peekLong(0);
+        long val = s.reg.popAsLong();
         d.staticInts().put(fName, val);
         d.staticIsDouble().put(fName, false);
+        valToPush = val;
+        logVal = String.valueOf(val);
+      }
+
+      // Push the value back for chained assignment
+      if (valToPush instanceof Double dv) s.reg.push(dv);
+      else if (valToPush instanceof Long lv) s.reg.push(lv);
+      else s.reg.pushObject(valToPush);
+
+      if (Boolean.getBoolean("chuck.debug.static")) {
+        vm.print("[DEBUG] SetStatic " + classNameOnStack + "." + fName + " = " + logVal + "\n");
       }
     }
   }

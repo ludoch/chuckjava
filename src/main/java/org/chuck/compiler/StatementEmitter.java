@@ -1126,17 +1126,28 @@ public class StatementEmitter {
         // 5. Load current element: collection[idx]
         code.addInstruction(new VarInstrs.LoadLocal(collOffset));
         code.addInstruction(new VarInstrs.LoadLocal(idxOffset));
-        code.addInstruction(new ArrayInstrs.GetArrayInt());
+        code.addInstruction(new ArrayInstrs.GetArrayInt()); // Runtime handles type correctly
 
         // 6. Store in iteration variable (always fresh in loop scope)
         int iterOffset = parent.getLocalCount();
         parent.setLocalCount(iterOffset + 1);
         scope.put(s.iterName(), iterOffset);
         // Track iter var type so method dispatch inside the body works
-        if (s.iterType() != null && !s.iterType().equals("auto")) {
-          parent.getLocalTypeScopes().peek().put(s.iterName(), s.iterType());
+        String iterType = s.iterType();
+        if ("auto".equals(iterType)) {
+          // Infer from collection element type
+          String collType = parent.getExprType(s.collection());
+          if (collType != null && collType.endsWith("[]")) {
+            iterType = collType.substring(0, collType.length() - 2);
+          }
         }
-        code.addInstruction(new VarInstrs.StoreLocal(iterOffset));
+        if (iterType != null) {
+          parent.getLocalTypeScopes().peek().put(s.iterName(), iterType);
+        }
+        
+        if ("float".equals(iterType)) code.addInstruction(new VarInstrs.StoreLocal(iterOffset));
+        else if (org.chuck.core.ChuckLanguage.CORE_DATA_TYPES.contains(iterType)) code.addInstruction(new VarInstrs.StoreLocal(iterOffset));
+        else code.addInstruction(new VarInstrs.StoreLocal(iterOffset));
         code.addInstruction(new StackInstrs.Pop());
 
         // 7. Loop body
