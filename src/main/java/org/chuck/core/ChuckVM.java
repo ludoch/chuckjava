@@ -360,23 +360,24 @@ public class ChuckVM {
       final List<Integer> errorLines = new java.util.ArrayList<>();
       final List<Integer> errorCols = new java.util.ArrayList<>();
 
-      BaseErrorListener errorListener = new BaseErrorListener() {
-        @Override
-        public void syntaxError(
-            Recognizer<?, ?> recognizer,
-            Object offendingSymbol,
-            int line,
-            int charPositionInLine,
-            String msg,
-            RecognitionException e) {
-          if (errors.isEmpty()) { // Only capture first error
-              errors.add(msg);
-              errorLines.add(line);
-              errorCols.add(charPositionInLine);
-          }
-          print(String.format("Parser error: line %d:%d %s\n", line, charPositionInLine, msg));
-        }
-      };
+      BaseErrorListener errorListener =
+          new BaseErrorListener() {
+            @Override
+            public void syntaxError(
+                Recognizer<?, ?> recognizer,
+                Object offendingSymbol,
+                int line,
+                int charPositionInLine,
+                String msg,
+                RecognitionException e) {
+              if (errors.isEmpty()) { // Only capture first error
+                errors.add(msg);
+                errorLines.add(line);
+                errorCols.add(charPositionInLine);
+              }
+              print(String.format("Parser error: line %d:%d %s\n", line, charPositionInLine, msg));
+            }
+          };
 
       CharStream input = CharStreams.fromString(source);
       ChuckANTLRLexer lexer = new ChuckANTLRLexer(input);

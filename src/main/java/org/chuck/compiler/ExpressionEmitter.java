@@ -693,9 +693,11 @@ public class ExpressionEmitter {
             case ChuckAST.DotExp dot -> {
               String potentialClassName = parent.resolveClassName(dot.base(), code);
               if (potentialClassName != null) {
-                String actualClassWithField = parent.findStaticFieldOwner(potentialClassName, dot.member());
+                String actualClassWithField =
+                    parent.findStaticFieldOwner(potentialClassName, dot.member());
                 if (actualClassWithField != null) {
-                  code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
+                  code.addInstruction(
+                      new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
                   code.addInstruction(new StackInstrs.Pop());
                   return;
                 }
@@ -736,9 +738,11 @@ public class ExpressionEmitter {
             case ChuckAST.DotExp dot -> {
               String potentialClassName = parent.resolveClassName(dot.base(), code);
               if (potentialClassName != null) {
-                String actualClassWithField = parent.findStaticFieldOwner(potentialClassName, dot.member());
+                String actualClassWithField =
+                    parent.findStaticFieldOwner(potentialClassName, dot.member());
                 if (actualClassWithField != null) {
-                  code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
+                  code.addInstruction(
+                      new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
                   code.addInstruction(new StackInstrs.Pop());
                   return;
                 }

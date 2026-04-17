@@ -32,65 +32,73 @@ public class BatchTester {
     List<String> failures = Collections.synchronizedList(new ArrayList<>());
 
     String classpath = System.getProperty("java.class.path");
-    
-    // Increased parallelism since memory is isolated per process
-    ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
 
-    Thread progressThread = new Thread(() -> {
-      while (!Thread.currentThread().isInterrupted()) {
-        try {
-          Thread.sleep(5000);
-          System.out.printf("--- Heartbeat Progress: %d/%d (P:%d, F:%d, T:%d) ---\n",
-              processed.get(), total, passed.get(), failed.get(), timedOut.get());
-        } catch (InterruptedException e) {
-          break;
-        }
-      }
-    });
+    // Increased parallelism since memory is isolated per process
+    ExecutorService executor =
+        Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+
+    Thread progressThread =
+        new Thread(
+            () -> {
+              while (!Thread.currentThread().isInterrupted()) {
+                try {
+                  Thread.sleep(5000);
+                  System.out.printf(
+                      "--- Heartbeat Progress: %d/%d (P:%d, F:%d, T:%d) ---\n",
+                      processed.get(), total, passed.get(), failed.get(), timedOut.get());
+                } catch (InterruptedException e) {
+                  break;
+                }
+              }
+            });
     progressThread.setDaemon(true);
     progressThread.start();
 
     for (Path file : allFiles) {
-      executor.submit(() -> {
-        String path = file.toString();
-        try {
-          ProcessBuilder pb = new ProcessBuilder(
-              "java",
-              "--enable-preview",
-              "--add-modules", "jdk.incubator.vector",
-              "-cp", classpath,
-              "org.chuck.SingleTestRunner",
-              path
-          );
-          
-          Process p = pb.start();
-          if (!p.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-            p.destroyForcibly();
-            timedOut.incrementAndGet();
-            failures.add(path + " (Process Timed out)");
-          } else {
-            int exitCode = p.exitValue();
-            if (exitCode == 0) {
-              passed.incrementAndGet();
-            } else if (exitCode == 3) {
-              timedOut.incrementAndGet();
-              failures.add(path + " (VM Timed out)");
-            } else {
-              failed.incrementAndGet();
-              // Capture error output
-              try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getErrorStream()))) {
-                  String errorLine = reader.lines().collect(Collectors.joining("\n"));
-                  failures.add(path + " (Exit code " + exitCode + "):\n" + errorLine);
+      executor.submit(
+          () -> {
+            String path = file.toString();
+            try {
+              ProcessBuilder pb =
+                  new ProcessBuilder(
+                      "java",
+                      "--enable-preview",
+                      "--add-modules",
+                      "jdk.incubator.vector",
+                      "-cp",
+                      classpath,
+                      "org.chuck.SingleTestRunner",
+                      path);
+
+              Process p = pb.start();
+              if (!p.waitFor(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                p.destroyForcibly();
+                timedOut.incrementAndGet();
+                failures.add(path + " (Process Timed out)");
+              } else {
+                int exitCode = p.exitValue();
+                if (exitCode == 0) {
+                  passed.incrementAndGet();
+                } else if (exitCode == 3) {
+                  timedOut.incrementAndGet();
+                  failures.add(path + " (VM Timed out)");
+                } else {
+                  failed.incrementAndGet();
+                  // Capture error output
+                  try (BufferedReader reader =
+                      new BufferedReader(new InputStreamReader(p.getErrorStream()))) {
+                    String errorLine = reader.lines().collect(Collectors.joining("\n"));
+                    failures.add(path + " (Exit code " + exitCode + "):\n" + errorLine);
+                  }
+                }
               }
+            } catch (Exception e) {
+              failed.incrementAndGet();
+              failures.add(path + " (Launcher error: " + e.getMessage() + ")");
+            } finally {
+              processed.incrementAndGet();
             }
-          }
-        } catch (Exception e) {
-          failed.incrementAndGet();
-          failures.add(path + " (Launcher error: " + e.getMessage() + ")");
-        } finally {
-          processed.incrementAndGet();
-        }
-      });
+          });
     }
 
     executor.shutdown();
@@ -110,19 +118,20 @@ public class BatchTester {
     if (!failures.isEmpty()) {
       // Save report to file instead of dumping to stdout if too large
       try (PrintWriter pw = new PrintWriter(new FileWriter("test-report.txt"))) {
-          pw.println("--- 📊 Batch Test Report ---");
-          pw.println("Total:     " + total);
-          pw.println("Passed:    " + passed.get());
-          pw.println("Failed:    " + failed.get());
-          pw.println("Timed Out: " + timedOut.get());
-          pw.println("\n--- 📝 Failure Details ---");
-          failures.forEach(f -> {
-            pw.println("--------------------------------------------------");
-            pw.println(f);
-          });
-          System.out.println("✅ Detailed report saved to test-report.txt");
+        pw.println("--- 📊 Batch Test Report ---");
+        pw.println("Total:     " + total);
+        pw.println("Passed:    " + passed.get());
+        pw.println("Failed:    " + failed.get());
+        pw.println("Timed Out: " + timedOut.get());
+        pw.println("\n--- 📝 Failure Details ---");
+        failures.forEach(
+            f -> {
+              pw.println("--------------------------------------------------");
+              pw.println(f);
+            });
+        System.out.println("✅ Detailed report saved to test-report.txt");
       } catch (IOException e) {
-          System.err.println("Failed to write report: " + e.getMessage());
+        System.err.println("Failed to write report: " + e.getMessage());
       }
     }
 
@@ -148,7 +157,7 @@ public class BatchTester {
                 // Skip examples that are known to be interactive or infinite listeners
                 if (path.contains("adc.ck")) return false;
                 if (path.contains("otf_")) return false; // On-the-fly examples usually infinite
-                
+
                 for (int i = 0; i < p.getNameCount(); i++) {
                   if (p.getName(i).toString().startsWith(".")
                       && !p.getName(i).toString().endsWith(".ck")) return false;

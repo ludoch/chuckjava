@@ -243,10 +243,17 @@ public class ChuckCLI {
 
       for (String fileName : filesToAdd) {
         try {
-          String source = Files.readString(Paths.get(fileName));
-          int id = vm.run(source, fileName);
-          ChuckShred shred = vm.getShred(id);
-          if (shred != null) initialShreds.add(shred);
+          if (fileName.endsWith(".java")) {
+            Runnable task = org.chuck.core.ChuckDSL.load(Paths.get(fileName));
+            int id = vm.spork(task);
+            ChuckShred shred = vm.getShred(id);
+            if (shred != null) initialShreds.add(shred);
+          } else {
+            String source = Files.readString(Paths.get(fileName));
+            int id = vm.run(source, fileName);
+            ChuckShred shred = vm.getShred(id);
+            if (shred != null) initialShreds.add(shred);
+          }
         } catch (ChuckCompilerException e) {
           printRichError(e);
         } catch (Exception e) {

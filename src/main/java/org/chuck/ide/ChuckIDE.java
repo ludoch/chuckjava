@@ -331,7 +331,11 @@ public class ChuckIDE extends Application {
     openItem.setOnAction(
         e -> {
           FileChooser fc = new FileChooser();
-          fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("ChucK Files", "*.ck"));
+          fc.getExtensionFilters()
+              .addAll(
+                  new FileChooser.ExtensionFilter("ChucK Files (*.ck, *.java)", "*.ck", "*.java"),
+                  new FileChooser.ExtensionFilter("ChucK (.ck)", "*.ck"),
+                  new FileChooser.ExtensionFilter("Java DSL (.java)", "*.java"));
           File f = fc.showOpenDialog(stage);
           if (f != null) loadFileIntoEditor(f);
         });
@@ -424,6 +428,7 @@ public class ChuckIDE extends Application {
     Menu tutorialMenu = createTutorialMenu();
     Menu examplesMenu = new Menu("_Examples");
     loadExamples(new File("examples"), examplesMenu);
+    loadExamples(new File("examples_dsl"), examplesMenu);
 
     Menu helpMenu = new Menu("_Help");
     MenuItem githubItem = new MenuItem("GitHub Repository");
@@ -466,7 +471,7 @@ public class ChuckIDE extends Application {
         Menu sub = new Menu(f.getName());
         loadExamples(f, sub);
         if (!sub.getItems().isEmpty()) parent.getItems().add(sub);
-      } else if (f.getName().endsWith(".ck")) {
+      } else if (f.getName().endsWith(".ck") || f.getName().endsWith(".java")) {
         MenuItem item = new MenuItem(f.getName());
         item.setOnAction(e -> loadFileIntoEditor(f));
         parent.getItems().add(item);
@@ -574,10 +579,35 @@ public class ChuckIDE extends Application {
       String code = et.getEditor().getText();
       String name = et.getText().replaceFirst("^\\* ", "");
       String args = et.getArguments();
-      int id = vm.run(code, name);
-      if (id > 0) {
-        et.setLastSporkedShredId(id);
-        shredListView.getItems().add(new ShredInfo(id, name, vm.getShred(id)));
+
+      if (name.endsWith(".java")) {
+        // Handle Java DSL
+        try {
+          File f = et.getFile();
+          if (f == null) {
+            // If it's a new unsaved .java tab, we need to save it to a temp file first
+            // because ChuckDSL.load needs a Path on disk for the compiler.
+            f = File.createTempFile("ChuckDSL_", ".java");
+            f.deleteOnExit();
+            Files.writeString(f.toPath(), code);
+          }
+          Runnable task = org.chuck.core.ChuckDSL.load(f.toPath());
+          int id = vm.spork(task);
+          if (id > 0) {
+            et.setLastSporkedShredId(id);
+            shredListView.getItems().add(new ShredInfo(id, name, vm.getShred(id)));
+          }
+        } catch (Exception e) {
+          print("❌ Java DSL Error: " + e.getMessage() + "\n");
+          e.printStackTrace();
+        }
+      } else {
+        // Handle standard ChucK .ck
+        int id = vm.run(code, name);
+        if (id > 0) {
+          et.setLastSporkedShredId(id);
+          shredListView.getItems().add(new ShredInfo(id, name, vm.getShred(id)));
+        }
       }
     }
   }

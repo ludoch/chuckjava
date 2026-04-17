@@ -1,8 +1,6 @@
 package org.chuck;
 
 import java.nio.file.*;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import org.chuck.core.ChuckVM;
 
 /** Helper to run a single .ck file in a fresh JVM, with support for expected error files. */
@@ -20,12 +18,14 @@ public class SingleTestRunner {
     String expectation = null;
     boolean isErrorExpectation = false;
     if (Files.exists(Paths.get(expectationFile))) {
-        try {
-            expectation = Files.readString(Paths.get(expectationFile)).trim();
-            // Heuristic: if it contains "error:" or "exception", it's an error test
-            isErrorExpectation = expectation.toLowerCase().contains("error") || 
-                                expectation.toLowerCase().contains("exception");
-        } catch (Exception ignored) {}
+      try {
+        expectation = Files.readString(Paths.get(expectationFile)).trim();
+        // Heuristic: if it contains "error:" or "exception", it's an error test
+        isErrorExpectation =
+            expectation.toLowerCase().contains("error")
+                || expectation.toLowerCase().contains("exception");
+      } catch (Exception ignored) {
+      }
     }
 
     StringBuilder actualOutput = new StringBuilder();
@@ -37,36 +37,36 @@ public class SingleTestRunner {
       try {
         vm.run(source, path);
       } catch (Throwable t) {
-          // If we have an expected error, check if this exception matches
-          if (isErrorExpectation) {
-              String msg = t.getMessage();
-              if (msg != null && isErrorMatch(msg, expectation)) {
-                  System.out.println("SUCCESS (Expected error caught)");
-                  System.exit(0);
-              } else {
-                  System.err.println("CAUGHT WRONG ERROR:");
-                  System.err.println("Expected: " + expectation);
-                  System.err.println("Actual:   " + msg);
-                  t.printStackTrace();
-                  System.exit(1);
-              }
+        // If we have an expected error, check if this exception matches
+        if (isErrorExpectation) {
+          String msg = t.getMessage();
+          if (msg != null && isErrorMatch(msg, expectation)) {
+            System.out.println("SUCCESS (Expected error caught)");
+            System.exit(0);
           } else {
-              // No expected error, so any exception is a failure
-              t.printStackTrace();
-              System.exit(1);
+            System.err.println("CAUGHT WRONG ERROR:");
+            System.err.println("Expected: " + expectation);
+            System.err.println("Actual:   " + msg);
+            t.printStackTrace();
+            System.exit(1);
           }
+        } else {
+          // No expected error, so any exception is a failure
+          t.printStackTrace();
+          System.exit(1);
+        }
       }
 
       // If we reach here, no exception was thrown by vm.run (compiler or initial shred execution)
       // Some errors might be logged via print listener instead of thrown
       if (isErrorExpectation) {
-          if (isErrorMatch(actualOutput.toString(), expectation)) {
-              System.out.println("SUCCESS (Expected error found in output)");
-              System.exit(0);
-          }
+        if (isErrorMatch(actualOutput.toString(), expectation)) {
+          System.out.println("SUCCESS (Expected error found in output)");
+          System.exit(0);
+        }
       }
 
-      int steps = 50; 
+      int steps = 50;
       int samplesPerStep = sampleRate / 10;
       boolean finished = false;
 
@@ -79,31 +79,32 @@ public class SingleTestRunner {
         vm.advanceTime(samplesPerStep);
         if (System.currentTimeMillis() - startTime > timeoutSeconds * 1000) break;
       }
-      
+
       if (isErrorExpectation) {
-          if (isErrorMatch(actualOutput.toString(), expectation)) {
-              System.out.println("SUCCESS (Expected error found in output)");
-              System.exit(0);
-          }
-          // If we reach here for an error test, it means the error was NEVER caught
-          System.err.println("ERROR NOT CAUGHT");
-          System.err.println("Expected: " + expectation);
-          System.err.println("Actual output: " + actualOutput.toString());
-          System.exit(4);
+        if (isErrorMatch(actualOutput.toString(), expectation)) {
+          System.out.println("SUCCESS (Expected error found in output)");
+          System.exit(0);
+        }
+        // If we reach here for an error test, it means the error was NEVER caught
+        System.err.println("ERROR NOT CAUGHT");
+        System.err.println("Expected: " + expectation);
+        System.err.println("Actual output: " + actualOutput.toString());
+        System.exit(4);
       }
 
       if (expectation != null && !isErrorExpectation) {
-          if (!isErrorMatch(actualOutput.toString(), expectation)) {
-              System.err.println("OUTPUT MISMATCH");
-              System.err.println("Expected: " + expectation);
-              System.err.println("Actual:   " + actualOutput.toString());
-              System.exit(5);
-          }
+        if (!isErrorMatch(actualOutput.toString(), expectation)) {
+          System.err.println("OUTPUT MISMATCH");
+          System.err.println("Expected: " + expectation);
+          System.err.println("Actual:   " + actualOutput.toString());
+          System.exit(5);
+        }
       }
 
       if (!finished) {
 
-        // Smoke test: if it ran for several seconds without error, call it a success for infinite loops
+        // Smoke test: if it ran for several seconds without error, call it a success for infinite
+        // loops
         System.out.println("SUCCESS (Smoke test passed)");
         System.exit(0);
       }
@@ -118,61 +119,66 @@ public class SingleTestRunner {
   }
 
   private static boolean isErrorMatch(String actual, String expected) {
-      if (actual == null || expected == null) return false;
-      if (expected.isEmpty()) return true;
+    if (actual == null || expected == null) return false;
+    if (expected.isEmpty()) return true;
 
-      // Normalize both: lowercase, remove line/col numbers, collapse whitespace
-      String cleanExpected = expected.toLowerCase()
-          .replaceAll("\\d+:\\d+", "") // remove line:col
-          .replaceAll("\\.ck", "")     // remove filename extensions
-          .replaceAll("\\s+", " ")
-          .trim();
-          
-      String cleanActual = actual.toLowerCase()
-          .replaceAll("\\d+:\\d+", "")
-          .replaceAll("\\.ck", "")
-          .replaceAll("\\s+", " ")
-          .trim();
-      
-      // If expected contains "error:", try to find the core message after it
-      if (cleanExpected.contains("error:")) {
-          String coreMessage = cleanExpected.substring(cleanExpected.indexOf("error:") + 6).trim();
-          if (cleanActual.contains(coreMessage)) return true;
+    // Normalize both: lowercase, remove line/col numbers, collapse whitespace
+    String cleanExpected =
+        expected
+            .toLowerCase()
+            .replaceAll("\\d+:\\d+", "") // remove line:col
+            .replaceAll("\\.ck", "") // remove filename extensions
+            .replaceAll("\\s+", " ")
+            .trim();
+
+    String cleanActual =
+        actual
+            .toLowerCase()
+            .replaceAll("\\d+:\\d+", "")
+            .replaceAll("\\.ck", "")
+            .replaceAll("\\s+", " ")
+            .trim();
+
+    // If expected contains "error:", try to find the core message after it
+    if (cleanExpected.contains("error:")) {
+      String coreMessage = cleanExpected.substring(cleanExpected.indexOf("error:") + 6).trim();
+      if (cleanActual.contains(coreMessage)) return true;
+    }
+
+    // Treat "mismatched input" or "extraneous input" as "syntax error"
+    if (cleanExpected.contains("syntax error")) {
+      if (cleanActual.contains("mismatched input")
+          || cleanActual.contains("extraneous input")
+          || cleanActual.contains("no viable alternative")
+          || (cleanExpected.contains("empty file") && cleanActual.contains("empty file")))
+        return true;
+    }
+
+    // Check for common ChucK error keywords if the full match fails
+    String[] keywords = {"error", "exception", "undefined", "cannot", "invalid", "illegal"};
+    for (String kw : keywords) {
+      if (cleanExpected.contains(kw) && cleanActual.contains(kw)) {
+        // If both have the keyword, and actual contains a good chunk of expected
+        if (cleanExpected.length() > 10) {
+          String partial = cleanExpected.substring(0, Math.min(cleanExpected.length(), 20));
+          if (cleanActual.contains(partial)) return true;
+        }
       }
+    }
 
-      // Treat "mismatched input" or "extraneous input" as "syntax error"
-      if (cleanExpected.contains("syntax error")) {
-          if (cleanActual.contains("mismatched input") || 
-              cleanActual.contains("extraneous input") ||
-              cleanActual.contains("no viable alternative") ||
-              (cleanExpected.contains("empty file") && cleanActual.contains("empty file"))) return true;
-      }
+    // Fuzzy numeric matching for floats: normalize precision to 4 decimal places
+    String fuzzyExpected = normalizeNumerics(cleanExpected);
+    String fuzzyActual = normalizeNumerics(cleanActual);
+    if (fuzzyActual.contains(fuzzyExpected) || fuzzyExpected.contains(fuzzyActual)) return true;
 
-      // Check for common ChucK error keywords if the full match fails
-      String[] keywords = {"error", "exception", "undefined", "cannot", "invalid", "illegal"};
-      for (String kw : keywords) {
-          if (cleanExpected.contains(kw) && cleanActual.contains(kw)) {
-              // If both have the keyword, and actual contains a good chunk of expected
-              if (cleanExpected.length() > 10) {
-                  String partial = cleanExpected.substring(0, Math.min(cleanExpected.length(), 20));
-                  if (cleanActual.contains(partial)) return true;
-              }
-          }
-      }
-
-      // Fuzzy numeric matching for floats: normalize precision to 4 decimal places
-      String fuzzyExpected = normalizeNumerics(cleanExpected);
-      String fuzzyActual = normalizeNumerics(cleanActual);
-      if (fuzzyActual.contains(fuzzyExpected) || fuzzyExpected.contains(fuzzyActual)) return true;
-
-      return cleanActual.contains(cleanExpected) || cleanExpected.contains(cleanActual);
+    return cleanActual.contains(cleanExpected) || cleanExpected.contains(cleanActual);
   }
 
   private static String normalizeNumerics(String s) {
-      // Find patterns like 1.234567 and turn them into 1.2345
-      // This helps matching reference ChucK output which often uses 4 decimal places.
-      java.util.regex.Pattern p = java.util.regex.Pattern.compile("(\\d+\\.\\d{4})\\d*");
-      java.util.regex.Matcher m = p.matcher(s);
-      return m.replaceAll("$1");
+    // Find patterns like 1.234567 and turn them into 1.2345
+    // This helps matching reference ChucK output which often uses 4 decimal places.
+    java.util.regex.Pattern p = java.util.regex.Pattern.compile("(\\d+\\.\\d{4})\\d*");
+    java.util.regex.Matcher m = p.matcher(s);
+    return m.replaceAll("$1");
   }
 }
