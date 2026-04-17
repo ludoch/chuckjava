@@ -347,7 +347,12 @@ public class ChuckIDE extends Application {
     saveItem.setAccelerator(new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN));
     saveItem.setOnAction(e -> saveCurrentTab());
 
-    fileMenu.getItems().addAll(newItem, openItem, recentMenu, saveItem, new SeparatorMenuItem());
+    MenuItem saveDslItem = new MenuItem("Save as Java DSL...");
+    saveDslItem.setOnAction(e -> saveAsJavaDSL());
+
+    fileMenu
+        .getItems()
+        .addAll(newItem, openItem, recentMenu, saveItem, saveDslItem, new SeparatorMenuItem());
 
     // Edit Menu
     Menu editMenu = new Menu("_Edit");
@@ -475,6 +480,55 @@ public class ChuckIDE extends Application {
         MenuItem item = new MenuItem(f.getName());
         item.setOnAction(e -> loadFileIntoEditor(f));
         parent.getItems().add(item);
+      }
+    }
+  }
+
+  private void saveAsJavaDSL() {
+    if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et) {
+      String chuckCode = et.getEditor().getText();
+      String baseName = et.getText().replaceFirst("^\\* ", "");
+      if (baseName.endsWith(".ck")) baseName = baseName.substring(0, baseName.length() - 3);
+      if (baseName.equals("Untitled")) baseName = "MyJavaShred";
+      // Ensure valid Java class name (basic cleanup)
+      baseName = baseName.replaceAll("[^a-zA-Z0-9_]", "");
+      if (baseName.isEmpty() || Character.isDigit(baseName.charAt(0)))
+        baseName = "Shred_" + baseName;
+
+      try {
+        // Parse ChucK code to AST
+        org.antlr.v4.runtime.CharStream input =
+            org.antlr.v4.runtime.CharStreams.fromString(chuckCode);
+        org.chuck.compiler.ChuckANTLRLexer lexer = new org.chuck.compiler.ChuckANTLRLexer(input);
+        org.antlr.v4.runtime.CommonTokenStream tokens =
+            new org.antlr.v4.runtime.CommonTokenStream(lexer);
+        org.chuck.compiler.ChuckANTLRParser parser =
+            new org.chuck.compiler.ChuckANTLRParser(tokens);
+        org.chuck.compiler.ChuckASTVisitor visitor = new org.chuck.compiler.ChuckASTVisitor();
+        @SuppressWarnings("unchecked")
+        List<org.chuck.compiler.ChuckAST.Stmt> ast =
+            (List<org.chuck.compiler.ChuckAST.Stmt>) visitor.visit(parser.program());
+
+        // Convert to Java DSL
+        org.chuck.compiler.ChuckToDSLConverter converter =
+            new org.chuck.compiler.ChuckToDSLConverter();
+        String javaCode = converter.convert(ast, baseName);
+
+        // Save file
+        FileChooser fc = new FileChooser();
+        fc.setTitle("Save as Java DSL");
+        fc.setInitialFileName(baseName + ".java");
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("Java Files", "*.java"));
+        File f = fc.showSaveDialog(stage);
+        if (f != null) {
+          Files.writeString(f.toPath(), javaCode);
+          print("✅ Saved Java DSL to: " + f.getAbsolutePath() + "\n");
+          // Optionally open it
+          loadFileIntoEditor(f);
+        }
+      } catch (Exception e) {
+        print("❌ Error converting to Java DSL: " + e.getMessage() + "\n");
+        e.printStackTrace();
       }
     }
   }

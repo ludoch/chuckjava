@@ -122,3 +122,16 @@ host.spork(() -> {
 2. **Implement `Shred`**: The IDE and CLI look for a class implementing `org.chuck.core.Shred`.
 3. **Sample Rate**: Always pass `sampleRate()` to UGen constructors to ensure they are initialized correctly for the current VM environment.
 4. **No Semi-colons in ChucK?**: Remember that while the logic is the same, this is still **Java**. You must use semi-colons, proper variable declarations, and adhere to Java syntax.
+
+---
+
+## Converting ChucK to Java DSL
+
+If you have an existing ChucK script (`.ck`) and want to see how it would look in the Java DSL, you can use the IDE's built-in converter:
+
+1. Open your `.ck` file in the **ChucK-Java IDE**.
+2. Go to **File > Save as Java DSL...**.
+3. Choose a name and location for your new `.java` file.
+4. The IDE will parse your ChucK code and generate a corresponding Java class implementing the `Shred` interface.
+
+This is a great way to learn the DSL syntax by seeing your familiar ChucK code transformed into Java.

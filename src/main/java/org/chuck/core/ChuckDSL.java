@@ -74,6 +74,11 @@ public class ChuckDSL {
     return ugen;
   }
 
+  /** MIDI note to Frequency conversion. */
+  public static double mtof(double midiNote) {
+    return Std.mtof(midiNote);
+  }
+
   /**
    * Compiles a Java DSL file into a Runnable that can be sporked. The class in the file must
    * implement org.chuck.core.Shred or have a shred() method.

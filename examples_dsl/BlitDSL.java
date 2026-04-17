@@ -1,48 +1,26 @@
-import org.chuck.audio.osc.Blit;
-import org.chuck.audio.fx.JCRev;
-import org.chuck.core.Shred;
 import static org.chuck.core.ChuckDSL.*;
 
-/**
- * Band-Limited Impulse Train (BLIT) with reverb example using the Java Fluent DSL.
- * Plays 8 random pentatonic notes through a JCRev reverb.
- *
- * Original ChucK (blit.ck):
- *   Blit s => JCRev r => dac;
- *   .5 => s.gain;  .05 => r.mix;
- *   int hi[] = { 0, 2, 4, 7, 9, 11 };
- *   while(true) {
- *       Std.mtof(33 + Math.random2(0,3)*12 + hi[Math.random2(0,5)]) => s.freq;
- *       Math.random2(1,5) => s.harmonics;
- *       120::ms => now;
- *   }
- */
+import org.chuck.audio.fx.JCRev;
+import org.chuck.audio.osc.Blit;
+import org.chuck.core.Shred;
+
 public class BlitDSL implements Shred {
+  @Override
+  public void shred() {
+    Blit s = new Blit(sampleRate());
+    JCRev r = new JCRev(sampleRate());
 
-    private static final int[] SCALE = {0, 2, 4, 7, 9, 11};
+    s.chuck(r).chuck(dac());
+    s.gain(0.5);
+    r.mix(0.05f);
 
-    /** MIDI note to frequency: 440 * 2^((midi-69)/12) */
-    private static double mtof(int midi) {
-        return 440.0 * Math.pow(2.0, (midi - 69) / 12.0);
+    long[] hi = {0, 2, 4, 7, 9, 11};
+
+    while (true) {
+      double freq = mtof(33 + ((int) (Math.random() * 4) * 12) + hi[(int) (Math.random() * hi.length)]);
+      s.freq(freq);
+      s.harmonics((int) (Math.random() * 5) + 1);
+      advance(ms(120));
     }
-
-    @Override
-    public void shred() {
-        Blit s = new Blit(sampleRate());
-        JCRev r = new JCRev((float) sampleRate());
-
-        s.chuck(r).chuck(dac());
-        s.gain(0.5);
-        r.mix(0.05f);
-
-        // play 8 random notes
-        for (int i = 0; i < 8; i++) {
-            int octave = (int)(Math.random() * 4);           // random2(0, 3)
-            int degree = (int)(Math.random() * SCALE.length); // random2(0, 5)
-            int midi = 33 + octave * 12 + SCALE[degree];
-            s.freq(mtof(midi));
-            s.harmonics((int)(Math.random() * 5) + 1);       // random2(1, 5)
-            advance(ms(120));
-        }
-    }
+  }
 }
