@@ -101,10 +101,18 @@ public class ArrayInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      Object rhs = s.reg.pop();
+      boolean isDouble = s.reg.isDouble(0);
+      boolean isObject = s.reg.isObject(0);
+      Object rhs;
+      if (isObject) rhs = s.reg.popObject();
+      else if (isDouble) rhs = s.reg.popAsDouble();
+      else rhs = s.reg.popAsLong();
+
       Object lhs = s.reg.popObject();
       if (lhs instanceof ChuckArray a) {
-        a.append(rhs);
+        if (isObject) a.append(rhs);
+        else if (isDouble) a.append((double) (Double) rhs);
+        else a.append((long) (Long) rhs);
       } else if (lhs instanceof ChuckIO io) {
         io.write(rhs);
       }
