@@ -8,6 +8,7 @@ import org.chuck.core.ChuckDuration;
 import org.chuck.core.ChuckEvent;
 import org.chuck.core.ChuckFactory;
 import org.chuck.core.ChuckInstr;
+import org.chuck.core.ChuckLanguage;
 import org.chuck.core.ChuckObject;
 import org.chuck.core.ChuckShred;
 import org.chuck.core.ChuckString;
@@ -78,24 +79,26 @@ public class ObjectInstrs {
       }
       Object obj = s.reg.popObject();
 
-      if (obj == null) {
+      String className = null;
+      UserObject uo = null;
+      if (obj instanceof UserObject) {
+        uo = (UserObject) obj;
+        className = uo.className;
+      } else if (obj instanceof String sName) {
+        className = sName;
+      } else if (obj instanceof ChuckArray a) {
+        className = a.vecTag != null ? a.vecTag : "array";
+      } else if (obj instanceof ChuckString) {
+        className = "string";
+      }
+
+      if (obj == null && className == null) {
         if (mName.equals("size") && a == 0) {
           s.reg.push(0L);
           return;
         }
         throw new org.chuck.core.ChuckRuntimeException(
             "NullPointerException: cannot call method '" + mName + "' on null object");
-      }
-
-      String className = null;
-      UserObject uo = null;
-      if (obj instanceof UserObject) {
-        uo = (UserObject) obj;
-        className = uo.className;
-      } else if (obj instanceof ChuckArray a) {
-        className = a.vecTag != null ? a.vecTag : "array";
-      } else if (obj instanceof ChuckString) {
-        className = "string";
       }
       if (obj instanceof ChuckShred) {
         className = "Shred";
@@ -430,17 +433,40 @@ public class ObjectInstrs {
         java.lang.reflect.Method bestMethod = null;
         Object[] bestArgs = null;
         int bestScore = -1;
-        // In GraalVM native image, unregistered subclasses return empty from getMethods().
-        // Walk up the hierarchy until we find a registered class (e.g. ChuckUGen).
-        // Method.invoke() still does virtual dispatch on the actual instance.
-        java.lang.reflect.Method[] reflMethods = obj.getClass().getMethods();
-        if (reflMethods.length == 0) {
-          Class<?> parent = obj.getClass().getSuperclass();
-          while (parent != null && reflMethods.length == 0) {
-            reflMethods = parent.getMethods();
-            parent = parent.getSuperclass();
-          }
+        
+        java.lang.reflect.Method[] reflMethods;
+        Object targetObj = obj;
+        
+        if (obj instanceof String sName) {
+            // Static call on a built-in class
+            try {
+                Class<?> cls = Class.forName("org.chuck.core.ai." + sName);
+                System.err.println("[CallMethod] found AI class: " + cls.getName());
+                reflMethods = cls.getMethods();
+                targetObj = null; // Static call
+            } catch (ClassNotFoundException e) {
+                try {
+                    Class<?> cls = Class.forName("org.chuck.core." + sName);
+                    System.err.println("[CallMethod] found core class: " + cls.getName());
+                    reflMethods = cls.getMethods();
+                    targetObj = null;
+                } catch (ClassNotFoundException e2) {
+                    System.err.println("[CallMethod] could not find class: " + sName);
+                    reflMethods = new java.lang.reflect.Method[0];
+                }
+            }
+        } else {
+            // Instance call
+            reflMethods = obj.getClass().getMethods();
+            if (reflMethods.length == 0) {
+              Class<?> parent = obj.getClass().getSuperclass();
+              while (parent != null && reflMethods.length == 0) {
+                reflMethods = parent.getMethods();
+                parent = parent.getSuperclass();
+              }
+            }
         }
+        
         for (java.lang.reflect.Method m : reflMethods) {
           if (!m.getName().equals(mName) || m.getParameterCount() != a) continue;
           Class<?>[] pts = m.getParameterTypes();
@@ -529,7 +555,7 @@ public class ObjectInstrs {
         }
         if (bestMethod != null) {
           try {
-            Object res = bestMethod.invoke(obj, bestArgs);
+            Object res = bestMethod.invoke(targetObj, bestArgs);
             if (bestMethod.getReturnType() == void.class) {
               s.reg.pushObject(obj);
             } else if (res == null) {
@@ -796,18 +822,21 @@ public class ObjectInstrs {
         } else if (a > 1) {
           long[] dims = new long[a];
           for (int di = 0; di < a; di++) dims[di] = ((Number) args[di]).longValue();
-          obj = ChuckFactory.buildMultiDimArray(dims, 0, t, vm, s, rm);
+          String baseT = (t != null) ? t.replaceAll("\\[\\]", "").trim() : null;
+          obj = ChuckFactory.buildMultiDimArray(dims, 0, baseT, vm, s, rm);
         } else {
           ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
-          String elemType = (t != null) ? t.replaceAll("\\[\\]", "") : null;
+          String elemType = (t != null) ? t.replaceAll("\\[\\]", "").trim() : null;
           arr.elementTypeName = elemType;
-          for (int i = 0; i < sz; i++) {
-            ChuckObject elem =
-                ChuckFactory.instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
-            if (elem != null) {
-              arr.setObject(i, elem);
-              if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
-            }
+          if (!ChuckLanguage.isPrimitiveType(elemType)) {
+              for (int i = 0; i < sz; i++) {
+                ChuckObject elem =
+                    ChuckFactory.instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
+                if (elem != null) {
+                  arr.setObject(i, elem);
+                  if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
+                }
+              }
           }
           obj = arr;
         }
@@ -924,18 +953,21 @@ public class ObjectInstrs {
         } else if (a > 1) {
           long[] dims = new long[a];
           for (int di = 0; di < a; di++) dims[di] = ((Number) args[di]).longValue();
-          obj = ChuckFactory.buildMultiDimArray(dims, 0, t, vm, s, rm);
+          String baseT = (t != null) ? t.replaceAll("\\[\\]", "").trim() : null;
+          obj = ChuckFactory.buildMultiDimArray(dims, 0, baseT, vm, s, rm);
         } else {
           ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);
-          String elemType = (t != null) ? t.replaceAll("\\[\\]", "") : null;
+          String elemType = (t != null) ? t.replaceAll("\\[\\]", "").trim() : null;
           arr.elementTypeName = elemType;
-          for (int i = 0; i < sz; i++) {
-            ChuckObject elem =
-                ChuckFactory.instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
-            if (elem != null) {
-              arr.setObject(i, elem);
-              if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
-            }
+          if (!ChuckLanguage.isPrimitiveType(elemType)) {
+              for (int i = 0; i < sz; i++) {
+                ChuckObject elem =
+                    ChuckFactory.instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
+                if (elem != null) {
+                  arr.setObject(i, elem);
+                  if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
+                }
+              }
           }
           obj = arr;
         }

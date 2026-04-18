@@ -182,12 +182,15 @@ public class ChuckFactory {
         arr.setObject(i, buildMultiDimArray(dims, dimIdx + 1, elemType, vm, s, rm));
       }
     } else {
-      for (int i = 0; i < sz; i++) {
-        ChuckObject elem = instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
-        if (elem != null) {
-          arr.setObject(i, elem);
-          if (elem instanceof ChuckUGen u) s.registerUGen(u);
-        }
+      arr.elementTypeName = elemType;
+      if (!ChuckLanguage.isPrimitiveType(elemType)) {
+          for (int i = 0; i < sz; i++) {
+            ChuckObject elem = instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
+            if (elem != null) {
+              arr.setObject(i, elem);
+              if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
+            }
+          }
       }
     }
     return arr;

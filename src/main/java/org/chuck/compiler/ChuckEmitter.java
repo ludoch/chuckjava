@@ -1108,15 +1108,20 @@ public class ChuckEmitter {
 
         boolean forceGlobal = e.isGlobal();
         boolean useGlobal = forceGlobal || localScopes.size() == 1;
-        
+
         Integer localOffset = (forceGlobal || useGlobal) ? null : getLocalOffset(e.name());
         boolean isField = false;
-        
+
         if (localOffset == null && currentClass != null && !isInStaticFuncContext()) {
-            isField = currentClassFields.contains(e.name()) || hasInstanceField(currentClass, e.name());
+          isField =
+              currentClassFields.contains(e.name()) || hasInstanceField(currentClass, e.name());
         }
 
-        if (localOffset == null && !forceGlobal && !useGlobal && !isField && !localScopes.isEmpty()) {
+        if (localOffset == null
+            && !forceGlobal
+            && !useGlobal
+            && !isField
+            && !localScopes.isEmpty()) {
           // New local variable
           Map<String, Integer> scope = localScopes.peek();
           localOffset = localCount;

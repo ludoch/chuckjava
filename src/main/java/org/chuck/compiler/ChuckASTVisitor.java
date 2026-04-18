@@ -445,10 +445,8 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     }
 
     for (VariableDeclContext v : ctx.variableDecl()) {
-      StringBuilder fullType = new StringBuilder(typeBase);
       List<ChuckAST.Exp> arraySizes = new ArrayList<>();
       for (ChuckANTLRParser.ArrayDimensionContext ad : v.arrayDimension()) {
-        fullType.append("[]");
         if (ad.expression() != null) {
           arraySizes.add((ChuckAST.Exp) visit(ad.expression()));
         } else {
@@ -456,6 +454,15 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
               new ChuckAST.IntExp(
                   -1, ad.getStart().getLine(), ad.getStart().getCharPositionInLine()));
         }
+      }
+
+      String fullType = typeBase.toString();
+      // If the variable declaration itself has dimensions (e.g. float f[5]),
+      // ChucK treats it as an array.
+      if (!arraySizes.isEmpty()) {
+          // Keep base type, but maybe mark as array? 
+          // Actually, ChucK-Java expects fullType to include [] if it's an array.
+          for (int i = 0; i < arraySizes.size(); i++) fullType += "[]";
       }
 
       boolean isRef = v.REFERENCE_TAG() != null;

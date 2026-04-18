@@ -223,6 +223,9 @@ public class ChuckStack {
 
   // Random access for locals
   public long getData(int idx) {
+    if (isDouble[idx]) {
+        return (long) Double.longBitsToDouble(primitives[idx]);
+    }
     return primitives[idx];
   }
 

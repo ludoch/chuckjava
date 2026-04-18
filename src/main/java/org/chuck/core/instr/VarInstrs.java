@@ -405,7 +405,9 @@ public class VarInstrs {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
       int idx = s.getFramePointer() + offset;
-      s.mem.setData(idx, s.mem.getData(idx) + delta);
+      long val = s.mem.getData(idx) + delta;
+      s.mem.setData(idx, val);
+      s.reg.push(val);
     }
 
     @Override

@@ -33,7 +33,7 @@ public class BatchTester {
 
     String classpath = System.getProperty("java.class.path");
     if (!classpath.contains("target/classes")) {
-        classpath = "target/classes:" + classpath;
+      classpath = "target/classes:" + classpath;
     }
     final String finalClasspath = classpath;
 

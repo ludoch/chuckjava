@@ -610,16 +610,20 @@ public class ChuckShred implements Comparable<ChuckShred> {
         }
         MethodHandle handle = this.code.getHandle(pc);
         if (handle == null) break;
+        if (Boolean.getBoolean("chuck.debug.instr")) {
+            System.out.println("[INSTR] " + String.format("%04d", pc) + ": " + this.code.getInstruction(pc));
+        }
         int oldPc = pc;
         ChuckCode oldC = this.code;
         try {
           handle.invokeExact(vm, this);
         } catch (Throwable e) {
           int line = this.code.getLineNumber(pc);
+          String exMsg = e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
           vm.print(
               String.format(
                   "[chuck]:(EXCEPTION in sync code) %s on line[%d] in %s\n",
-                  e.getMessage(), line, this.code.getName()));
+                  exMsg, line, this.code.getName()));
           break;
         }
         if (this.code == oldC && pc == oldPc) pc++;

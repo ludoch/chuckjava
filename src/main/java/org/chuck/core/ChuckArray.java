@@ -52,10 +52,16 @@ public class ChuckArray extends ChuckObject {
     for (int i = 0; i < size; i++) {
       intData.add(0L);
       floatData.add(0.0);
-      objectData.add(null);
-      if ("int".equals(this.elementTypeName)) types.add((byte) 0);
-      else if ("float".equals(this.elementTypeName)) types.add((byte) 1);
-      else types.add((byte) 2);
+      if (this.elementTypeName != null
+          && (this.elementTypeName.equals("complex") || this.elementTypeName.equals("polar"))) {
+        objectData.add(new ChuckArray(this.elementTypeName, new double[] {0, 0}));
+        types.add((byte) 2);
+      } else {
+        objectData.add(null);
+        if ("int".equals(this.elementTypeName)) types.add((byte) 0);
+        else if ("float".equals(this.elementTypeName)) types.add((byte) 1);
+        else types.add((byte) 2);
+      }
     }
   }
 
@@ -283,8 +289,13 @@ public class ChuckArray extends ChuckObject {
     int i = (int) idx;
     if (i < 0) i = types.size() + i;
     if (i < 0 || i >= types.size()) {
-      throw new org.chuck.core.ChuckRuntimeException(
-          "ArrayOutofBounds: index[" + idx + "] size[" + types.size() + "]");
+      String msg = "ArrayOutofBounds: index[" + idx + "] size[" + types.size() + "]";
+      if (ChuckShred.CURRENT_SHRED.isBound()) {
+          ChuckShred s = ChuckShred.CURRENT_SHRED.get();
+          msg += " at pc[" + s.getPc() + "]";
+          if (s.getCode() != null) msg += " in " + s.getCode().getName();
+      }
+      throw new org.chuck.core.ChuckRuntimeException(msg);
     }
     return i;
   }

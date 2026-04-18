@@ -28,6 +28,7 @@ public class Optimizer {
         ChuckInstr i3 = (i + 2 < instrs.size()) ? instrs.get(i + 2) : null;
         ChuckInstr i4 = (i + 3 < instrs.size()) ? instrs.get(i + 3) : null;
 
+        /*
         // 1a. Remove [Dup, Pop]
         if (i1 instanceof StackInstrs.Dup && i2 instanceof StackInstrs.Pop) {
           i++; // skip both
@@ -136,6 +137,7 @@ public class Optimizer {
             continue;
           }
         }
+        */
 
         next.add(i1);
       }

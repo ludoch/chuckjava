@@ -65,7 +65,7 @@ public class ChuckIO extends ChuckObject {
   private String formatFloatCompact(double dv) {
     if (Double.isInfinite(dv)) return dv > 0 ? "inf" : "-inf";
     if (Double.isNaN(dv)) return "nan";
-    
+
     // For -pi ChucK expects -3.14159
     if (Math.abs(dv - Math.PI) < 0.000001) return "3.14159";
     if (Math.abs(dv + Math.PI) < 0.000001) return "-3.14159";
@@ -86,19 +86,19 @@ public class ChuckIO extends ChuckObject {
   private String formatFloat4(double dv) {
     if (Double.isInfinite(dv)) return dv > 0 ? "inf" : "-inf";
     if (Double.isNaN(dv)) return "nan";
-    
+
     // Special case for PI to match ChucK reference output precision
     if (Math.abs(dv - Math.PI) < 0.000001) return "3.14159";
-    
+
     if (dv == (long) dv) return String.valueOf((long) dv);
-    
+
     String s = String.format("%.4f", dv);
     while (s.contains(".") && (s.endsWith("0") || s.endsWith("."))) {
-        if (s.endsWith(".")) {
-            s = s.substring(0, s.length() - 1);
-            break;
-        }
+      if (s.endsWith(".")) {
         s = s.substring(0, s.length() - 1);
+        break;
+      }
+      s = s.substring(0, s.length() - 1);
     }
     return s;
   }

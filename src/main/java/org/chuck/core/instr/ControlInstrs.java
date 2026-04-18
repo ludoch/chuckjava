@@ -3,6 +3,16 @@ package org.chuck.core.instr;
 import org.chuck.core.*;
 
 public class ControlInstrs {
+  public static class NoOp implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {}
+
+    @Override
+    public String toString() {
+      return "NoOp";
+    }
+  }
+
   public static class Jump implements ChuckInstr {
     public int target;
 

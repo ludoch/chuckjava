@@ -497,11 +497,11 @@ public class ExpressionEmitter {
             boolean resolvedUseGlobal =
                 resolvedDecl.isGlobal()
                     || (parent.getLocalScopes().size() <= 1 && parent.getCurrentClass() == null);
-            
+
             // Only emit the declaration (default init) if it's NOT an assignment
-            // Wait, for => it is ALWAYS an assignment. 
+            // Wait, for => it is ALWAYS an assignment.
             // So we should NOT emit the declaration here.
-            
+
             this.emitExpression(e.lhs(), code);
             parent.emitChuckTarget(resolvedDecl, code, e.op());
           } else {
@@ -515,7 +515,8 @@ public class ExpressionEmitter {
               Integer localOffset = parent.getLocalOffset(rhsId.name());
               String varName = (localOffset == null) ? rhsId.name() : null;
               this.emitExpression(e.lhs(), code);
-              if (code != null) code.addInstruction(new MiscInstrs.FileIOReadTo(varName, localOffset, rhsType));
+              if (code != null)
+                code.addInstruction(new MiscInstrs.FileIOReadTo(varName, localOffset, rhsType));
             } else {
               this.emitExpression(e.lhs(), code);
               parent.emitChuckTarget(e.rhs(), code, e.op());
@@ -667,7 +668,8 @@ public class ExpressionEmitter {
           boolean isPostfixPlus = e.op() == ChuckAST.Operator.POSTFIX_PLUS_PLUS;
           String rhsType = parent.getVarType(e.rhs());
           if (rhsType != null && parent.getUserClassRegistry().containsKey(rhsType)) {
-            String opSym = isPostfixPlus ? "++" : "--";            List<String> pArgTypes = List.of(rhsType);
+            String opSym = isPostfixPlus ? "++" : "--";
+            List<String> pArgTypes = List.of(rhsType);
             String fullKey = parent.getMethodKey("__pub_op__" + opSym, pArgTypes);
             String privKey = parent.getMethodKey("__op__" + opSym, pArgTypes);
             ChuckCode opCode = parent.getFunctions().get(fullKey);
@@ -689,16 +691,20 @@ public class ExpressionEmitter {
           if (e.rhs() instanceof ChuckAST.DotExp dot) {
             String potentialClassName = parent.resolveClassName(dot.base());
             if (potentialClassName != null) {
-              String actualClassWithField = parent.findStaticFieldOwner(potentialClassName, dot.member());
+              String actualClassWithField =
+                  parent.findStaticFieldOwner(potentialClassName, dot.member());
               if (actualClassWithField != null) {
                 if (code != null) {
-                  code.addInstruction(new FieldInstrs.GetStatic(actualClassWithField, dot.member()));
-                  code.addInstruction(new FieldInstrs.GetStatic(actualClassWithField, dot.member()));
+                  code.addInstruction(
+                      new FieldInstrs.GetStatic(actualClassWithField, dot.member()));
+                  code.addInstruction(
+                      new FieldInstrs.GetStatic(actualClassWithField, dot.member()));
                   code.addInstruction(new PushInstrs.PushInt(1));
                   if (isPostfixPlus) code.addInstruction(new ArithmeticInstrs.AddAny());
                   else code.addInstruction(new ArithmeticInstrs.MinusAny());
                   code.addInstruction(new PushInstrs.PushString(actualClassWithField));
-                  code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
+                  code.addInstruction(
+                      new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
                 }
                 return;
               }
@@ -716,14 +722,9 @@ public class ExpressionEmitter {
             // Stack: [original_value, updated_value]
           }
           parent.emitChuckTarget(e.rhs(), code, e.op());
-          // emitChuckTarget for => will leave updated_value on stack.
-          // Stack: [original_value, updated_value]
-          if (code != null) {
-            code.addInstruction(new StackInstrs.Swap());
-            // Stack: [updated_value, original_value]
-            code.addInstruction(new StackInstrs.Pop());
-            // Stack: [original_value]
-          }
+          // emitChuckTarget for variable assignment will pop the updated_value.
+          // Stack: [original_value]
+          return;
         } else if (e.op() == ChuckAST.Operator.WRITE_IO
             || (e.op() == ChuckAST.Operator.LE && parent.isIOType(parent.getExprType(e.lhs())))) {
           this.emitExpression(e.lhs(), code);
@@ -749,7 +750,8 @@ public class ExpressionEmitter {
                 if (actualClassWithField != null) {
                   if (code != null) {
                     code.addInstruction(new PushInstrs.PushString(actualClassWithField));
-                    code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
+                    code.addInstruction(
+                        new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
                   }
                   return;
                 }
@@ -768,7 +770,8 @@ public class ExpressionEmitter {
               for (int i = 0; i < ae.indices().size(); i++) {
                 this.emitExpression(ae.indices().get(i), code);
                 if (code != null) {
-                  if (i < ae.indices().size() - 1) code.addInstruction(new ArrayInstrs.GetArrayInt());
+                  if (i < ae.indices().size() - 1)
+                    code.addInstruction(new ArrayInstrs.GetArrayInt());
                   else {
                     if (ae.indices().size() == 1 && "int".equals(elemType))
                       code.addInstruction(new ArrayInstrs.SetArrayIntFast());
@@ -799,7 +802,8 @@ public class ExpressionEmitter {
                 if (actualClassWithField != null) {
                   if (code != null) {
                     code.addInstruction(new PushInstrs.PushString(actualClassWithField));
-                    code.addInstruction(new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
+                    code.addInstruction(
+                        new FieldInstrs.SetStatic(actualClassWithField, dot.member()));
                   }
                   return;
                 }
@@ -818,7 +822,8 @@ public class ExpressionEmitter {
               for (int i = 0; i < ae.indices().size(); i++) {
                 this.emitExpression(ae.indices().get(i), code);
                 if (code != null) {
-                  if (i < ae.indices().size() - 1) code.addInstruction(new ArrayInstrs.GetArrayInt());
+                  if (i < ae.indices().size() - 1)
+                    code.addInstruction(new ArrayInstrs.GetArrayInt());
                   else {
                     if (ae.indices().size() == 1 && "int".equals(elemType))
                       code.addInstruction(new ArrayInstrs.SetArrayIntFast());
@@ -900,16 +905,18 @@ public class ExpressionEmitter {
                       || desc.staticMethods().containsKey(mPubKey)) {
                     this.emitExpression(e.lhs(), code);
                     this.emitExpression(e.rhs(), code);
-                    if (code != null) code.addInstruction(
-                        new ObjectInstrs.CallMethod("__pub_op__" + opSymbol, 1, mPubKey));
+                    if (code != null)
+                      code.addInstruction(
+                          new ObjectInstrs.CallMethod("__pub_op__" + opSymbol, 1, mPubKey));
                     return;
                   }
                   if (desc.methods().containsKey(mPrivKey)
                       || desc.staticMethods().containsKey(mPrivKey)) {
                     this.emitExpression(e.lhs(), code);
                     this.emitExpression(e.rhs(), code);
-                    if (code != null) code.addInstruction(
-                        new ObjectInstrs.CallMethod("__op__" + opSymbol, 1, mPrivKey));
+                    if (code != null)
+                      code.addInstruction(
+                          new ObjectInstrs.CallMethod("__op__" + opSymbol, 1, mPrivKey));
                     return;
                   }
                 }
@@ -1146,7 +1153,8 @@ public class ExpressionEmitter {
                   this.emitExpression(e.rhs(), code);
                   if (bothInt) code.addInstruction(new LogicInstrs.AndInt());
                   int endIdx = code.getNumInstructions();
-                  code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfFalseAndPushFalse(endIdx));
+                  code.replaceInstruction(
+                      jumpIdx, new ControlInstrs.JumpIfFalseAndPushFalse(endIdx));
                 }
               }
               case OR -> {
@@ -1169,14 +1177,15 @@ public class ExpressionEmitter {
                 }
               }
               case SHIFT_LEFT ->
-                  code.addInstruction(new ArrayInstrs.ShiftLeftOrAppend(parent.getExprType(e.lhs())));
+                  code.addInstruction(
+                      new ArrayInstrs.ShiftLeftOrAppend(parent.getExprType(e.lhs())));
               default -> {}
             }
           } else {
             // Need to handle side effects of AND/OR even if code is null
             if (e.op() == ChuckAST.Operator.AND || e.op() == ChuckAST.Operator.OR) {
-                this.emitExpression(e.lhs(), code);
-                this.emitExpression(e.rhs(), code);
+              this.emitExpression(e.lhs(), code);
+              this.emitExpression(e.rhs(), code);
             }
           }
         }
@@ -1214,7 +1223,8 @@ public class ExpressionEmitter {
           else if (e.name().equals("false")) code.addInstruction(new PushInstrs.PushInt(0));
           else if (e.name().equals("now")) code.addInstruction(new PushInstrs.PushNow());
           else if (e.name().equals("dac")) code.addInstruction(new PushInstrs.PushDac());
-          else if (e.name().equals("blackhole")) code.addInstruction(new PushInstrs.PushBlackhole());
+          else if (e.name().equals("blackhole"))
+            code.addInstruction(new PushInstrs.PushBlackhole());
           else if (e.name().equals("adc")) code.addInstruction(new PushInstrs.PushAdc());
           else if (e.name().equals("me")) code.addInstruction(new PushInstrs.PushMe());
           else if (e.name().equals("cherr")) code.addInstruction(new PushInstrs.PushCherr());
@@ -1251,7 +1261,8 @@ public class ExpressionEmitter {
           String actualClassWithField = parent.findStaticFieldOwner(potentialClassName, e.member());
           if (actualClassWithField != null) {
             parent.checkAccess(actualClassWithField, e.member(), false, e.line(), e.column());
-            if (code != null) code.addInstruction(new FieldInstrs.GetStatic(actualClassWithField, e.member()));
+            if (code != null)
+              code.addInstruction(new FieldInstrs.GetStatic(actualClassWithField, e.member()));
             return;
           }
         }
@@ -1274,11 +1285,13 @@ public class ExpressionEmitter {
                   code.addInstruction(new PushInstrs.PushFloat(Double.NEGATIVE_INFINITY));
               case "NaN", "nan" -> code.addInstruction(new PushInstrs.PushFloat(Double.NaN));
               case "PI", "pi" -> code.addInstruction(new PushInstrs.PushFloat(Math.PI));
-              case "TWO_PI", "two_pi" -> code.addInstruction(new PushInstrs.PushFloat(2.0 * Math.PI));
+              case "TWO_PI", "two_pi" ->
+                  code.addInstruction(new PushInstrs.PushFloat(2.0 * Math.PI));
               case "HALF_PI", "half_pi" ->
                   code.addInstruction(new PushInstrs.PushFloat(Math.PI / 2.0));
               case "E", "e" -> code.addInstruction(new PushInstrs.PushFloat(Math.E));
-              case "SQRT2", "sqrt2" -> code.addInstruction(new PushInstrs.PushFloat(Math.sqrt(2.0)));
+              case "SQRT2", "sqrt2" ->
+                  code.addInstruction(new PushInstrs.PushFloat(Math.sqrt(2.0)));
               case "j" -> {
                 code.addInstruction(new PushInstrs.PushFloat(0.0));
                 code.addInstruction(new PushInstrs.PushFloat(1.0));
@@ -1322,12 +1335,15 @@ public class ExpressionEmitter {
         }
         if (e.base() instanceof ChuckAST.IdExp id) {
           if (Set.of("ADSR", "Adsr").contains(id.name())) {
-            if (code != null) code.addInstruction(
-                new FieldInstrs.GetBuiltinStatic("org.chuck.audio.Adsr", e.member()));
+            if (code != null)
+              code.addInstruction(
+                  new FieldInstrs.GetBuiltinStatic("org.chuck.audio.Adsr", e.member()));
             return;
           }
           if (id.name().equals("Std")) {
-            if (code != null) code.addInstruction(new FieldInstrs.GetBuiltinStatic("org.chuck.core.Std", e.member()));
+            if (code != null)
+              code.addInstruction(
+                  new FieldInstrs.GetBuiltinStatic("org.chuck.core.Std", e.member()));
             return;
           }
           if (id.name().equals("Machine")) {
@@ -1344,15 +1360,17 @@ public class ExpressionEmitter {
             return;
           }
           if (Set.of("RegEx", "Reflect", "SerialIO", "FileIO").contains(id.name())) {
-            if (code != null) code.addInstruction(
-                new FieldInstrs.GetBuiltinStatic("org.chuck.core." + id.name(), e.member()));
+            if (code != null)
+              code.addInstruction(
+                  new FieldInstrs.GetBuiltinStatic("org.chuck.core." + id.name(), e.member()));
             return;
           }
           if (parent.getUserClassRegistry().containsKey(id.name())) {
             UserClassDescriptor d = parent.getUserClassRegistry().get(id.name());
             if (d.staticInts().containsKey(e.member())
                 || d.staticObjects().containsKey(e.member())) {
-              if (code != null) code.addInstruction(new FieldInstrs.GetStatic(id.name(), e.member()));
+              if (code != null)
+                code.addInstruction(new FieldInstrs.GetStatic(id.name(), e.member()));
               return;
             }
           }
@@ -1390,7 +1408,8 @@ public class ExpressionEmitter {
       }
       case ChuckAST.ArrayLitExp e -> {
         for (ChuckAST.Exp el : e.elements()) this.emitExpression(el, code);
-        if (code != null) code.addInstruction(new ArrayInstrs.NewArrayFromStack(e.elements().size()));
+        if (code != null)
+          code.addInstruction(new ArrayInstrs.NewArrayFromStack(e.elements().size()));
       }
       case ChuckAST.VectorLitExp e -> {
         for (ChuckAST.Exp el : e.elements()) this.emitExpression(el, code);
@@ -1401,7 +1420,8 @@ public class ExpressionEmitter {
               case 4 -> "vec4";
               default -> null;
             };
-        if (code != null) code.addInstruction(new ArrayInstrs.NewArrayFromStack(e.elements().size(), vTag));
+        if (code != null)
+          code.addInstruction(new ArrayInstrs.NewArrayFromStack(e.elements().size(), vTag));
       }
       case ChuckAST.ComplexLit e -> {
         this.emitExpression(e.re(), code);
@@ -1503,28 +1523,32 @@ public class ExpressionEmitter {
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
             if (code != null) code.addInstruction(new org.chuck.core.instr.MachineCall(mn, argc));
             if (mn.equals("shreds")) {
-                // Ensure result is treated as object/array
+              // Ensure result is treated as object/array
             }
             return;
           }
           if (Set.of("RegEx", "Reflect", "SerialIO").contains(bn)) {
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
-            if (code != null) code.addInstruction(
-                new ObjectInstrs.CallBuiltinStatic("org.chuck.core." + bn, mn, argc));
+            if (code != null)
+              code.addInstruction(
+                  new ObjectInstrs.CallBuiltinStatic("org.chuck.core." + bn, mn, argc));
             return;
           }
           // AI/ML static class methods: MLP.shuffle(X, Y), PCA.reduce(X, k, out), etc.
           if (bn.equals("MLP") || bn.equals("PCA")) {
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
-            if (code != null) code.addInstruction(
-                new ObjectInstrs.CallBuiltinStatic("org.chuck.core.ai." + bn, mn, argc));
+            if (code != null)
+              code.addInstruction(
+                  new ObjectInstrs.CallBuiltinStatic("org.chuck.core.ai." + bn, mn, argc));
             return;
           }
           // Windowing static factory: Windowing.hann(n), Windowing.hamming(n), etc.
           if (bn.equals("Windowing")) {
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
-            if (code != null) code.addInstruction(
-                new ObjectInstrs.CallBuiltinStatic("org.chuck.audio.analysis.Windowing", mn, argc));
+            if (code != null)
+              code.addInstruction(
+                  new ObjectInstrs.CallBuiltinStatic(
+                      "org.chuck.audio.analysis.Windowing", mn, argc));
             return;
           }
         }
@@ -1572,8 +1596,9 @@ public class ExpressionEmitter {
           UserClassDescriptor cd = parent.getUserClassRegistry().get(parent.getCurrentClass());
           if (cd != null && cd.parentName() != null) {
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
-            if (code != null) code.addInstruction(
-                new ObjectInstrs.CallSuperMethod(cd.parentName(), dot.member(), argc));
+            if (code != null)
+              code.addInstruction(
+                  new ObjectInstrs.CallSuperMethod(cd.parentName(), dot.member(), argc));
             return;
           }
         }
@@ -1581,7 +1606,9 @@ public class ExpressionEmitter {
           String bt = parent.getExprType(dot.base());
           if (bt == null
               && dot.base() instanceof ChuckAST.IdExp id
-              && parent.getUserClassRegistry().containsKey(id.name())) bt = id.name();
+              && (parent.getUserClassRegistry().containsKey(id.name())
+                  || Set.of("PCA", "KNN", "KNN2", "SVM", "MLP", "HMM", "Word2Vec", "Wekinator")
+                      .contains(id.name()))) bt = id.name();
           if (bt == null) {
             // Type unknown (e.g. chained call: fft.upchuck().cvals()) — emit base then call by name
             this.emitExpression(dot.base(), code);
@@ -1590,8 +1617,10 @@ public class ExpressionEmitter {
             return;
           }
           if (bt != null) {
+            boolean isBuiltinStatic = Set.of("PCA", "KNN", "KNN2", "SVM", "MLP", "HMM", "Word2Vec", "Wekinator")
+                      .contains(bt);
             // Specialization for built-in UGen method calls (single arg)
-            if (argc == 1 && (parent.isKnownUGenType(bt) || parent.isSubclassOfUGen(bt))) {
+            if (!isBuiltinStatic && argc == 1 && (parent.isKnownUGenType(bt) || parent.isSubclassOfUGen(bt))) {
               String argType = argTypes.get(0);
               String mn = dot.member();
               Set<String> safeFloat = Set.of("freq", "gain", "phase", "cutoff");
@@ -1609,20 +1638,21 @@ public class ExpressionEmitter {
                 return;
               }
             }
-            if (bt.equals("string") || bt.endsWith("[]")) {
+            if (!isBuiltinStatic && (bt.equals("string") || bt.endsWith("[]"))) {
               this.emitExpression(dot.base(), code);
               for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
               String fk = parent.getMethodKey(dot.member(), argTypes);
-              if (code != null) code.addInstruction(new ObjectInstrs.CallMethod(dot.member(), argc, fk));
+              if (code != null)
+                code.addInstruction(new ObjectInstrs.CallMethod(dot.member(), argc, fk));
               return;
             }
-            if (dot.member().equals("last")
+            if (!isBuiltinStatic && dot.member().equals("last")
                 && (parent.isKnownUGenType(bt) || parent.isSubclassOfUGen(bt))) {
               this.emitExpression(dot.base(), code);
               if (code != null) code.addInstruction(new UgenInstrs.GetLastOut());
               return;
             }
-            if (dot.member().equals("dot") && ChuckEmitter.isVecType(bt)) {
+            if (!isBuiltinStatic && dot.member().equals("dot") && ChuckEmitter.isVecType(bt)) {
               this.emitExpression(dot.base(), code);
               for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
               if (code != null) code.addInstruction(new VecInstrs.Dot());
@@ -1641,12 +1671,19 @@ public class ExpressionEmitter {
                 return;
               }
             }
-            this.emitExpression(dot.base(), code);
+
+            if (!isBuiltinStatic) this.emitExpression(dot.base(), code);
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
             String fk = parent.resolveMethodKey(bt, dot.member(), argTypes);
             if (parent.getUserClassRegistry().containsKey(bt))
               parent.checkAccess(bt, fk, true, e.line(), e.column());
-            if (code != null) code.addInstruction(new ObjectInstrs.CallMethod(dot.member(), argc, fk));
+            if (code != null) {
+              if (isBuiltinStatic) {
+                  // Push the class name as a string to serve as the "object" for static calls
+                  code.addInstruction(new PushInstrs.PushString(bt));
+              }
+              code.addInstruction(new ObjectInstrs.CallMethod(dot.member(), argc, fk));
+            }
             return;
           }
         } else if (e.base() instanceof ChuckAST.IdExp id) {
@@ -1656,7 +1693,8 @@ public class ExpressionEmitter {
             String ck = parent.getMethodKey(parent.getCurrentClass(), argTypes);
             if (code != null) code.addInstruction(new StackInstrs.PushThis());
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
-            if (code != null) code.addInstruction(new ObjectInstrs.CallMethod(parent.getCurrentClass(), argc, ck));
+            if (code != null)
+              code.addInstruction(new ObjectInstrs.CallMethod(parent.getCurrentClass(), argc, ck));
             return;
           }
           if (parent.getCurrentClass() != null) {
@@ -1680,13 +1718,15 @@ public class ExpressionEmitter {
           String fk = parent.getMethodKey(name, argTypes);
           if (parent.getFunctions().containsKey(fk)) {
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
-            if (code != null) code.addInstruction(new CallFunc(parent.getFunctions().get(fk), argc));
+            if (code != null)
+              code.addInstruction(new CallFunc(parent.getFunctions().get(fk), argc));
             return;
           }
           String fbk = name + ":" + argc;
           if (parent.getFunctions().containsKey(fbk)) {
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
-            if (code != null) code.addInstruction(new CallFunc(parent.getFunctions().get(fbk), argc));
+            if (code != null)
+              code.addInstruction(new CallFunc(parent.getFunctions().get(fbk), argc));
             return;
           }
           if (Set.of("print", "chout", "cherr").contains(name)) {
@@ -1714,20 +1754,23 @@ public class ExpressionEmitter {
                       parent.getCurrentClass(), fn + ":" + e.call().args().size());
             if (tgt != null) {
               for (ChuckAST.Exp arg : e.call().args()) this.emitExpression(arg, code);
-              if (code != null) code.addInstruction(new ObjectInstrs.Spork(tgt, e.call().args().size()));
+              if (code != null)
+                code.addInstruction(new ObjectInstrs.Spork(tgt, e.call().args().size()));
               return;
             }
             if (parent.getFunctions().containsKey(key)) {
               for (ChuckAST.Exp arg : e.call().args()) this.emitExpression(arg, code);
-              if (code != null) code.addInstruction(
-                  new ObjectInstrs.Spork(parent.getFunctions().get(key), e.call().args().size()));
+              if (code != null)
+                code.addInstruction(
+                    new ObjectInstrs.Spork(parent.getFunctions().get(key), e.call().args().size()));
               return;
             }
             String fbk = fn + ":" + e.call().args().size();
             if (parent.getFunctions().containsKey(fbk)) {
               for (ChuckAST.Exp arg : e.call().args()) this.emitExpression(arg, code);
-              if (code != null) code.addInstruction(
-                  new ObjectInstrs.Spork(parent.getFunctions().get(fbk), e.call().args().size()));
+              if (code != null)
+                code.addInstruction(
+                    new ObjectInstrs.Spork(parent.getFunctions().get(fbk), e.call().args().size()));
               return;
             }
           }
@@ -1745,7 +1788,8 @@ public class ExpressionEmitter {
               ChuckCode tgt = parent.resolveStaticMethod(bcn, rk);
               if (tgt != null) {
                 for (ChuckAST.Exp arg : e.call().args()) this.emitExpression(arg, code);
-                if (code != null) code.addInstruction(new ObjectInstrs.Spork(tgt, e.call().args().size()));
+                if (code != null)
+                  code.addInstruction(new ObjectInstrs.Spork(tgt, e.call().args().size()));
                 return;
               }
             }
@@ -1756,8 +1800,9 @@ public class ExpressionEmitter {
                 (bt != null)
                     ? parent.resolveMethodKey(bt, dot.member(), ats)
                     : parent.getMethodKey(dot.member(), ats);
-            if (code != null) code.addInstruction(
-                new ObjectInstrs.SporkMethod(dot.member(), e.call().args().size(), rk));
+            if (code != null)
+              code.addInstruction(
+                  new ObjectInstrs.SporkMethod(dot.member(), e.call().args().size(), rk));
             return;
           }
           default -> {}
@@ -1779,7 +1824,8 @@ public class ExpressionEmitter {
           code.replaceInstruction(jf, new ControlInstrs.JumpIfFalse(code.getNumInstructions()));
         }
         this.emitExpression(e.elseExp(), code);
-        if (code != null) code.replaceInstruction(je, new ControlInstrs.Jump(code.getNumInstructions()));
+        if (code != null)
+          code.replaceInstruction(je, new ControlInstrs.Jump(code.getNumInstructions()));
       }
       case ChuckAST.CastExp e -> {
         this.emitExpression(e.value(), code);

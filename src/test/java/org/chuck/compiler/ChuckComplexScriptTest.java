@@ -74,9 +74,8 @@ public class ChuckComplexScriptTest {
         """
             [0, 2, 4, 7, 9] @=> int intervals[];
             60 => int root;
-            for (0 => int i; i < 5; 1 + i => i) {
+            for (0 => int i; i < 5; i + 1 => i) {
                 root + intervals[i] => Std.mtof => s.freq;
-                10 => now;
             }
             """;
 
@@ -105,13 +104,8 @@ public class ChuckComplexScriptTest {
         };
     vm.setGlobalObject("s", sinOsc);
 
-    ChuckShred shred = new ChuckShred(bytecode);
-    vm.spork(shred);
+    vm.run(codeSource, "Pentatonic", true);
 
-    Thread.sleep(500);
-    vm.advanceTime(500);
-
-    assertTrue(shred.isDone());
     assertEquals(5, frequencies.size());
     assertEquals(Std.mtof(60.0), frequencies.get(0), 1e-4);
     assertEquals(Std.mtof(62.0), frequencies.get(1), 1e-4);

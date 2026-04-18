@@ -46,8 +46,8 @@ public class ChuckObject {
   }
 
   /**
-   * Internal data setter that doesn't reset the isDouble flag. Used by subclasses in their hooks
-   * if they need to pass-through to super.
+   * Internal data setter that doesn't reset the isDouble flag. Used by subclasses in their hooks if
+   * they need to pass-through to super.
    */
   public void setDataInternal(int index, long value) {
     if (index < data.length) {

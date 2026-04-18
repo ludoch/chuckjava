@@ -32,6 +32,7 @@ public class PCATest {
   @Test
   void testChuckScript_pcaReduce() {
     ChuckVM vm = new ChuckVM(44100);
+    vm.setLogLevel(1);
     StringBuilder out = new StringBuilder();
     vm.addPrintListener(out::append);
     String code =
@@ -45,8 +46,8 @@ public class PCATest {
             + "PCA.reduce(input, 3, output);\n"
             + "<<< \"done:\", output[0][0] >>>;\n";
     vm.run(code, "test");
-    vm.advanceTime(5);
+    vm.advanceTime(10);
     String output = out.toString();
-    assertTrue(output.contains("done:"), "PCA.reduce should produce output: " + output);
+    assertTrue(output.contains("done:"), "PCA.reduce should produce output: [" + output + "]");
   }
 }

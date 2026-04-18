@@ -125,7 +125,7 @@ public class ArithmeticInstrs {
             && la.vecTag.equals(ra.vecTag)) {
           double[] res = new double[la.size()];
           for (int i = 0; i < res.length; i++) {
-             res[i] = la.getFloat(i) * ra.getFloat(i);
+            res[i] = la.getFloat(i) * ra.getFloat(i);
           }
           s.reg.pushObject(new ChuckArray(la.vecTag, res));
         } else if (l instanceof ChuckArray la
@@ -172,8 +172,8 @@ public class ArithmeticInstrs {
             && la.vecTag.equals(ra.vecTag)) {
           double[] res = new double[la.size()];
           for (int i = 0; i < res.length; i++) {
-             double d = ra.getFloat(i);
-             res[i] = (d == 0) ? 0 : la.getFloat(i) / d;
+            double d = ra.getFloat(i);
+            res[i] = (d == 0) ? 0 : la.getFloat(i) / d;
           }
           s.reg.pushObject(new ChuckArray(la.vecTag, res));
         } else if (l instanceof ChuckArray la

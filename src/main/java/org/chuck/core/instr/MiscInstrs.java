@@ -75,7 +75,7 @@ public class MiscInstrs {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
       boolean initialized = vm.isStaticInitialized(name);
-      
+
       UserClassDescriptor old = vm.getUserClass(name);
       if (old != null) {
         // Preserve static field values from the existing descriptor
@@ -83,14 +83,13 @@ public class MiscInstrs {
         d.staticIsDouble().putAll(old.staticIsDouble());
         d.staticObjects().putAll(old.staticObjects());
       }
-      
+
       // Always register/update the class descriptor in the VM
       vm.registerUserClass(name, d);
 
       if (!initialized) {
         // Run static initializer once after the class is registered for the first time in the VM
-        if (d.staticInitCode() != null
-            && d.staticInitCode().getNumInstructions() > 0) {
+        if (d.staticInitCode() != null && d.staticInitCode().getNumInstructions() > 0) {
           vm.setStaticInitialized(name);
           vm.executeSynchronous(d.staticInitCode(), s);
         }

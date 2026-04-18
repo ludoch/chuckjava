@@ -77,7 +77,8 @@ public class ChuckObjectPool {
     return new ChuckDuration(samples);
   }
 
-  private static final java.util.concurrent.ConcurrentHashMap<String, ChuckString> STRING_INTERN_MAP = new java.util.concurrent.ConcurrentHashMap<>();
+  private static final java.util.concurrent.ConcurrentHashMap<String, ChuckString>
+      STRING_INTERN_MAP = new java.util.concurrent.ConcurrentHashMap<>();
 
   public static ChuckString getString(String val) {
     if (val == null) val = "";

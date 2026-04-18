@@ -82,7 +82,7 @@ public class StatementEmitter {
 
         parent.emitExpression(s.condition(), code);
         int jumpIdx = code.getNumInstructions();
-        code.addInstruction(null); // placeholder for JumpIfFalse
+        code.addInstruction(new ControlInstrs.NoOp()); // placeholder for JumpIfFalse
         this.emitStatement(s.body(), code);
         code.addInstruction(new ControlInstrs.Jump(startPc));
         int endPc = code.getNumInstructions();
@@ -103,7 +103,7 @@ public class StatementEmitter {
         parent.emitExpression(s.condition(), code);
         code.addInstruction(new LogicInstrs.LogicalNot());
         int jumpIdx = code.getNumInstructions();
-        code.addInstruction(null); // placeholder for JumpIfFalse
+        code.addInstruction(new ControlInstrs.NoOp()); // placeholder for JumpIfFalse
         this.emitStatement(s.body(), code);
         code.addInstruction(new ControlInstrs.Jump(startPc));
         int endPc = code.getNumInstructions();
@@ -143,13 +143,13 @@ public class StatementEmitter {
       case ChuckAST.BreakStmt _ -> {
         if (!parent.getBreakJumps().isEmpty()) {
           parent.getBreakJumps().peek().add(code.getNumInstructions());
-          code.addInstruction(null); // placeholder for Jump
+          code.addInstruction(new ControlInstrs.NoOp()); // placeholder for Jump
         }
       }
       case ChuckAST.ContinueStmt _ -> {
         if (!parent.getContinueJumps().isEmpty()) {
           parent.getContinueJumps().peek().add(code.getNumInstructions());
-          code.addInstruction(null); // placeholder for Jump
+          code.addInstruction(new ControlInstrs.NoOp()); // placeholder for Jump
         }
       }
       case ChuckAST.SwitchStmt s -> {
@@ -227,7 +227,7 @@ public class StatementEmitter {
           code.addInstruction(new PushInstrs.PushInt(1)); // truthy
         }
         int jumpIdx = code.getNumInstructions();
-        code.addInstruction(null); // placeholder for JumpIfFalse
+        code.addInstruction(new ControlInstrs.NoOp()); // placeholder for JumpIfFalse
 
         this.emitStatement(s.body(), code);
 
@@ -479,7 +479,7 @@ public class StatementEmitter {
             if (code != null) {
               String fullType = s.type();
               if (isArrayDecl && !fullType.endsWith("[]")) {
-                  fullType += "[]";
+                fullType += "[]";
               }
               code.addInstruction(
                   new ObjectInstrs.InstantiateSetAndPushLocal(
@@ -993,22 +993,37 @@ public class StatementEmitter {
               String type = ds.type();
               boolean isUGen = parent.isKnownUGenType(type) || parent.isSubclassOfUGen(type);
               boolean isObject = !org.chuck.core.ChuckLanguage.PRIMITIVE_TYPES.contains(type);
-              
-              if (isUGen || (isObject && ds.callArgs() != null)) {
+              boolean isString = "string".equals(type);
+
+              if (isUGen || ((isObject || isString) && ds.callArgs() != null)) {
                 // Instantiate and set static object field
-                // For strings with args, we need to handle specially or use the generic instantiate logic
+                // For strings with args, we need to handle specially or use the generic instantiate
+                // logic
                 int argCount = 0;
                 if (ds.callArgs() != null) {
-                    if (ds.callArgs() instanceof ChuckAST.CallExp ce) {
-                        for (ChuckAST.Exp arg : ce.args()) parent.emitExpression(arg, staticInitCodeLocal);
-                        argCount = ce.args().size();
-                    } else {
-                        parent.emitExpression(ds.callArgs(), staticInitCodeLocal);
-                        argCount = 1;
-                    }
+                  if (ds.callArgs() instanceof ChuckAST.CallExp ce) {
+                    for (ChuckAST.Exp arg : ce.args())
+                      parent.emitExpression(arg, staticInitCodeLocal);
+                    argCount = ce.args().size();
+                  } else {
+                    parent.emitExpression(ds.callArgs(), staticInitCodeLocal);
+                    argCount = 1;
+                  }
                 }
-                
-                staticInitCodeLocal.addInstruction(new ObjectInstrs.InstantiateSetAndPushGlobal(type, "@static_init_" + s.name() + "_" + fName + "_" + new java.util.Random().nextInt(1000000), argCount, false, false, parent.getUserClassRegistry()));
+
+                staticInitCodeLocal.addInstruction(
+                    new ObjectInstrs.InstantiateSetAndPushGlobal(
+                        type,
+                        "@static_init_"
+                            + s.name()
+                            + "_"
+                            + fName
+                            + "_"
+                            + new java.util.Random().nextInt(1000000),
+                        argCount,
+                        false,
+                        false,
+                        parent.getUserClassRegistry()));
                 staticInitCodeLocal.addInstruction(new PushInstrs.PushString(s.name()));
                 staticInitCodeLocal.addInstruction(new FieldInstrs.SetStatic(s.name(), fName));
                 staticInitCodeLocal.addInstruction(new StackInstrs.Pop());
@@ -1058,14 +1073,14 @@ public class StatementEmitter {
       case ChuckAST.IfStmt s -> {
         parent.emitExpression(s.condition(), code);
         int jumpIdx = code.getNumInstructions();
-        code.addInstruction(null); // placeholder for JumpIfFalse
+        code.addInstruction(new ControlInstrs.NoOp()); // placeholder for JumpIfFalse
 
         int bodyStart = code.getNumInstructions();
         this.emitStatement(s.thenBranch(), code);
 
         if (s.elseBranch() != null) {
           int thenEndIdx = code.getNumInstructions();
-          code.addInstruction(null); // placeholder for Jump (skip else)
+          code.addInstruction(new ControlInstrs.NoOp()); // placeholder for Jump (skip else)
           int elseStartIdx = code.getNumInstructions();
           code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfFalse(elseStartIdx));
           this.emitStatement(s.elseBranch(), code);
@@ -1112,7 +1127,7 @@ public class StatementEmitter {
         code.addInstruction(new LogicInstrs.LessThanAny());
 
         int jumpIdx = code.getNumInstructions();
-        code.addInstruction(null); // placeholder for JumpIfFalse
+        code.addInstruction(new ControlInstrs.NoOp()); // placeholder for JumpIfFalse
 
         // 5. Load current element: collection[idx]
         code.addInstruction(new VarInstrs.LoadLocal(collOffset));
@@ -1188,7 +1203,7 @@ public class StatementEmitter {
         code.addInstruction(new PushInstrs.PushInt(0));
         code.addInstruction(new LogicInstrs.GreaterThanAny());
         int jumpIdx = code.getNumInstructions();
-        code.addInstruction(null); // placeholder for JumpIfFalse
+        code.addInstruction(new ControlInstrs.NoOp()); // placeholder for JumpIfFalse
 
         // Body
         this.emitStatement(s.body(), code);
