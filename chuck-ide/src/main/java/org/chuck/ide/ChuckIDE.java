@@ -90,6 +90,9 @@ public class ChuckIDE extends Application {
     initVM();
     setupUI(primaryStage);
 
+    // Ensure a clean VM state for the initial script
+    if (vm != null) vm.clear();
+
     // Initial tab
     addNewTab(
         "Untitled.ck",
