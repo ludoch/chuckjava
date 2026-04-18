@@ -90,6 +90,13 @@ public class SndBuf extends ChuckUGen {
           // Try removing chuck-core prefix if present
           String altPath = resourcePath.replace("/chuck-core/", "/");
           ris = SndBuf.class.getResourceAsStream(altPath);
+
+          if (ris == null) {
+            // Try adding /examples/ if it starts with data/ or book/
+            if (altPath.startsWith("/data/") || altPath.startsWith("/book/")) {
+              ris = SndBuf.class.getResourceAsStream("/examples" + altPath);
+            }
+          }
         }
 
         if (ris != null) {

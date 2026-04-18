@@ -1,6 +1,6 @@
 #!/bin/bash
-# Use chuck-core/examples as default
-EXAMPLES_DIR=${1:-chuck-core/examples}
+# Use chuck-samples/src/main/resources/examples as default
+EXAMPLES_DIR=${1:-chuck-samples/src/main/resources/examples}
 TIMEOUT=3
 VERBOSE=2
 TOTAL=0; SUCCESS=0; SILENT=0; FAILED=0

@@ -96,6 +96,7 @@ mvn -pl sequencer javafx:run
 
 The project is divided into several Maven modules:
 - **`chuck-core`**: Core ChucK engine, compiler, and audio/MIDI logic.
+- **`chuck-samples`**: ChucK examples, audio data, and Java DSL shreds.
 - **`chuck-cli`**: Command-line interface and GraalVM native image entry point.
 - **`sequencer`**: JavaFX-based extensions, including the standalone Visual Sequencer.
 - **`chuck-ide`**: The main JavaFX IDE application.

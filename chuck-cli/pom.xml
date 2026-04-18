@@ -17,6 +17,11 @@
             <groupId>org.chuck</groupId>
             <artifactId>chuck-core</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.chuck</groupId>
+            <artifactId>chuck-samples</artifactId>
+            <version>${project.version}</version>
+        </dependency>
     </dependencies>
 
     <build>

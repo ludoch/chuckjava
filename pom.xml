@@ -18,6 +18,7 @@
         <module>chuck-cli</module>
         <module>sequencer</module>
         <module>chuck-ide</module>
+        <module>chuck-samples</module>
     </modules>
 
     <properties>

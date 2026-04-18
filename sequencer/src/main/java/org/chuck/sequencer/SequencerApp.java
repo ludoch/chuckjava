@@ -19,7 +19,8 @@ import org.chuck.audio.ChuckAudio;
 import org.chuck.core.ChuckVM;
 
 public class SequencerApp extends Application {
-  private static final String DEFAULT_ENGINE = "chuck-core/examples/sequencer_setup.ck";
+  private static final String DEFAULT_ENGINE =
+      "chuck-samples/src/main/resources/examples/sequencer_setup.ck";
   private ChuckVM vm;
   private ChuckAudio audio;
   private SequencerPanel sequencerPanel;

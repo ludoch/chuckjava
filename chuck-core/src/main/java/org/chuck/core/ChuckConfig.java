@@ -12,16 +12,12 @@ public class ChuckConfig {
     searchPaths.add(".");
     searchPaths.add("..");
     searchPaths.add("examples/data");
-    searchPaths.add("chuck-core/examples/data");
-    searchPaths.add("../chuck-core/examples/data");
-    searchPaths.add("examples/book/digital-artists/audio");
-    searchPaths.add("chuck-core/examples/book/digital-artists/audio");
-    searchPaths.add("../chuck-core/examples/book/digital-artists/audio");
-    searchPaths.add("examples/book/digital-artists/chapter4/audio");
-    searchPaths.add("chuck-core/examples/book/digital-artists/chapter4/audio");
-    searchPaths.add("../chuck-core/examples/book/digital-artists/chapter4/audio");
-    searchPaths.add("examples/book/digital-artists/chapter5/audio");
-    searchPaths.add("examples/book/digital-artists/chapter9/audio");
+    searchPaths.add("chuck-samples/src/main/resources");
+    searchPaths.add("../chuck-samples/src/main/resources");
+    searchPaths.add("chuck-samples/src/main/resources/examples/data");
+    searchPaths.add("../chuck-samples/src/main/resources/examples/data");
+    searchPaths.add("chuck-samples/src/main/resources/examples/book/digital-artists/audio");
+    searchPaths.add("../chuck-samples/src/main/resources/examples/book/digital-artists/audio");
   }
 
   public static void addSearchPath(String path) {

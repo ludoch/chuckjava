@@ -13,7 +13,6 @@ import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.stage.FileChooser;
 import org.chuck.core.ChuckArray;
-import org.chuck.core.ChuckType;
 import org.chuck.core.ChuckVM;
 
 /**
@@ -102,8 +101,8 @@ public class SequencerPanel extends VBox {
   }
 
   private void initArrays() {
-    patternArray = new ChuckArray(ChuckType.ARRAY, ROWS * COLS);
-    probabilityArray = new ChuckArray(ChuckType.ARRAY, ROWS); // Per-track probability
+    patternArray = new ChuckArray("int", ROWS * COLS);
+    probabilityArray = new ChuckArray("float", ROWS); // Per-track probability
 
     for (int i = 0; i < ROWS * COLS; i++) patternArray.setInt(i, 0L);
     for (int i = 0; i < ROWS; i++) probabilityArray.setFloat(i, 1.0); // 100% default

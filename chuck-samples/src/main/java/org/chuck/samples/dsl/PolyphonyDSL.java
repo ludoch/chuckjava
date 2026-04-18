@@ -1,0 +1,44 @@
+import static org.chuck.core.ChuckDSL.*;
+
+import org.chuck.audio.osc.TriOsc;
+import org.chuck.audio.util.Adsr;
+import org.chuck.core.ChuckVM;
+import org.chuck.core.Shred;
+
+/**
+ * Polyphony and Concurrency example using the Java Fluent DSL. Demonstrates spawning multiple
+ * Java-based shreds.
+ */
+public class PolyphonyDSL implements Shred {
+  @Override
+  public void shred() {
+    // Access current VM to spork more shreds
+    ChuckVM vm = org.chuck.core.ChuckVM.CURRENT_VM.get();
+
+    // Spawn 5 overlapping notes
+    for (int i = 0; i < 5; i++) {
+      final double freq = 220.0 * (i + 1);
+
+      vm.spork(
+          () -> {
+            TriOsc tri = new TriOsc(sampleRate());
+            Adsr env = new Adsr(sampleRate());
+
+            tri.chuck(env).chuck(dac());
+            tri.freq(freq);
+            env.set(0.5f, 0.2f, 0.3f, 1.0f);
+
+            env.keyOn();
+            advance(second(1.0));
+
+            env.keyOff();
+            advance(second(1.0));
+          });
+
+      // Wait 200ms before spawning next note
+      advance(ms(200));
+    }
+
+    advance(second(3.0));
+  }
+}

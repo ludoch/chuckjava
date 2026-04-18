@@ -427,8 +427,8 @@ public class ChuckIDE extends Application {
 
     Menu tutorialMenu = createTutorialMenu();
     Menu examplesMenu = new Menu("_Examples");
-    loadExamples(new File("chuck-core/examples"), examplesMenu);
-    loadExamples(new File("chuck-core/examples_dsl"), examplesMenu);
+    loadExamples(new File("chuck-samples/src/main/resources/examples"), examplesMenu);
+    loadExamples(new File("chuck-samples/src/main/java/org/chuck/samples/dsl"), examplesMenu);
 
     Menu helpMenu = new Menu("_Help");
     MenuItem githubItem = new MenuItem("GitHub Repository");

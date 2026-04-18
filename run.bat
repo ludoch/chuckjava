@@ -14,8 +14,12 @@ set ARGS=
 :loop
 if "%~1"=="" goto endloop
 set ARG=%~1
-if "%ARG:~0,9%"=="examples/" set ARG=chuck-core/%ARG%
-if "%ARG:~0,13%"=="examples_dsl/" set ARG=chuck-core/%ARG%
+if "%ARG:~0,9%"=="examples/" (
+    set ARG=chuck-samples/src/main/resources/%ARG%
+) else if "%ARG:~0,13%"=="examples_dsl/" (
+    for %%i in ("%ARG%") do set FILENAME=%%~nxi
+    set ARG=chuck-samples/src/main/java/org/chuck/samples/dsl/%FILENAME%
+)
 set ARGS=%ARGS% %ARG%
 shift
 goto loop

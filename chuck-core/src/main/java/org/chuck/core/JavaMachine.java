@@ -69,7 +69,7 @@ public class JavaMachine {
     ChuckHost host = new ChuckHost(44100).withAudio(512, 2);
     JavaMachine machine = new JavaMachine(host);
 
-    String dir = args.length > 0 ? args[0] : "examples_dsl";
+    String dir = args.length > 0 ? args[0] : "chuck-samples/src/main/java/org/chuck/samples/dsl";
     machine.watch(dir);
   }
 }

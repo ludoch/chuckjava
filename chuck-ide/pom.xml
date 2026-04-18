@@ -27,6 +27,11 @@
             <artifactId>sequencer</artifactId>
         </dependency>
         <dependency>
+            <groupId>org.chuck</groupId>
+            <artifactId>chuck-samples</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-controls</artifactId>
         </dependency>

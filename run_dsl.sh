@@ -29,8 +29,11 @@ fi
 # Adjust paths if they start with examples/ or examples_dsl/
 ARGS=()
 for arg in "$@"; do
-    if [[ $arg == examples/* ]] || [[ $arg == examples_dsl/* ]]; then
-        ARGS+=("chuck-core/$arg")
+    if [[ $arg == examples/* ]]; then
+        ARGS+=("chuck-samples/src/main/resources/$arg")
+    elif [[ $arg == examples_dsl/* ]]; then
+        filename=$(basename "$arg")
+        ARGS+=("chuck-samples/src/main/java/org/chuck/samples/dsl/$filename")
     else
         ARGS+=("$arg")
     fi

@@ -52,14 +52,6 @@
             <resource>
                 <directory>src/main/resources</directory>
             </resource>
-            <resource>
-                <directory>examples</directory>
-                <targetPath>examples</targetPath>
-            </resource>
-            <resource>
-                <directory>examples_dsl</directory>
-                <targetPath>examples_dsl</targetPath>
-            </resource>
         </resources>
         <plugins>
             <plugin>
