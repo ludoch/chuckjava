@@ -77,12 +77,29 @@ ChucK-Java supports a full-featured CLI that mirrors the original ChucK implemen
 
 ### Usage
 ```bash
-# Via fat JAR
-java --enable-native-access=ALL-UNNAMED -jar target/chuck-java.jar examples/basic/bar.ck
+# Build all modules
+mvn install -DskipTests
+
+# Run the CLI
+java --enable-native-access=ALL-UNNAMED -jar chuck-cli/target/chuck-cli-1.0-SNAPSHOT-shaded.jar examples/basic/bar.ck
 
 # Launch JavaFX IDE
-mvn javafx:run
+mvn -pl chuck-ide javafx:run
+
+# Launch Standalone Visual Sequencer
+mvn -pl sequencer javafx:run
 ```
+
+---
+
+## 🛠️ Project Structure
+
+The project is divided into several Maven modules:
+- **`chuck-core`**: Core ChucK engine, compiler, and audio/MIDI logic.
+- **`chuck-cli`**: Command-line interface and GraalVM native image entry point.
+- **`sequencer`**: JavaFX-based extensions, including the standalone Visual Sequencer.
+- **`chuck-ide`**: The main JavaFX IDE application.
+
 
 ---
 
@@ -100,10 +117,12 @@ Ensure you run with `--enable-native-access=ALL-UNNAMED`.
 
 ## 📚 Documentation
 
-- **[Java DSL Guide](JAVA_DSL.md)**: Learn how to write ChucK code in pure Java.
-- **[UGen Reference](UGEN_REFERENCE.md)**: Detailed list of available Unit Generators and their parameters.
-- **[MIDI Guide](MIDI_GUIDE.md)**: How to use MIDI input, output, and polyphony.
-- **[Language Specification](LANGUAGE.md)**: Deep dive into the ChucK-Java language features.
+- **[Java DSL Guide](chuck-core/JAVA_DSL.md)**: Learn how to write ChucK code in pure Java.
+- **[UGen Reference](chuck-core/UGEN_REFERENCE.md)**: Detailed list of available Unit Generators and their parameters.
+- **[MIDI Guide](chuck-core/MIDI_GUIDE.md)**: How to use MIDI input, output, and polyphony.
+- **[Language Specification](chuck-core/LANGUAGE.md)**: Deep dive into the ChucK-Java language features.
+- **[Hosting Guide](chuck-core/HOSTING.md)**: Embed the ChucK engine into your own Java apps.
+- **[Testing Skill](chuck-core/CHUCK_TESTING_SKILL.md)**: How to run the massive E2E integration suite.
 
 ---
 

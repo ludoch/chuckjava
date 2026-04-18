@@ -5,10 +5,6 @@
 # Usage — extract artifacts to ./dist/linux/:
 #   docker build --output dist/linux .
 #
-# Or build and run interactively:
-#   docker build -t chuck-builder .
-#   docker run --rm chuck-builder --version
-#
 # The default output stage produces just the chuck binary.
 # To also produce the IDE bundle, build the "full" target:
 #   docker build --target full --output dist/linux .
@@ -21,31 +17,34 @@ RUN microdnf install -y maven && microdnf clean all
 
 WORKDIR /build
 
-# Cache Maven dependencies as a separate layer (invalidated only on pom.xml change)
+# Copy the parent pom and all modules
 COPY pom.xml .
-RUN mvn dependency:go-offline -B -q 2>/dev/null; true
+COPY chuck-core/ chuck-core/
+COPY chuck-cli/ chuck-cli/
+COPY sequencer/ sequencer/
+COPY chuck-ide/ chuck-ide/
 
-# Copy source and examples
-COPY src/ src/
-COPY examples/ examples/
-COPY examples_dsl/ examples_dsl/
+# Build and Install everything to local m2 (required for inter-module dependencies)
+RUN mvn install -DskipTests -B
 
-# Build native CLI
-RUN mvn -Pnative package -DskipTests -B
+# Build native CLI from the chuck-cli module
+RUN mvn -Pnative -pl chuck-cli package -DskipTests -B
 
-# Build IDE bundle (Linux app-image); skip AOT training run (headless container)
-RUN mvn -Pide-bundle package -DskipTests -B -DskipAot=true
+# Build IDE bundle from the chuck-ide module
+# Note: jpackage might require a full GUI environment or certain libs even for app-image.
+# In a standard container, we skip AOT but still attempt the bundle.
+RUN mvn -Pide-bundle -pl chuck-ide package -DskipTests -B -DskipAot=true
 
 # ─── Stage 2: minimal output — just the native binary ─────────────────────────
 FROM scratch AS default
-COPY --from=builder /build/target/chuck /chuck
+COPY --from=builder /build/chuck-cli/target/chuck /chuck
 
 # ─── Stage 3: full output — binary + IDE bundle ───────────────────────────────
 FROM scratch AS full
-COPY --from=builder /build/target/chuck /chuck
-COPY --from=builder /build/target/chuck-ide-bundle/chuck-ide/ /chuck-ide/
+COPY --from=builder /build/chuck-cli/target/chuck /chuck
+COPY --from=builder /build/chuck-ide/target/chuck-ide-bundle/chuck-ide/ /chuck-ide/
 
 # ─── Stage 4: runnable image (for quick smoke tests) ──────────────────────────
 FROM ubuntu:24.04 AS runnable
-COPY --from=builder /build/target/chuck /usr/local/bin/chuck
+COPY --from=builder /build/chuck-cli/target/chuck /usr/local/bin/chuck
 ENTRYPOINT ["chuck"]
