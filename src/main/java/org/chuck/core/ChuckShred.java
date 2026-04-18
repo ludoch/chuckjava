@@ -611,7 +611,8 @@ public class ChuckShred implements Comparable<ChuckShred> {
         MethodHandle handle = this.code.getHandle(pc);
         if (handle == null) break;
         if (Boolean.getBoolean("chuck.debug.instr")) {
-            System.out.println("[INSTR] " + String.format("%04d", pc) + ": " + this.code.getInstruction(pc));
+          System.out.println(
+              "[INSTR] " + String.format("%04d", pc) + ": " + this.code.getInstruction(pc));
         }
         int oldPc = pc;
         ChuckCode oldC = this.code;

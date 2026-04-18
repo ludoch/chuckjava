@@ -458,6 +458,12 @@ public class StatementEmitter {
                     parent.getUserClassRegistry()));
             code.addInstruction(new StackInstrs.Pop());
           } else if (useGlobal) {
+            if ("HMM".equals(s.type()))
+              System.out.println(
+                  "DEBUG: Emitting InstantiateSetAndPushGlobal for HMM, name="
+                      + s.name()
+                      + ", argCount="
+                      + argCount);
             parent.getGlobalVarTypes().put(s.name(), s.type());
             code.addInstruction(
                 new ObjectInstrs.InstantiateSetAndPushGlobal(
@@ -483,7 +489,7 @@ public class StatementEmitter {
               }
               code.addInstruction(
                   new ObjectInstrs.InstantiateSetAndPushLocal(
-                      fullType,
+                      parent.getBaseType(fullType),
                       offset,
                       argCount,
                       s.isReference(),
@@ -995,7 +1001,7 @@ public class StatementEmitter {
               boolean isObject = !org.chuck.core.ChuckLanguage.PRIMITIVE_TYPES.contains(type);
               boolean isString = "string".equals(type);
 
-              if (isUGen || ((isObject || isString) && ds.callArgs() != null)) {
+              if (isUGen || (isObject && !isString) || (isString && ds.callArgs() != null)) {
                 // Instantiate and set static object field
                 // For strings with args, we need to handle specially or use the generic instantiate
                 // logic
@@ -1013,7 +1019,7 @@ public class StatementEmitter {
 
                 staticInitCodeLocal.addInstruction(
                     new ObjectInstrs.InstantiateSetAndPushGlobal(
-                        type,
+                        parent.getBaseType(type),
                         "@static_init_"
                             + s.name()
                             + "_"

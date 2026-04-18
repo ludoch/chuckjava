@@ -433,40 +433,40 @@ public class ObjectInstrs {
         java.lang.reflect.Method bestMethod = null;
         Object[] bestArgs = null;
         int bestScore = -1;
-        
+
         java.lang.reflect.Method[] reflMethods;
         Object targetObj = obj;
-        
+
         if (obj instanceof String sName) {
-            // Static call on a built-in class
+          // Static call on a built-in class
+          try {
+            Class<?> cls = Class.forName("org.chuck.core.ai." + sName);
+            System.err.println("[CallMethod] found AI class: " + cls.getName());
+            reflMethods = cls.getMethods();
+            targetObj = null; // Static call
+          } catch (ClassNotFoundException e) {
             try {
-                Class<?> cls = Class.forName("org.chuck.core.ai." + sName);
-                System.err.println("[CallMethod] found AI class: " + cls.getName());
-                reflMethods = cls.getMethods();
-                targetObj = null; // Static call
-            } catch (ClassNotFoundException e) {
-                try {
-                    Class<?> cls = Class.forName("org.chuck.core." + sName);
-                    System.err.println("[CallMethod] found core class: " + cls.getName());
-                    reflMethods = cls.getMethods();
-                    targetObj = null;
-                } catch (ClassNotFoundException e2) {
-                    System.err.println("[CallMethod] could not find class: " + sName);
-                    reflMethods = new java.lang.reflect.Method[0];
-                }
+              Class<?> cls = Class.forName("org.chuck.core." + sName);
+              System.err.println("[CallMethod] found core class: " + cls.getName());
+              reflMethods = cls.getMethods();
+              targetObj = null;
+            } catch (ClassNotFoundException e2) {
+              System.err.println("[CallMethod] could not find class: " + sName);
+              reflMethods = new java.lang.reflect.Method[0];
             }
+          }
         } else {
-            // Instance call
-            reflMethods = obj.getClass().getMethods();
-            if (reflMethods.length == 0) {
-              Class<?> parent = obj.getClass().getSuperclass();
-              while (parent != null && reflMethods.length == 0) {
-                reflMethods = parent.getMethods();
-                parent = parent.getSuperclass();
-              }
+          // Instance call
+          reflMethods = obj.getClass().getMethods();
+          if (reflMethods.length == 0) {
+            Class<?> parent = obj.getClass().getSuperclass();
+            while (parent != null && reflMethods.length == 0) {
+              reflMethods = parent.getMethods();
+              parent = parent.getSuperclass();
             }
+          }
         }
-        
+
         for (java.lang.reflect.Method m : reflMethods) {
           if (!m.getName().equals(mName) || m.getParameterCount() != a) continue;
           Class<?>[] pts = m.getParameterTypes();
@@ -829,14 +829,14 @@ public class ObjectInstrs {
           String elemType = (t != null) ? t.replaceAll("\\[\\]", "").trim() : null;
           arr.elementTypeName = elemType;
           if (!ChuckLanguage.isPrimitiveType(elemType)) {
-              for (int i = 0; i < sz; i++) {
-                ChuckObject elem =
-                    ChuckFactory.instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
-                if (elem != null) {
-                  arr.setObject(i, elem);
-                  if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
-                }
+            for (int i = 0; i < sz; i++) {
+              ChuckObject elem =
+                  ChuckFactory.instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
+              if (elem != null) {
+                arr.setObject(i, elem);
+                if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
               }
+            }
           }
           obj = arr;
         }
@@ -847,6 +847,7 @@ public class ObjectInstrs {
         obj = new ChuckString(initVal);
       } else if (!t.equals("int") && !t.equals("float") && !t.equals("dur") && !t.equals("time")) {
         obj = ChuckFactory.instantiateType(t, a, args, vm.getSampleRate(), vm, s, rm);
+        if (obj == null) {}
         if (a > 0
             && obj instanceof org.chuck.audio.ChuckUGen ugen
             && args[0] instanceof Number n2) {
@@ -960,14 +961,14 @@ public class ObjectInstrs {
           String elemType = (t != null) ? t.replaceAll("\\[\\]", "").trim() : null;
           arr.elementTypeName = elemType;
           if (!ChuckLanguage.isPrimitiveType(elemType)) {
-              for (int i = 0; i < sz; i++) {
-                ChuckObject elem =
-                    ChuckFactory.instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
-                if (elem != null) {
-                  arr.setObject(i, elem);
-                  if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
-                }
+            for (int i = 0; i < sz; i++) {
+              ChuckObject elem =
+                  ChuckFactory.instantiateType(elemType, 0, null, vm.getSampleRate(), vm, s, rm);
+              if (elem != null) {
+                arr.setObject(i, elem);
+                if (elem instanceof org.chuck.audio.ChuckUGen u) s.registerUGen(u);
               }
+            }
           }
           obj = arr;
         }
@@ -979,6 +980,7 @@ public class ObjectInstrs {
         obj = new ChuckString(initVal);
       } else if (!t.equals("int") && !t.equals("float") && !t.equals("dur") && !t.equals("time")) {
         obj = ChuckFactory.instantiateType(t, a, args, vm.getSampleRate(), vm, s, rm);
+        if (obj == null) {}
         // Apply single numeric ctor arg to UGen (e.g. SinOsc s(440) sets freq=440)
         if (a > 0
             && obj instanceof org.chuck.audio.ChuckUGen ugen

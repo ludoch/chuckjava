@@ -291,9 +291,9 @@ public class ChuckArray extends ChuckObject {
     if (i < 0 || i >= types.size()) {
       String msg = "ArrayOutofBounds: index[" + idx + "] size[" + types.size() + "]";
       if (ChuckShred.CURRENT_SHRED.isBound()) {
-          ChuckShred s = ChuckShred.CURRENT_SHRED.get();
-          msg += " at pc[" + s.getPc() + "]";
-          if (s.getCode() != null) msg += " in " + s.getCode().getName();
+        ChuckShred s = ChuckShred.CURRENT_SHRED.get();
+        msg += " at pc[" + s.getPc() + "]";
+        if (s.getCode() != null) msg += " in " + s.getCode().getName();
       }
       throw new org.chuck.core.ChuckRuntimeException(msg);
     }

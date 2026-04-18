@@ -30,27 +30,27 @@ public class PCA extends ChuckObject {
     if (n == 0) return 0L;
     int D = -1;
     for (int i = 0; i < n; i++) {
-        Object row = dataArr.getObject(i);
-        if (row instanceof ChuckArray ca) {
-            D = ca.size();
-            break;
-        }
+      Object row = dataArr.getObject(i);
+      if (row instanceof ChuckArray ca) {
+        D = ca.size();
+        break;
+      }
     }
     if (D == -1) return 0L;
 
     double[][] X = new double[n][D];
     for (int i = 0; i < n; i++) {
-        Object rowObj = dataArr.getObject(i);
-        if (rowObj instanceof ChuckArray ca) {
-            if (ca.size() != D) {
-                // Ignore rows with mismatched dimensions or handle appropriately
-                X[i] = new double[D];
-            } else {
-                X[i] = KNN.toDoubleArray(ca);
-            }
+      Object rowObj = dataArr.getObject(i);
+      if (rowObj instanceof ChuckArray ca) {
+        if (ca.size() != D) {
+          // Ignore rows with mismatched dimensions or handle appropriately
+          X[i] = new double[D];
         } else {
-            X[i] = new double[D];
+          X[i] = KNN.toDoubleArray(ca);
         }
+      } else {
+        X[i] = new double[D];
+      }
     }
 
     // center
@@ -62,9 +62,9 @@ public class PCA extends ChuckObject {
     // covariance matrix (D x D, symmetric)
     double[][] cov = new double[D][D];
     if (n > 1) {
-        for (double[] row : X)
-          for (int i = 0; i < D; i++) for (int j = 0; j < D; j++) cov[i][j] += row[i] * row[j];
-        for (int i = 0; i < D; i++) for (int j = 0; j < D; j++) cov[i][j] /= (n - 1);
+      for (double[] row : X)
+        for (int i = 0; i < D; i++) for (int j = 0; j < D; j++) cov[i][j] += row[i] * row[j];
+      for (int i = 0; i < D; i++) for (int j = 0; j < D; j++) cov[i][j] /= (n - 1);
     }
 
     // power iteration to find top-k eigenvectors
@@ -174,24 +174,24 @@ public class PCA extends ChuckObject {
     pca.train(inputArr);
     int n = inputArr.size();
     int actualK = pca.getNumTrainedComponents();
-    
+
     // Ensure output array has enough rows
     if (outputArr.size() < n) outputArr.size(n);
-    
+
     for (int i = 0; i < n; i++) {
       Object inRowObj = inputArr.getObject(i);
       if (inRowObj instanceof ChuckArray inRow) {
-          ChuckArray row;
-          Object rowObj = outputArr.getObject(i);
-          if (rowObj instanceof ChuckArray ca) {
-            row = ca;
-            if (row.size() < actualK) row.size(actualK);
-          } else {
-            row = new ChuckArray(org.chuck.core.ChuckType.ARRAY, actualK);
-            row.elementTypeName = "float";
-            outputArr.setObject(i, row);
-          }
-          pca.transform(inRow, row);
+        ChuckArray row;
+        Object rowObj = outputArr.getObject(i);
+        if (rowObj instanceof ChuckArray ca) {
+          row = ca;
+          if (row.size() < actualK) row.size(actualK);
+        } else {
+          row = new ChuckArray(org.chuck.core.ChuckType.ARRAY, actualK);
+          row.elementTypeName = "float";
+          outputArr.setObject(i, row);
+        }
+        pca.transform(inRow, row);
       }
     }
     return n;

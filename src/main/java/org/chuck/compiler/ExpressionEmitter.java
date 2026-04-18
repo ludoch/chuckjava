@@ -1604,11 +1604,12 @@ public class ExpressionEmitter {
         }
         if (e.base() instanceof ChuckAST.DotExp dot) {
           String bt = parent.getExprType(dot.base());
-          if (bt == null
-              && dot.base() instanceof ChuckAST.IdExp id
-              && (parent.getUserClassRegistry().containsKey(id.name())
-                  || Set.of("PCA", "KNN", "KNN2", "SVM", "MLP", "HMM", "Word2Vec", "Wekinator")
-                      .contains(id.name()))) bt = id.name();
+          String resolvedClassName = parent.resolveClassName(dot.base());
+          boolean isBuiltinClassName =
+              resolvedClassName != null
+                  && Set.of("PCA", "KNN", "KNN2", "SVM", "MLP", "HMM", "Word2Vec", "Wekinator")
+                      .contains(resolvedClassName);
+          if (bt == null && isBuiltinClassName) bt = resolvedClassName;
           if (bt == null) {
             // Type unknown (e.g. chained call: fft.upchuck().cvals()) — emit base then call by name
             this.emitExpression(dot.base(), code);
@@ -1617,10 +1618,11 @@ public class ExpressionEmitter {
             return;
           }
           if (bt != null) {
-            boolean isBuiltinStatic = Set.of("PCA", "KNN", "KNN2", "SVM", "MLP", "HMM", "Word2Vec", "Wekinator")
-                      .contains(bt);
+            boolean isStaticDispatch = isBuiltinClassName;
             // Specialization for built-in UGen method calls (single arg)
-            if (!isBuiltinStatic && argc == 1 && (parent.isKnownUGenType(bt) || parent.isSubclassOfUGen(bt))) {
+            if (!isStaticDispatch
+                && argc == 1
+                && (parent.isKnownUGenType(bt) || parent.isSubclassOfUGen(bt))) {
               String argType = argTypes.get(0);
               String mn = dot.member();
               Set<String> safeFloat = Set.of("freq", "gain", "phase", "cutoff");
@@ -1638,7 +1640,7 @@ public class ExpressionEmitter {
                 return;
               }
             }
-            if (!isBuiltinStatic && (bt.equals("string") || bt.endsWith("[]"))) {
+            if (!isStaticDispatch && (bt.equals("string") || bt.endsWith("[]"))) {
               this.emitExpression(dot.base(), code);
               for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
               String fk = parent.getMethodKey(dot.member(), argTypes);
@@ -1646,13 +1648,14 @@ public class ExpressionEmitter {
                 code.addInstruction(new ObjectInstrs.CallMethod(dot.member(), argc, fk));
               return;
             }
-            if (!isBuiltinStatic && dot.member().equals("last")
+            if (!isStaticDispatch
+                && dot.member().equals("last")
                 && (parent.isKnownUGenType(bt) || parent.isSubclassOfUGen(bt))) {
               this.emitExpression(dot.base(), code);
               if (code != null) code.addInstruction(new UgenInstrs.GetLastOut());
               return;
             }
-            if (!isBuiltinStatic && dot.member().equals("dot") && ChuckEmitter.isVecType(bt)) {
+            if (!isStaticDispatch && dot.member().equals("dot") && ChuckEmitter.isVecType(bt)) {
               this.emitExpression(dot.base(), code);
               for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
               if (code != null) code.addInstruction(new VecInstrs.Dot());
@@ -1672,15 +1675,15 @@ public class ExpressionEmitter {
               }
             }
 
-            if (!isBuiltinStatic) this.emitExpression(dot.base(), code);
+            if (!isStaticDispatch) this.emitExpression(dot.base(), code);
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
             String fk = parent.resolveMethodKey(bt, dot.member(), argTypes);
             if (parent.getUserClassRegistry().containsKey(bt))
               parent.checkAccess(bt, fk, true, e.line(), e.column());
             if (code != null) {
-              if (isBuiltinStatic) {
-                  // Push the class name as a string to serve as the "object" for static calls
-                  code.addInstruction(new PushInstrs.PushString(bt));
+              if (isStaticDispatch) {
+                // Push the class name as a string to serve as the "object" for static calls
+                code.addInstruction(new PushInstrs.PushString(bt));
               }
               code.addInstruction(new ObjectInstrs.CallMethod(dot.member(), argc, fk));
             }
