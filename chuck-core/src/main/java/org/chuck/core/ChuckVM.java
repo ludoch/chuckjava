@@ -346,12 +346,31 @@ public class ChuckVM {
     for (String n : globalIsObject.keySet()) {
       if (globalIsObject.get(n)) {
         Object obj = globalObjects.get(n);
-        if (obj instanceof ChuckArray ca && ca.vecTag != null) {
-          types.put(n, ca.vecTag);
+        if (obj instanceof ChuckArray ca) {
+          if (ca.vecTag != null) {
+            types.put(n, ca.vecTag);
+          } else if (ca.elementTypeName != null) {
+            types.put(n, ca.elementTypeName + "[]");
+          } else {
+            types.put(n, "array");
+          }
         } else if (obj instanceof UserObject uo) {
           types.put(n, uo.className);
         } else if (obj instanceof ChuckObject co) {
-          types.put(n, co.getType().getName());
+          String typeName = co.getType().getName();
+          // If the runtime object has a generic type name but we know its specific class,
+          // use the class name to avoid type conflicts on reload.
+          if (obj instanceof org.chuck.audio.ChuckUGen
+              && (typeName.equals("UGen") || typeName.equals("Osc") || typeName.equals("ChuGen"))) {
+            typeName = obj.getClass().getSimpleName();
+            // Map common internal names back to ChucK names
+            if (typeName.endsWith("UGen") && !typeName.equals("UGen")) {
+              typeName = typeName.substring(0, typeName.length() - 4);
+            } else if (typeName.equals("Lpf")) {
+              typeName = "LPF"; // ChucK canonical name
+            }
+          }
+          types.put(n, typeName);
         } else if (obj != null) {
           types.put(n, obj.getClass().getSimpleName());
         }
@@ -831,6 +850,13 @@ public class ChuckVM {
     }
     for (ChuckShred s : shreds) {
       s.cleanup(this);
+    }
+
+    // Unchuck all global objects that are UGens from DAC
+    for (Object obj : globalObjects.values()) {
+      if (obj instanceof org.chuck.audio.ChuckUGen ugen) {
+        ugen.unchuckAll();
+      }
     }
 
     // Clear global state

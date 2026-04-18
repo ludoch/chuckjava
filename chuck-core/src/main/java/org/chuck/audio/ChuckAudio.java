@@ -577,6 +577,8 @@ public class ChuckAudio {
 
   // ── Audio engine thread ───────────────────────────────────────────────────
 
+  private Thread audioEngineThread;
+
   public void start() {
     if (running || outputLine == null) return;
     running = true;
@@ -587,7 +589,7 @@ public class ChuckAudio {
     final int bps = fmt.bytesPerSample;
     final int effBuf = effectiveBufferSize; // Phase 2: may differ from bufferSize
 
-    Thread audioThread =
+    audioEngineThread =
         Thread.ofPlatform()
             .name("ChucK-Audio-Engine")
             .daemon(true)
@@ -745,9 +747,9 @@ public class ChuckAudio {
                   }
                 });
     if (scheduleRealtime) {
-      audioThread.setPriority(Thread.MAX_PRIORITY);
+      audioEngineThread.setPriority(Thread.MAX_PRIORITY);
     }
-    audioThread.start();
+    audioEngineThread.start();
   }
 
   /**
@@ -896,6 +898,9 @@ public class ChuckAudio {
 
   public void stop() {
     running = false;
+    if (audioEngineThread != null) {
+      audioEngineThread.interrupt();
+    }
     try {
       stopRecording();
     } catch (IOException e) {
