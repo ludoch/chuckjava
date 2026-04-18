@@ -842,9 +842,10 @@ public class ChuckVM {
     globalFunctions.clear();
     globalDocs.clear();
     globalFunctionDocs.clear();
+    userClassRegistry.clear();
 
-    // Re-initialize special globals (dac, adc, etc. if needed)
-    // Most are initialized in the constructor, but some might need re-init here.
+    // Re-initialize special globals (dac, adc, etc. if needed)    // Most are initialized in the
+    // constructor, but some might need re-init here.
     // However, the error suggests 'kit' is persisting because it's in one of these maps.
   }
 

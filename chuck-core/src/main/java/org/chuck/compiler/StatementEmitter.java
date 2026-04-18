@@ -310,9 +310,8 @@ public class StatementEmitter {
           String prevType = parent.getGlobalVarTypes().get(s.name());
           if (prevType != null
               && !prevType.equals(s.type())
-              && !prevType.equals("int")
-              && !prevType.equals("float")
-              && !prevType.equals("string")) {
+              && !ChuckLanguage.isPrimitiveType(prevType)
+              && !ChuckLanguage.isPrimitiveType(s.type())) {
             throw new org.chuck.core.ChuckCompilerException(
                 "global "
                     + prevType
