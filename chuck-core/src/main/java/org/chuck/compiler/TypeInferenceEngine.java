@@ -149,6 +149,9 @@ public class TypeInferenceEngine {
             || (bin.op() == ChuckAST.Operator.LE && isIOType(lhsType))) {
           yield "IO";
         }
+        if (bin.op() == ChuckAST.Operator.DUR_MUL) {
+          yield "dur";
+        }
         if (bin.op() == ChuckAST.Operator.EQ
             || bin.op() == ChuckAST.Operator.NEQ
             || bin.op() == ChuckAST.Operator.LT

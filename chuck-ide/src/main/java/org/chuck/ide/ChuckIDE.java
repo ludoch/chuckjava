@@ -455,8 +455,72 @@ public class ChuckIDE extends Application {
 
     Menu tutorialMenu = createTutorialMenu();
     Menu examplesMenu = new Menu("_Examples");
-    loadExamples(new File("chuck-samples/src/main/resources/examples"), examplesMenu);
-    loadExamples(new File("chuck-samples/src/main/java/org/chuck/samples/dsl"), examplesMenu);
+
+    File samplesBase = findDir("chuck-samples/src/main/resources/examples");
+    if (samplesBase != null) {
+      Menu coreMenu = new Menu("Core Language");
+      Menu audioMenu = new Menu("Audio & Synthesis");
+      Menu externalMenu = new Menu("External I/O");
+      Menu specializedMenu = new Menu("Specialized");
+
+      addCategorized(
+          samplesBase,
+          new String[] {
+            "basic", "array", "class", "ctrl", "event", "func", "io", "machine", "math", "oper",
+            "shred", "string", "time", "type"
+          },
+          coreMenu);
+      addCategorized(
+          samplesBase,
+          new String[] {
+            "analysis", "chugins", "deep", "effects", "filter", "multi", "spatial", "stereo", "stk"
+          },
+          audioMenu);
+      addCategorized(samplesBase, new String[] {"hid", "midi", "osc", "serial"}, externalMenu);
+      addCategorized(
+          samplesBase, new String[] {"ai", "vector", "extend", "import", "data"}, specializedMenu);
+
+      if (!coreMenu.getItems().isEmpty()) examplesMenu.getItems().add(coreMenu);
+      if (!audioMenu.getItems().isEmpty()) examplesMenu.getItems().add(audioMenu);
+      if (!externalMenu.getItems().isEmpty()) examplesMenu.getItems().add(externalMenu);
+      if (!specializedMenu.getItems().isEmpty()) examplesMenu.getItems().add(specializedMenu);
+
+      File bookDir = new File(samplesBase, "book");
+      if (bookDir.exists()) {
+        Menu bookMenu = new Menu("ChucK Book");
+        loadExamples(bookDir, bookMenu);
+        if (!bookMenu.getItems().isEmpty()) examplesMenu.getItems().add(bookMenu);
+      }
+
+      // Top-level files
+      File[] files = samplesBase.listFiles();
+      if (files != null) {
+        boolean first = true;
+        Arrays.sort(files);
+        for (File f : files) {
+          if (f.isFile() && (f.getName().endsWith(".ck") || f.getName().endsWith(".java"))) {
+            if (first) {
+              examplesMenu.getItems().add(new SeparatorMenuItem());
+              first = false;
+            }
+            MenuItem item = new MenuItem(f.getName());
+            item.setOnAction(e -> loadFileIntoEditor(f));
+            examplesMenu.getItems().add(item);
+          }
+        }
+      }
+    }
+
+    File dslBase = findDir("chuck-samples/src/main/java/org/chuck/samples/dsl");
+    if (dslBase != null) {
+      Menu dslMenu = new Menu("Java DSL");
+      loadExamples(dslBase, dslMenu);
+      if (!dslMenu.getItems().isEmpty()) {
+        if (!examplesMenu.getItems().isEmpty())
+          examplesMenu.getItems().add(new SeparatorMenuItem());
+        examplesMenu.getItems().add(dslMenu);
+      }
+    }
 
     Menu helpMenu = new Menu("_Help");
     MenuItem githubItem = new MenuItem("GitHub Repository");
@@ -487,6 +551,33 @@ public class ChuckIDE extends Application {
       item.setOnAction(e -> loadFileIntoEditor(f));
       recentMenu.getItems().add(item);
     }
+  }
+
+  private void addCategorized(File base, String[] dirs, Menu parent) {
+    for (String d : dirs) {
+      File dir = new File(base, d);
+      if (dir.exists() && dir.isDirectory()) {
+        Menu sub = new Menu(d);
+        loadExamples(dir, sub);
+        if (!sub.getItems().isEmpty()) parent.getItems().add(sub);
+      }
+    }
+  }
+
+  private File findDir(String path) {
+    File f = new File(path);
+    if (f.exists() && f.isDirectory()) return f;
+    f = new File("../" + path);
+    if (f.exists() && f.isDirectory()) return f;
+    // Also try without chuck-samples/ prefix if we are already inside it or parallel
+    if (path.startsWith("chuck-samples/")) {
+      String subPath = path.substring("chuck-samples/".length());
+      f = new File(subPath);
+      if (f.exists() && f.isDirectory()) return f;
+      f = new File("../" + subPath);
+      if (f.exists() && f.isDirectory()) return f;
+    }
+    return null;
   }
 
   private void loadExamples(File dir, Menu parent) {
