@@ -25,7 +25,8 @@ Operate using a **Research -> Strategy -> Execution** lifecycle.
 -   **Types & Safety:** Rigorously adhere to the type system. Do not bypass or suppress warnings unless explicitly instructed.
 -   **Testing:**
     -   Always update or add tests for any change.
-    -   Use `mvn test` for JVM tests and `mvn -Pnative -DskipNativeTests=false test` for native tests.
+    -   **Always run `mvn clean package`** to trigger all regressions, including code style (Spotless) and full unit test suites.
+    -   Use `mvn test` for fast JVM tests and `mvn -Pnative -DskipNativeTests=false test` for native tests.
     -   **Validation is mandatory.** A task is not complete until verified by tests and project-specific build/linting commands.
 -   **ANTLR Parser:** When changing the grammar, verify against all examples using `mvn test -Dtest=ParseAllExamplesTest`.
 -   **CI/CD:**
@@ -38,6 +39,9 @@ Operate using a **Research -> Strategy -> Execution** lifecycle.
 ```bash
 # Compile
 mvn compile
+
+# Full validation (regressions + code style + tests)
+mvn clean package
 
 # Run all JVM tests
 mvn test
