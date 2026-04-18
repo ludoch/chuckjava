@@ -62,7 +62,7 @@
         <dependency>
             <groupId>org.rtmidijava</groupId>
             <artifactId>rtmidijava</artifactId>
-            <version>1.0.0</version>
+            <version>1.0.1</version>
         </dependency>
         <!-- ANTLR4 Runtime -->
         <dependency>
