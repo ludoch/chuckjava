@@ -620,8 +620,12 @@ public class ChuckIDE extends Application {
     replaceBtnRef = replaceBtn;
 
     Button clearBtn = new Button("Clear VM");
-    clearBtn.setStyle("-fx-background-color: #f0b8b8;");
-    clearBtn.setOnAction(e -> vm.clear());
+    clearBtn.setStyle("-fx-background-color: #f0b8b8; -fx-font-weight: bold;");
+    clearBtn.setOnAction(
+        e -> {
+          vm.clear();
+          print("VM cleared.\n");
+        });
 
     return new ToolBar(addBtn, replaceBtn, new Separator(), clearBtn);
   }
