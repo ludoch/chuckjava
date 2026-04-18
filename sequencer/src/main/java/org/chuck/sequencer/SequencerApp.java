@@ -208,19 +208,28 @@ public class SequencerApp extends Application {
   }
 
   private void shutdown() {
-    new Thread(
+    System.out.println("[SequencerApp] Shutdown initiated...");
+
+    // Run cleanup in a background thread
+    Thread shutdownThread =
+        new Thread(
             () -> {
               try {
+                System.out.println("[SequencerApp] Stopping audio...");
                 if (audio != null) audio.stop();
+                System.out.println("[SequencerApp] Shutting down VM...");
                 if (vm != null) vm.shutdown();
+                System.out.println("[SequencerApp] Cleanup complete. Exiting.");
               } catch (Exception e) {
                 e.printStackTrace();
               } finally {
-                System.exit(0);
+                Runtime.getRuntime().halt(0);
               }
             },
-            "Sequencer-Shutdown-Thread")
-        .start();
+            "Sequencer-Shutdown-Thread");
+
+    shutdownThread.setDaemon(true);
+    shutdownThread.start();
   }
 
   @Override

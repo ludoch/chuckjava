@@ -107,24 +107,38 @@ public class ChuckIDE extends Application {
     startAnimationTimer();
 
     // SHUTDOWN HANDLER
-    primaryStage.setOnCloseRequest(
-        e -> {
-          e.consume();
-          primaryStage.hide();
-          new Thread(
-                  () -> {
-                    try {
-                      if (audio != null) audio.stop();
-                      if (vm != null) vm.shutdown();
-                    } catch (Exception ex) {
-                      ex.printStackTrace();
-                    } finally {
-                      System.exit(0);
-                    }
-                  },
-                  "IDE-Shutdown-Thread")
-              .start();
-        });
+    primaryStage.setOnCloseRequest(e -> shutdown());
+  }
+
+  private void shutdown() {
+    System.out.println("[ChuckIDE] Shutdown initiated...");
+    // Hide immediately to give user feedback
+    if (stage != null) stage.hide();
+
+    // Run cleanup in a background thread to avoid blocking the UI
+    Thread shutdownThread =
+        new Thread(
+            () -> {
+              try {
+                System.out.println("[ChuckIDE] Stopping audio...");
+                if (audio != null) audio.stop();
+
+                System.out.println("[ChuckIDE] Shutting down VM...");
+                if (vm != null) vm.shutdown();
+
+                System.out.println("[ChuckIDE] Cleanup complete. Exiting.");
+              } catch (Exception ex) {
+                System.err.println("[ChuckIDE] Error during shutdown:");
+                ex.printStackTrace();
+              } finally {
+                // Final hammer: ensure the process actually dies
+                Runtime.getRuntime().halt(0);
+              }
+            },
+            "IDE-Shutdown-Thread");
+
+    shutdownThread.setDaemon(true);
+    shutdownThread.start();
   }
 
   private void loadPreferences() {
@@ -359,9 +373,20 @@ public class ChuckIDE extends Application {
     MenuItem saveDslItem = new MenuItem("Save as Java DSL...");
     saveDslItem.setOnAction(e -> saveAsJavaDSL());
 
+    MenuItem exitItem = new MenuItem("Exit");
+    exitItem.setAccelerator(new KeyCodeCombination(KeyCode.Q, KeyCombination.CONTROL_DOWN));
+    exitItem.setOnAction(e -> shutdown());
+
     fileMenu
         .getItems()
-        .addAll(newItem, openItem, recentMenu, saveItem, saveDslItem, new SeparatorMenuItem());
+        .addAll(
+            newItem,
+            openItem,
+            recentMenu,
+            saveItem,
+            saveDslItem,
+            new SeparatorMenuItem(),
+            exitItem);
 
     // Edit Menu
     Menu editMenu = new Menu("_Edit");
