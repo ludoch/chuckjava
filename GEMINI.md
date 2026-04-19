@@ -38,30 +38,29 @@ Operate using a **Research -> Strategy -> Execution** lifecycle.
 ## Project-Specific Commands
 
 ```bash
-# Compile
-mvn compile
-
-# Format code
-mvn spotless:apply
-
 # Full validation (regressions + code style + tests)
 mvn clean package
 
-# Run all JVM tests
-mvn test
+# Run Sequencer E2E Regression Tests (Headless/Virtual Time)
+mvn -pl sequencer test -Dtest=SequencerEngineTest
 
-# Run ANTLR parser test against all examples
-mvn test -Dtest=ParseAllExamplesTest
+# Run Standalone Sequencer (Normal)
+mvn -pl sequencer javafx:run
 
-# Build GraalVM native image
-mvn -Pnative package -DskipTests
-
-# Build IDE bundle
-mvn -Pide-bundle package -DskipTests
-
-# Publish Maven artifact (requires GITHUB_TOKEN and proper settings.xml)
-mvn deploy -DskipTests
+# Run Standalone Sequencer with full Diagnostics (Level 2)
+mvn -pl sequencer javafx:run -Dchuck.loglevel=2
 ```
+
+## Sequencer Stability & Regression
+
+The Sequencer relies on a delicate Java-to-ChucK synchronization layer. To prevent regressions:
+1.  **ALWAYS run `SequencerEngineTest`** after any change to the VM, `SndBuf`, or `sequencer_setup.ck`.
+2.  **Audio Dummy Mode:** Tests use `-Dchuck.audio.dummy=true` to simulate the audio path without physical hardware. This is essential for CI and headless environments.
+3.  **Log Levels:** The engine script (`sequencer_setup.ck`) respects `Machine.loglevel()`. 
+    - Level 1 (Default): Silent.
+    - Level 2: Trigger logs and DAC output monitoring.
+    - Level 3: Debug beeps for every trigger.
+4.  **Array Linking:** The engine re-links Java arrays *inside* the loop via `Machine.getGlobalObject`. Never revert to static `global` array declarations which can cause `ArrayOutOfBounds` during engine reloads.
 
 ## Critical Files
 
