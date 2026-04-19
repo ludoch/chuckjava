@@ -1,14 +1,14 @@
 /* 
-   CHUCK GRID SEQUENCER PRO SETUP (v3.4 - Stability Fix)
+   CHUCK GRID SEQUENCER PRO SETUP (v3.5 - Persistent Diagnostics)
    ------------------------------
 */
 
-<<< "--- ENGINE STARTING (v3.4) ---" >>>;
+<<< "--- ENGINE STARTING (v3.5) ---" >>>;
 
 // 1. Setup Drum Kit (8 tracks)
 SndBuf kit[8];
 Gain master => dac;
-0.6 => master.gain;
+0.7 => master.gain;
 
 // Load samples
 "examples/data/kick.wav" => kit[0].read;
@@ -20,7 +20,7 @@ Gain master => dac;
 "examples/book/digital-artists/audio/click_01.wav" => kit[6].read;
 "examples/data/snare-hop.wav" => kit[7].read;
 
-// Initialize
+// Initialize: set to end of buffer
 for(0 => int i; i < 8; i++) {
     kit[i] => master;
     kit[i].samples() => kit[i].pos;
@@ -32,9 +32,6 @@ global int seq_current_step;
 // Internal references
 int data[];
 float probs[];
-
-// Helper for logging
-fun int isVerbose() { return Machine.loglevel() >= 2; }
 
 // Timing logic (120 BPM)
 125::ms => dur T;
@@ -50,29 +47,35 @@ while(true) {
     Machine.getGlobalObject("seq_probability") $ float[] @=> probs;
 
     if (data != null) {
-        // HEARTBEAT (Log Level 2+)
-        if (step % 16 == 0 && isVerbose()) <<< "HEARTBEAT: Step 0, Pattern[0] =", data[0] >>>;
+        // HEARTBEAT
+        if (step % 16 == 0) <<< "HEARTBEAT: Step 0, Pattern[0] =", data[0] >>>;
 
-        // 3. Check all 8 rows for the current step
+        // 3. Process Triggers
         for(0 => int r; r < 8; r++) {
             data[r * 16 + (step % 16)] => int val;
             
             if (val != 0) {
-                // Default to 100% probability
-                1.0 => float p;
-                if (probs != null && r < probs.cap()) probs[r] => p;
-
-                if (p >= 1.0 || Math.randomf() <= p) {
-                    0 => kit[r].pos; // TRIGGER
-                    if (isVerbose()) <<< "TRIGGER: Row", r, "Step", (step % 16) >>>;
-                }
+                0 => kit[r].pos; // TRIGGER DRUM
+                <<< "TRIGGER: Row", r, "Step", (step % 16) >>>;
+                
+                // Temporary verification oscillator (subtle)
+                SinOsc s => dac; 
+                440 + (r * 100) => s.freq; 
+                0.05 => s.gain; 
+                2::ms => now; 
+                0 => s.gain;
             }
         }
     } else {
         if (step % 8 == 0) <<< "WAITING FOR JAVA DATA..." >>>;
     }
 
-    // 4. Advance time
+    // 4. DAC Output Monitor (Always on)
+    master.last() => float out;
+    if (Math.abs(out) > 0.001) {
+        <<< ">>> DAC OUTPUT Level:", out, ">>>" >>>;
+    }
+    
     T => now;
     step++;
 }
