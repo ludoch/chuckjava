@@ -341,7 +341,7 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
     this.onNextPark = r;
   }
 
-  private void notifyParked() {
+  public void notifyParked() {
     if (onNextPark != null) {
       onNextPark.run();
       onNextPark = null;
