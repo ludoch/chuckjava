@@ -1,14 +1,14 @@
 /* 
-   CHUCK GRID SEQUENCER PRO SETUP (v3.0 - Visual Debug)
+   CHUCK GRID SEQUENCER PRO SETUP (v3.1 - FINAL)
    ------------------------------
 */
 
-<<< "--- ENGINE STARTING (v3.0) ---" >>>;
+<<< "--- ENGINE STARTING (v3.1) ---" >>>;
 
 // 1. Setup Drum Kit (8 tracks)
 SndBuf kit[8];
 Gain master => dac;
-0.6 => master.gain;
+0.5 => master.gain;
 
 // Load samples
 "examples/data/kick.wav" => kit[0].read;
@@ -20,7 +20,7 @@ Gain master => dac;
 "examples/book/digital-artists/audio/click_01.wav" => kit[6].read;
 "examples/data/snare-hop.wav" => kit[7].read;
 
-// Initialize: connect all to master and set to end (silent)
+// Initialize: set all to end (silent)
 for(0 => int i; i < 8; i++) {
     kit[i] => master;
     kit[i].samples() => kit[i].pos;
@@ -39,35 +39,39 @@ T - (now % T) => now;
 
 0 => int step;
 while(true) {
+    // 1. Sync cursor to UI
     step % 16 => seq_current_step;
     
-    // FETCH GLOBALS EACH LOOP
+    // 2. Refresh data from Java VM
     Machine.getGlobalObject("seq_pattern") $ int[] @=> data;
     Machine.getGlobalObject("seq_probability") $ float[] @=> probs;
 
     if (data == null) {
-        if (step % 8 == 0) <<< "WAITING FOR JAVA GRID DATA..." >>>;
+        if (step % 8 == 0) <<< "STATUS: Waiting for Java Grid Data..." >>>;
     } else {
-        if (step % 16 == 0) <<< "LOOP START: data[0] is", data[0] >>>;
-        
+        // HEARTBEAT: Show engine is alive and reading index 0
+        if (step % 16 == 0) <<< "HEARTBEAT: Step 0, Pattern[0] =", data[0] >>>;
+
+        // 3. Process Triggers
         for(0 => int r; r < 8; r++) {
             data[r * 16 + (step % 16)] => int val;
             if (val > 0) {
+                // Apply probability
                 1.0 => float p;
                 if (probs != null && r < probs.cap()) probs[r] => p;
 
                 if (Math.randomf() <= p) {
-                    0 => kit[r].pos;
+                    0 => kit[r].pos; // TRIGGER
                     <<< "TRIGGER: Row", r, "Step", (step % 16) >>>;
                 }
             }
         }
     }
 
-    // Audio Emission Monitor (print if non-zero)
-    master.last() => float output;
-    if (Math.abs(output) > 0.001) {
-        <<< "DAC OUTPUT Level:", output >>>;
+    // 4. DAC Output Monitor (print only if non-zero)
+    master.last() => float out;
+    if (Math.abs(out) > 0.001) {
+        <<< "--- DAC LEVEL:", out, "---" >>>;
     }
     
     T => now;
