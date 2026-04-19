@@ -68,6 +68,7 @@ public class UGenRegistry {
 
     // --- Effects ---
     register("Echo", (sr, args) -> new Echo((int) (sr * 2)));
+    register("PingPongDelay", (sr, args) -> new org.chuck.audio.fx.PingPongDelay(sr));
     register("Delay", (sr, args) -> new Delay((int) (sr * 2), sr));
     register("DelayL", (sr, args) -> new DelayL((int) (sr * 2), sr));
     register("DelayA", (sr, args) -> new DelayA((int) (sr * 2), sr));
