@@ -84,35 +84,24 @@ public class SndBuf extends ChuckUGen {
     // Try loading as a real file
     try {
       java.io.File file = org.chuck.core.ChuckConfig.resolveFile(path);
-      javax.sound.sampled.AudioInputStream ais;
-      if (file.exists()) {
+      javax.sound.sampled.AudioInputStream ais = null;
+      if (file != null && file.exists()) {
         ais = javax.sound.sampled.AudioSystem.getAudioInputStream(file);
       } else {
         // Try resource fallback
-        String resourcePath = path.startsWith("/") ? path : "/" + path;
-        java.io.InputStream ris = SndBuf.class.getResourceAsStream(resourcePath);
-        if (ris == null) {
-          // Try removing chuck-core prefix if present
-          String altPath = resourcePath.replace("/chuck-core/", "/");
-          ris = SndBuf.class.getResourceAsStream(altPath);
-
-          if (ris == null) {
-            // Try adding /examples/ if it starts with data/ or book/
-            if (altPath.startsWith("/data/") || altPath.startsWith("/book/")) {
-              ris = SndBuf.class.getResourceAsStream("/examples" + altPath);
-            }
-          }
-        }
-
+        String resourcePath = path.replace("\\", "/");
+        if (!resourcePath.startsWith("/")) resourcePath = "/" + resourcePath;
+        
+        java.io.InputStream ris = findResource(resourcePath);
         if (ris != null) {
-          ais =
-              javax.sound.sampled.AudioSystem.getAudioInputStream(
-                  new java.io.BufferedInputStream(ris));
-        } else {
+          ais = javax.sound.sampled.AudioSystem.getAudioInputStream(new java.io.BufferedInputStream(ris));
+        }
+      }
+
+      if (ais == null) {
           logger.log(Level.SEVERE, "[Audio] SndBuf: File or resource not found: " + path);
           samples = new float[0];
           return;
-        }
       }
 
       javax.sound.sampled.AudioFormat format = ais.getFormat();
@@ -176,6 +165,34 @@ public class SndBuf extends ChuckUGen {
       samples = new float[0];
     }
     pos = 0;
+  }
+
+  private java.io.InputStream findResource(String path) {
+    // 1. Direct match
+    java.io.InputStream is = getResource(path);
+    if (is != null) return is;
+    
+    // 2. Remove module prefix if any
+    if (path.contains("-core/")) {
+        is = getResource(path.substring(path.indexOf("-core/") + 5));
+        if (is != null) return is;
+    }
+    if (path.contains("-samples/")) {
+        is = getResource(path.substring(path.indexOf("-samples/") + 8));
+        if (is != null) return is;
+    }
+    
+    // 3. Try common locations
+    if (path.contains("/data/")) {
+        is = getResource("/examples/data/" + path.substring(path.lastIndexOf("/") + 1));
+        if (is != null) return is;
+    }
+    
+    return null;
+  }
+
+  private java.io.InputStream getResource(String path) {
+    return SndBuf.class.getResourceAsStream(path);
   }
 
   public String read(String path) {

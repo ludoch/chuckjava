@@ -63,7 +63,8 @@ public class ChuckToDSLConverterTest {
 
     System.out.println(javaCode);
 
-    assertTrue(javaCode.contains("long myFreq = 100"));
+    assertTrue(javaCode.contains("public long myFreq = (long)(0)"));
+    assertTrue(javaCode.contains("myFreq = 100"));
     assertTrue(javaCode.contains("s.freq(myFreq)"));
     assertTrue(javaCode.contains("myFreq = (long)(1000)"));
     assertTrue(javaCode.contains("s.chuck(dac())"));
@@ -153,5 +154,69 @@ public class ChuckToDSLConverterTest {
 
     assertTrue(javaCode.contains("e.timeout(ms(100))"));
     assertTrue(javaCode.contains("if (advance(e))"));
+  }
+
+  @Test
+  public void testMultiVariableMixedInitialization() throws Exception {
+    String source = """
+        int a, b, c;
+        1 => a;
+        10 => int y;
+        int x, z;
+        """;
+
+    var input = CharStreams.fromString(source);
+    var lexer = new ChuckANTLRLexer(input);
+    var tokens = new CommonTokenStream(lexer);
+    var parser = new ChuckANTLRParser(tokens);
+
+    var visitor = new ChuckASTVisitor(tokens);
+    @SuppressWarnings("unchecked")
+    List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
+
+    var converter = new ChuckToDSLConverter();
+    String javaCode = converter.convert(ast, "MultiVarShred");
+
+    System.out.println(javaCode);
+
+    assertTrue(javaCode.contains("public long a = (long)(0)"));
+    assertTrue(javaCode.contains("public long b = (long)(0)"));
+    assertTrue(javaCode.contains("public long c = (long)(0)"));
+    assertTrue(javaCode.contains("public long x = (long)(0)"));
+    assertTrue(javaCode.contains("public long y = (long)(0)"));
+    assertTrue(javaCode.contains("public long z = (long)(0)"));
+    
+    // Check initializations in shred()
+    assertTrue(javaCode.contains("a = (long)(1)"));
+    assertTrue(javaCode.contains("y = 10"));
+  }
+
+  @Test
+  public void testInterfaceMapping() throws Exception {
+    String source = """
+        public interface MyMappable {
+            fun void map(int x);
+            fun float get();
+        }
+        """;
+
+    var input = CharStreams.fromString(source);
+    var lexer = new ChuckANTLRLexer(input);
+    var tokens = new CommonTokenStream(lexer);
+    var parser = new ChuckANTLRParser(tokens);
+
+    var visitor = new ChuckASTVisitor(tokens);
+    @SuppressWarnings("unchecked")
+    List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
+
+    var converter = new ChuckToDSLConverter();
+    String javaCode = converter.convert(ast, "InterfaceShred");
+
+    System.out.println(javaCode);
+
+    assertTrue(javaCode.contains("public interface MyMappable"));
+    assertTrue(javaCode.contains("public void map(long x);"));
+    assertTrue(javaCode.contains("public double get();"));
+    assertFalse(javaCode.contains("public void map(long x) {"));
   }
 }

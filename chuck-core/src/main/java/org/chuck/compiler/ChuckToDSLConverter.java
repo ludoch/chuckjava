@@ -85,6 +85,10 @@ public class ChuckToDSLConverter {
                 + "[]".repeat(field.arraySizes().size() - 1);
       } else if (isUGen(type)) {
         init = " = new " + type + "()";
+      } else if (type.equals("ChuckDuration")) {
+        init = " = new ChuckDuration(0)";
+      } else if (isPrimitive(type)) {
+        init = " = (" + type + ")(0)";
       }
       sb.append(indent("public " + type + " " + field.name() + init + ";", 1)).append("\n");
     }
@@ -148,28 +152,48 @@ public class ChuckToDSLConverter {
     if (stmts == null) return;
     for (ChuckAST.Stmt s : stmts) {
       if (s instanceof ChuckAST.DeclStmt ds) {
-        fields.add(ds);
-        String type = mapType(ds.type());
-        varTypes.put(ds.name(), type);
-        if (ds.isGlobal()) globals.add(ds.name());
-
-        // Array tracking for auto-init
-        if (ds.arraySizes() != null && !ds.arraySizes().isEmpty()) {
-          String baseType = type;
-          while (baseType.endsWith("[]")) baseType = baseType.substring(0, baseType.length() - 2);
-          if (!isPrimitive(baseType)) {
-            arraysToInit.add(ds);
-          }
-        }
+        addField(ds);
+      } else if (s instanceof ChuckAST.ExpStmt es) {
+        collectFromExp(es.exp());
       } else if (s instanceof ChuckAST.IfStmt is) {
         collectFields(List.of(is.thenBranch()));
         if (is.elseBranch() != null) collectFields(List.of(is.elseBranch()));
       } else if (s instanceof ChuckAST.WhileStmt ws) {
         collectFields(List.of(ws.body()));
       } else if (s instanceof ChuckAST.ForStmt fs) {
+        if (fs.init() != null) collectFields(List.of(fs.init()));
         collectFields(List.of(fs.body()));
       } else if (s instanceof ChuckAST.BlockStmt bs) {
         collectFields(bs.statements());
+      }
+    }
+  }
+
+  private void collectFromExp(ChuckAST.Exp exp) {
+    if (exp instanceof ChuckAST.DeclExp de) {
+      addField(new ChuckAST.DeclStmt(
+          de.type(), de.name(), de.arraySizes(), de.callArgs(),
+          de.isReference(), de.isStatic(), de.isGlobal(), de.isConst(),
+          de.access(), de.doc(), de.line(), de.column()));
+    } else if (exp instanceof ChuckAST.BinaryExp be) {
+      collectFromExp(be.lhs());
+      collectFromExp(be.rhs());
+    }
+  }
+
+  private void addField(ChuckAST.DeclStmt ds) {
+    if (fields.stream().anyMatch(f -> f.name().equals(ds.name()))) return;
+    fields.add(ds);
+    String type = mapType(ds.type());
+    varTypes.put(ds.name(), type);
+    if (ds.isGlobal()) globals.add(ds.name());
+
+    // Array tracking for auto-init
+    if (ds.arraySizes() != null && !ds.arraySizes().isEmpty()) {
+      String baseType = type;
+      while (baseType.endsWith("[]")) baseType = baseType.substring(0, baseType.length() - 2);
+      if (!isPrimitive(baseType)) {
+        arraysToInit.add(ds);
       }
     }
   }
@@ -183,6 +207,8 @@ public class ChuckToDSLConverter {
     }
     return sb.toString();
   }
+
+  private boolean isInterfaceMode = false;
 
   private String visitStmt(ChuckAST.Stmt stmt) {
     String comment = formatComment(stmt.doc(), 0);
@@ -239,7 +265,7 @@ public class ChuckToDSLConverter {
       if (ds.arraySizes() != null && !ds.arraySizes().isEmpty()) {
           // If it is a field, it was already declared as field in convert()
           // We only want to avoid re-declaring the type here.
-          if (fields.contains(ds)) {
+          if (varTypes.containsKey(ds.name())) {
               // It is already initialized via arraysToInit block at start of shred()
               return "";
           }
@@ -247,7 +273,7 @@ public class ChuckToDSLConverter {
 
       StringBuilder sb = new StringBuilder();
       // If it's a field, only emit the initialization part
-      boolean isAlreadyField = fields.contains(ds);
+      boolean isAlreadyField = varTypes.containsKey(ds.name());
       if (!isAlreadyField) {
           sb.append(type).append(" ").append(ds.name());
       } else {
@@ -368,7 +394,12 @@ public class ChuckToDSLConverter {
         varTypes.put(fds.argNames().get(i), argType);
         sb.append(argType).append(" ").append(fds.argNames().get(i));
       }
-      sb.append(") ").append(visitStmt(fds.body()));
+      sb.append(")");
+      if (isInterfaceMode) {
+        sb.append(";");
+      } else {
+        sb.append(" ").append(visitStmt(fds.body()));
+      }
       return sb.toString();
     } else if (stmt instanceof ChuckAST.ClassDefStmt cds) {
       StringBuilder sb = new StringBuilder();
@@ -381,12 +412,15 @@ public class ChuckToDSLConverter {
         sb.append(" extends ").append(mapType(cds.parentName()));
       }
       sb.append(" {\n");
+      boolean oldInterfaceMode = isInterfaceMode;
+      isInterfaceMode = cds.isInterface();
       for (ChuckAST.Stmt s : cds.body()) {
         if (s instanceof ChuckAST.DeclStmt ds) {
           varTypes.put(ds.name(), mapType(ds.type()));
         }
         sb.append(indent(visitStmt(s), 1)).append("\n");
       }
+      isInterfaceMode = oldInterfaceMode;
       sb.append("}");
       return sb.toString();
     }
@@ -477,8 +511,13 @@ public class ChuckToDSLConverter {
                 (isPrimitive(deType) && !(be.lhs() instanceof ChuckAST.IntExp) && !(be.lhs() instanceof ChuckAST.FloatExp))
                     ? "(" + deType + ")"
                     : "";
+
+            if (fields.stream().anyMatch(f -> f.name().equals(de.name()))) {
+                return de.name() + " = " + cast + lhsCode;
+            }
             return deType + " " + de.name() + " = " + cast + lhsCode;
-            }        }
+          }
+        }
 
         // val => s.freq
         if (be.rhs() instanceof ChuckAST.DotExp de) {

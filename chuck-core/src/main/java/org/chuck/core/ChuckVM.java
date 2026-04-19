@@ -513,6 +513,7 @@ public class ChuckVM {
         }
       }
       String source = java.nio.file.Files.readString(file.toPath());
+      ChuckConfig.setCurrentScriptDir(file.getParent());
 
       int id = run(source, file.getAbsolutePath());
 

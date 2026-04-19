@@ -45,6 +45,7 @@ The `ChuckToDSLConverter` is a source-to-source translator that converts ChucK (
 ### 5. Definitions
 -   **Function Definitions**: `fun void foo() { ... }` is mapped to a Java method within the `Shred` class.
 -   **Class Definitions**: `class Bar { ... }` is mapped to an inner class within the `Shred` class.
+-   **Interface Definitions**: `interface MyInt { fun void x(); }` is mapped to Java interfaces with abstract method signatures.
 
 ### 6. Concurrency
 -   **Sporking**: `spork ~ call()` is mapped to `spork(() -> call())`.
@@ -76,9 +77,9 @@ Core UGens like `SinOsc`, `SndBuf`, and `Gain` have been extended with ChucK-idi
 -   **Note**: Conjunctions (`e1 && e2 => now`) and Disjunctions (`e1 || e2 => now`) are now fully supported.
 
 ### 2. Multi-variable Declarations with Mixed Init
--   **Status**: ⚠️ Partial.
--   **Limitation**: `int a, b=1, c;` might need more complex splitting logic in the visitor to produce valid Java.
+-   **Status**: ✅ Supported.
+-   **Note**: `int a, b, c;` and `10 => int x;` patterns are correctly mapped as class fields.
 
 ### 3. Operator Overloading
 -   **Status**: ⚠️ Partial.
--   **Limitation**: Standard Java binary operators (`+`, `-`, etc.) won't automatically call custom overloaded methods in the generated DSL.
+-   **Limitation**: While operator methods (e.g., `__op__plus`) are correctly emitted, standard Java binary operators (`+`, `-`, etc.) won't automatically call these methods in the generated DSL.
