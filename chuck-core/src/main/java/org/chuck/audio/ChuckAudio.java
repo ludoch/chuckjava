@@ -516,6 +516,12 @@ public class ChuckAudio {
   }
 
   private void initJavaSound() {
+    if (Boolean.getBoolean("chuck.audio.dummy")) {
+      logger.info("[Audio] Using dummy audio engine (CI/Headless mode)");
+      effectiveBufferSize = bufferSize;
+      actualSampleRate = sampleRate;
+      return;
+    }
     gainSmoothAlpha = (float) (1.0 - Math.exp(-1.0 / (sampleRate * 0.02)));
 
     // ── Output ───────────────────────────────────────────────────────────────

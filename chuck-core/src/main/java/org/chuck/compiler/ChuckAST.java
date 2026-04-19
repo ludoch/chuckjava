@@ -1,7 +1,11 @@
 package org.chuck.compiler;
 
+import java.util.List;
+
 /** Base interface for all Abstract Syntax Tree nodes. */
 public sealed interface ChuckAST {
+  String doc();
+
   int line();
 
   int column();
@@ -61,41 +65,42 @@ public sealed interface ChuckAST {
 
   // --- Expression Nodes ---
 
-  record IntExp(long value, int line, int column) implements Exp {}
+  record IntExp(long value, String doc, int line, int column) implements Exp {}
 
-  record FloatExp(double value, int line, int column) implements Exp {}
+  record FloatExp(double value, String doc, int line, int column) implements Exp {}
 
-  record StringExp(String value, int line, int column) implements Exp {}
+  record StringExp(String value, String doc, int line, int column) implements Exp {}
 
-  record IdExp(String name, int line, int column) implements Exp {}
+  record IdExp(String name, String doc, int line, int column) implements Exp {}
 
-  record MeExp(int line, int column) implements Exp {}
+  record MeExp(String doc, int line, int column) implements Exp {}
 
-  record BinaryExp(Exp lhs, Operator op, Exp rhs, int line, int column) implements Exp {}
-
-  record UnaryExp(Operator op, Exp exp, int line, int column) implements Exp {}
-
-  record CallExp(Exp base, java.util.List<Exp> args, int line, int column) implements Exp {}
-
-  record DotExp(Exp base, String member, int line, int column) implements Exp {}
-
-  record ArrayLitExp(java.util.List<Exp> elements, int line, int column) implements Exp {}
-
-  record VectorLitExp(java.util.List<Exp> elements, int line, int column) implements Exp {}
-
-  record ComplexLit(Exp re, Exp im, int line, int column) implements Exp {}
-
-  record PolarLit(Exp mag, Exp phase, int line, int column) implements Exp {}
-
-  record ArrayAccessExp(Exp base, java.util.List<Exp> indices, int line, int column)
+  record BinaryExp(Exp lhs, Operator op, Exp rhs, String doc, int line, int column)
       implements Exp {}
 
-  record SporkExp(CallExp call, int line, int column) implements Exp {}
+  record UnaryExp(Operator op, Exp exp, String doc, int line, int column) implements Exp {}
+
+  record CallExp(Exp base, List<Exp> args, String doc, int line, int column) implements Exp {}
+
+  record DotExp(Exp base, String member, String doc, int line, int column) implements Exp {}
+
+  record ArrayLitExp(List<Exp> elements, String doc, int line, int column) implements Exp {}
+
+  record VectorLitExp(List<Exp> elements, String doc, int line, int column) implements Exp {}
+
+  record ComplexLit(Exp re, Exp im, String doc, int line, int column) implements Exp {}
+
+  record PolarLit(Exp mag, Exp phase, String doc, int line, int column) implements Exp {}
+
+  record ArrayAccessExp(Exp base, List<Exp> indices, String doc, int line, int column)
+      implements Exp {}
+
+  record SporkExp(CallExp call, String doc, int line, int column) implements Exp {}
 
   record DeclExp(
       String type,
       String name,
-      java.util.List<Exp> arraySizes,
+      List<Exp> arraySizes,
       Exp callArgs,
       boolean isReference,
       boolean isStatic,
@@ -107,44 +112,47 @@ public sealed interface ChuckAST {
       int column)
       implements Exp {}
 
-  record TernaryExp(Exp condition, Exp thenExp, Exp elseExp, int line, int column) implements Exp {}
+  record TernaryExp(Exp condition, Exp thenExp, Exp elseExp, String doc, int line, int column)
+      implements Exp {}
 
-  record CastExp(Exp value, String targetType, int line, int column) implements Exp {}
+  record CastExp(Exp value, String targetType, String doc, int line, int column) implements Exp {}
 
   /** typeof(expr) — returns the runtime type name of expr as a string */
-  record TypeofExp(Exp expr, int line, int column) implements Exp {}
+  record TypeofExp(Exp expr, String doc, int line, int column) implements Exp {}
 
   /** instanceof(expr, TypeName) — returns 1 if expr is an instance of TypeName, else 0 */
-  record InstanceofExp(Exp expr, String typeName, int line, int column) implements Exp {}
+  record InstanceofExp(Exp expr, String typeName, String doc, int line, int column)
+      implements Exp {}
 
   // --- Statement Nodes ---
 
-  record ImportStmt(String path, int line, int column) implements Stmt {}
+  record ImportStmt(String path, String doc, int line, int column) implements Stmt {}
 
-  record ExpStmt(Exp exp, int line, int column) implements Stmt {}
+  record ExpStmt(Exp exp, String doc, int line, int column) implements Stmt {}
 
-  record IfStmt(Exp condition, Stmt thenBranch, Stmt elseBranch, int line, int column)
+  record IfStmt(Exp condition, Stmt thenBranch, Stmt elseBranch, String doc, int line, int column)
       implements Stmt {}
 
-  record WhileStmt(Exp condition, Stmt body, int line, int column) implements Stmt {}
+  record WhileStmt(Exp condition, Stmt body, String doc, int line, int column) implements Stmt {}
 
-  record UntilStmt(Exp condition, Stmt body, int line, int column) implements Stmt {}
+  record UntilStmt(Exp condition, Stmt body, String doc, int line, int column) implements Stmt {}
 
-  record DoStmt(Stmt body, Exp condition, boolean isUntil, int line, int column) implements Stmt {}
-
-  record ForStmt(Stmt init, Stmt condition, Exp update, Stmt body, int line, int column)
+  record DoStmt(Stmt body, Exp condition, boolean isUntil, String doc, int line, int column)
       implements Stmt {}
 
-  record ReturnStmt(Exp exp, int line, int column) implements Stmt {}
+  record ForStmt(Stmt init, Stmt condition, Exp update, Stmt body, String doc, int line, int column)
+      implements Stmt {}
 
-  record BlockStmt(java.util.List<Stmt> statements, boolean isScoped, int line, int column)
+  record ReturnStmt(Exp exp, String doc, int line, int column) implements Stmt {}
+
+  record BlockStmt(List<Stmt> statements, boolean isScoped, String doc, int line, int column)
       implements Stmt {}
 
   // Declaration statement: int i; or float f[10];
   record DeclStmt(
       String type,
       String name,
-      java.util.List<Exp> arraySizes,
+      List<Exp> arraySizes,
       Exp callArgs,
       boolean isReference,
       boolean isStatic,
@@ -159,8 +167,8 @@ public sealed interface ChuckAST {
   record FuncDefStmt(
       String returnType,
       String name,
-      java.util.List<String> argTypes,
-      java.util.List<String> argNames,
+      List<String> argTypes,
+      List<String> argNames,
       Stmt body,
       boolean isStatic,
       AccessModifier access,
@@ -172,7 +180,7 @@ public sealed interface ChuckAST {
   record ClassDefStmt(
       String name,
       String parentName,
-      java.util.List<Stmt> body,
+      List<Stmt> body,
       boolean isAbstract,
       boolean isInterface,
       AccessModifier access,
@@ -181,23 +189,23 @@ public sealed interface ChuckAST {
       int column)
       implements Stmt {}
 
-  record RepeatStmt(Exp count, Stmt body, int line, int column) implements Stmt {}
+  record RepeatStmt(Exp count, Stmt body, String doc, int line, int column) implements Stmt {}
 
-  record LoopStmt(Stmt body, int line, int column) implements Stmt {}
+  record LoopStmt(Stmt body, String doc, int line, int column) implements Stmt {}
 
   record ForEachStmt(
-      String iterType, String iterName, Exp collection, Stmt body, int line, int column)
+      String iterType, String iterName, Exp collection, Stmt body, String doc, int line, int column)
       implements Stmt {}
 
-  record SwitchStmt(Exp condition, java.util.List<CaseStmt> cases, int line, int column)
+  record SwitchStmt(Exp condition, List<CaseStmt> cases, String doc, int line, int column)
       implements Stmt {}
 
-  record CaseStmt(Exp match, boolean isDefault, java.util.List<Stmt> body, int line, int column)
+  record CaseStmt(Exp match, boolean isDefault, List<Stmt> body, String doc, int line, int column)
       implements Stmt {}
 
-  record BreakStmt(int line, int column) implements Stmt {}
+  record BreakStmt(String doc, int line, int column) implements Stmt {}
 
-  record ContinueStmt(int line, int column) implements Stmt {}
+  record ContinueStmt(String doc, int line, int column) implements Stmt {}
 
-  record PrintStmt(java.util.List<Exp> expressions, int line, int column) implements Stmt {}
+  record PrintStmt(List<Exp> expressions, String doc, int line, int column) implements Stmt {}
 }

@@ -846,29 +846,31 @@ public class ExpressionEmitter {
           }
         } else {
           if (e.op() == ChuckAST.Operator.PLUS) {
-            if (e.lhs() instanceof ChuckAST.IdExp(String fnName, int _, int _)) {
+            if (e.lhs() instanceof ChuckAST.IdExp(String fnName, String _, int _, int _)) {
               boolean isFuncRef =
                   parent.getFunctions().keySet().stream().anyMatch(k -> k.startsWith(fnName + ":"));
               if (isFuncRef)
                 throw error(e, "cannot perform '+' on '[fun]" + fnName + "()' and value");
             }
-            if (e.lhs() instanceof ChuckAST.DotExp lhsDot
-                && lhsDot.base() instanceof ChuckAST.IdExp baseId
-                && parent.getUserClassRegistry().containsKey(baseId.name())) {
-              UserClassDescriptor d = parent.getUserClassRegistry().get(baseId.name());
-              String memName = lhsDot.member();
-              boolean isMemberFunc =
-                  d.methods().containsKey(memName)
-                      || d.staticMethods().keySet().stream()
-                          .anyMatch(k -> k.startsWith(memName + ":"));
-              if (isMemberFunc)
-                throw error(
-                    e,
-                    "cannot perform '+' on '[fun]"
-                        + baseId.name()
-                        + "."
-                        + memName
-                        + "()' and value");
+            if (e.lhs()
+                instanceof
+                ChuckAST.DotExp(ChuckAST.Exp base, String memName, String _, int _, int _)) {
+              if (base instanceof ChuckAST.IdExp baseId
+                  && parent.getUserClassRegistry().containsKey(baseId.name())) {
+                UserClassDescriptor d = parent.getUserClassRegistry().get(baseId.name());
+                boolean isMemberFunc =
+                    d.methods().containsKey(memName)
+                        || d.staticMethods().keySet().stream()
+                            .anyMatch(k -> k.startsWith(memName + ":"));
+                if (isMemberFunc)
+                  throw error(
+                      e,
+                      "cannot perform '+' on '[fun]"
+                          + baseId.name()
+                          + "."
+                          + memName
+                          + "()' and value");
+              }
             }
           }
           {

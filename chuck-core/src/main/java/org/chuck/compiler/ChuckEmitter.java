@@ -71,7 +71,7 @@ public class ChuckEmitter {
       org.antlr.v4.runtime.CommonTokenStream tokens =
           new org.antlr.v4.runtime.CommonTokenStream(lexer);
       ChuckANTLRParser parser = new ChuckANTLRParser(tokens);
-      ChuckASTVisitor visitor = new ChuckASTVisitor();
+      ChuckASTVisitor visitor = new ChuckASTVisitor(tokens);
       @SuppressWarnings("unchecked")
       List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
       importCache.put(pathStr, ast);

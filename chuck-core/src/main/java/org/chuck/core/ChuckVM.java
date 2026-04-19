@@ -427,7 +427,7 @@ public class ChuckVM {
         throw new ChuckCompilerException(errors.get(0), name, errorLines.get(0), errorCols.get(0));
       }
 
-      ChuckASTVisitor visitor = new ChuckASTVisitor();
+      ChuckASTVisitor visitor = new ChuckASTVisitor(tokens);
       @SuppressWarnings("unchecked")
       List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(programCtx);
 

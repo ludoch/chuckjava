@@ -88,7 +88,7 @@ public class AntlrExamplesTester {
               });
 
           // 2. Visit (Map to AST)
-          ChuckASTVisitor visitor = new ChuckASTVisitor();
+          ChuckASTVisitor visitor = new ChuckASTVisitor(tokens);
           @SuppressWarnings("unchecked")
           List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
 

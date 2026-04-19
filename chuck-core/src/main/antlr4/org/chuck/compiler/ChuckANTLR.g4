@@ -261,7 +261,7 @@ RTRIPLE      : '>>>';
 fragment ESC : '\\' . ;
 
 WS : [ \t\r\n]+ -> skip ;
-COMMENT : '//' ~[\r\n]* -> skip ;
-DOC_COMMENT : '/**' .*? '*/' ;
-MULTILINE_COMMENT : '/*' ~[*] .*? '*/' -> skip ;
+COMMENT : '//' ~[\r\n]* -> channel(HIDDEN) ;
+DOC_COMMENT : '/**' .*? '*/' -> channel(HIDDEN) ;
+MULTILINE_COMMENT : '/*' .*? '*/' -> channel(HIDDEN) ;
 
