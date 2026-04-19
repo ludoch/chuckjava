@@ -65,7 +65,7 @@ public class ChuckToDSLConverterTest {
 
     assertTrue(javaCode.contains("long myFreq = 100"));
     assertTrue(javaCode.contains("s.freq(myFreq)"));
-    assertTrue(javaCode.contains("myFreq = 1000"));
+    assertTrue(javaCode.contains("myFreq = (long)(1000)"));
     assertTrue(javaCode.contains("s.chuck(dac())"));
   }
 

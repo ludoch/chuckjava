@@ -22,6 +22,15 @@ public class ChuckToDSLConverter {
     varTypes.clear();
     arraysToInit.clear();
     fields.clear();
+    
+    for (ChuckAST.Stmt s : program) {
+      if (s instanceof ChuckAST.DeclStmt ds) {
+        String type = mapType(ds.type());
+        varTypes.put(ds.name(), type);
+        if (ds.isGlobal()) globals.add(ds.name());
+      }
+    }
+
     StringBuilder sb = new StringBuilder();
     sb.append("import static org.chuck.core.ChuckDSL.*;\n");
     sb.append("import org.chuck.audio.*;\n");
@@ -34,29 +43,50 @@ public class ChuckToDSLConverter {
 
     sb.append("public class ").append(className).append(" implements Shred {\n");
 
-    List<ChuckAST.FuncDefStmt> methods = new ArrayList<>();
-    List<ChuckAST.ClassDefStmt> classes = new ArrayList<>();
-    List<ChuckAST.Stmt> shredBody = new ArrayList<>();
-    for (ChuckAST.Stmt s : program) {
-      if (s instanceof ChuckAST.FuncDefStmt fs) {
-        methods.add(fs);
-      } else if (s instanceof ChuckAST.ClassDefStmt cs) {
-        classes.add(cs);
-      } else {
-        shredBody.add(s);
-      }
-    }
+    List<ChuckAST.FuncDefStmt> methods =
+        program.stream()
+            .filter(s -> s instanceof ChuckAST.FuncDefStmt)
+            .map(s -> (ChuckAST.FuncDefStmt) s)
+            .toList();
+    List<ChuckAST.ClassDefStmt> classes =
+        program.stream()
+            .filter(s -> s instanceof ChuckAST.ClassDefStmt)
+            .map(s -> (ChuckAST.ClassDefStmt) s)
+            .toList();
+    List<ChuckAST.Stmt> shredBody =
+        program.stream()
+            .filter(
+                s ->
+                    !(s instanceof ChuckAST.FuncDefStmt)
+                        && !(s instanceof ChuckAST.ClassDefStmt))
+            .toList();
 
     collectFields(program);
 
     // 2. Emit Fields
     isFieldMode = true;
+    Set<String> emittedFields = new HashSet<>();
     for (ChuckAST.DeclStmt field : fields) {
+      if (emittedFields.contains(field.name())) continue;
+      emittedFields.add(field.name());
       String type = mapType(field.type());
-      String init = isUGen(type) ? " = new " + type + "()" : "";
+      String init = "";
+      if (field.arraySizes() != null && !field.arraySizes().isEmpty()) {
+        String baseType = type;
+        while (baseType.endsWith("[]")) baseType = baseType.substring(0, baseType.length() - 2);
+        String size = visitExp(field.arraySizes().get(0));
+        if (size.equals("-1") || size.startsWith("(-1")) size = "0";
+        init =
+            " = new "
+                + baseType
+                + "["
+                + size
+                + "]"
+                + "[]".repeat(field.arraySizes().size() - 1);
+      } else if (isUGen(type)) {
+        init = " = new " + type + "()";
+      }
       sb.append(indent("public " + type + " " + field.name() + init + ";", 1)).append("\n");
-      // Populate arraysToInit etc.
-      visitStmt(field);
     }
     isFieldMode = false;
     sb.append("\n");
@@ -93,15 +123,7 @@ public class ChuckToDSLConverter {
         String loopVar = "i_" + ds.name();
         sb.append(
             indent(
-                "for (int "
-                    + loopVar
-                    + " = 0; "
-                    + loopVar
-                    + " < "
-                    + ds.name()
-                    + ".length; "
-                    + loopVar
-                    + "++) {\n",
+                "for (int " + loopVar + " = 0; " + loopVar + " < " + ds.name() + ".length; " + loopVar + "++) {\n",
                 2));
         String init = isUGen(baseType) ? "new " + baseType + "()" : "new " + baseType + "()";
         sb.append(indent(ds.name() + "[" + loopVar + "] = " + init + ";\n", 3));
@@ -111,8 +133,6 @@ public class ChuckToDSLConverter {
     }
 
     for (ChuckAST.Stmt stmt : shredBody) {
-      // In the shred method, if it's a DeclStmt that is already a field,
-      // it might only emit its connection.
       String s = visitStmt(stmt);
       if (s != null && !s.isEmpty()) {
         sb.append(indent(s, 2)).append("\n");
@@ -132,6 +152,15 @@ public class ChuckToDSLConverter {
         String type = mapType(ds.type());
         varTypes.put(ds.name(), type);
         if (ds.isGlobal()) globals.add(ds.name());
+
+        // Array tracking for auto-init
+        if (ds.arraySizes() != null && !ds.arraySizes().isEmpty()) {
+          String baseType = type;
+          while (baseType.endsWith("[]")) baseType = baseType.substring(0, baseType.length() - 2);
+          if (!isPrimitive(baseType)) {
+            arraysToInit.add(ds);
+          }
+        }
       } else if (s instanceof ChuckAST.IfStmt is) {
         collectFields(List.of(is.thenBranch()));
         if (is.elseBranch() != null) collectFields(List.of(is.elseBranch()));
@@ -193,28 +222,9 @@ public class ChuckToDSLConverter {
       String type = mapType(ds.type());
       varTypes.put(ds.name(), type);
       if (isFieldMode) {
-        // Handle array declaration tracking
-        if (ds.arraySizes() != null && !ds.arraySizes().isEmpty()) {
-          String baseType = type;
-          while (baseType.endsWith("[]")) baseType = baseType.substring(0, baseType.length() - 2);
-          if (!isPrimitive(baseType)) {
-            arraysToInit.add(ds);
-          }
-        }
         return null;
       }
-      if (!isFieldMode) {
-        // If it has an initial connection/assignment, we should emit it here.
-        if (ds.callArgs() instanceof ChuckAST.BinaryExp be && be.op() == ChuckAST.Operator.CHUCK) {
-          String lhs = visitExp(be.lhs());
-          String rhs = visitExp(be.rhs());
-          if (isPrimitive(type)) {
-            return ds.name() + " = (" + type + ")(" + lhs + ");";
-          }
-          return ds.name() + ".chuck(" + rhs + ");";
-        }
-        return "";
-      }
+
       if (ds.isGlobal()) {
         String getter =
             switch (type) {
@@ -224,63 +234,65 @@ public class ChuckToDSLConverter {
             };
         return type + " " + ds.name() + " = (" + type + ")" + getter + ";";
       }
-      StringBuilder sb = new StringBuilder();
-
+      
       // Handle array declaration
       if (ds.arraySizes() != null && !ds.arraySizes().isEmpty()) {
-        String baseType = type;
-        while (baseType.endsWith("[]")) baseType = baseType.substring(0, baseType.length() - 2);
-
-        if (!isPrimitive(baseType)) {
-          arraysToInit.add(ds);
-        }
-
-        sb.append(baseType)
-            .append("[] ".repeat(ds.arraySizes().size()))
-            .append(ds.name())
-            .append(" = new ")
-            .append(baseType)
-            .append("[")
-            .append(visitExp(ds.arraySizes().get(0)))
-            .append("]")
-            .append("[]".repeat(ds.arraySizes().size() - 1))
-            .append(";");
-        return sb.toString();
+          // If it is a field, it was already declared as field in convert()
+          // We only want to avoid re-declaring the type here.
+          if (fields.contains(ds)) {
+              // It is already initialized via arraysToInit block at start of shred()
+              return "";
+          }
       }
 
-      // Base declaration
-      if (!isFieldMode && fields.contains(ds)) {
-        // It is a field, already declared. Only emit initialization if any.
-        if (isPrimitive(type)) {
-          return ds.name() + " = 0;";
-        }
-        return "";
-      }
-      sb.append(type).append(" ").append(ds.name());
-      if (isPrimitive(type)) {
-        sb.append(" = 0;"); // Default for primitives, will be overridden by connection if any
-        if (type.equals("ChuckDuration")) sb.setLength(sb.length() - 2); // remove "0;"
-        if (type.equals("ChuckDuration")) sb.append(" = samp(0);");
-      } else if (isUGen(type)) {
-        sb.append(" = new ").append(type).append("();");
+      StringBuilder sb = new StringBuilder();
+      // If it's a field, only emit the initialization part
+      boolean isAlreadyField = fields.contains(ds);
+      if (!isAlreadyField) {
+          sb.append(type).append(" ").append(ds.name());
       } else {
-        sb.append(" = new ").append(type).append("();");
+          // It's a field, we just need the name for assignment if any
       }
 
       // Handle connection in declaration: SinOsc s => dac;
       if (ds.callArgs() instanceof ChuckAST.BinaryExp be && be.op() == ChuckAST.Operator.CHUCK) {
-        if (type.equals("long") || type.equals("double") || type.equals("ChuckDuration")) {
-          sb.setLength(sb.length() - 1); // remove last ";"
-          sb.append(" = ").append(visitExp(be.lhs())).append(";");
+        String lhs = visitExp(be.lhs());
+        String rhs = visitExp(be.rhs());
+        if (isPrimitive(type)) {
+          if (isAlreadyField) {
+            return ds.name() + " = (" + type + ")(" + lhs + ")";
+          }
+          sb.append(" = (").append(type).append(")(").append(lhs).append(")");
+          return sb.toString();
         } else {
-          sb.append(" ")
-              .append(ds.name())
-              .append(".chuck(")
-              .append(visitExp(be.rhs()))
-              .append(");");
+          if (isAlreadyField) {
+            return ds.name() + ".chuck(" + rhs + ")";
+          }
+          sb.append(" = new ").append(type).append("()");
+          sb.append("\n");
+          sb.append(indent(ds.name() + ".chuck(" + rhs + ");", 0));
+          return sb.toString();
         }
       }
-      return sb.toString();
+
+      if (isAlreadyField) return "";
+
+      if (isPrimitive(type)) {
+        sb.append(" = (").append(type).append(")(0)");
+        if (type.equals("ChuckDuration")) {
+          sb.setLength(sb.length() - (type.length() + 6)); // remove " = (type)(0)"
+          sb.append(" = samp(0)");
+        }
+      } else if (isUGen(type)) {
+        sb.append(" = new ").append(type).append("()");
+      } else {
+        sb.append(" = new ").append(type).append("()");
+      }
+      String res = sb.toString();
+      if (!isFieldMode && !res.isEmpty() && !res.endsWith(";") && !res.endsWith("\n") && !res.endsWith("}")) {
+          res += ";";
+      }
+      return res;
     } else if (stmt instanceof ChuckAST.DoStmt ds) {
       String cond = visitExp(ds.condition());
       if (ds.isUntil()) cond = "!(" + cond + ")";
@@ -407,127 +419,131 @@ public class ChuckToDSLConverter {
       if (id.name().equals("me")) return "me()";
       return id.name();
     } else if (exp instanceof ChuckAST.BinaryExp be) {
+      String lhsCode = visitExp(be.lhs());
+      String rhsCode = visitExp(be.rhs());
+      String lhsType = typeOf(be.lhs());
+      String rhsType = typeOf(be.rhs());
+
       if (be.op() == ChuckAST.Operator.PERCENT) {
-        String lhs = visitExp(be.lhs());
-        String rhs = visitExp(be.rhs());
         if (isDur(be.lhs()) || isDur(be.rhs())) {
-          if (lhs.equals("now()")) lhs = "samp(now())";
-          if (rhs.equals("now()")) rhs = "samp(now())";
-          return lhs + ".percent(" + rhs + ")";
+          if (lhsCode.equals("now()")) lhsCode = "samp(now())";
+          if (rhsCode.equals("now()")) rhsCode = "samp(now())";
+          return lhsCode + ".percent(" + rhsCode + ")";
         }
-        return "(" + lhs + " % " + rhs + ")";
+        return "(" + lhsCode + " % " + rhsCode + ")";
       }
       if (be.op() == ChuckAST.Operator.PLUS || be.op() == ChuckAST.Operator.MINUS) {
-        String lhs = visitExp(be.lhs());
-        String rhs = visitExp(be.rhs());
         if (isDur(be.lhs()) || isDur(be.rhs())) {
-          if (lhs.equals("now()")) lhs = "samp(now())";
-          if (rhs.equals("now()")) rhs = "samp(now())";
+          if (lhsCode.equals("now()")) lhsCode = "samp(now())";
+          if (rhsCode.equals("now()")) rhsCode = "samp(now())";
           String method = be.op() == ChuckAST.Operator.PLUS ? "plus" : "minus";
-          return lhs + "." + method + "(" + rhs + ")";
+          return lhsCode + "." + method + "(" + rhsCode + ")";
         }
         String op = be.op() == ChuckAST.Operator.PLUS ? "+" : "-";
-        return "(" + lhs + " " + op + " " + rhs + ")";
+        return "(" + lhsCode + " " + op + " " + rhsCode + ")";
       }
 
       if (be.op() == ChuckAST.Operator.GE
           || be.op() == ChuckAST.Operator.GT
           || be.op() == ChuckAST.Operator.LE
           || be.op() == ChuckAST.Operator.LT) {
-        String lhs = visitExp(be.lhs());
-        String rhs = visitExp(be.rhs());
         if (isDur(be.lhs()) || isDur(be.rhs())) {
-          if (lhs.equals("now()")) lhs = "samp(now())";
-          if (rhs.equals("now()")) rhs = "samp(now())";
-          return "(" + lhs + ".samples() " + mapOp(be.op()) + " " + rhs + ".samples())";
+          if (lhsCode.equals("now()")) lhsCode = "samp(now())";
+          if (rhsCode.equals("now()")) rhsCode = "samp(now())";
+          return "(" + lhsCode + ".samples() " + mapOp(be.op()) + " " + rhsCode + ".samples())";
         }
       }
       if (be.op() == ChuckAST.Operator.CHUCK || be.op() == ChuckAST.Operator.AT_CHUCK) {
         // Special case: duration => now OR event => now OR event_array => now
         if (be.rhs() instanceof ChuckAST.IdExp id && id.name().equals("now")) {
-          String lhs = visitExp(be.lhs());
-          String type = varTypes.get(lhs);
-          if (type != null && type.startsWith("ChuckEvent") && type.endsWith("[]")) {
-            return "advance(" + lhs + ")";
+          if ("ChuckEvent[]".equals(lhsType)) {
+            return "advance(" + lhsCode + ")";
           }
-          return "advance(" + lhs + ")";
+          return "advance(" + lhsCode + ")";
         }
-        String lhs = visitExp(be.lhs());
-        String rhs = visitExp(be.rhs());
 
         // Handle: Machine.getGlobalObject(...) $ int[] @=> data;
         if (be.lhs() instanceof ChuckAST.CastExp ce) {
           String targetType = mapType(ce.targetType());
-          return rhs + " = (" + targetType + ")(" + visitExp(ce.value()) + ")";
+          return rhsCode + " = (" + targetType + ")(" + visitExp(ce.value()) + ")";
         }
-
-        // val => s.freq
-        if (be.rhs() instanceof ChuckAST.DotExp de) {
-          return visitExp(de.base()) + "." + de.member() + "(" + lhs + ")";
-        }
-
-        // Handle primitive or array assignment via =>
-        String rhsType = varTypes.get(rhs);
 
         // Handle: 0 => int i;
         if (be.rhs() instanceof ChuckAST.DeclExp de) {
           String deType = mapType(de.type());
           if (isPrimitive(deType) || deType.endsWith("[]")) {
             varTypes.put(de.name(), deType);
-            String cast = isPrimitive(deType) ? "(" + deType + ")" : "";
-            return deType + " " + de.name() + " = " + cast + "(" + lhs + ")";
-          }
+            String cast =
+                (isPrimitive(deType) && !(be.lhs() instanceof ChuckAST.IntExp) && !(be.lhs() instanceof ChuckAST.FloatExp))
+                    ? "(" + deType + ")"
+                    : "";
+            return deType + " " + de.name() + " = " + cast + lhsCode;
+            }        }
+
+        // val => s.freq
+        if (be.rhs() instanceof ChuckAST.DotExp de) {
+          return visitExp(de.base()) + "." + de.member() + "(" + lhsCode + ")";
         }
 
+        // Handle primitive or array assignment via =>
         if (be.rhs() instanceof ChuckAST.IdExp) {
           if (rhsType != null && (isPrimitive(rhsType) || rhsType.endsWith("[]"))) {
             String cast = isPrimitive(rhsType) ? "(" + rhsType + ")" : "";
-            return rhs + " = " + cast + "(" + lhs + ")";
+            return rhsCode + " = " + cast + "(" + lhsCode + ")";
+          }
+          if (rhsType == null) {
+              String inferredType = typeOf(be.lhs());
+              if (inferredType != null && isPrimitive(inferredType)) {
+                  varTypes.put(rhsCode, inferredType);
+                  return rhsCode + " = (" + inferredType + ")(" + lhsCode + ")";
+              }
           }
         }
 
-        if (globals.contains(rhs)) {
-          return "Machine.setGlobalObject(\"" + rhs + "\", " + lhs + ")";
+        if (globals.contains(rhsCode)) {
+          String setter =
+              switch (rhsType != null ? rhsType : "Object") {
+                case "long" -> "Machine.setGlobalInt(\"" + rhsCode + "\", " + lhsCode + ")";
+                case "double" -> "Machine.setGlobalFloat(\"" + rhsCode + "\", " + lhsCode + ")";
+                default -> "Machine.setGlobalObject(\"" + rhsCode + "\", " + lhsCode + ")";
+              };
+          return setter;
         }
         if (rhsType == null
-            && (rhs.equals("i")
-                || rhs.equals("j")
-                || rhs.equals("k")
-                || rhs.equals("r")
-                || rhs.equals("x")
-                || rhs.equals("y")
-                || rhs.equals("z")
-                || rhs.equals("val")
-                || rhs.equals("step"))) {
-          return rhs + " = " + lhs;
+            && (rhsCode.equals("i")
+                || rhsCode.equals("j")
+                || rhsCode.equals("k")
+                || rhsCode.equals("r")
+                || rhsCode.equals("x")
+                || rhsCode.equals("y")
+                || rhsCode.equals("z")
+                || rhsCode.equals("val")
+                || rhsCode.equals("step")
+                || rhsCode.contains("Freq")
+                || rhsCode.contains("Gain"))) {
+          return rhsCode + " = " + lhsCode;
         }
 
         // Default: s => dac
-        return lhs + ".chuck(" + rhs + ")";
+        return lhsCode + ".chuck(" + rhsCode + ")";
       } else if (be.op() == ChuckAST.Operator.UNCHUCK) {
-        return visitExp(be.lhs()) + ".unchuck(" + visitExp(be.rhs()) + ")";
+        return lhsCode + ".unchuck(" + rhsCode + ")";
       } else if (be.op() == ChuckAST.Operator.DUR_MUL) {
         // 1::second
-        String unit = visitExp(be.rhs());
-        String val = visitExp(be.lhs());
-        return unit + "(" + val + ")";
+        return rhsCode + "(" + lhsCode + ")";
       } else if (be.op() == ChuckAST.Operator.ASSIGN) {
-        String lhs = visitExp(be.lhs());
-        String rhs = visitExp(be.rhs());
-        if (globals.contains(lhs)) {
-          return "Machine.setGlobalObject(\"" + lhs + "\", " + rhs + ")";
+        if (globals.contains(lhsCode)) {
+          return "Machine.setGlobalObject(\"" + lhsCode + "\", " + rhsCode + ")";
         }
-        return lhs + " = " + rhs;
+        return lhsCode + " = " + rhsCode;
       } else if (be.op() == ChuckAST.Operator.POSTFIX_PLUS_PLUS) {
-        return visitExp(be.rhs()) + "++";
+        return rhsCode + "++";
       } else if (be.op() == ChuckAST.Operator.POSTFIX_MINUS_MINUS) {
-        return visitExp(be.rhs()) + "--";
+        return rhsCode + "--";
       }
-      String lhs = visitExp(be.lhs());
-      String rhs = visitExp(be.rhs());
-      if (lhs.equals("now()")) lhs = "samp(now())";
-      if (rhs.equals("now()")) rhs = "samp(now())";
-      return "(" + lhs + " " + mapOp(be.op()) + " " + rhs + ")";
+      if (lhsCode.equals("now()")) lhsCode = "samp(now())";
+      if (rhsCode.equals("now()")) rhsCode = "samp(now())";
+      return "(" + lhsCode + " " + mapOp(be.op()) + " " + rhsCode + ")";
     } else if (exp instanceof ChuckAST.LogicalExp le) {
       List<String> ops = new ArrayList<>();
       flattenLogical(le, ops);
@@ -650,6 +666,24 @@ public class ChuckToDSLConverter {
     return "// Unsupported expression: " + exp.getClass().getSimpleName();
   }
 
+  private String typeOf(ChuckAST.Exp exp) {
+    if (exp instanceof ChuckAST.IdExp id) {
+      String type = varTypes.get(id.name());
+      if (type != null) return type;
+      if (id.name().equals("now")) return "ChuckDuration";
+      if (id.name().equals("dac") || id.name().equals("adc")) return "ChuckUGen";
+      return null;
+    }
+    if (exp instanceof ChuckAST.IntExp) return "long";
+    if (exp instanceof ChuckAST.FloatExp) return "double";
+    if (exp instanceof ChuckAST.BinaryExp be) {
+      if (be.op() == ChuckAST.Operator.DUR_MUL) return "ChuckDuration";
+      return typeOf(be.lhs()); // simplified
+    }
+    if (exp instanceof ChuckAST.DeclExp de) return mapType(de.type());
+    return null;
+  }
+
   private void flattenLogical(ChuckAST.Exp exp, List<String> result) {
     if (exp instanceof ChuckAST.LogicalExp le) {
       flattenLogical(le.lhs(), result);
@@ -713,16 +747,12 @@ public class ChuckToDSLConverter {
   private boolean isEvent(String operand) {
     String type = varTypes.get(operand);
     if (type == null) return false;
-    return type.startsWith("ChuckEvent");
+    return type.startsWith("ChuckEvent") || type.contains("Event");
   }
 
   private boolean isDur(ChuckAST.Exp exp) {
-    if (exp instanceof ChuckAST.IdExp id) {
-      String type = varTypes.get(id.name());
-      return "ChuckDuration".equals(type) || "now".equals(id.name());
-    }
-    if (exp instanceof ChuckAST.BinaryExp be && be.op() == ChuckAST.Operator.DUR_MUL) return true;
-    return false;
+    String type = typeOf(exp);
+    return "ChuckDuration".equals(type);
   }
 
   private boolean isPrimitive(String type) {

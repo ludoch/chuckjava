@@ -379,6 +379,27 @@ public class ChuckVM {
     return types;
   }
 
+  public int run(Shred shred) {
+    ChuckShred s = new ChuckShred(null);
+    int id = s.getId();
+    activeShreds.put(id, s);
+
+    Thread.startVirtualThread(() -> {
+      liveThreadCount.incrementAndGet();
+      try {
+        ScopedValue.where(CURRENT_VM, this)
+            .where(ChuckShred.CURRENT_SHRED, s)
+            .run(shred::shred);
+      } finally {
+        activeShreds.remove(id);
+        s.setDone(true);
+        liveThreadCount.decrementAndGet();
+      }
+    });
+
+    return id;
+  }
+
   public int run(String source, String name) {
     return run(source, name, false, null);
   }
