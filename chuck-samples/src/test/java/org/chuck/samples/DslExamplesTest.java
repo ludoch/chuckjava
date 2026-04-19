@@ -25,16 +25,32 @@ public class DslExamplesTest {
   private double runAndMeasure(ChuckVM vm, double seconds) {
     double maxRms = 0.0;
     long totalSamples = (long) (seconds * SAMPLE_RATE);
-    for (long i = 0; i < totalSamples; i++) {
-      vm.advanceTime(1);
-      float sumSq = 0;
-      for (int c = 0; c < vm.getNumChannels(); c++) {
-        float s = vm.getChannelLastOut(c);
-        sumSq += s * s;
+    long remaining = totalSamples;
+    int blockSize = BUFFER_SIZE;
+
+    float[][] buffers = new float[vm.getNumChannels()][blockSize];
+
+    try {
+      while (remaining > 0) {
+        int step = (int) Math.min(remaining, blockSize);
+        vm.advanceTime(buffers, 0, step);
+        remaining -= step;
+
+        // Calculate max RMS across the entire block
+        for (int i = 0; i < step; i++) {
+          float sumSq = 0;
+          for (int c = 0; c < vm.getNumChannels(); c++) {
+            float s = buffers[c][i];
+            sumSq += s * s;
+          }
+          double rms = Math.sqrt(sumSq / vm.getNumChannels());
+          if (rms > maxRms) maxRms = rms;
+        }
       }
-      double rms = Math.sqrt(sumSq / vm.getNumChannels());
-      if (rms > maxRms) maxRms = rms;
+    } finally {
+      vm.shutdown(); // Ensure threads and shreds are cleaned up to prevent timeouts
     }
+
     return maxRms;
   }
 

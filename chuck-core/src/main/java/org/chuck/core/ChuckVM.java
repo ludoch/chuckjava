@@ -632,6 +632,7 @@ public class ChuckVM {
                 deadShreds.add(shred);
                 while (deadShreds.size() > 50) deadShreds.poll();
                 liveThreadCount.decrementAndGet();
+                shred.notifyParked(); // Fix: Must be very last to prevent concurrent cleanup!
               }
             });
 
@@ -742,6 +743,8 @@ public class ChuckVM {
         if (readyShredsInternal.isEmpty()) break;
 
         for (ChuckShred nextShred : readyShredsInternal) {
+          if (nextShred.isDone()) continue;
+
           updateJitter(currentTime, nextShred);
 
           final CountDownLatch latch = new CountDownLatch(1);
@@ -750,7 +753,9 @@ public class ChuckVM {
 
           try {
             if (!latch.await(5, TimeUnit.SECONDS)) {
-              print("[vm]: Timeout waiting for shred " + nextShred.getId() + " to park\n");
+              String msg = "[vm]: Timeout waiting for shred " + nextShred.getId() + " to park";
+              print(msg + "\n");
+              throw new RuntimeException(msg);
             }
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();

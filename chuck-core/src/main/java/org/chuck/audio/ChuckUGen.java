@@ -13,7 +13,6 @@ public abstract class ChuckUGen extends ChuckObject {
   protected volatile int sourcesCount = 0;
 
   // Backward compatibility: some subclasses use 'sources' directly.
-  // We keep it as a getter-like field or just accept the tiny overhead of syncing it.
   protected final List<ChuckUGen> sources =
       new java.util.AbstractList<>() {
         @Override
@@ -39,6 +38,17 @@ public abstract class ChuckUGen extends ChuckObject {
           }
         }
       };
+
+  public List<ChuckUGen> getSources() {
+    ugenLock.lock();
+    try {
+      ChuckUGen[] snapshot = new ChuckUGen[sourcesCount];
+      System.arraycopy(sourcesArray, 0, snapshot, 0, sourcesCount);
+      return List.of(snapshot);
+    } finally {
+      ugenLock.unlock();
+    }
+  }
 
   protected final List<ChuckUGen> targets = new ArrayList<>();
   protected final ReentrantLock ugenLock = new ReentrantLock();
@@ -334,10 +344,6 @@ public abstract class ChuckUGen extends ChuckObject {
       return getChannelLastOut(i); // For mono, it's already in lastOut
     }
     return getChannelLastOut(i);
-  }
-
-  public List<ChuckUGen> getSources() {
-    return sources;
   }
 
   public int getNumSources() {
