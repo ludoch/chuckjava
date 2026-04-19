@@ -48,6 +48,7 @@ public class ChuckShred implements Comparable<ChuckShred> {
   private final List<ChuckShred> waitingShreds = new ArrayList<>();
 
   private ChuckEvent eventWaitingOn = null;
+  private boolean wasSignaled = false;
   private ChuckShred parentShred = null;
 
   private final List<Runnable> parkedListeners = Collections.synchronizedList(new ArrayList<>());
@@ -331,6 +332,7 @@ public class ChuckShred implements Comparable<ChuckShred> {
       this.instructionCount = 0;
       this.isRunning = false;
       this.isWaiting = true;
+      this.wasSignaled = false;
       condition.signal();
       notifyParked();
       while (isWaiting && !isDone) condition.await();
@@ -344,9 +346,14 @@ public class ChuckShred implements Comparable<ChuckShred> {
   public boolean notifyTriggered(ChuckEvent e, ChuckVM vm) {
     if (eventWaitingOn == null || eventWaitingOn == e) {
       this.eventWaitingOn = null;
+      this.wasSignaled = true;
       return true;
     }
     return false;
+  }
+
+  public boolean wasSignaled() {
+    return wasSignaled;
   }
 
   public void setEventWaitingOn(ChuckEvent e) {

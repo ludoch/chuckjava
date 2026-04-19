@@ -72,6 +72,11 @@ public class ChuckEvent extends ChuckObject {
     }
   }
 
+  public void signal() {
+    ChuckVM vm = ChuckVM.CURRENT_VM.get();
+    if (vm != null) signal(vm);
+  }
+
   public void signal(ChuckVM vm) {
     ChuckShred toWake = null;
     eventLock.lock();
@@ -110,6 +115,11 @@ public class ChuckEvent extends ChuckObject {
   /** Returns true — all ChucK events can be waited on. */
   public boolean can_wait() {
     return true;
+  }
+
+  public void broadcast() {
+    ChuckVM vm = ChuckVM.CURRENT_VM.get();
+    if (vm != null) broadcast(vm);
   }
 
   public void broadcast(ChuckVM vm) {

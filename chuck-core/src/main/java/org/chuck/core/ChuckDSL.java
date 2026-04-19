@@ -42,6 +42,30 @@ public class ChuckDSL {
     }
   }
 
+  /** Waits for an event. Equivalent to: event => now; */
+  public static boolean advance(ChuckEvent event) {
+    ChuckShred current = ChuckShred.CURRENT_SHRED.get();
+    ChuckVM vm = ChuckVM.CURRENT_VM.get();
+    if (current != null && vm != null) {
+      event.waitOn(current, vm);
+      return current.wasSignaled();
+    }
+    return false;
+  }
+
+  /** Waits for any event in an array. Equivalent to: event_array => now; */
+  public static boolean advance(ChuckEvent[] events) {
+    ChuckShred current = ChuckShred.CURRENT_SHRED.get();
+    ChuckVM vm = ChuckVM.CURRENT_VM.get();
+    if (current != null && vm != null) {
+      ChuckEventDisjunction disjunction = new ChuckEventDisjunction();
+      for (ChuckEvent e : events) disjunction.addEvent(e);
+      disjunction.waitOn(current, vm);
+      return current.wasSignaled();
+    }
+    return false;
+  }
+
   /** 1 sample duration. */
   public static ChuckDuration samp() {
     return ChuckDuration.of(1);
@@ -77,6 +101,20 @@ public class ChuckDSL {
   /** MIDI note to Frequency conversion. */
   public static double mtof(double midiNote) {
     return Std.mtof(midiNote);
+  }
+
+  /** Creates an event conjunction (wait until ALL trigger). */
+  public static ChuckEvent eventAnd(ChuckEvent... events) {
+    ChuckEventConjunction conjunction = new ChuckEventConjunction();
+    for (ChuckEvent e : events) conjunction.addEvent(e);
+    return conjunction;
+  }
+
+  /** Creates an event disjunction (wait until ANY trigger). */
+  public static ChuckEvent eventOr(ChuckEvent... events) {
+    ChuckEventDisjunction disjunction = new ChuckEventDisjunction();
+    for (ChuckEvent e : events) disjunction.addEvent(e);
+    return disjunction;
   }
 
   /**

@@ -239,11 +239,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     }
     if (stmts.size() == 1) return stmts.get(0);
     return new ChuckAST.BlockStmt(
-        stmts,
-        false,
-        currentDoc,
-        ctx.getStart().getLine(),
-        ctx.getStart().getCharPositionInLine());
+        stmts, false, currentDoc, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
   }
 
   // --- Statement Implementations ---
@@ -527,7 +523,12 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             ? (ChuckAST.Exp) list.get(0)
             : (right instanceof ChuckAST.Exp e ? e : null);
     return new ChuckAST.BinaryExp(
-        lExp, op, rExp, currentDoc, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        lExp,
+        op,
+        rExp,
+        currentDoc,
+        ctx.getStart().getLine(),
+        ctx.getStart().getCharPositionInLine());
   }
 
   @Override
@@ -550,6 +551,20 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
       if (op != ChuckAST.Operator.NONE) break;
     }
     return new ChuckAST.BinaryExp(
+        (ChuckAST.Exp) visit(ctx.expression(0)),
+        op,
+        (ChuckAST.Exp) visit(ctx.expression(1)),
+        currentDoc,
+        ctx.getStart().getLine(),
+        ctx.getStart().getCharPositionInLine());
+  }
+
+  @Override
+  public ChuckAST.Exp visitLogicalOp(LogicalOpContext ctx) {
+    captureDoc(ctx);
+    String currentDoc = consumeDoc();
+    String op = ctx.getChild(1).getText();
+    return new ChuckAST.LogicalExp(
         (ChuckAST.Exp) visit(ctx.expression(0)),
         op,
         (ChuckAST.Exp) visit(ctx.expression(1)),
@@ -780,7 +795,8 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
           0, "", ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     List<ChuckAST.Exp> exps = (List<ChuckAST.Exp>) visit(ctx.expressionList());
     return exps.isEmpty()
-        ? new ChuckAST.IntExp(0, "", ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine())
+        ? new ChuckAST.IntExp(
+            0, "", ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine())
         : exps.get(0);
   }
 

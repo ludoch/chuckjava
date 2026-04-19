@@ -162,6 +162,7 @@ public class TypeInferenceEngine {
         }
         yield lhsType;
       }
+      case ChuckAST.LogicalExp _ -> "int";
       case ChuckAST.DotExp dot -> {
         String baseType = getExprType(dot.base());
         if (baseType == null

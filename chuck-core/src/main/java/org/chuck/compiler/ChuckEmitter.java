@@ -472,6 +472,7 @@ public class ChuckEmitter {
         String type = getVarTypeByName(id.name());
         yield type;
       }
+      case ChuckAST.LogicalExp _ -> "int";
       default -> null;
     };
   }
@@ -1210,6 +1211,7 @@ public class ChuckEmitter {
           emitExpression(exp, code);
         }
       }
+      case ChuckAST.LogicalExp _ -> emitExpression(exp, code);
       default -> emitExpression(exp, code);
     }
   }
@@ -1409,7 +1411,11 @@ public class ChuckEmitter {
         checkStaticInitSource(bin.lhs());
         checkStaticInitSource(bin.rhs());
       }
-      case ChuckAST.UnaryExp u -> checkStaticInitSource(u.exp());
+      case ChuckAST.LogicalExp log -> {
+        checkStaticInitSource(log.lhs());
+        checkStaticInitSource(log.rhs());
+      }
+      case ChuckAST.UnaryExp un -> checkStaticInitSource(un.exp());
       default -> {}
     }
   }

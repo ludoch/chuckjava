@@ -1459,6 +1459,17 @@ public class ExpressionEmitter {
           }
         }
       }
+      case ChuckAST.LogicalExp e -> {
+        this.emitExpression(e.lhs(), code);
+        this.emitExpression(e.rhs(), code);
+        if (code != null) {
+          if ("&&".equals(e.op())) {
+            code.addInstruction(new LogicInstrs.LogicalAnd());
+          } else {
+            code.addInstruction(new LogicInstrs.LogicalOr());
+          }
+        }
+      }
       case ChuckAST.CallExp e -> {
         List<String> argTypes = e.args().stream().map(parent::getExprType).toList();
         int argc = e.args().size();

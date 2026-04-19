@@ -16,6 +16,7 @@ The `ChuckToDSLConverter` is a source-to-source translator that converts ChucK (
     -   UGen to UGen: Mapped to `.chuck(target)`.
     -   Value to UGen Parameter: Mapped to `.member(value)`.
     -   Time Advancement: `dur => now` is mapped to `advance(dur)`.
+    -   Event Waiting: `event => now` is mapped to `advance(event)`.
 -   **Unchuck (`!=>`)**: Mapped to `.unchuck(target)`.
 -   **At-Chuck (`@=>`)**: Mapped to assignment (`=`).
 
@@ -29,6 +30,7 @@ The `ChuckToDSLConverter` is a source-to-source translator that converts ChucK (
     -   Standard: `SinOsc s;` -> `SinOsc s = new SinOsc(sampleRate());`
     -   Primitive init: `10 => int i;` -> `long i = 10;`
     -   Array: `int data[16];` -> `long[] data = new long[16];`
+-   **Global Keyword**: `global int x;` is mapped to `Machine.getGlobalInt("x")` and `Machine.setGlobalObject("x", val)`.
 -   **Literals**: Multi-dimensional arrays, vector literals (`#(1,2)`), complex, and polar literals.
 
 ### 4. Expressions
@@ -39,44 +41,39 @@ The `ChuckToDSLConverter` is a source-to-source translator that converts ChucK (
 -   **Built-ins**: `dac`, `adc`, `blackhole`, `now`, `me`, `sampleRate`.
 -   **Introspection**: `typeof(x)` and `x instanceof Type`.
 
-### 5. Concurrency
+### 5. Definitions
+-   **Function Definitions**: `fun void foo() { ... }` is mapped to a Java method within the `Shred` class.
+-   **Class Definitions**: `class Bar { ... }` is mapped to an inner class within the `Shred` class.
+
+### 6. Concurrency
 -   **Sporking**: `spork ~ call()` is mapped to `spork(() -> call())`.
 
-### 6. Comments
+### 7. Comments
 -   Preservation of `//`, `/* */`, and `/** */` comments, prepended to the corresponding Java statements.
 
 ---
 
 ## Missing Features / Limitations
 
-### 1. Function Definitions
--   **Status**: ❌ Missing implementation.
--   **Current Behavior**: Emits a comment `// function definition: name`.
--   **Needed**: Mapping ChucK `fun` to Java methods within the `Shred` class.
-
-### 2. Class Definitions
--   **Status**: ❌ Missing implementation.
--   **Current Behavior**: Emits a comment `// class definition: name`.
--   **Needed**: Mapping ChucK classes to nested or separate Java classes.
-
-### 3. Events & Polymorphism
+### 1. Events & Polymorphism
 -   **Status**: ⚠️ Partial.
--   **Current Behavior**: Basic `Event` usage works via method calls, but custom event classes and complex polymorphism are not yet handled.
+-   **Current Behavior**: `event => now` and `e.signal()` work.
+-   **Limitation**: Complex event synchronization (conjunctions/disjunctions) and custom event subclassing might need more validation.
 
-### 4. Special UGen Members
+### 2. Special UGen Members
 -   **Status**: ⚠️ Partial.
 -   **Current Behavior**: Maps `s.freq` and `s.gain` correctly.
 -   **Limitation**: Some UGens might have members that don't follow the standard getter/setter pattern in Java.
 
-### 5. Multi-variable Declarations with Mixed Init
+### 3. Multi-variable Declarations with Mixed Init
 -   **Status**: ⚠️ Partial.
 -   **Limitation**: `int a, b=1, c;` might need more complex splitting logic in the visitor to produce valid Java.
 
-### 6. Operator Overloading
--   **Status**: ❌ Missing.
--   **Limitation**: ChucK's `@operator+` cannot be directly translated to Java. It must be mapped to specific method names (e.g., `__op_plus`).
-
-### 7. Global Variable Scope
+### 4. Operator Overloading
 -   **Status**: ⚠️ Partial.
--   **Current Behavior**: Handles `Machine.getGlobalObject("name")` when explicitly written in ChucK.
--   **Improvement**: Automatic detection of `global` keyword to map to `Machine.getGlobal*` in the DSL.
+-   **Current Behavior**: Standardizes names to `__op__plus` etc.
+-   **Limitation**: Standard Java binary operators (`+`, `-`, etc.) won't automatically call these methods in the generated DSL.
+
+### 5. Smart Assignment (Type Inference)
+-   **Status**: ⚠️ Experimental.
+-   **Limitation**: The converter uses basic name guessing (`i`, `j`, `val`, etc.) to decide between `=` and `.chuck()` for the `=>` operator when the LHS type is unknown.

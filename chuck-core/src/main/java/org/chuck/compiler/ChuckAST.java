@@ -78,6 +78,8 @@ public sealed interface ChuckAST {
   record BinaryExp(Exp lhs, Operator op, Exp rhs, String doc, int line, int column)
       implements Exp {}
 
+  record LogicalExp(Exp lhs, String op, Exp rhs, String doc, int line, int column) implements Exp {}
+
   record UnaryExp(Operator op, Exp exp, String doc, int line, int column) implements Exp {}
 
   record CallExp(Exp base, List<Exp> args, String doc, int line, int column) implements Exp {}
