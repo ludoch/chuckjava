@@ -1,12 +1,14 @@
 /* 
-   CHUCK GRID SEQUENCER PRO SETUP (v3.3 - Log Level Control)
+   CHUCK GRID SEQUENCER PRO SETUP (v3.4 - Stability Fix)
    ------------------------------
 */
+
+<<< "--- ENGINE STARTING (v3.4) ---" >>>;
 
 // 1. Setup Drum Kit (8 tracks)
 SndBuf kit[8];
 Gain master => dac;
-0.5 => master.gain;
+0.6 => master.gain;
 
 // Load samples
 "examples/data/kick.wav" => kit[0].read;
@@ -31,11 +33,8 @@ global int seq_current_step;
 int data[];
 float probs[];
 
-// Helper to check verbosity
-fun int verbose() { return Machine.loglevel() >= 2; }
-fun int debug()   { return Machine.loglevel() >= 3; }
-
-if (verbose()) <<< "--- ENGINE STARTING (v3.3) ---" >>>;
+// Helper for logging
+fun int isVerbose() { return Machine.loglevel() >= 2; }
 
 // Timing logic (120 BPM)
 125::ms => dur T;
@@ -43,47 +42,37 @@ T - (now % T) => now;
 
 0 => int step;
 while(true) {
+    // 1. Update cursor
     step % 16 => seq_current_step;
     
-    // Refresh data from Java VM
+    // 2. Fetch Java Data
     Machine.getGlobalObject("seq_pattern") $ int[] @=> data;
     Machine.getGlobalObject("seq_probability") $ float[] @=> probs;
 
-    if (data == null) {
-        if (step % 8 == 0 && verbose()) <<< "STATUS: Waiting for Java Grid Data..." >>>;
-    } else {
+    if (data != null) {
         // HEARTBEAT (Log Level 2+)
-        if (step % 16 == 0 && verbose()) {
-            <<< "HEARTBEAT: Step 0. data[0] =", data[0] >>>;
-        }
+        if (step % 16 == 0 && isVerbose()) <<< "HEARTBEAT: Step 0, Pattern[0] =", data[0] >>>;
 
-        // Process all tracks
+        // 3. Check all 8 rows for the current step
         for(0 => int r; r < 8; r++) {
             data[r * 16 + (step % 16)] => int val;
             
             if (val != 0) {
-                // Apply probability check
+                // Default to 100% probability
                 1.0 => float p;
                 if (probs != null && r < probs.cap()) probs[r] => p;
 
-                if (Math.randomf() <= p) {
-                    0 => kit[r].pos;
-                    if (verbose()) <<< "TRIGGER: Row", r, "Step", (step % 16) >>>;
-                    
-                    // Diagnostic Beep (Log Level 3+ only)
-                    if (debug()) {
-                        SinOsc s => dac; 440 + (r*100) => s.freq; 0.05 => s.gain; 5::ms => now; 0 => s.gain;
-                    }
+                if (p >= 1.0 || Math.randomf() <= p) {
+                    0 => kit[r].pos; // TRIGGER
+                    if (isVerbose()) <<< "TRIGGER: Row", r, "Step", (step % 16) >>>;
                 }
             }
         }
+    } else {
+        if (step % 8 == 0) <<< "WAITING FOR JAVA DATA..." >>>;
     }
 
-    // Audio Emission Monitor (Log Level 2+)
-    if (verbose() && Math.abs(master.last()) > 0.001) {
-        <<< ">>> DAC ACTIVE Level:", master.last() >>>;
-    }
-    
+    // 4. Advance time
     T => now;
     step++;
 }
