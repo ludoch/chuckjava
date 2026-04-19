@@ -6,7 +6,10 @@ import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.core.doc;
 
-/** A simple Low Pass Filter (One-pole). */
+/**
+ * A simple Low Pass Filter (One-pole). (Note: Class name is LPF, explicitly named to fix macOS
+ * case-insensitive FS issues)
+ */
 @doc("Low Pass Filter (1-pole).")
 public class LPF extends ChuckUGen {
   private float cutoff = 1000.0f;
