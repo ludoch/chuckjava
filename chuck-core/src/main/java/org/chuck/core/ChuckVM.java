@@ -960,6 +960,12 @@ public class ChuckVM {
 
   public void setLogLevel(int level) {
     this.logLevel = level;
+    java.util.logging.Logger root = java.util.logging.Logger.getLogger("org.chuck");
+    if (level <= 1) {
+      root.setLevel(java.util.logging.Level.WARNING);
+    } else {
+      root.setLevel(java.util.logging.Level.INFO);
+    }
   }
 
   public int getLogLevel() {

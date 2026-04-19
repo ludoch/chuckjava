@@ -3,7 +3,7 @@
    ------------------------------
 */
 
-<<< "--- ENGINE STARTING (v3.2) ---" >>>;
+if (Machine.loglevel() >= 2) <<< "--- ENGINE STARTING (v3.2) ---" >>>;
 
 // 1. Setup Drum Kit (8 tracks)
 SndBuf kit[8];
