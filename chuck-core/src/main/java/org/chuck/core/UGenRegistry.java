@@ -48,7 +48,7 @@ public class UGenRegistry {
     register("BlitSquare", (sr, args) -> new BlitSquare(sr));
 
     // --- Filters ---
-    register("LPF", (sr, args) -> new LPF(sr));
+    register("SVFilter", (sr, args) -> new SVFilter(sr));
     register("LPF", (sr, args) -> new LPF(sr));
     register("HPF", (sr, args) -> new HPF(sr));
     register("BPF", (sr, args) -> new BPF(sr));
