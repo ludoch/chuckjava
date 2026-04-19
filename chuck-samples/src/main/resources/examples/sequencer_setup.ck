@@ -1,9 +1,9 @@
 /* 
-   CHUCK GRID SEQUENCER PRO SETUP (v3.6 - Hardened Timing)
+   CHUCK GRID SEQUENCER PRO SETUP (v3.7 - The Final Fix)
    ------------------------------
 */
 
-<<< "--- ENGINE STARTING (v3.6) ---" >>>;
+<<< "--- ENGINE STARTING (v3.7) ---" >>>;
 
 // 1. Setup Drum Kit
 SndBuf kit[8];
@@ -31,54 +31,49 @@ global int seq_current_step;
 int data[];
 float probs[];
 
-// LINKING PHASE: Wait until Java has provided the objects
-while(data == null) {
-    Machine.getGlobalObject("seq_pattern") $ int[] @=> data;
-    if (data == null) 100::ms => now;
-}
-while(probs == null) {
-    Machine.getGlobalObject("seq_probability") $ float[] @=> probs;
-    if (probs == null) 100::ms => now;
-}
+// Helper for logging
+fun int isVerbose() { return Machine.loglevel() >= 2; }
 
-<<< "--- JAVA LINK ESTABLISHED ---" >>>;
-
-// 2. Timing logic (120 BPM)
+// Timing logic (120 BPM)
 125::ms => dur T;
 T - (now % T) => now;
 
 0 => int step;
 while(true) {
-    // A. Update cursor
+    // 1. Refresh references from Java (Crucial: do this inside the loop)
+    Machine.getGlobalObject("seq_pattern") $ int[] @=> data;
+    Machine.getGlobalObject("seq_probability") $ float[] @=> probs;
+
+    // 2. Safety Check: skip if Java hasn't provided data yet
+    if (data == null || data.cap() < 128) {
+        if (step % 8 == 0) <<< "WAITING FOR JAVA GRID..." >>>;
+        100::ms => now;
+        continue;
+    }
+
+    // 3. Update UI cursor
     step % 16 => seq_current_step;
     
-    // B. Periodic Heartbeat
-    if (step % 16 == 0) <<< "HEARTBEAT: Step 0, Pattern[0] =", data[0] >>>;
+    // HEARTBEAT (Log Level 2+)
+    if (step % 16 == 0 && isVerbose()) <<< "HEARTBEAT: Step 0, Pattern[0] =", data[0] >>>;
 
-    // C. Scan all 8 tracks for the current step
+    // 4. Process Triggers
     for(0 => int r; r < 8; r++) {
         data[r * 16 + (step % 16)] => int val;
         
         if (val != 0) {
-            // Check probability
+            // Apply probability
             1.0 => float p;
-            if (r < probs.cap()) probs[r] => p;
+            if (probs != null && r < probs.cap()) probs[r] => p;
 
             if (p >= 1.0 || Math.randomf() <= p) {
                 0 => kit[r].pos; // TRIGGER
-                <<< "TRIGGER: Row", r, "Step", (step % 16) >>>;
-                
-                // Tiny yield to ensure audio seek is processed
-                1::samp => now;
+                if (isVerbose()) <<< "TRIGGER: Row", r, "Step", (step % 16) >>>;
             }
         }
     }
 
-    // D. Audio Monitor
-    master.last() => float out;
-    if (Math.abs(out) > 0.001) <<< "DAC Level:", out >>>;
-
-    // E. Wait for next step
+    // 5. Advance time
     T => now;
     step++;
 }
