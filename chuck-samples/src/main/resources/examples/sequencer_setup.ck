@@ -1,9 +1,9 @@
 /* 
-   CHUCK GRID SEQUENCER PRO SETUP (v3.7 - The Final Fix)
+   CHUCK GRID SEQUENCER PRO SETUP (v3.8 - Works on Mac)
    ------------------------------
 */
 
-<<< "--- ENGINE STARTING (v3.7) ---" >>>;
+<<< "--- ENGINE STARTING (v3.8) ---" >>>;
 
 // 1. Setup Drum Kit
 SndBuf kit[8];
@@ -28,11 +28,11 @@ for(0 => int i; i < 8; i++) {
 
 // 3. Global synchronization
 global int seq_current_step;
-int data[];
-float probs[];
 
-// Helper for logging
-fun int isVerbose() { return Machine.loglevel() >= 2; }
+// Local placeholders (Size 128, will be replaced by Java)
+new int[128] @=> int data[];
+new float[8] @=> float probs[];
+for(0 => int i; i < 8; i++) 1.0 => probs[i];
 
 // Timing logic (120 BPM)
 125::ms => dur T;
@@ -40,40 +40,44 @@ T - (now % T) => now;
 
 0 => int step;
 while(true) {
-    // 1. Refresh references from Java (Crucial: do this inside the loop)
-    Machine.getGlobalObject("seq_pattern") $ int[] @=> data;
-    Machine.getGlobalObject("seq_probability") $ float[] @=> probs;
-
-    // 2. Safety Check: skip if Java hasn't provided data yet
-    if (data == null || data.cap() < 128) {
-        if (step % 8 == 0) <<< "WAITING FOR JAVA GRID..." >>>;
-        100::ms => now;
-        continue;
+    // 1. Refresh data from Java VM
+    Machine.getGlobalObject("seq_pattern") $ int[] @=> int[] javaData;
+    Machine.getGlobalObject("seq_probability") $ float[] @=> float[] javaProbs;
+    
+    // 2. Only use Java data if it is valid and correct size
+    if (javaData != null && javaData.cap() == 128) {
+        javaData @=> data;
+    }
+    if (javaProbs != null && javaProbs.cap() == 8) {
+        javaProbs @=> probs;
     }
 
     // 3. Update UI cursor
     step % 16 => seq_current_step;
     
-    // HEARTBEAT (Log Level 2+)
-    if (step % 16 == 0 && isVerbose()) <<< "HEARTBEAT: Step 0, Pattern[0] =", data[0] >>>;
+    // 4. Diagnostic Heartbeat
+    if (step % 16 == 0) {
+        <<< "HEARTBEAT: Step 0. data.cap() =", data.cap(), "data[0] =", data[0] >>>;
+    }
 
-    // 4. Process Triggers
+    // 5. Process all 8 tracks
     for(0 => int r; r < 8; r++) {
         data[r * 16 + (step % 16)] => int val;
         
         if (val != 0) {
-            // Apply probability
-            1.0 => float p;
-            if (probs != null && r < probs.cap()) probs[r] => p;
-
-            if (p >= 1.0 || Math.randomf() <= p) {
+            probs[r] => float p;
+            if (Math.randomf() <= p) {
                 0 => kit[r].pos; // TRIGGER
-                if (isVerbose()) <<< "TRIGGER: Row", r, "Step", (step % 16) >>>;
+                <<< "TRIGGER: Row", r, "Step", (step % 16) >>>;
             }
         }
     }
 
-    // 5. Advance time
+    // 6. Audio Monitor
+    master.last() => float out;
+    if (Math.abs(out) > 0.001) <<< "DAC Level:", out >>>;
+
+    // 7. Advance time
     T => now;
     step++;
 }
