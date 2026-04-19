@@ -48,8 +48,8 @@ public class UGenRegistry {
     register("BlitSquare", (sr, args) -> new BlitSquare(sr));
 
     // --- Filters ---
-    register("LPF", (sr, args) -> new Lpf(sr));
-    register("Lpf", (sr, args) -> new Lpf(sr));
+    register("LPF", (sr, args) -> new LPF(sr));
+    register("LPF", (sr, args) -> new LPF(sr));
     register("HPF", (sr, args) -> new HPF(sr));
     register("BPF", (sr, args) -> new BPF(sr));
     register("BRF", (sr, args) -> new BRF(sr));
@@ -197,7 +197,7 @@ public class UGenRegistry {
     register("PowerADSR", (sr, args) -> new PowerADSR(sr));
     register("WPDiodeLadder", (sr, args) -> new WPDiodeLadder(sr));
     register("WPKorg35", (sr, args) -> new WPKorg35(sr));
-    register("Range", (sr, args) -> new ChuginRange());
+    register("Range", (sr, args) -> new Range());
     register("FIR", (sr, args) -> new FIR(sr));
     register("KasFilter", (sr, args) -> new KasFilter(sr));
     register("WinFuncEnv", (sr, args) -> new WinFuncEnv());

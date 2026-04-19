@@ -1,14 +1,14 @@
 package org.chuck.audio.stk;
 
 import org.chuck.audio.ChuckUGen;
-import org.chuck.audio.filter.Lpf;
+import org.chuck.audio.filter.LPF;
 import org.chuck.audio.osc.SinOsc;
 import org.chuck.audio.util.Adsr;
 
 /** Moog: STK Moog-style synthesizer model. Uses a resonant low-pass filter and ADSR envelope. */
 public class Moog extends ChuckUGen {
   private final SinOsc[] oscillators = new SinOsc[2];
-  private final Lpf filter;
+  private final LPF filter;
   private final Adsr adsr;
 
   @SuppressWarnings("unused")
@@ -24,7 +24,7 @@ public class Moog extends ChuckUGen {
     this.sampleRate = sampleRate;
     oscillators[0] = new SinOsc(sampleRate);
     oscillators[1] = new SinOsc(sampleRate);
-    filter = new Lpf(sampleRate);
+    filter = new LPF(sampleRate);
     adsr = new Adsr(sampleRate);
     adsr.set(0.01f, 0.1f, 0.5f, 0.2f);
     setFreq(440.0);

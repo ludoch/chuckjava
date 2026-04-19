@@ -8,14 +8,18 @@ import org.chuck.core.doc;
 
 /** A simple Low Pass Filter (One-pole). */
 @doc("Low Pass Filter (1-pole).")
-public class Lpf extends ChuckUGen {
+public class LPF extends ChuckUGen {
   private float cutoff = 1000.0f;
   private float sampleRate;
 
   // Filter state
   private float v0 = 0.0f;
 
-  public Lpf(float sampleRate) {
+  public LPF() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
+  public LPF(float sampleRate) {
     this.sampleRate = sampleRate;
   }
 

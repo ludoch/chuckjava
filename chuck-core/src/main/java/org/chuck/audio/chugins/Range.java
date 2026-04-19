@@ -3,16 +3,16 @@ package org.chuck.audio.chugins;
 import org.chuck.audio.ChuckUGen;
 
 /**
- * ChuginRange — linear rescale of a signal from one range to another.
+ * Range — linear rescale of a signal from one range to another.
  *
  * <p>Maps input in [inMin, inMax] to output in [outMin, outMax]. Optionally hard-clips output to
  * [outMin, outMax].
  *
  * <p>Port of chugins/Range.
  *
- * <p>Named ChuginRange to avoid collision with java.util.stream. Use as "Range" in ChucK scripts.
+ * <p>Named Range to avoid collision with java.util.stream. Use as "Range" in ChucK scripts.
  */
-public class ChuginRange extends ChuckUGen {
+public class Range extends ChuckUGen {
   private float inMin = -1.0f;
   private float inMax = 1.0f;
   private float outMin = 0.0f;
@@ -47,6 +47,10 @@ public class ChuginRange extends ChuckUGen {
     outMax = out1;
   }
 
+  public float inMin(double v) {
+    return inMin((float) v);
+  }
+
   public float inMin(float v) {
     inMin = v;
     return v;
@@ -54,6 +58,10 @@ public class ChuginRange extends ChuckUGen {
 
   public float inMin() {
     return inMin;
+  }
+
+  public float inMax(double v) {
+    return inMax((float) v);
   }
 
   public float inMax(float v) {
@@ -65,6 +73,10 @@ public class ChuginRange extends ChuckUGen {
     return inMax;
   }
 
+  public float outMin(double v) {
+    return outMin((float) v);
+  }
+
   public float outMin(float v) {
     outMin = v;
     return v;
@@ -72,6 +84,10 @@ public class ChuginRange extends ChuckUGen {
 
   public float outMin() {
     return outMin;
+  }
+
+  public float outMax(double v) {
+    return outMax((float) v);
   }
 
   public float outMax(float v) {

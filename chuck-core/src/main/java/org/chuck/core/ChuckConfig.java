@@ -33,7 +33,7 @@ public class ChuckConfig {
 
   public static File resolveFile(String filename) {
     if (filename == null || filename.isEmpty()) return new File("");
-    
+
     File f = new File(filename);
     if (f.isAbsolute() && f.exists()) {
       return f;
@@ -41,8 +41,8 @@ public class ChuckConfig {
 
     // 1. Try relative to current script
     if (currentScriptDir != null) {
-        File resolved = new File(currentScriptDir, filename);
-        if (resolved.exists()) return resolved;
+      File resolved = new File(currentScriptDir, filename);
+      if (resolved.exists()) return resolved;
     }
 
     // 2. Try relative to CWD
@@ -55,11 +55,11 @@ public class ChuckConfig {
         return resolved;
       }
     }
-    
+
     // 4. Try normalized path (fix backslashes on Linux/Mac etc)
     String normalized = filename.replace("\\", "/");
     if (!normalized.equals(filename)) {
-        return resolveFile(normalized);
+      return resolveFile(normalized);
     }
 
     return f; // Return original if not found

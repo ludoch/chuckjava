@@ -91,17 +91,19 @@ public class SndBuf extends ChuckUGen {
         // Try resource fallback
         String resourcePath = path.replace("\\", "/");
         if (!resourcePath.startsWith("/")) resourcePath = "/" + resourcePath;
-        
+
         java.io.InputStream ris = findResource(resourcePath);
         if (ris != null) {
-          ais = javax.sound.sampled.AudioSystem.getAudioInputStream(new java.io.BufferedInputStream(ris));
+          ais =
+              javax.sound.sampled.AudioSystem.getAudioInputStream(
+                  new java.io.BufferedInputStream(ris));
         }
       }
 
       if (ais == null) {
-          logger.log(Level.SEVERE, "[Audio] SndBuf: File or resource not found: " + path);
-          samples = new float[0];
-          return;
+        logger.log(Level.SEVERE, "[Audio] SndBuf: File or resource not found: " + path);
+        samples = new float[0];
+        return;
       }
 
       javax.sound.sampled.AudioFormat format = ais.getFormat();
@@ -171,23 +173,23 @@ public class SndBuf extends ChuckUGen {
     // 1. Direct match
     java.io.InputStream is = getResource(path);
     if (is != null) return is;
-    
+
     // 2. Remove module prefix if any
     if (path.contains("-core/")) {
-        is = getResource(path.substring(path.indexOf("-core/") + 5));
-        if (is != null) return is;
+      is = getResource(path.substring(path.indexOf("-core/") + 5));
+      if (is != null) return is;
     }
     if (path.contains("-samples/")) {
-        is = getResource(path.substring(path.indexOf("-samples/") + 8));
-        if (is != null) return is;
+      is = getResource(path.substring(path.indexOf("-samples/") + 8));
+      if (is != null) return is;
     }
-    
+
     // 3. Try common locations
     if (path.contains("/data/")) {
-        is = getResource("/examples/data/" + path.substring(path.lastIndexOf("/") + 1));
-        if (is != null) return is;
+      is = getResource("/examples/data/" + path.substring(path.lastIndexOf("/") + 1));
+      if (is != null) return is;
     }
-    
+
     return null;
   }
 
@@ -200,9 +202,28 @@ public class SndBuf extends ChuckUGen {
     return path;
   }
 
+  public double pos(double p) {
+    setPos(p);
+    return p;
+  }
+
   public long pos(long p) {
     setPos(p);
     return p;
+  }
+
+  public double rate(double r) {
+    setRate(r);
+    return r;
+  }
+
+  public float rate(float r) {
+    setRate(r);
+    return r;
+  }
+
+  public double rate() {
+    return rate;
   }
 
   public long samples() {

@@ -34,6 +34,7 @@ public sealed interface ChuckAST {
     OR,
     S_OR,
     S_AND,
+    LOGICAL_NOT,
     SHIFT_LEFT,
     SHIFT_RIGHT,
     PERCENT,

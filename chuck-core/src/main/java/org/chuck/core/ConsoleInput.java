@@ -1,34 +1,42 @@
 package org.chuck.core;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-
 /**
  * ChucK ConsoleInput — reads lines from stdin. Usage in ChucK: ConsoleInput cin; cin.prompt("enter:
  * ") => string line => now; // blocks until Enter cin.readline() => string line;
  */
-public class ConsoleInput extends ChuckObject {
-  private static final BufferedReader READER = new BufferedReader(new InputStreamReader(System.in));
+public class ConsoleInput extends ChuckEvent {
+  private static final java.io.BufferedReader READER =
+      new java.io.BufferedReader(new java.io.InputStreamReader(System.in));
+  private String lastLine = "";
 
   public ConsoleInput() {
-    super(ChuckType.OBJECT);
+    super();
   }
 
   /** Block until the user presses Enter; return the line (without newline). */
   public String readline() {
     try {
-      String line = READER.readLine();
-      return line != null ? line : "";
+      lastLine = READER.readLine();
+      return lastLine != null ? lastLine : "";
     } catch (Exception e) {
       return "";
     }
   }
 
+  public boolean more() {
+    return true; // Simplified
+  }
+
+  public String getLine() {
+    return lastLine;
+  }
+
   /** Print a prompt string, then block until the user presses Enter. */
-  public String prompt(String msg) {
+  public ConsoleInput prompt(String msg) {
     System.out.print(msg);
     System.out.flush();
-    return readline();
+    readline();
+    return this;
   }
 
   /** Non-blocking: 1 if a line is ready to read, 0 otherwise. */
@@ -40,8 +48,8 @@ public class ConsoleInput extends ChuckObject {
     }
   }
 
-  /** Always returns 1 — ConsoleInput can always be waited on. */
-  public long can_wait() {
-    return 1L;
+  /** Always returns true — ConsoleInput can always be waited on. */
+  public boolean can_wait() {
+    return true;
   }
 }

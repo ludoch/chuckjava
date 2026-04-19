@@ -24,6 +24,10 @@ public class Perlin extends ChuckUGen {
   private final double[] g1 = new double[B + B + 2];
   private boolean initialized = false;
 
+  public Perlin() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public Perlin(float sampleRate) {
     this.sampleRate = sampleRate;
     init();

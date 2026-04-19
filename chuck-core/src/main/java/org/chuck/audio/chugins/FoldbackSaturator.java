@@ -26,6 +26,10 @@ public class FoldbackSaturator extends ChuckUGen {
     return s * (1.0f / threshold) * makeupGain;
   }
 
+  public float makeupGain(double v) {
+    return makeupGain((float) v);
+  }
+
   public float makeupGain(float v) {
     makeupGain = v;
     return v;
@@ -35,6 +39,10 @@ public class FoldbackSaturator extends ChuckUGen {
     return makeupGain;
   }
 
+  public float threshold(double v) {
+    return threshold((float) v);
+  }
+
   public float threshold(float v) {
     if (v >= 0) threshold = v;
     return threshold;
@@ -42,6 +50,10 @@ public class FoldbackSaturator extends ChuckUGen {
 
   public float threshold() {
     return threshold;
+  }
+
+  public float index(double v) {
+    return index((float) v);
   }
 
   public float index(float v) {

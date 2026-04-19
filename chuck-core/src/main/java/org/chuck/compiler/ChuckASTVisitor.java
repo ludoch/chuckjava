@@ -210,29 +210,47 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
                 de.line(),
                 de.column()));
       } else if (exp instanceof ChuckAST.BinaryExp be
-          && be.lhs() instanceof ChuckAST.DeclExp de
           && (be.op() == ChuckAST.Operator.CHUCK || be.op() == ChuckAST.Operator.AT_CHUCK)) {
-        stmts.add(
-            new ChuckAST.DeclStmt(
-                de.type(),
-                de.name(),
-                de.arraySizes(),
-                de.callArgs(),
-                de.isReference(),
-                de.isStatic(),
-                de.isGlobal(),
-                de.isConst(),
-                de.access(),
-                de.doc(),
-                de.line(),
-                de.column()));
-        ChuckAST.IdExp id = new ChuckAST.IdExp(de.name(), "", de.line(), de.column());
-        stmts.add(
-            new ChuckAST.ExpStmt(
-                new ChuckAST.BinaryExp(id, be.op(), be.rhs(), "", be.line(), be.column()),
-                "",
-                be.line(),
-                be.column()));
+        if (be.lhs() instanceof ChuckAST.DeclExp de) {
+          stmts.add(
+              new ChuckAST.DeclStmt(
+                  de.type(),
+                  de.name(),
+                  de.arraySizes(),
+                  be.rhs(),
+                  de.isReference(),
+                  de.isStatic(),
+                  de.isGlobal(),
+                  de.isConst(),
+                  de.access(),
+                  de.doc(),
+                  de.line(),
+                  de.column()));
+          ChuckAST.IdExp id = new ChuckAST.IdExp(de.name(), "", de.line(), de.column());
+          stmts.add(
+              new ChuckAST.ExpStmt(
+                  new ChuckAST.BinaryExp(id, be.op(), be.rhs(), "", be.line(), be.column()),
+                  "",
+                  be.line(),
+                  be.column()));
+        } else if (be.rhs() instanceof ChuckAST.DeclExp de) {
+          stmts.add(
+              new ChuckAST.DeclStmt(
+                  de.type(),
+                  de.name(),
+                  de.arraySizes(),
+                  be.lhs(),
+                  de.isReference(),
+                  de.isStatic(),
+                  de.isGlobal(),
+                  de.isConst(),
+                  de.access(),
+                  de.doc(),
+                  de.line(),
+                  de.column()));
+        } else {
+          stmts.add(new ChuckAST.ExpStmt(exp, currentDoc, exp.line(), exp.column()));
+        }
       } else {
         stmts.add(new ChuckAST.ExpStmt(exp, currentDoc, exp.line(), exp.column()));
       }
@@ -614,7 +632,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     ChuckAST.Operator op =
         switch (opStr) {
           case "-" -> ChuckAST.Operator.MINUS;
-          case "!" -> ChuckAST.Operator.S_OR;
+          case "!" -> ChuckAST.Operator.LOGICAL_NOT;
           case "++" -> ChuckAST.Operator.PLUS;
           case "--" -> ChuckAST.Operator.MINUS;
           default -> ChuckAST.Operator.NONE;

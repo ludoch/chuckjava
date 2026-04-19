@@ -232,16 +232,16 @@ public class JitCompiler implements Opcodes {
 
         mv.visitLabel(notOsc);
         mv.visitVarInsn(ALOAD, 6);
-        mv.visitTypeInsn(INSTANCEOF, "org/chuck/audio/filter/Lpf");
+        mv.visitTypeInsn(INSTANCEOF, "org/chuck/audio/filter/LPF");
         mv.visitJumpInsn(IFEQ, notLpf);
 
         if (cbi.mName.equals("cutoff")) {
           mv.visitVarInsn(ALOAD, 6);
-          mv.visitTypeInsn(CHECKCAST, "org/chuck/audio/filter/Lpf");
+          mv.visitTypeInsn(CHECKCAST, "org/chuck/audio/filter/LPF");
           mv.visitVarInsn(LLOAD, 4);
           mv.visitInsn(L2F);
           mv.visitMethodInsn(
-              INVOKEVIRTUAL, "org/chuck/audio/filter/Lpf", "setCutoff", "(F)V", false);
+              INVOKEVIRTUAL, "org/chuck/audio/filter/LPF", "setCutoff", "(F)V", false);
         }
 
         mv.visitLabel(notLpf);

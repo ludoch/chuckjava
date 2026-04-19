@@ -8,11 +8,37 @@ import java.util.Map;
 /**
  * Represents an array in ChucK. ChucK arrays can be both indexed (int) and associative (string).
  */
-public class ChuckArray extends ChuckObject {
+public class ChuckArray extends ChuckObject implements Iterable<Object> {
   private final List<Long> intData = new ArrayList<>();
   private final List<Double> floatData = new ArrayList<>();
   private final List<Object> objectData = new ArrayList<>();
-  private final List<Byte> types = new ArrayList<>(); // 0=int, 1=float, 2=obj
+  private final List<Byte> types = new ArrayList<>(); // 0: int, 1: float, 2: object
+
+  @Override
+  public java.util.Iterator<Object> iterator() {
+    return new java.util.Iterator<Object>() {
+      private int index = 0;
+
+      @Override
+      public boolean hasNext() {
+        return index < size();
+      }
+
+      @Override
+      public Object next() {
+        byte type = types.get(index);
+        Object val =
+            switch (type) {
+              case 0 -> intData.get(index);
+              case 1 -> floatData.get(index);
+              default -> objectData.get(index);
+            };
+        index++;
+        return val;
+      }
+    };
+  }
+
   private final Map<String, Long> assocInt = new HashMap<>();
   private final Map<String, Double> assocFloat = new HashMap<>();
   private final Map<String, Object> assocObject = new HashMap<>();
@@ -75,6 +101,25 @@ public class ChuckArray extends ChuckObject {
       objectData.add(null);
       types.add((byte) 1);
     }
+  }
+
+  public ChuckArray(String tag, long[] vals) {
+    super(ChuckType.ARRAY);
+    this.elementTypeName = tag != null ? tag.replaceAll("\\[\\]", "") : null;
+    for (long v : vals) {
+      intData.add(v);
+      floatData.add((double) v);
+      objectData.add(null);
+      types.add((byte) 0);
+    }
+  }
+
+  public int size() {
+    return types.size();
+  }
+
+  public int cap() {
+    return types.size();
   }
 
   private void ensureCapacity(int index) {
@@ -275,14 +320,6 @@ public class ChuckArray extends ChuckObject {
     this.assocInt.putAll(other.assocInt);
     this.assocFloat.putAll(other.assocFloat);
     this.assocObject.putAll(other.assocObject);
-  }
-
-  public int size() {
-    return types.size();
-  }
-
-  public int cap() {
-    return types.size();
   }
 
   public int resolveIndex(long idx) {

@@ -144,6 +144,95 @@ public class ChuckDSL {
     return val;
   }
 
+  public static ChuckShred me() {
+    return ChuckShred.CURRENT_SHRED.get();
+  }
+
+  // String helpers for ChucK parity
+  public static String setCharAt(String s, int pos, int c) {
+    char[] chars = s.toCharArray();
+    if (pos >= 0 && pos < chars.length) chars[pos] = (char) c;
+    return new String(chars);
+  }
+
+  public static String setCharAt2(String s, int pos, String sub) {
+    if (sub == null || sub.isEmpty()) return s;
+    return setCharAt(s, pos, sub.charAt(0));
+  }
+
+  public static String charAt2(String s, int pos) {
+    if (pos < 0 || pos >= s.length()) return "";
+    return String.valueOf(s.charAt(pos));
+  }
+
+  public static int find(String s, String sub) {
+    return s.indexOf(sub);
+  }
+
+  public static int find(String s, int c) {
+    return s.indexOf(c);
+  }
+
+  public static int rfind(String s, String sub) {
+    return s.lastIndexOf(sub);
+  }
+
+  public static int rfind(String s, int c) {
+    return s.lastIndexOf(c);
+  }
+
+  public static String lower(String s) {
+    return s.toLowerCase();
+  }
+
+  public static String upper(String s) {
+    return s.toUpperCase();
+  }
+
+  public static String ltrim(String s) {
+    return s.stripLeading();
+  }
+
+  public static String rtrim(String s) {
+    return s.stripTrailing();
+  }
+
+  public static String trim(String s) {
+    return s.trim();
+  }
+
+  public static String insert(String s, int pos, String sub) {
+    if (pos < 0) pos = 0;
+    if (pos > s.length()) pos = s.length();
+    return s.substring(0, pos) + sub + s.substring(pos);
+  }
+
+  public static String erase(String s, int pos, int len) {
+    if (pos < 0) pos = 0;
+    if (pos >= s.length()) return s;
+    int end = pos + len;
+    if (end > s.length()) end = s.length();
+    return s.substring(0, pos) + s.substring(end);
+  }
+
+  public static String replace(String s, int pos, int len, String sub) {
+    return insert(erase(s, pos, len), pos, sub);
+  }
+
+  public static String replace(String s, int pos, String sub) {
+    return replace(s, pos, sub.length(), sub);
+  }
+
+  public static void _CHUCK_INTERNAL_ASSERT_(boolean condition, String message) {
+    if (!condition) {
+      throw new RuntimeException("ChucK Assertion Failed: " + message);
+    }
+  }
+
+  public static void _CHUCK_INTERNAL_ASSERT_(long condition, String message) {
+    _CHUCK_INTERNAL_ASSERT_(condition != 0, message);
+  }
+
   /**
    * Compiles a Java DSL file into a Runnable that can be sporked. The class in the file must
    * implement org.chuck.core.Shred or have a shred() method.

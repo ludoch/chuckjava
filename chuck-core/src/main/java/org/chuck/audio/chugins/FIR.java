@@ -17,6 +17,10 @@ public class FIR extends ChuckUGen {
   private float[] buffer;
   private int order;
 
+  public FIR() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public FIR(float sampleRate) {
     this.sampleRate = sampleRate;
     order(4);

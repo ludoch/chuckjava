@@ -366,7 +366,7 @@ public class ChuckVM {
             // Map common internal names back to ChucK names
             if (typeName.endsWith("UGen") && !typeName.equals("UGen")) {
               typeName = typeName.substring(0, typeName.length() - 4);
-            } else if (typeName.equals("Lpf")) {
+            } else if (typeName.equals("LPF")) {
               typeName = "LPF"; // ChucK canonical name
             }
           }
@@ -384,18 +384,19 @@ public class ChuckVM {
     int id = s.getId();
     activeShreds.put(id, s);
 
-    Thread.startVirtualThread(() -> {
-      liveThreadCount.incrementAndGet();
-      try {
-        ScopedValue.where(CURRENT_VM, this)
-            .where(ChuckShred.CURRENT_SHRED, s)
-            .run(shred::shred);
-      } finally {
-        activeShreds.remove(id);
-        s.setDone(true);
-        liveThreadCount.decrementAndGet();
-      }
-    });
+    Thread.startVirtualThread(
+        () -> {
+          liveThreadCount.incrementAndGet();
+          try {
+            ScopedValue.where(CURRENT_VM, this)
+                .where(ChuckShred.CURRENT_SHRED, s)
+                .run(shred::shred);
+          } finally {
+            activeShreds.remove(id);
+            s.setDone(true);
+            liveThreadCount.decrementAndGet();
+          }
+        });
 
     return id;
   }

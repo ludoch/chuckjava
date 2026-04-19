@@ -16,6 +16,10 @@ public class ExpEnv extends ChuckUGen {
   private double value = 0.0;
   private double t60 = 0.0;
 
+  public ExpEnv() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public ExpEnv(float sampleRate) {
     this.sampleRate = sampleRate;
   }

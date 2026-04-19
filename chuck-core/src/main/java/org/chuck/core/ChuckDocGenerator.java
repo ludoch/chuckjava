@@ -109,7 +109,7 @@ public class ChuckDocGenerator {
     // Special mapping for common case mismatches
     String realName = typeName;
     if (typeName.equals("ADSR")) realName = "Adsr";
-    if (typeName.equals("LPF")) realName = "Lpf";
+    if (typeName.equals("LPF")) realName = "LPF";
 
     for (String pkg : packages) {
       try {

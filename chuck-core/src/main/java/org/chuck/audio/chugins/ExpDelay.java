@@ -27,6 +27,10 @@ public class ExpDelay extends ChuckUGen {
   private float gainScale;
   private float mix = 1.0f;
 
+  public ExpDelay() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public ExpDelay(float sampleRate) {
     maxBufLen = DEFAULT_BUFLEN;
     bufLen = maxBufLen;

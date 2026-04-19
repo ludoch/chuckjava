@@ -22,6 +22,10 @@ public class KasFilter extends ChuckUGen {
   private double lastIn = 0.0;
   private double phase = 0.0;
 
+  public KasFilter() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public KasFilter(float sampleRate) {
     this.phasePerSample = Math.PI / sampleRate;
   }

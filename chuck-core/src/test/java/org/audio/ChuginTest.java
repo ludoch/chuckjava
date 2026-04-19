@@ -191,7 +191,7 @@ public class ChuginTest {
 
   @Test
   void testChuginRange_rescales() {
-    ChuginRange r = new ChuginRange();
+    Range r = new Range();
     r.inMin(-1.0f);
     r.inMax(1.0f);
     r.outMin(0.0f);

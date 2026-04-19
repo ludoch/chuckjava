@@ -45,6 +45,10 @@ public class ChuckDuration extends ChuckObject implements Comparable<ChuckDurati
     return new ChuckDuration(this.samples / divisor);
   }
 
+  public double div(ChuckDuration other) {
+    return this.samples / other.samples;
+  }
+
   public ChuckDuration percent(ChuckDuration other) {
     return new ChuckDuration(this.samples % other.samples);
   }

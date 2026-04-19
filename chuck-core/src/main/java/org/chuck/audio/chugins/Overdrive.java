@@ -19,6 +19,10 @@ public class Overdrive extends ChuckUGen {
     return -1.0f;
   }
 
+  public float drive(double d) {
+    return drive((float) d);
+  }
+
   public float drive(float d) {
     if (d >= 0) drive = d;
     return drive;

@@ -270,7 +270,7 @@ public class StatementEmitter {
       }
       case ChuckAST.DeclStmt s -> {
         // Check for 'auto' without initialization
-        if (s.type().equals("auto")) {
+        if (s.type().equals("auto") && s.callArgs() == null) {
           throw new org.chuck.core.ChuckCompilerException(
               "'auto' requires initialization (cannot declare 'auto' without a value)",
               parent.getCurrentFile(),

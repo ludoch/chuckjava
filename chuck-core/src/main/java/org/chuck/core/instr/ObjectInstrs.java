@@ -1459,7 +1459,7 @@ public class ObjectInstrs {
       Object obj = s.reg.popObject();
       if (obj instanceof org.chuck.audio.osc.Osc o) {
         if (mName.equals("sync")) o.setSync((int) val);
-      } else if (obj instanceof org.chuck.audio.filter.Lpf l) {
+      } else if (obj instanceof org.chuck.audio.filter.LPF l) {
         if (mName.equals("cutoff")) l.setCutoff((float) val);
       }
       s.reg.push(val);

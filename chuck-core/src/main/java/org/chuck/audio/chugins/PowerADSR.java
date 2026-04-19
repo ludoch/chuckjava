@@ -47,6 +47,10 @@ public class PowerADSR extends ChuckUGen {
 
   private int state = DONE;
 
+  public PowerADSR() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public PowerADSR(float sampleRate) {
     this.sampleRate = sampleRate;
     attackDuration = sampleRate;

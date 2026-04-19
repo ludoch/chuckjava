@@ -29,7 +29,7 @@ public class AudioGoldenTester {
     float sampleRate = 44100.0f;
     org.chuck.audio.osc.SinOsc sin = new org.chuck.audio.osc.SinOsc(sampleRate);
     sin.freq(5000.0);
-    org.chuck.audio.filter.Lpf lpf = new org.chuck.audio.filter.Lpf(sampleRate);
+    org.chuck.audio.filter.LPF lpf = new org.chuck.audio.filter.LPF(sampleRate);
     lpf.setCutoff(100.0f);
 
     // Connect sin => lpf

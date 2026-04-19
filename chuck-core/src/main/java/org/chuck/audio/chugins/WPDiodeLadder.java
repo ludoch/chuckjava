@@ -39,6 +39,10 @@ public class WPDiodeLadder extends ChuckUGen {
   private boolean nonlinear = false;
   private boolean nlpNorm = true; // true = normalized tanh
 
+  public WPDiodeLadder() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public WPDiodeLadder(float sampleRate) {
     this.sampleRate = sampleRate;
     // a0 constants set in constructor per Pirkle

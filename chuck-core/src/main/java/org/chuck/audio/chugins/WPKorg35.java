@@ -33,6 +33,10 @@ public class WPKorg35 extends ChuckUGen {
   private double saturation = 1.0;
   private boolean nonlinear = false;
 
+  public WPKorg35() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public WPKorg35(float sampleRate) {
     this.sampleRate = sampleRate;
     updateFilter();

@@ -17,6 +17,10 @@ public class MagicSine extends ChuckUGen {
   private double x = 1.0; // cosine state
   private double y = 0.0; // sine state (output)
 
+  public MagicSine() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public MagicSine(float sampleRate) {
     this.sampleRate = sampleRate;
     setFreq(220.0f);

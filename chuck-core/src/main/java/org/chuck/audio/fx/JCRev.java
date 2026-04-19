@@ -10,6 +10,10 @@ public class JCRev extends StereoUGen {
   private final Delay outLeft, outRight;
   private float mix = 0.5f;
 
+  public JCRev() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public JCRev(float sampleRate) {
     // Delay lengths adapted for 44.1kHz. Disable auto-registration for internal parts.
     allpass[0] = new AllPass(225, false);
@@ -39,6 +43,10 @@ public class JCRev extends StereoUGen {
     outRight = new Delay(157, sampleRate, false);
     outLeft.delay(100);
     outRight.delay(157);
+  }
+
+  public void mix(double mix) {
+    this.mix = (float) mix;
   }
 
   public void mix(float mix) {

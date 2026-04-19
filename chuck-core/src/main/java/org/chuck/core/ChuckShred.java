@@ -130,6 +130,10 @@ public class ChuckShred implements Comparable<ChuckShred> {
   }
 
   // Source and Path information
+  public void exit() {
+    isDone = true;
+  }
+
   public String path() {
     return code != null ? code.getName() : "eval";
   }
@@ -143,6 +147,10 @@ public class ChuckShred implements Comparable<ChuckShred> {
   }
 
   public String sourceDir() {
+    return dir(0);
+  }
+
+  public String dir() {
     return dir(0);
   }
 
