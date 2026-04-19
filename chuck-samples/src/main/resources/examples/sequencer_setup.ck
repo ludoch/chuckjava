@@ -46,10 +46,10 @@ while(true) {
     Machine.getGlobalObject("seq_probability") $ float[] @=> probs;
 
     if (data == null) {
-        if (step % 8 == 0) <<< "STATUS: data array is NULL" >>>;
+        if (step % 8 == 0 && Machine.loglevel() >= 2) <<< "STATUS: data array is NULL" >>>;
     } else {
-        // HEARTBEAT
-        if (step % 16 == 0) {
+        // HEARTBEAT (Level 2+)
+        if (step % 16 == 0 && Machine.loglevel() >= 2) {
             <<< "HEARTBEAT: Step 0. data[0] =", data[0], "probs[0] =", (probs != null ? probs[0] : -1.0) >>>;
         }
 
@@ -57,21 +57,25 @@ while(true) {
         for(0 => int r; r < 8; r++) {
             data[r * 16 + (step % 16)] => int val;
             
-            // LOG ANY NON-ZERO VALUE FOUND
+            // LOG ANY NON-ZERO VALUE FOUND (Level 2+)
             if (val != 0) {
-                <<< "!!! FOUND ACTIVE CELL !!! Row:", r, "Step:", (step % 16), "Value:", val >>>;
+                if (Machine.loglevel() >= 2) {
+                    <<< "!!! FOUND ACTIVE CELL !!! Row:", r, "Step:", (step % 16), "Value:", val >>>;
+                }
                 
                 // Trigger Sample
                 0 => kit[r].pos;
                 
-                // Verification Beep
-                SinOsc s => dac; 440 => s.freq; 0.1 => s.gain; 5::ms => now; 0 => s.gain;
+                // Verification Beep (Level 3+ only)
+                if (Machine.loglevel() >= 3) {
+                    SinOsc s => dac; 440 => s.freq; 0.1 => s.gain; 5::ms => now; 0 => s.gain;
+                }
             }
         }
     }
 
-    // DAC OUTPUT Level Check
-    if (Math.abs(master.last()) > 0.001) {
+    // DAC OUTPUT Level Check (Level 2+)
+    if (Machine.loglevel() >= 2 && Math.abs(master.last()) > 0.001) {
         <<< ">>> DAC ACTIVE Level:", master.last() >>>;
     }
     
