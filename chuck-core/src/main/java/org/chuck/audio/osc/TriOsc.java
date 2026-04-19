@@ -15,6 +15,10 @@ import jdk.incubator.vector.VectorMask;
  * applied here.
  */
 public class TriOsc extends Osc {
+  public TriOsc() {
+    super();
+  }
+
   public TriOsc(float sampleRate) {
     super(sampleRate);
   }

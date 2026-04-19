@@ -35,6 +35,15 @@ public class Gain extends ChuckUGen {
     db(db);
   }
 
+  public double gain(double val) {
+    this.gain = (float) val;
+    return val;
+  }
+
+  public float last() {
+    return lastOut;
+  }
+
   /** SIMD Optimized block processing using the JDK 25 Vector API. */
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {

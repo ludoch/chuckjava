@@ -178,6 +178,16 @@ public class SndBuf extends ChuckUGen {
     pos = 0;
   }
 
+  public String read(String path) {
+    setRead(path);
+    return path;
+  }
+
+  public long pos(long p) {
+    setPos(p);
+    return p;
+  }
+
   public long samples() {
     return samples.length;
   }

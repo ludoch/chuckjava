@@ -15,6 +15,10 @@ import jdk.incubator.vector.VectorMask;
  * frequencies.
  */
 public class PulseOsc extends Osc {
+  public PulseOsc() {
+    super();
+  }
+
   public PulseOsc(float sampleRate) {
     super(sampleRate);
   }

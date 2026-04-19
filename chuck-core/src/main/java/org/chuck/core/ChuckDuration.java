@@ -33,6 +33,22 @@ public class ChuckDuration extends ChuckObject implements Comparable<ChuckDurati
     return new ChuckDuration(this.samples + other.samples);
   }
 
+  public ChuckDuration minus(ChuckDuration other) {
+    return new ChuckDuration(this.samples - other.samples);
+  }
+
+  public ChuckDuration times(double factor) {
+    return new ChuckDuration(this.samples * factor);
+  }
+
+  public ChuckDuration div(double divisor) {
+    return new ChuckDuration(this.samples / divisor);
+  }
+
+  public ChuckDuration percent(ChuckDuration other) {
+    return new ChuckDuration(this.samples % other.samples);
+  }
+
   @Override
   public int compareTo(ChuckDuration o) {
     return Double.compare(this.samples, o.samples);

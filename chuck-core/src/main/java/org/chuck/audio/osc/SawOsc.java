@@ -14,6 +14,10 @@ import jdk.incubator.vector.FloatVector;
  * negligible CPU cost.
  */
 public class SawOsc extends Osc {
+  public SawOsc() {
+    super();
+  }
+
   public SawOsc(float sampleRate) {
     super(sampleRate);
     this.freq = 440.0;

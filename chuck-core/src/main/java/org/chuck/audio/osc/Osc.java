@@ -19,6 +19,10 @@ public abstract class Osc extends ChuckUGen {
 
   protected final float sampleRate;
 
+  public Osc() {
+    this(org.chuck.core.ChuckDSL.sampleRate());
+  }
+
   public Osc(float sampleRate) {
     this(sampleRate, true);
   }

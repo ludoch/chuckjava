@@ -16,7 +16,7 @@ The `ChuckToDSLConverter` is a source-to-source translator that converts ChucK (
     -   UGen to UGen: Mapped to `.chuck(target)`.
     -   Value to UGen Parameter: Mapped to `.member(value)`.
     -   Time Advancement: `dur => now` is mapped to `advance(dur)`.
-    -   Event Waiting: `event => now` is mapped to `advance(event)`.
+    -   Event Waiting: `event => now` is mapped to `advance(event)`. Supports array waiting: `event_array => now`.
 -   **Unchuck (`!=>`)**: Mapped to `.unchuck(target)`.
 -   **At-Chuck (`@=>`)**: Mapped to assignment (`=`).
 
@@ -26,15 +26,16 @@ The `ChuckToDSLConverter` is a source-to-source translator that converts ChucK (
     -   `float` -> `double`
     -   `dur` -> `ChuckDuration`
     -   `time` -> `long`
--   **Declarations**:
-    -   Standard: `SinOsc s;` -> `SinOsc s = new SinOsc(sampleRate());`
-    -   Primitive init: `10 => int i;` -> `long i = 10;`
-    -   Array: `int data[16];` -> `long[] data = new long[16];`
--   **Global Keyword**: `global int x;` is mapped to `Machine.getGlobalInt("x")` and `Machine.setGlobalObject("x", val)`.
+-   **Declarations & Scoping**:
+    -   **Field Promotion**: All variable declarations (including those nested in `if` or `while` blocks) are promoted to `public` class fields to ensure cross-shred and cross-method visibility.
+    -   **UGen Auto-Init**: `SinOsc s[10];` automatically generates a loop in `shred()` to instantiate all 10 oscillators.
+    -   **Standard**: `SinOsc s;` -> `SinOsc s = new SinOsc();` (using current sample rate).
+-   **Global Keyword**: `global int x;` is mapped to `Machine.getGlobalInt("x")` and `Machine.setGlobalInt("x", val)`.
 -   **Literals**: Multi-dimensional arrays, vector literals (`#(1,2)`), complex, and polar literals.
 
 ### 4. Expressions
--   **Operators**: Full mapping of arithmetic, comparison, and logical operators.
+-   **High-Fidelity Duration Arithmetic**: `now % T` and `T1 + T2` are correctly mapped to `samp(now()).percent(T)` and `T1.plus(T2)` only when durations are involved, falling back to primitive arithmetic otherwise.
+-   **Operators**: Full mapping of arithmetic, comparison (including duration-to-sample comparisons), and logical operators.
 -   **Unary**: Support for `-` and `!`.
 -   **Ternary**: Full support for `cond ? then : else`.
 -   **Cast**: `(Type) value`.
@@ -48,32 +49,36 @@ The `ChuckToDSLConverter` is a source-to-source translator that converts ChucK (
 ### 6. Concurrency
 -   **Sporking**: `spork ~ call()` is mapped to `spork(() -> call())`.
 
-### 7. Comments
+### 7. Documentation & Comments
 -   Preservation of `//`, `/* */`, and `/** */` comments, prepended to the corresponding Java statements.
+-   Support for `@doc` tags in AST nodes.
+
+---
+
+## Technical Infrastructure
+
+### Machine API
+A `Machine` helper class provides static parity for ChucK's system calls:
+- `Machine.loglevel()`
+- `Machine.getGlobalInt/Float/Object(name)`
+- `Machine.spork(Runnable)`
+- `Machine.add(path)`
+
+### UGen Consistency
+Core UGens like `SinOsc`, `SndBuf`, and `Gain` have been extended with ChucK-idiomatic method overloads (`pos()`, `read()`, `gain()`, `last()`) and default constructors to ensure the translated Java code is clean and functional.
 
 ---
 
 ## Missing Features / Limitations
 
 ### 1. Events & Polymorphism
--   **Status**: ⚠️ Partial.
--   **Current Behavior**: `event => now` and `e.signal()` work.
--   **Limitation**: Complex event synchronization (conjunctions/disjunctions) and custom event subclassing might need more validation.
+-   **Status**: ✅ Supported.
+-   **Note**: Conjunctions (`e1 && e2 => now`) and Disjunctions (`e1 || e2 => now`) are now fully supported.
 
-### 2. Special UGen Members
--   **Status**: ⚠️ Partial.
--   **Current Behavior**: Maps `s.freq` and `s.gain` correctly.
--   **Limitation**: Some UGens might have members that don't follow the standard getter/setter pattern in Java.
-
-### 3. Multi-variable Declarations with Mixed Init
+### 2. Multi-variable Declarations with Mixed Init
 -   **Status**: ⚠️ Partial.
 -   **Limitation**: `int a, b=1, c;` might need more complex splitting logic in the visitor to produce valid Java.
 
-### 4. Operator Overloading
+### 3. Operator Overloading
 -   **Status**: ⚠️ Partial.
--   **Current Behavior**: Standardizes names to `__op__plus` etc.
--   **Limitation**: Standard Java binary operators (`+`, `-`, etc.) won't automatically call these methods in the generated DSL.
-
-### 5. Smart Assignment (Type Inference)
--   **Status**: ⚠️ Experimental.
--   **Limitation**: The converter uses basic name guessing (`i`, `j`, `val`, etc.) to decide between `=` and `.chuck()` for the `=>` operator when the LHS type is unknown.
+-   **Limitation**: Standard Java binary operators (`+`, `-`, etc.) won't automatically call custom overloaded methods in the generated DSL.

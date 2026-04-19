@@ -11,6 +11,10 @@ import org.chuck.core.doc;
 /** A sine wave oscillator using high-accuracy SIMD polynomial approximation. */
 @doc("A sine wave oscillator.")
 public class SinOsc extends Osc {
+  public SinOsc() {
+    super();
+  }
+
   public SinOsc(float sampleRate) {
     this(sampleRate, true);
   }
