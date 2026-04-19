@@ -1,6 +1,6 @@
 import static org.chuck.core.ChuckDSL.*;
 
-import org.chuck.audio.filter.Lpf;
+import org.chuck.audio.filter.LPF;
 import org.chuck.audio.osc.Noise;
 import org.chuck.core.Shred;
 
@@ -20,7 +20,7 @@ public class LpfDSL implements Shred {
   @Override
   public void shred() {
     Noise n = new Noise();
-    Lpf lpf = new Lpf(sampleRate());
+    LPF lpf = new LPF(sampleRate());
     n.chuck(lpf).chuck(dac());
 
     // sweep cutoff for 2 seconds (400 steps Ã— 5ms)
