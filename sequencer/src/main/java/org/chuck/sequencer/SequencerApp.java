@@ -198,8 +198,9 @@ public class SequencerApp extends Application {
 
   private void initVM() {
     vm = new ChuckVM(44100, 2);
+    vm.setGlobalInt("seq_chaos", 0L); // Explicitly disable chaos on start
     org.chuck.core.ChuckConfig.addSearchPath("chuck-samples/src/main/resources/examples");
-    audio = new ChuckAudio(vm, 512, 2, 44100);
+    audio = new ChuckAudio(vm, 1024, 2, 44100); // Larger buffer for Mac
     vm.setAudio(audio);
     audio.start();
   }
