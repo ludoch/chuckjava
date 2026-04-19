@@ -1,5 +1,5 @@
 /* 
-   CHUCK GRID SEQUENCER PRO SETUP (v3.8 - Works on Mac)
+   CHUCK GRID SEQUENCER PRO SETUP (v3.8 - FIXED)
    ------------------------------
 */
 
@@ -26,13 +26,12 @@ for(0 => int i; i < 8; i++) {
     kit[i].samples() => kit[i].pos;
 }
 
-// 3. Global synchronization
+// Global synchronization
 global int seq_current_step;
 
-// Local placeholders (Size 128, will be replaced by Java)
-new int[128] @=> int data[];
-new float[8] @=> float probs[];
-for(0 => int i; i < 8; i++) 1.0 => probs[i];
+// Local references
+int data[];
+float probs[];
 
 // Timing logic (120 BPM)
 125::ms => dur T;
@@ -41,43 +40,38 @@ T - (now % T) => now;
 0 => int step;
 while(true) {
     // 1. Refresh data from Java VM
-    Machine.getGlobalObject("seq_pattern") $ int[] @=> int[] javaData;
-    Machine.getGlobalObject("seq_probability") $ float[] @=> float[] javaProbs;
-    
-    // 2. Only use Java data if it is valid and correct size
-    if (javaData != null && javaData.cap() == 128) {
-        javaData @=> data;
-    }
-    if (javaProbs != null && javaProbs.cap() == 8) {
-        javaProbs @=> probs;
-    }
+    Machine.getGlobalObject("seq_pattern") $ int[] @=> data;
+    Machine.getGlobalObject("seq_probability") $ float[] @=> probs;
 
-    // 3. Update UI cursor
-    step % 16 => seq_current_step;
-    
-    // 4. Diagnostic Heartbeat
-    if (step % 16 == 0) {
-        <<< "HEARTBEAT: Step 0. data.cap() =", data.cap(), "data[0] =", data[0] >>>;
-    }
+    if (data == null) {
+        if (step % 8 == 0) <<< "WAITING FOR JAVA GRID DATA..." >>>;
+    } else {
+        // 2. Sync UI cursor
+        step % 16 => seq_current_step;
 
-    // 5. Process all 8 tracks
-    for(0 => int r; r < 8; r++) {
-        data[r * 16 + (step % 16)] => int val;
-        
-        if (val != 0) {
-            probs[r] => float p;
-            if (Math.randomf() <= p) {
-                0 => kit[r].pos; // TRIGGER
-                <<< "TRIGGER: Row", r, "Step", (step % 16) >>>;
+        // 3. Process all 8 tracks
+        for(0 => int r; r < 8; r++) {
+            data[r * 16 + (step % 16)] => int val;
+            
+            if (val != 0) {
+                // Apply probability
+                1.0 => float p;
+                if (probs != null && r < probs.cap()) probs[r] => p;
+
+                if (Math.randomf() <= p) {
+                    0 => kit[r].pos; // TRIGGER
+                    <<< "TRIGGER: Row", r, "Step", (step % 16) >>>;
+                }
             }
         }
     }
 
-    // 6. Audio Monitor
+    // 4. DAC Output Monitor (print only if non-zero)
     master.last() => float out;
-    if (Math.abs(out) > 0.001) <<< "DAC Level:", out >>>;
-
-    // 7. Advance time
+    if (Math.abs(out) > 0.001) {
+        <<< "--- DAC LEVEL:", out, "---" >>>;
+    }
+    
     T => now;
     step++;
 }
