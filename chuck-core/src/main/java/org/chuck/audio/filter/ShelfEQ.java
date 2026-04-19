@@ -23,13 +23,13 @@ public class ShelfEQ extends ChuckUGen {
   private static final double Q = Math.sqrt(2.0) / 2.0;
 
   // low shelf coeffs
-  private float lb0, lb1, lb2, la1, la2;
+  private double lb0, lb1, lb2, la1, la2;
   // high shelf coeffs
-  private float hb0, hb1, hb2, ha1, ha2;
+  private double hb0, hb1, hb2, ha1, ha2;
 
   // state
-  private float lx1 = 0, lx2 = 0, ly1 = 0, ly2 = 0;
-  private float hx1 = 0, hx2 = 0, hy1 = 0, hy2 = 0;
+  private double lx1 = 0, lx2 = 0, ly1 = 0, ly2 = 0;
+  private double hx1 = 0, hx2 = 0, hy1 = 0, hy2 = 0;
 
   public ShelfEQ() {
     this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
@@ -94,11 +94,11 @@ public class ShelfEQ extends ChuckUGen {
     double a1 = -2.0 * ((A - 1.0) + (A + 1.0) * cosw0);
     double a2 = (A + 1.0) + (A - 1.0) * cosw0 - 2.0 * Math.sqrt(A) * alpha;
 
-    lb0 = (float) (b0 / a0);
-    lb1 = (float) (b1 / a0);
-    lb2 = (float) (b2 / a0);
-    la1 = (float) (a1 / a0);
-    la2 = (float) (a2 / a0);
+    lb0 = b0 / a0;
+    lb1 = b1 / a0;
+    lb2 = b2 / a0;
+    la1 = a1 / a0;
+    la2 = a2 / a0;
 
     // 2. High Shelf calculations
     A = Math.pow(10.0, trebleGainDB / 40.0);
@@ -113,11 +113,11 @@ public class ShelfEQ extends ChuckUGen {
     a1 = 2.0 * ((A - 1.0) - (A + 1.0) * cosw0);
     a2 = (A + 1.0) - (A - 1.0) * cosw0 - 2.0 * Math.sqrt(A) * alpha;
 
-    hb0 = (float) (b0 / a0);
-    hb1 = (float) (b1 / a0);
-    hb2 = (float) (b2 / a0);
-    ha1 = (float) (a1 / a0);
-    ha2 = (float) (a2 / a0);
+    hb0 = b0 / a0;
+    hb1 = b1 / a0;
+    hb2 = b2 / a0;
+    ha1 = a1 / a0;
+    ha2 = a2 / a0;
   }
 
   @Override
@@ -151,27 +151,27 @@ public class ShelfEQ extends ChuckUGen {
     }
 
     // Local variables for state to help JIT optimization
-    float t_lx1 = lx1, t_lx2 = lx2, t_ly1 = ly1, t_ly2 = ly2;
-    float t_hx1 = hx1, t_hx2 = hx2, t_hy1 = hy1, t_hy2 = hy2;
+    double t_lx1 = lx1, t_lx2 = lx2, t_ly1 = ly1, t_ly2 = ly2;
+    double t_hx1 = hx1, t_hx2 = hx2, t_hy1 = hy1, t_hy2 = hy2;
 
     for (int i = 0; i < length; i++) {
-      float in = inputSum[i];
+      double in = inputSum[i];
 
       // Process Low Shelf
-      float lOut = lb0 * in + lb1 * t_lx1 + lb2 * t_lx2 - la1 * t_ly1 - la2 * t_ly2;
+      double lOut = lb0 * in + lb1 * t_lx1 + lb2 * t_lx2 - la1 * t_ly1 - la2 * t_ly2;
       t_lx2 = t_lx1;
       t_lx1 = in;
       t_ly2 = t_ly1;
       t_ly1 = lOut;
 
       // Process High Shelf
-      float hOut = hb0 * lOut + hb1 * t_hx1 + hb2 * t_hx2 - ha1 * t_hy1 - ha2 * t_hy2;
+      double hOut = hb0 * lOut + hb1 * t_hx1 + hb2 * t_hx2 - ha1 * t_hy1 - ha2 * t_hy2;
       t_hx2 = t_hx1;
       t_hx1 = lOut;
       t_hy2 = t_hy1;
       t_hy1 = hOut;
 
-      blockCache[i] = hOut * gain;
+      blockCache[i] = (float) hOut * gain;
       if (buffer != null) buffer[offset + i] = blockCache[i];
     }
 
@@ -192,18 +192,18 @@ public class ShelfEQ extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
-    float lOut = lb0 * input + lb1 * lx1 + lb2 * lx2 - la1 * ly1 - la2 * ly2;
+    double lOut = lb0 * input + lb1 * lx1 + lb2 * lx2 - la1 * ly1 - la2 * ly2;
     lx2 = lx1;
     lx1 = input;
     ly2 = ly1;
     ly1 = lOut;
 
-    float hOut = hb0 * lOut + hb1 * hx1 + hb2 * hx2 - ha1 * hy1 - ha2 * hy2;
+    double hOut = hb0 * lOut + hb1 * hx1 + hb2 * hx2 - ha1 * hy1 - ha2 * hy2;
     hx2 = hx1;
     hx1 = lOut;
     hy2 = hy1;
     hy1 = hOut;
 
-    return hOut;
+    return (float) hOut;
   }
 }
