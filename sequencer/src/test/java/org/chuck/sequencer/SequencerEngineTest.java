@@ -25,11 +25,15 @@ public class SequencerEngineTest {
     for (int i = 0; i < rows * cols; i++) patternArray.setInt(i, 0L);
     for (int i = 0; i < rows; i++) probabilityArray.setFloat(i, 1.0);
 
-    // Enable kick on step 0
-    patternArray.setInt(0, 1L);
+    // Enable some random triggers
+    java.util.Random rnd = new java.util.Random();
+    for (int i = 0; i < rows * cols; i++) {
+      if (rnd.nextDouble() > 0.8) {
+        patternArray.setInt(i, 1L);
+      }
+    }
 
-    // SET GLOBALS BEFORE ADDING SCRIPT
-    vm.setGlobalObject("seq_pattern", patternArray);
+    // SET GLOBALS BEFORE ADDING SCRIPT    vm.setGlobalObject("seq_pattern", patternArray);
     vm.setGlobalObject("seq_probability", probabilityArray);
 
     System.out.println("Loading engine from: " + f.getAbsolutePath());

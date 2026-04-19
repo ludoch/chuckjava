@@ -11,6 +11,10 @@ SndBuf kit[8];
 Gain master => dac;
 0.6 => master.gain;
 
+// Test Oscillator
+SinOsc testBlip => dac;
+0 => testBlip.gain;
+
 // Load samples
 "examples/data/kick.wav" => kit[0].read;
 "examples/data/snare.wav" => kit[1].read;
@@ -33,17 +37,39 @@ global float seq_probability[];
 global int seq_current_step;
 
 <<< "--- ENGINE STARTING ---" >>>;
-<<< "Engine: seq_pattern", (seq_pattern != null ? "LINKED" : "NULL") >>>;
 
-// Internal references to work with
+// Internal references
 int data[];
 float probs[];
 
-if (seq_pattern != null) seq_pattern @=> data;
-else new int[128] @=> data;
+// LINKING: Prefer direct 'global' variables if they are set (should be)
+if (seq_pattern != null) {
+    seq_pattern @=> data;
+    <<< "LINKED seq_pattern from global keyword" >>>;
+} else {
+    // Fallback: Try Machine API if global keyword is failing
+    Machine.getGlobalObject("seq_pattern") $ int[] @=> data;
+    if (data != null) <<< "LINKED seq_pattern from Machine API" >>>;
+}
 
-if (seq_probability != null) seq_probability @=> probs;
-else new float[8] @=> probs;
+if (seq_probability != null) {
+    seq_probability @=> probs;
+    <<< "LINKED seq_probability from global keyword" >>>;
+} else {
+    Machine.getGlobalObject("seq_probability") $ float[] @=> probs;
+    if (probs != null) <<< "LINKED seq_probability from Machine API" >>>;
+}
+
+// FINAL SAFETY: If everything is null, initialize local
+if (data == null) {
+    <<< "WARNING: Initializing local data array (128)" >>>;
+    new int[128] @=> data;
+}
+if (probs == null) {
+    <<< "WARNING: Initializing local probs array (8)" >>>;
+    new float[8] @=> probs;
+    for(0 => int i; i < 8; i++) 1.0 => probs[i];
+}
 
 // RMS Monitor: Print master output level every 250ms
 spork ~ rmsMonitor();
@@ -74,11 +100,19 @@ while(true) {
         if (val > 0) {
             // Apply probability (0.0 to 1.0)
             1.0 => float p;
-            if (r < probs.cap()) probs[r] => p;
+            if (probs != null && r < probs.cap()) probs[r] => p;
 
             if (Math.randomf() <= p) {
                 0 => kit[r].pos; // TRIGGER
                 <<< "TRIGGER: Row", r, "Step", (step % 16), "[DATA VAL:", val, "]" >>>;
+                
+                // Audio path verification: Play a short high beep
+                880 + (r * 110) => testBlip.freq;
+                0.1 => testBlip.gain;
+                10::ms => now;
+                0 => testBlip.gain;
+                (T - 10::ms) => now;
+                continue;
             }
         }
     }
