@@ -19,8 +19,8 @@ public class SVFilter extends ChuckUGen {
   private float morph = 0.0f; // 0=LP, 0.5=BP, 1.0=HP
 
   // Filter state
-  private float ic1eq = 0.0f;
-  private float ic2eq = 0.0f;
+  private double ic1eq = 0.0;
+  private double ic2eq = 0.0;
 
   public SVFilter() {
     this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
@@ -90,42 +90,42 @@ public class SVFilter extends ChuckUGen {
 
     // Process filter
     // Morph coefficients
-    float m = this.morph;
-    float cLow = m <= 0.5f ? 1.0f - 2.0f * m : 0.0f;
-    float cBand = m <= 0.5f ? 2.0f * m : 1.0f - 2.0f * (m - 0.5f);
-    float cHigh = m <= 0.5f ? 0.0f : 2.0f * (m - 0.5f);
+    double m = this.morph;
+    double cLow = m <= 0.5 ? 1.0 - 2.0 * m : 0.0;
+    double cBand = m <= 0.5 ? 2.0 * m : 1.0 - 2.0 * (m - 0.5);
+    double cHigh = m <= 0.5 ? 0.0 : 2.0 * (m - 0.5);
 
     // ZDF parameters (double sampled, so we use sampleRate * 2)
-    float g = (float) Math.tan(Math.PI * cutoff / (sampleRate * 2.0f));
-    float R = 1.0f / (2.0f * resonance);
-    float denom = 1.0f / (1.0f + 2.0f * R * g + g * g);
+    double g = Math.tan(Math.PI * cutoff / (sampleRate * 2.0));
+    double R = 1.0 / (2.0 * resonance);
+    double denom = 1.0 / (1.0 + 2.0 * R * g + g * g);
 
-    float l_ic1eq = ic1eq;
-    float l_ic2eq = ic2eq;
+    double l_ic1eq = ic1eq;
+    double l_ic2eq = ic2eq;
 
     for (int i = 0; i < length; i++) {
-      float in = inputSum[i];
-      float out = 0.0f;
+      double in = inputSum[i];
+      double out = 0.0;
 
       // Double sampling loop
       for (int step = 0; step < 2; step++) {
-        float hp = (in - 2.0f * R * l_ic1eq - g * l_ic1eq - l_ic2eq) * denom;
-        float bp = l_ic1eq + g * hp;
+        double hp = (in - 2.0 * R * l_ic1eq - g * l_ic1eq - l_ic2eq) * denom;
+        double bp = l_ic1eq + g * hp;
 
         // Tanh saturation on bandpass state
-        bp = (float) Math.tanh(bp);
+        bp = Math.tanh(bp);
 
-        float lp = l_ic2eq + g * bp;
+        double lp = l_ic2eq + g * bp;
 
-        l_ic1eq = 2.0f * bp - l_ic1eq;
-        l_ic2eq = 2.0f * lp - l_ic2eq;
+        l_ic1eq = 2.0 * bp - l_ic1eq;
+        l_ic2eq = 2.0 * lp - l_ic2eq;
 
         if (step == 1) { // Take output on the second step
           out = cLow * lp + cBand * bp + cHigh * hp;
         }
       }
 
-      blockCache[i] = out * gain;
+      blockCache[i] = (float) out * gain;
       if (buffer != null) buffer[offset + i] = blockCache[i];
     }
 
@@ -140,29 +140,29 @@ public class SVFilter extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
-    float m = this.morph;
-    float cLow = m <= 0.5f ? 1.0f - 2.0f * m : 0.0f;
-    float cBand = m <= 0.5f ? 2.0f * m : 1.0f - 2.0f * (m - 0.5f);
-    float cHigh = m <= 0.5f ? 0.0f : 2.0f * (m - 0.5f);
+    double m = this.morph;
+    double cLow = m <= 0.5 ? 1.0 - 2.0 * m : 0.0;
+    double cBand = m <= 0.5 ? 2.0 * m : 1.0 - 2.0 * (m - 0.5);
+    double cHigh = m <= 0.5 ? 0.0 : 2.0 * (m - 0.5);
 
-    float g = (float) Math.tan(Math.PI * cutoff / (sampleRate * 2.0f));
-    float R = 1.0f / (2.0f * resonance);
-    float denom = 1.0f / (1.0f + 2.0f * R * g + g * g);
+    double g = Math.tan(Math.PI * cutoff / (sampleRate * 2.0));
+    double R = 1.0 / (2.0 * resonance);
+    double denom = 1.0 / (1.0 + 2.0 * R * g + g * g);
 
-    float out = 0.0f;
+    double out = 0.0;
     for (int step = 0; step < 2; step++) {
-      float hp = (input - 2.0f * R * ic1eq - g * ic1eq - ic2eq) * denom;
-      float bp = ic1eq + g * hp;
-      bp = (float) Math.tanh(bp);
-      float lp = ic2eq + g * bp;
+      double hp = (input - 2.0 * R * ic1eq - g * ic1eq - ic2eq) * denom;
+      double bp = ic1eq + g * hp;
+      bp = Math.tanh(bp);
+      double lp = ic2eq + g * bp;
 
-      ic1eq = 2.0f * bp - ic1eq;
-      ic2eq = 2.0f * lp - ic2eq;
+      ic1eq = 2.0 * bp - ic1eq;
+      ic2eq = 2.0 * lp - ic2eq;
 
       if (step == 1) {
         out = cLow * lp + cBand * bp + cHigh * hp;
       }
     }
-    return out;
+    return (float) out;
   }
 }

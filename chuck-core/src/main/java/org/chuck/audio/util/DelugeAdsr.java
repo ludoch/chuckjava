@@ -23,31 +23,31 @@ public class DelugeAdsr extends ChuckUGen {
   private float sampleRate;
 
   private int state = IDLE;
-  private float value = 0.0f;
-  private float target = 0.0f;
+  private double value = 0.0;
+  private double target = 0.0;
 
   // Durations in samples
-  private float attackRate = 0.0f;
-  private float decayRate = 0.0f;
-  private float releaseRate = 0.0f;
-  private float fastReleaseRate = 0.0f;
+  private double attackRate = 0.0;
+  private double decayRate = 0.0;
+  private double releaseRate = 0.0;
+  private double fastReleaseRate = 0.0;
 
-  private float sustainLevel = 0.7f;
+  private double sustainLevel = 0.7;
 
   // Coefficients for exponential filters
-  private float attackCoef = 0.0f;
-  private float decayCoef = 0.0f;
-  private float releaseCoef = 0.0f;
-  private float fastReleaseCoef = 0.0f;
+  private double attackCoef = 0.0;
+  private double decayCoef = 0.0;
+  private double releaseCoef = 0.0;
+  private double fastReleaseCoef = 0.0;
 
   // Base offset for attack to ensure it reaches 1.0 in finite time
-  private static final float TARGET_RATIO_A = 0.3f;
-  private static final float TARGET_RATIO_DR = 0.0001f;
+  private static final double TARGET_RATIO_A = 0.3;
+  private static final double TARGET_RATIO_DR = 0.0001;
 
-  private float attackBase = 0.0f;
-  private float decayBase = 0.0f;
-  private float releaseBase = 0.0f;
-  private float fastReleaseBase = 0.0f;
+  private double attackBase = 0.0;
+  private double decayBase = 0.0;
+  private double releaseBase = 0.0;
+  private double fastReleaseBase = 0.0;
 
   public DelugeAdsr() {
     this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
@@ -62,64 +62,61 @@ public class DelugeAdsr extends ChuckUGen {
   }
 
   public double attackTime(double timeSeconds) {
-    float timeInSamples = (float) (timeSeconds * sampleRate);
+    double timeInSamples = timeSeconds * sampleRate;
     this.attackRate = timeInSamples;
-    if (timeInSamples > 0.0f) {
-      attackCoef =
-          (float) Math.exp(-Math.log((1.0 + TARGET_RATIO_A) / TARGET_RATIO_A) / timeInSamples);
-      attackBase = (1.0f + TARGET_RATIO_A) * (1.0f - attackCoef);
+    if (timeInSamples > 0.0) {
+      attackCoef = Math.exp(-Math.log((1.0 + TARGET_RATIO_A) / TARGET_RATIO_A) / timeInSamples);
+      attackBase = (1.0 + TARGET_RATIO_A) * (1.0 - attackCoef);
     } else {
-      attackCoef = 0.0f;
-      attackBase = 1.0f;
+      attackCoef = 0.0;
+      attackBase = 1.0;
     }
     return timeSeconds;
   }
 
   public double decayTime(double timeSeconds) {
-    float timeInSamples = (float) (timeSeconds * sampleRate);
+    double timeInSamples = timeSeconds * sampleRate;
     this.decayRate = timeInSamples;
-    if (timeInSamples > 0.0f) {
-      decayCoef =
-          (float) Math.exp(-Math.log((1.0 + TARGET_RATIO_DR) / TARGET_RATIO_DR) / timeInSamples);
-      decayBase = (sustainLevel - TARGET_RATIO_DR) * (1.0f - decayCoef);
+    if (timeInSamples > 0.0) {
+      decayCoef = Math.exp(-Math.log((1.0 + TARGET_RATIO_DR) / TARGET_RATIO_DR) / timeInSamples);
+      decayBase = (sustainLevel - TARGET_RATIO_DR) * (1.0 - decayCoef);
     } else {
-      decayCoef = 0.0f;
+      decayCoef = 0.0;
       decayBase = sustainLevel;
     }
     return timeSeconds;
   }
 
   public double sustainLevel(double level) {
-    this.sustainLevel = (float) Math.max(0.0, Math.min(1.0, level));
+    this.sustainLevel = Math.max(0.0, Math.min(1.0, level));
     // Recalculate decay base because it depends on sustain level
-    decayBase = (this.sustainLevel - TARGET_RATIO_DR) * (1.0f - decayCoef);
+    decayBase = (this.sustainLevel - TARGET_RATIO_DR) * (1.0 - decayCoef);
     return this.sustainLevel;
   }
 
   public double releaseTime(double timeSeconds) {
-    float timeInSamples = (float) (timeSeconds * sampleRate);
+    double timeInSamples = timeSeconds * sampleRate;
     this.releaseRate = timeInSamples;
-    if (timeInSamples > 0.0f) {
-      releaseCoef =
-          (float) Math.exp(-Math.log((1.0 + TARGET_RATIO_DR) / TARGET_RATIO_DR) / timeInSamples);
-      releaseBase = -TARGET_RATIO_DR * (1.0f - releaseCoef);
+    if (timeInSamples > 0.0) {
+      releaseCoef = Math.exp(-Math.log((1.0 + TARGET_RATIO_DR) / TARGET_RATIO_DR) / timeInSamples);
+      releaseBase = -TARGET_RATIO_DR * (1.0 - releaseCoef);
     } else {
-      releaseCoef = 0.0f;
-      releaseBase = 0.0f;
+      releaseCoef = 0.0;
+      releaseBase = 0.0;
     }
     return timeSeconds;
   }
 
   public double fastReleaseTime(double timeSeconds) {
-    float timeInSamples = (float) (timeSeconds * sampleRate);
+    double timeInSamples = timeSeconds * sampleRate;
     this.fastReleaseRate = timeInSamples;
-    if (timeInSamples > 0.0f) {
+    if (timeInSamples > 0.0) {
       fastReleaseCoef =
-          (float) Math.exp(-Math.log((1.0 + TARGET_RATIO_DR) / TARGET_RATIO_DR) / timeInSamples);
-      fastReleaseBase = -TARGET_RATIO_DR * (1.0f - fastReleaseCoef);
+          Math.exp(-Math.log((1.0 + TARGET_RATIO_DR) / TARGET_RATIO_DR) / timeInSamples);
+      fastReleaseBase = -TARGET_RATIO_DR * (1.0 - fastReleaseCoef);
     } else {
-      fastReleaseCoef = 0.0f;
-      fastReleaseBase = 0.0f;
+      fastReleaseCoef = 0.0;
+      fastReleaseBase = 0.0;
     }
     return timeSeconds;
   }
@@ -132,7 +129,7 @@ public class DelugeAdsr extends ChuckUGen {
   }
 
   public int keyOn() {
-    target = 1.0f;
+    target = 1.0;
     state = ATTACK;
     return 1;
   }
@@ -142,7 +139,7 @@ public class DelugeAdsr extends ChuckUGen {
   }
 
   public int keyOff() {
-    target = 0.0f;
+    target = 0.0;
     state = RELEASE;
     return 1;
   }
@@ -152,7 +149,7 @@ public class DelugeAdsr extends ChuckUGen {
   }
 
   public int fastRelease() {
-    target = 0.0f;
+    target = 0.0;
     state = FAST_RELEASE;
     return 1;
   }
@@ -172,8 +169,8 @@ public class DelugeAdsr extends ChuckUGen {
         break;
       case ATTACK:
         value = attackBase + value * attackCoef;
-        if (value >= 0.9999f) {
-          value = 1.0f;
+        if (value >= 0.9999) {
+          value = 1.0;
           target = sustainLevel;
           state = DECAY;
         }
@@ -190,21 +187,21 @@ public class DelugeAdsr extends ChuckUGen {
         break;
       case RELEASE:
         value = releaseBase + value * releaseCoef;
-        if (value <= 0.0f) {
-          value = 0.0f;
+        if (value <= 0.0) {
+          value = 0.0;
           state = IDLE;
         }
         break;
       case FAST_RELEASE:
         value = fastReleaseBase + value * fastReleaseCoef;
-        if (value <= 0.0f) {
-          value = 0.0f;
+        if (value <= 0.0) {
+          value = 0.0;
           state = IDLE;
         }
         break;
     }
 
     // Apply envelope to input
-    return input * value;
+    return (float) (input * value);
   }
 }
