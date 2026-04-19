@@ -11,7 +11,7 @@ SndBuf kit[8];
 Gain master => dac;
 0.6 => master.gain;
 
-// Load high-quality samples from the data folders
+// Load samples
 "examples/data/kick.wav" => kit[0].read;
 "examples/data/snare.wav" => kit[1].read;
 "examples/data/hihat.wav" => kit[2].read;
@@ -32,6 +32,7 @@ global int seq_pattern[];
 global float seq_probability[];
 global int seq_current_step;
 
+<<< "--- ENGINE STARTING ---" >>>;
 <<< "Engine: seq_pattern", (seq_pattern != null ? "LINKED" : "NULL") >>>;
 
 // Internal references to work with
@@ -43,6 +44,19 @@ else new int[128] @=> data;
 
 if (seq_probability != null) seq_probability @=> probs;
 else new float[8] @=> probs;
+
+// RMS Monitor: Print master output level every 250ms
+spork ~ rmsMonitor();
+
+fun void rmsMonitor() {
+    while(true) {
+        master.last() => float val;
+        if (Math.abs(val) > 0.001) {
+            <<< "--- DAC OUTPUT DETECTED: Level =", val, "---" >>>;
+        }
+        250::ms => now;
+    }
+}
 
 // 2. Timing logic (120 BPM)
 125::ms => dur T;
@@ -64,6 +78,7 @@ while(true) {
 
             if (Math.randomf() <= p) {
                 0 => kit[r].pos; // TRIGGER
+                <<< "TRIGGER: Row", r, "Step", (step % 16), "[DATA VAL:", val, "]" >>>;
             }
         }
     }
