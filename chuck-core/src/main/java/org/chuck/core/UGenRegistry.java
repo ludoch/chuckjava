@@ -115,6 +115,7 @@ public class UGenRegistry {
     register("SndBuf2", (sr, args) -> new SndBuf2(sr));
     register("WvIn", (sr, args) -> new WvIn(sr));
     register("Wavetable", (sr, args) -> new org.chuck.audio.util.Wavetable());
+    register("MorphingWavetable", (sr, args) -> new org.chuck.audio.util.MorphingWavetable(sr));
     register("WvOut", (sr, args) -> new WvOutUGen(sr));
     register("WvOut2", (sr, args) -> new WvOut2(sr));
     register("WaveLoop", (sr, args) -> new WaveLoop(sr));
