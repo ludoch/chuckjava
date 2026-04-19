@@ -19,6 +19,7 @@
         <module>sequencer</module>
         <module>chuck-ide</module>
         <module>chuck-samples</module>
+        <module>deluge</module>
     </modules>
 
     <properties>

@@ -1,0 +1,2 @@
+[chuck]:(EXCEPTION) MethodCalledByAbstractClass: 'FM' is an abstract class
+...(hint: call the method using a non-abstract subclass) shred[id=1:06-Errors/error-baseclass-stk2.ck]

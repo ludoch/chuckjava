@@ -1,0 +1,19 @@
+Child ctor
+test start
+super.Parent() - expecting parent ctor
+Parent ctor
+super.Base() - expecting base ctor
+Base ctor
+super.not_overridden() - expecting base not_overridden
+Base not_overridden
+super.overridden() - expecting parent overridden
+Parent overridden
+this.overridden() - expecting child overridden
+Child overridden
+super.not_overridden_by_child() - expecting parent not_overridden_by_child
+Parent not_overridden_by_child
+this.bubble_up() - expecting child bubble_up / parent bubble_up / base bubble_up
+Child bubble_up
+Parent bubble_up
+Base bubble_up
+test complete

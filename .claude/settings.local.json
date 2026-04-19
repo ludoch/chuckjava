@@ -33,7 +33,10 @@
       "Bash(find C:/Users/ludo/a/chuckjava/src/test -name *.ck -path *01-Basic*)",
       "Bash(do echo:*)",
       "Read(//c/Users/ludo/a/chuckjava/src/test/01-Basic/**)",
-      "Bash(done)"
+      "Bash(done)",
+      "WebFetch(domain:delugecommunity.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
