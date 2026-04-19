@@ -219,4 +219,110 @@ public class ChuckToDSLConverterTest {
     assertTrue(javaCode.contains("public double get();"));
     assertFalse(javaCode.contains("public void map(long x) {"));
   }
-}
+
+  @Test
+  public void testAssociativeArrayMapping() throws Exception {
+    String source = """
+        int m[];
+        10 => m["key"];
+        m["key"] => int x;
+        """;
+
+    var input = CharStreams.fromString(source);
+    var lexer = new ChuckANTLRLexer(input);
+    var tokens = new CommonTokenStream(lexer);
+    var parser = new ChuckANTLRParser(tokens);
+
+    var visitor = new ChuckASTVisitor(tokens);
+    @SuppressWarnings("unchecked")
+    List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
+
+    var converter = new ChuckToDSLConverter();
+    String javaCode = converter.convert(ast, "AssocArrayShred");
+
+    System.out.println(javaCode);
+
+    assertTrue(javaCode.contains("public ChuckArray m = new ChuckArray(\"long\", 0)"));
+    assertTrue(javaCode.contains("setInt(m, \"key\", 10)"));
+    assertTrue(javaCode.contains("x = (long)getObject(m, \"key\")"));
+    }
+
+    @Test
+    public void testOscMapping() throws Exception {
+    String source = """
+        OscIn oin;
+        OscOut oout;
+        1234 => oin.port;
+        "/test, i f s" => oin.addAddress;
+        "localhost" => oout.dest;
+        6449 => oout.port;
+
+        OscMsg msg;
+        while (true) {
+            oin => now;
+            while (oin.recv(msg)) {
+                msg.getInt(0) => int i;
+                msg.getFloat(1) => float f;
+                msg.getString(2) => string s;
+            }
+        }
+        """;
+
+    var input = CharStreams.fromString(source);
+    var lexer = new ChuckANTLRLexer(input);
+    var tokens = new CommonTokenStream(lexer);
+    var parser = new ChuckANTLRParser(tokens);
+
+    var visitor = new ChuckASTVisitor(tokens);
+    @SuppressWarnings("unchecked")
+    List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
+
+    var converter = new ChuckToDSLConverter();
+    String javaCode = converter.convert(ast, "OscShred");
+
+    System.out.println(javaCode);
+
+    assertTrue(javaCode.contains("public OscIn oin = new OscIn()"));
+    assertTrue(javaCode.contains("public OscOut oout = new OscOut()"));
+    assertTrue(javaCode.contains("public String s = null"));
+    assertTrue(javaCode.contains("oin.port(1234)"));
+    assertTrue(javaCode.contains("oin.addAddress(\"/test, i f s\")"));
+    assertTrue(javaCode.contains("advance(oin)"));
+    assertTrue(javaCode.contains("oin.recv(msg)"));
+    assertTrue(javaCode.contains("s = (String)msg.getString(2)"));
+    }
+
+    @Test
+    public void testOperatorOverloading() throws Exception {
+    String source = """
+        class Vec {
+            float x, y;
+            fun Vec @operator +(Vec other) {
+                Vec res;
+                x + other.x => res.x;
+                y + other.y => res.y;
+                return res;
+            }
+        }
+        Vec v1, v2;
+        v1 + v2 => Vec v3;
+        """;
+
+    var input = CharStreams.fromString(source);
+    var lexer = new ChuckANTLRLexer(input);
+    var tokens = new CommonTokenStream(lexer);
+    var parser = new ChuckANTLRParser(tokens);
+
+    var visitor = new ChuckASTVisitor(tokens);
+    @SuppressWarnings("unchecked")
+    List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
+
+    var converter = new ChuckToDSLConverter();
+    String javaCode = converter.convert(ast, "OpShred");
+
+    System.out.println(javaCode);
+
+    assertTrue(javaCode.contains("public Vec __op__plus(Vec other)"));
+    assertTrue(javaCode.contains("v1.__op__plus(v2)"));
+    }
+    }

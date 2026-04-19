@@ -1036,8 +1036,23 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
       if (opSym.startsWith("(") && opSym.endsWith(")")) {
         opSym = opSym.substring(1, opSym.length() - 1).trim();
       }
-      if (isPublic) name = "__pub_op__" + opSym;
-      else name = "__op__" + opSym;
+      String opWord =
+          switch (opSym) {
+            case "+" -> "plus";
+            case "-" -> "minus";
+            case "*" -> "times";
+            case "/" -> "div";
+            case "%" -> "percent";
+            case "==" -> "equal";
+            case "!=" -> "notequal";
+            case ">" -> "greater";
+            case ">=" -> "gequal";
+            case "<" -> "less";
+            case "<=" -> "lequal";
+            default -> opSym.replace(" ", "_");
+          };
+      if (isPublic) name = "__pub_op__" + opWord;
+      else name = "__op__" + opWord;
     }
 
     List<String> argTypes = new ArrayList<>();

@@ -117,6 +117,33 @@ public class ChuckDSL {
     return disjunction;
   }
 
+  public static long getInt(ChuckArray a, String key) {
+    return a.getAssocInt(key);
+  }
+
+  public static double getFloat(ChuckArray a, String key) {
+    return a.getAssocFloat(key);
+  }
+
+  public static Object getObject(ChuckArray a, String key) {
+    return a.getAssocObject(key);
+  }
+
+  public static long setInt(ChuckArray a, String key, long val) {
+    a.setAssocInt(key, val);
+    return val;
+  }
+
+  public static double setFloat(ChuckArray a, String key, double val) {
+    a.setAssocFloat(key, val);
+    return val;
+  }
+
+  public static Object setObject(ChuckArray a, String key, Object val) {
+    a.setAssocObject(key, val);
+    return val;
+  }
+
   /**
    * Compiles a Java DSL file into a Runnable that can be sporked. The class in the file must
    * implement org.chuck.core.Shred or have a shred() method.

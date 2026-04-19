@@ -16,7 +16,12 @@ public class OscIn extends ChuckEvent implements AutoCloseable {
   private volatile boolean running = false;
   private final Set<String> addresses = ConcurrentHashMap.newKeySet();
   private final ConcurrentLinkedDeque<OscMsg> messages = new ConcurrentLinkedDeque<>();
-  private final ChuckVM vm;
+  private ChuckVM vm;
+
+  public OscIn() {
+    super();
+    this.vm = ChuckVM.CURRENT_VM.get();
+  }
 
   public OscIn(ChuckVM vm) {
     super();
