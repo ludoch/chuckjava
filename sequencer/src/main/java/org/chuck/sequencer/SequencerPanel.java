@@ -51,6 +51,26 @@ public class SequencerPanel extends VBox {
     vm.setGlobalObject("seq_probability", probabilityArray);
   }
 
+  /** Syncs the UI grid buttons with the current state of the patternArray. */
+  public void syncUIFromVM() {
+    for (int r = 0; r < ROWS; r++) {
+      for (int c = 0; c < COLS; c++) {
+        int idx = r * COLS + c;
+        boolean active = patternArray.getInt(idx) > 0;
+        if (grid[r][c].isSelected() != active) {
+          final int row = r;
+          final int col = c;
+          final boolean sel = active;
+          javafx.application.Platform.runLater(
+              () -> {
+                grid[row][col].setSelected(sel);
+                updateButtonStyle(row, col, sel);
+              });
+        }
+      }
+    }
+  }
+
   private void setupUI() {
     HBox header = new HBox(10);
     Label title = new Label("GRID SEQUENCER PRO");
@@ -111,7 +131,10 @@ public class SequencerPanel extends VBox {
   private void updateValue(int row, int col, boolean selected) {
     int idx = row * COLS + col;
     patternArray.setInt(idx, selected ? 1L : 0L);
+    updateButtonStyle(row, col, selected);
+  }
 
+  private void updateButtonStyle(int row, int col, boolean selected) {
     String base = ((col / 4) % 2 == 0) ? "#444" : "#333";
     if (selected) {
       grid[row][col].setStyle("-fx-background-color: #4CAF50; -fx-border-color: #111;");

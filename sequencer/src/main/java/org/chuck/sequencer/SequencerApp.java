@@ -10,6 +10,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -76,9 +77,6 @@ public class SequencerApp extends Application {
   public void start(Stage primaryStage) {
     initVM();
 
-    // Initial engine load
-    new Thread(() -> loadEngine(false)).start();
-
     primaryStage.setTitle("ChucK-Java Sequencer Standalone");
 
     BorderPane root = new BorderPane();
@@ -87,6 +85,9 @@ public class SequencerApp extends Application {
     // Center: The Sequencer Panel
     sequencerPanel = new SequencerPanel(vm);
     root.setCenter(sequencerPanel);
+
+    // Initial engine load - now safe because sequencerPanel exists
+    new Thread(() -> loadEngine(false)).start();
 
     // Bottom Area: Controls + File Selection
     VBox bottomArea = new VBox(10);
@@ -125,6 +126,12 @@ public class SequencerApp extends Application {
     Button clearBtn = new Button("🗑 Clear");
     clearBtn.setOnAction(e -> sequencerPanel.clearGrid());
 
+    ToggleButton chaosBtn = new ToggleButton("🌀 Chaos Mode");
+    chaosBtn.setOnAction(
+        e -> {
+          vm.setGlobalInt("seq_chaos", chaosBtn.isSelected() ? 1L : 0L);
+        });
+
     Button saveBtn = new Button("💾 Save...");
     saveBtn.setOnAction(e -> sequencerPanel.savePattern());
 
@@ -142,6 +149,7 @@ public class SequencerApp extends Application {
             new Separator(Orientation.VERTICAL),
             randomBtn,
             clearBtn,
+            chaosBtn,
             new Separator(Orientation.VERTICAL),
             saveBtn,
             loadBtn,
@@ -190,6 +198,7 @@ public class SequencerApp extends Application {
 
   private void initVM() {
     vm = new ChuckVM(44100, 2);
+    org.chuck.core.ChuckConfig.addSearchPath("chuck-samples/src/main/resources/examples");
     audio = new ChuckAudio(vm, 512, 2, 44100);
     vm.setAudio(audio);
     audio.start();
@@ -202,6 +211,7 @@ public class SequencerApp extends Application {
         if (sequencerPanel != null) {
           int step = (int) vm.getGlobalInt("seq_current_step");
           sequencerPanel.setStep(step);
+          sequencerPanel.syncUIFromVM();
         }
       }
     }.start();

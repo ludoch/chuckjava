@@ -914,8 +914,10 @@ public class ObjectInstrs {
         }
       }
       if (r) {
-        vm.setGlobalObject(n, null);
-        s.reg.pushObject(null);
+        if (!vm.isGlobalObject(n)) {
+          vm.setGlobalObject(n, null);
+        }
+        s.reg.pushObject(vm.getGlobalObject(n));
         return;
       }
       if (vm.isGlobalObject(n) && !n.startsWith("@new_")) {
@@ -1155,6 +1157,14 @@ public class ObjectInstrs {
         if (ctorCode == null) ctorCode = desc.methods().get("@construct:" + ctorArgCount);
         if (ctorCode == null) ctorCode = desc.methods().get(t + ":0");
         if (ctorCode == null) ctorCode = desc.methods().get("@construct:0");
+      }
+
+      if (vm.isGlobalObject(n)) {
+        Object existing = vm.getGlobalObject(n);
+        if (existing instanceof ChuckArray) {
+          s.reg.pushObject(existing);
+          return;
+        }
       }
 
       ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sz);

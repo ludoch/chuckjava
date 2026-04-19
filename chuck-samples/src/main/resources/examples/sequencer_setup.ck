@@ -27,31 +27,50 @@ for(0 => int i; i < 8; i++) {
     kit[i].samples() => kit[i].pos;
 }
 
+// 3. Global variables for Java integration
+global int seq_pattern[];
+global float seq_probability[];
+global int seq_current_step;
+global int seq_chaos; // 0 = normal, 1 = chaotic (randomize)
+
+// Internal references to work with
+int data[];
+float probs[];
+
+if (seq_pattern != null) seq_pattern @=> data;
+else new int[128] @=> data;
+
+if (seq_probability != null) seq_probability @=> probs;
+else new float[8] @=> probs;
+
 // 2. Timing logic (120 BPM)
 125::ms => dur T;
 T - (now % T) => now; // Sync to global time
 
 0 => int step;
 while(true) {
-    // A. Update the global cursor position via Machine API for reliable Java sync
-    Machine.setGlobalInt("seq_current_step", step % 16);
+    // A. Update the global cursor position
+    step % 16 => seq_current_step;
     
-    // B. Read grid data and probabilities from the UI
-    if (Machine.getGlobalObject("seq_pattern") $ int[] @=> int data[]) {
-        if (Machine.getGlobalObject("seq_probability") $ float[] @=> float probs[]) {
-            
-            for(0 => int r; r < 8; r++) {
-                // Check if grid pad is ON
-                if (data[r * 16 + (step % 16)] > 0) {
-                    
-                    // Apply probability (0.0 to 1.0)
-                    1.0 => float p;
-                    if (r < probs.cap()) probs[r] => p;
-                    
-                    if (Math.randomf() <= p) {
-                        0 => kit[r].pos; // TRIGGER
-                    }
-                }
+    // CHAOS: Randomly toggle a cell if enabled
+    if (seq_chaos > 0 && Math.randomf() < 0.1) {
+        Math.random2(0, 7) => int r;
+        Math.random2(0, 15) => int c;
+        1 - data[r * 16 + c] => data[r * 16 + c];
+    }
+    
+    // B. Read grid data and probabilities
+    for(0 => int r; r < 8; r++) {
+        // Check if grid pad is ON
+        data[r * 16 + (step % 16)] => int val;
+        if (val > 0) {
+
+            // Apply probability (0.0 to 1.0)
+            1.0 => float p;
+            if (r < probs.cap()) probs[r] => p;
+
+            if (Math.randomf() <= p) {
+                0 => kit[r].pos; // TRIGGER
             }
         }
     }

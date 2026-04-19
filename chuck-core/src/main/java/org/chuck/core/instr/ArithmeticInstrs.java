@@ -19,8 +19,8 @@ public class ArithmeticInstrs {
       if (s.reg.getSp() < 2) return;
       if (s.reg.isObject(0) || s.reg.isObject(1)) {
         Object r = s.reg.pop(), l = s.reg.pop();
-        if (l instanceof ChuckDuration ld && r instanceof ChuckDuration rd) {
-          s.reg.pushObject(s.getDuration(ld.samples() + rd.samples()));
+        if (l instanceof ChuckDuration || r instanceof ChuckDuration) {
+          s.reg.pushObject(s.getDuration(toDouble(l) + toDouble(r)));
         } else if (l instanceof ChuckArray la
             && r instanceof ChuckArray ra
             && la.vecTag != null
@@ -69,8 +69,8 @@ public class ArithmeticInstrs {
       if (s.reg.getSp() < 2) return;
       if (s.reg.isObject(0) || s.reg.isObject(1)) {
         Object r = s.reg.pop(), l = s.reg.pop();
-        if (l instanceof ChuckDuration ld && r instanceof ChuckDuration rd) {
-          s.reg.pushObject(s.getDuration(ld.samples() - rd.samples()));
+        if (l instanceof ChuckDuration || r instanceof ChuckDuration) {
+          s.reg.pushObject(s.getDuration(toDouble(l) - toDouble(r)));
         } else if (l instanceof ChuckArray la
             && r instanceof ChuckArray ra
             && la.vecTag != null
@@ -119,7 +119,9 @@ public class ArithmeticInstrs {
       if (s.reg.getSp() < 2) return;
       if (s.reg.isObject(0) || s.reg.isObject(1)) {
         Object r = s.reg.pop(), l = s.reg.pop();
-        if (l instanceof ChuckArray la
+        if (l instanceof ChuckDuration || r instanceof ChuckDuration) {
+          s.reg.pushObject(s.getDuration(toDouble(l) * toDouble(r)));
+        } else if (l instanceof ChuckArray la
             && r instanceof ChuckArray ra
             && la.vecTag != null
             && la.vecTag.equals(ra.vecTag)) {
@@ -166,7 +168,11 @@ public class ArithmeticInstrs {
       if (s.reg.getSp() < 2) return;
       if (s.reg.isObject(0) || s.reg.isObject(1)) {
         Object r = s.reg.pop(), l = s.reg.pop();
-        if (l instanceof ChuckArray la
+        if (l instanceof ChuckDuration || r instanceof ChuckDuration) {
+          double rVal = toDouble(r);
+          if (rVal == 0) s.reg.pushObject(s.getDuration(0.0));
+          else s.reg.pushObject(s.getDuration(toDouble(l) / rVal));
+        } else if (l instanceof ChuckArray la
             && r instanceof ChuckArray ra
             && la.vecTag != null
             && la.vecTag.equals(ra.vecTag)) {
@@ -209,7 +215,7 @@ public class ArithmeticInstrs {
       }
       if (s.reg.isDouble(0) || s.reg.isDouble(1)) {
         double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-        s.reg.push(l / r);
+        s.reg.push(r == 0 ? 0.0 : l / r);
       } else {
         long r = s.reg.popAsLong(), l = s.reg.popAsLong();
         if (r == 0) s.reg.push(0L);
@@ -222,9 +228,22 @@ public class ArithmeticInstrs {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
       if (s.reg.getSp() < 2) return;
+      if (s.reg.isObject(0) || s.reg.isObject(1)) {
+        Object r = s.reg.pop(), l = s.reg.pop();
+        double rVal = toDouble(r), lVal = toDouble(l);
+        if (l instanceof ChuckDuration || r instanceof ChuckDuration) {
+          double res = (rVal == 0) ? 0 : lVal % rVal;
+          // IMPORTANT: If result is slightly negative due to floating point precision, wrap it
+          if (res < 0) res += Math.abs(rVal);
+          s.reg.pushObject(s.getDuration(res));
+        } else {
+          s.reg.push(rVal == 0 ? 0 : lVal % rVal);
+        }
+        return;
+      }
       if (s.reg.isDouble(0) || s.reg.isDouble(1)) {
         double r = s.reg.popAsDouble(), l = s.reg.popAsDouble();
-        s.reg.push(l % r);
+        s.reg.push(r == 0 ? 0 : l % r);
       } else {
         long r = s.reg.popAsLong(), l = s.reg.popAsLong();
         if (r == 0) s.reg.push(0L);

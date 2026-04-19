@@ -53,6 +53,6 @@ public class ChuckDuration extends ChuckObject implements Comparable<ChuckDurati
 
   @Override
   public String toString() {
-    return "ChuckDuration(" + samples + ")";
+    return String.valueOf(samples);
   }
 }

@@ -30,19 +30,19 @@ public class MiscInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      double v = s.reg.popAsDouble();
-      double smp =
+      double val = s.reg.popAsDouble();
+      double samples =
           switch (unit) {
-            case "ms" -> v * vm.getSampleRate() / 1000.0;
-            case "second" -> v * vm.getSampleRate();
-            case "minute" -> v * vm.getSampleRate() * 60.0;
-            case "hour" -> v * vm.getSampleRate() * 3600.0;
-            case "day" -> v * vm.getSampleRate() * 3600.0 * 24.0;
-            case "week" -> v * vm.getSampleRate() * 3600.0 * 24.0 * 7.0;
-            case "samp" -> v;
-            default -> 0.0;
+            case "samp" -> val;
+            case "ms" -> val * vm.getSampleRate() / 1000.0;
+            case "second" -> val * vm.getSampleRate();
+            case "minute" -> val * vm.getSampleRate() * 60.0;
+            case "hour" -> val * vm.getSampleRate() * 3600.0;
+            case "day" -> val * vm.getSampleRate() * 3600.0 * 24.0;
+            case "week" -> val * vm.getSampleRate() * 3600.0 * 24.0 * 7.0;
+            default -> 0;
           };
-      s.reg.pushObject(s.getDuration(smp));
+      s.reg.pushObject(s.getDuration(samples));
     }
   }
 

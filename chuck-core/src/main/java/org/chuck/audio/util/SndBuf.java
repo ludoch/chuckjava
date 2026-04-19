@@ -48,11 +48,17 @@ public class SndBuf extends ChuckUGen {
     setRead(path);
   }
 
+  private String currentPath = "";
+
   public void setRead(String path) {
     if (path == null || path.isEmpty()) {
       samples = new float[0];
+      currentPath = "";
       return;
     }
+
+    if (path.equals(currentPath)) return; // Avoid redundant loads
+    currentPath = path;
 
     // Handle "special:..." paths
     String p = path.toLowerCase();
@@ -81,7 +87,6 @@ public class SndBuf extends ChuckUGen {
       javax.sound.sampled.AudioInputStream ais;
       if (file.exists()) {
         ais = javax.sound.sampled.AudioSystem.getAudioInputStream(file);
-        logger.log(Level.INFO, "[Audio] SndBuf: Loading " + path + " from file");
       } else {
         // Try resource fallback
         String resourcePath = path.startsWith("/") ? path : "/" + path;
@@ -103,7 +108,6 @@ public class SndBuf extends ChuckUGen {
           ais =
               javax.sound.sampled.AudioSystem.getAudioInputStream(
                   new java.io.BufferedInputStream(ris));
-          logger.log(Level.INFO, "[Audio] SndBuf: Loading " + path + " from resource");
         } else {
           logger.log(Level.SEVERE, "[Audio] SndBuf: File or resource not found: " + path);
           samples = new float[0];
@@ -131,8 +135,6 @@ public class SndBuf extends ChuckUGen {
 
       int numChannels = format.getChannels();
       long totalSamples = ais.getFrameLength();
-      logger.log(
-          Level.INFO, "[Audio] SndBuf: totalSamples=" + totalSamples + " channels=" + numChannels);
 
       if (totalSamples <= 0) {
         // Read manually if frame length is unknown
@@ -165,7 +167,8 @@ public class SndBuf extends ChuckUGen {
           samples[i] = sum / numChannels;
         }
       }
-      logger.log(Level.INFO, "[Audio] SndBuf: Successfully loaded " + samples.length + " samples.");
+      logger.log(
+          Level.INFO, "[Audio] SndBuf: Loaded " + path + " (" + samples.length + " samples)");
       ais.close();
     } catch (Exception e) {
       logger.log(
