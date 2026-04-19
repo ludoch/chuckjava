@@ -1,14 +1,14 @@
 /* 
-   CHUCK GRID SEQUENCER PRO SETUP (v3.5 - Persistent Diagnostics)
+   CHUCK GRID SEQUENCER PRO SETUP (v3.6 - Hardened Timing)
    ------------------------------
 */
 
-<<< "--- ENGINE STARTING (v3.5) ---" >>>;
+<<< "--- ENGINE STARTING (v3.6) ---" >>>;
 
-// 1. Setup Drum Kit (8 tracks)
+// 1. Setup Drum Kit
 SndBuf kit[8];
 Gain master => dac;
-0.7 => master.gain;
+0.6 => master.gain;
 
 // Load samples
 "examples/data/kick.wav" => kit[0].read;
@@ -20,62 +20,65 @@ Gain master => dac;
 "examples/book/digital-artists/audio/click_01.wav" => kit[6].read;
 "examples/data/snare-hop.wav" => kit[7].read;
 
-// Initialize: set to end of buffer
+// Initialize
 for(0 => int i; i < 8; i++) {
     kit[i] => master;
     kit[i].samples() => kit[i].pos;
 }
 
-// 3. Global variables
+// 3. Global synchronization
 global int seq_current_step;
-
-// Internal references
 int data[];
 float probs[];
 
-// Timing logic (120 BPM)
+// LINKING PHASE: Wait until Java has provided the objects
+while(data == null) {
+    Machine.getGlobalObject("seq_pattern") $ int[] @=> data;
+    if (data == null) 100::ms => now;
+}
+while(probs == null) {
+    Machine.getGlobalObject("seq_probability") $ float[] @=> probs;
+    if (probs == null) 100::ms => now;
+}
+
+<<< "--- JAVA LINK ESTABLISHED ---" >>>;
+
+// 2. Timing logic (120 BPM)
 125::ms => dur T;
 T - (now % T) => now;
 
 0 => int step;
 while(true) {
-    // 1. Update cursor
+    // A. Update cursor
     step % 16 => seq_current_step;
     
-    // 2. Fetch Java Data
-    Machine.getGlobalObject("seq_pattern") $ int[] @=> data;
-    Machine.getGlobalObject("seq_probability") $ float[] @=> probs;
+    // B. Periodic Heartbeat
+    if (step % 16 == 0) <<< "HEARTBEAT: Step 0, Pattern[0] =", data[0] >>>;
 
-    if (data != null) {
-        // HEARTBEAT
-        if (step % 16 == 0) <<< "HEARTBEAT: Step 0, Pattern[0] =", data[0] >>>;
+    // C. Scan all 8 tracks for the current step
+    for(0 => int r; r < 8; r++) {
+        data[r * 16 + (step % 16)] => int val;
+        
+        if (val != 0) {
+            // Check probability
+            1.0 => float p;
+            if (r < probs.cap()) probs[r] => p;
 
-        // 3. Process Triggers
-        for(0 => int r; r < 8; r++) {
-            data[r * 16 + (step % 16)] => int val;
-            
-            if (val != 0) {
-                0 => kit[r].pos; // TRIGGER DRUM
+            if (p >= 1.0 || Math.randomf() <= p) {
+                0 => kit[r].pos; // TRIGGER
                 <<< "TRIGGER: Row", r, "Step", (step % 16) >>>;
                 
-                // Temporary verification oscillator (subtle)
-                SinOsc s => dac; 
-                440 + (r * 100) => s.freq; 
-                0.05 => s.gain; 
-                2::ms => now; 
-                0 => s.gain;
+                // Tiny yield to ensure audio seek is processed
+                1::samp => now;
             }
         }
-    } else {
-        if (step % 8 == 0) <<< "WAITING FOR JAVA DATA..." >>>;
     }
 
-    // 4. DAC Output Monitor (Always on)
+    // D. Audio Monitor
     master.last() => float out;
-    if (Math.abs(out) > 0.001) {
-        <<< ">>> DAC OUTPUT Level:", out, ">>>" >>>;
-    }
-    
+    if (Math.abs(out) > 0.001) <<< "DAC Level:", out >>>;
+
+    // E. Wait for next step
     T => now;
     step++;
 }
