@@ -75,14 +75,34 @@
 
 ChucK-Java supports a full-featured CLI that mirrors the original ChucK implementation, including full support for **on-the-fly (OTF)** programming.
 
-### Usage
+### Basic Usage
 ```bash
 # Build all modules
 mvn install -DskipTests
 
-# Run the CLI
-java --enable-native-access=ALL-UNNAMED -jar chuck-cli/target/chuck-cli-1.0-SNAPSHOT-shaded.jar examples/basic/bar.ck
+# Run the CLI (standard)
+java --enable-preview --add-modules jdk.incubator.vector \\
+     --enable-native-access=ALL-UNNAMED \\
+     -jar chuck-cli/target/chuck-cli-1.0-SNAPSHOT-shaded.jar examples/basic/bar.ck
+```
 
+### ⚡ Performance Optimization (Project Leyden)
+For near-instantaneous startup (comparable to the original ChucK), you can generate a **Class Data Sharing (CDS)** archive.
+
+1. **Generate the archive**:
+   ```bash
+   ./scripts/generate_cds.sh
+   ```
+2. **Run with the archive**:
+   ```bash
+   java -Xshare:on -XX:SharedArchiveFile=chuck.jsa \\
+        --enable-preview --add-modules jdk.incubator.vector \\
+        --enable-native-access=ALL-UNNAMED \\
+        -jar chuck-cli/target/chuck-cli-1.0-SNAPSHOT-shaded.jar your_script.ck
+   ```
+
+### Other Modes
+```bash
 # Launch JavaFX IDE
 mvn -pl chuck-ide javafx:run
 

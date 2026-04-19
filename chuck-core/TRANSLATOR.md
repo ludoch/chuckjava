@@ -26,6 +26,13 @@ The `ChuckToDSLConverter` is a source-to-source translator that converts ChucK (
     -   `float` -> `double`
     -   `dur` -> `ChuckDuration`
     -   `time` -> `long`
+    -   `string` -> `String`
+-   **Arrays & Associative Maps**:
+    -   **Indexed Arrays**: Standard Java arrays for `Event` types.
+    -   **Associative/Dynamic Arrays**: All other ChucK arrays (e.g., `int m[]`) are mapped to the `ChuckArray` class, which supports both integer and string indexing.
+    -   **Associative Access**: `m["key"]` is mapped to `getObject(m, "key")`, `setInt(m, "key", val)`, etc.
+-   **Networking**:
+    -   **OSC**: Full support for `OscIn`, `OscOut`, `OscMsg`, and `OscEvent`. Patterns like `oin => now` and `oin.recv(msg)` are fully mapped.
 -   **Declarations & Scoping**:
     -   **Field Promotion**: All variable declarations (including those nested in `if` or `while` blocks) are promoted to `public` class fields to ensure cross-shred and cross-method visibility.
     -   **UGen Auto-Init**: `SinOsc s[10];` automatically generates a loop in `shred()` to instantiate all 10 oscillators.
@@ -81,5 +88,6 @@ Core UGens like `SinOsc`, `SndBuf`, and `Gain` have been extended with ChucK-idi
 -   **Note**: `int a, b, c;` and `10 => int x;` patterns are correctly mapped as class fields.
 
 ### 3. Operator Overloading
--   **Status**: ⚠️ Partial.
--   **Limitation**: While operator methods (e.g., `__op__plus`) are correctly emitted, standard Java binary operators (`+`, `-`, etc.) won't automatically call these methods in the generated DSL.
+-   **Status**: ✅ Supported.
+-   **Deep Mapping**: Binary operators (`+`, `-`, `*`, `/`, `%`) and comparisons involving custom classes are automatically mapped to internal operator methods (e.g., `v1 + v2` -> `v1.__op__plus(v2)`).
+-   **Parity**: Fully handles ChucK's `@operator` syntax within class definitions.
