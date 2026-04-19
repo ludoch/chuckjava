@@ -4,28 +4,32 @@ import static org.chuck.audio.VectorAudio.SPECIES;
 
 import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
-import org.chuck.audio.fx.Delay;
 
-/** An all-pass filter UGen. Adapted from STK. */
+/** An all-pass filter UGen. Adapted from STK. Uses double precision internally to prevent limit cycles. */
 public class AllPass extends ChuckUGen {
-  private final Delay delayLine;
-  private float coefficient = 0.7f;
+  private final double[] buffer;
+  private int writePos = 0;
+  private int delaySamples;
+  private double coefficient = 0.7;
 
-  public AllPass(int delaySamples) {
-    this(delaySamples, true);
+  public AllPass(int maxDelaySamples) {
+    this(maxDelaySamples, true);
   }
 
-  public AllPass(int delaySamples, boolean autoRegister) {
+  public AllPass(int maxDelaySamples, boolean autoRegister) {
     super(autoRegister);
-    this.delayLine = new Delay(delaySamples, 44100.0f, false);
-    this.delayLine.delay(delaySamples);
+    this.buffer = new double[maxDelaySamples];
+    this.delaySamples = maxDelaySamples;
   }
 
   public void delay(double samples) {
-    delayLine.delay(samples);
+    int s = (int) samples;
+    if (s >= buffer.length) s = buffer.length - 1;
+    if (s < 0) s = 0;
+    this.delaySamples = s;
   }
 
-  public void setCoefficient(float c) {
+  public void setCoefficient(double c) {
     this.coefficient = c;
   }
 
@@ -63,15 +67,21 @@ public class AllPass extends ChuckUGen {
       if (buffer != null) System.arraycopy(buffer, offset, inputSum, 0, length);
     }
 
-    // 2. Filter logic (scalar recursive)
+    // 2. Filter logic (double scalar recursive)
     for (int i = 0; i < length; i++) {
-      float input = inputSum[i];
-      float temp = delayLine.getLastOut();
-      float inner = input + coefficient * temp;
-      delayLine.tick(inner, systemTime == -1 ? -1 : systemTime + i);
-      float out = (-coefficient * inner + temp) * gain;
-      blockCache[i] = out;
-      if (buffer != null) buffer[offset + i] = out;
+      double input = inputSum[i];
+
+      int readPos = (writePos - delaySamples + this.buffer.length) % this.buffer.length;
+      double temp = this.buffer[readPos];
+
+      double inner = input + coefficient * temp;
+      this.buffer[writePos] = inner;
+      writePos = (writePos + 1) % this.buffer.length;
+
+      double out = (-coefficient * inner + temp) * gain;
+
+      blockCache[i] = (float) out;
+      if (buffer != null) buffer[offset + i] = blockCache[i];
     }
 
     blockStartTime = systemTime;
@@ -82,9 +92,14 @@ public class AllPass extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
-    float temp = delayLine.getLastOut();
-    float inner = input + coefficient * temp;
-    delayLine.tick(inner, systemTime);
-    return -coefficient * inner + temp;
+    int readPos = (writePos - delaySamples + buffer.length) % buffer.length;
+    double temp = buffer[readPos];
+
+    double inner = input + coefficient * temp;
+    buffer[writePos] = inner;
+    writePos = (writePos + 1) % buffer.length;
+
+    double out = -coefficient * inner + temp;
+    return (float) out;
   }
 }

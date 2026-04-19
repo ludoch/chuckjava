@@ -10,9 +10,9 @@ import org.chuck.core.doc;
 @doc("Stereo echo effect with feedback and mix control.")
 public class Echo extends StereoUGen {
   private Delay delayL, delayR;
-  private float mix = 0.5f;
-  private float lastWetL = 0.0f;
-  private float lastWetR = 0.0f;
+  private double mix = 0.5;
+  private double lastWetL = 0.0;
+  private double lastWetR = 0.0;
   private final float sampleRate;
 
   public Echo(int maxDelaySamples) {
@@ -34,7 +34,7 @@ public class Echo extends StereoUGen {
   }
 
   public float mix() {
-    return mix;
+    return (float) mix;
   }
 
   @doc("Set the delay time in samples.")
@@ -66,14 +66,14 @@ public class Echo extends StereoUGen {
   @Override
   protected void computeStereo(float left, float right, long systemTime) {
     // Feedback loop using separate channels
-    float wetL = delayL.tick(left + lastWetL * gain, systemTime);
-    float wetR = delayR.tick(right + lastWetR * gain, systemTime);
+    double wetL = delayL.tick((float) (left + lastWetL * gain), systemTime);
+    double wetR = delayR.tick((float) (right + lastWetR * gain), systemTime);
 
     lastWetL = wetL;
     lastWetR = wetR;
 
-    lastOutChannels[0] = left * (1.0f - mix) + wetL * mix;
-    lastOutChannels[1] = right * (1.0f - mix) + wetR * mix;
+    lastOutChannels[0] = (float) (left * (1.0 - mix) + wetL * mix);
+    lastOutChannels[1] = (float) (right * (1.0 - mix) + wetR * mix);
   }
 
   @Override

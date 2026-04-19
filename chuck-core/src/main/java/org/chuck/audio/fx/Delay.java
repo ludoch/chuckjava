@@ -4,7 +4,7 @@ import org.chuck.audio.ChuckUGen;
 
 /** A delay-line UGen. */
 public class Delay extends ChuckUGen {
-  private final float[] buffer;
+  private final double[] buffer;
   private int writePos = 0;
   private int delaySamples;
 
@@ -21,7 +21,7 @@ public class Delay extends ChuckUGen {
 
   public Delay(int maxDelaySamples, float sampleRate, boolean autoRegister) {
     super(autoRegister);
-    this.buffer = new float[maxDelaySamples];
+    this.buffer = new double[maxDelaySamples];
     this.delaySamples = 0; // Default to 0 delay
     this.sampleRate = sampleRate;
   }
@@ -59,12 +59,12 @@ public class Delay extends ChuckUGen {
   protected float compute(float input, long systemTime) {
     // Read delayed sample
     int readPos = (writePos - delaySamples + buffer.length) % buffer.length;
-    float out = buffer[readPos];
+    double out = buffer[readPos];
 
     // Write current input to buffer
     buffer[writePos] = input;
     writePos = (writePos + 1) % buffer.length;
 
-    return out;
+    return (float) out;
   }
 }
