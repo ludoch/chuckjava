@@ -923,9 +923,16 @@ public class ChuckVM {
     globalFunctionDocs.clear();
     userClassRegistry.clear();
 
-    // Re-initialize special globals (dac, adc, etc. if needed)    // Most are initialized in the
-    // constructor, but some might need re-init here.
-    // However, the error suggests 'kit' is persisting because it's in one of these maps.
+    // Ensure audio outputs are fully silenced
+    for (DacChannel chan : dacChannels) {
+      chan.unchuckAll();
+    }
+    if (multiChannelDac != null) multiChannelDac.unchuckAll();
+    if (blackhole != null) blackhole.unchuckAll();
+
+    // Re-initialize special globals (dac, adc, etc. if needed)
+    setGlobalObject("dac", multiChannelDac);
+    setGlobalObject("blackhole", blackhole);
   }
 
   /**
