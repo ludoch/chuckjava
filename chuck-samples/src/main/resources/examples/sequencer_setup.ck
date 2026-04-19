@@ -27,21 +27,12 @@ for(0 => int i; i < 8; i++) {
     kit[i].samples() => kit[i].pos;
 }
 
-// Test tone to verify dac is working on startup
-SinOsc testBlip => dac;
-0.05 => testBlip.gain;
-880 => testBlip.freq;
-20::ms => now;
-0 => testBlip.gain;
-
 // 3. Global variables for Java integration
 global int seq_pattern[];
 global float seq_probability[];
 global int seq_current_step;
-global int seq_chaos; // 0 = normal, 1 = chaotic (randomize)
 
 <<< "Engine: seq_pattern", (seq_pattern != null ? "LINKED" : "NULL") >>>;
-<<< "Engine: seq_chaos is", seq_chaos >>>;
 
 // Internal references to work with
 int data[];
@@ -62,37 +53,17 @@ while(true) {
     // A. Update the global cursor position
     step % 16 => seq_current_step;
     
-    // Diagnostic print every 16 steps
-    if (step % 16 == 0) {
-        <<< "Step 0: Chaos=", seq_chaos, "Pattern[0]=", data[0] >>>;
-    }
-
-    // CHAOS: Randomly toggle a cell if enabled
-    if (seq_chaos > 0 && Math.randomf() < 0.1) {
-        Math.random2(0, 7) => int r;
-        Math.random2(0, 15) => int c;
-        1 - data[r * 16 + c] => data[r * 16 + c];
-    }
-    
     // B. Read grid data and probabilities
     for(0 => int r; r < 8; r++) {
         // Check if grid pad is ON
         data[r * 16 + (step % 16)] => int val;
         if (val > 0) {
-
             // Apply probability (0.0 to 1.0)
             1.0 => float p;
             if (r < probs.cap()) probs[r] => p;
 
             if (Math.randomf() <= p) {
                 0 => kit[r].pos; // TRIGGER
-                // Short blip to verify audio path even if samples are silent
-                800 - (r * 50) => testBlip.freq;
-                0.02 => testBlip.gain;
-                5::ms => now;
-                0 => testBlip.gain;
-                (T - 5::ms) => now;
-                continue;
             }
         }
     }

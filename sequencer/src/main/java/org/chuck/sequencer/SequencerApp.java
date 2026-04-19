@@ -10,7 +10,6 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
-import javafx.scene.control.ToggleButton;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
@@ -126,12 +125,6 @@ public class SequencerApp extends Application {
     Button clearBtn = new Button("🗑 Clear");
     clearBtn.setOnAction(e -> sequencerPanel.clearGrid());
 
-    ToggleButton chaosBtn = new ToggleButton("🌀 Chaos Mode");
-    chaosBtn.setOnAction(
-        e -> {
-          vm.setGlobalInt("seq_chaos", chaosBtn.isSelected() ? 1L : 0L);
-        });
-
     Button saveBtn = new Button("💾 Save...");
     saveBtn.setOnAction(e -> sequencerPanel.savePattern());
 
@@ -149,7 +142,6 @@ public class SequencerApp extends Application {
             new Separator(Orientation.VERTICAL),
             randomBtn,
             clearBtn,
-            chaosBtn,
             new Separator(Orientation.VERTICAL),
             saveBtn,
             loadBtn,
@@ -198,7 +190,6 @@ public class SequencerApp extends Application {
 
   private void initVM() {
     vm = new ChuckVM(44100, 2);
-    vm.setGlobalInt("seq_chaos", 0L); // Explicitly disable chaos on start
     org.chuck.core.ChuckConfig.addSearchPath("chuck-samples/src/main/resources/examples");
     audio = new ChuckAudio(vm, 1024, 2, 44100); // Larger buffer for Mac
     vm.setAudio(audio);
