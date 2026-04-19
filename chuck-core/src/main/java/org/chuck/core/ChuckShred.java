@@ -51,7 +51,7 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
   private final ChuckObjectPool.ShredAllocator allocator = new ChuckObjectPool.ShredAllocator();
 
   private String lastExceptionMessage = null;
-  private Runnable onNextPark = null;
+  private volatile Runnable onNextPark = null;
   private long instructionCount = 0;
   private static final long MAX_INSTRUCTIONS_BEFORE_YIELD = 10000;
 
@@ -333,7 +333,7 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
   public boolean notifyTriggered(ChuckEvent e, ChuckVM vm) {
     eventWaitingOn = null;
     wasSignaled = true;
-    resume(vm, true);
+    wakeTime = vm.getCurrentTime();
     return true;
   }
 
