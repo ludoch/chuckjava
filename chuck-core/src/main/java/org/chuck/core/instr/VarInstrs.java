@@ -88,13 +88,12 @@ public class VarInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      Object val = null;
-      if (s.reg.isObject(0)) val = s.reg.peekObject(0);
-      if (val != null && val instanceof ChuckString cs) {
-        val = new ChuckString(cs.toString());
-      }
       if (s.reg.getSp() > 0) {
-        if (val != null) {
+        if (s.reg.isObject(0)) {
+          Object val = s.reg.peekObject(0);
+          if (val instanceof ChuckString cs) {
+            val = new ChuckString(cs.toString());
+          }
           vm.setGlobalObject(name, val);
         } else if (s.reg.isDouble(0)) {
           double d = s.reg.peekAsDouble(0);

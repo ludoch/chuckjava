@@ -127,7 +127,18 @@ public class ArrayInstrs {
     public void execute(ChuckVM vm, ChuckShred s) {
       long[] sizes = new long[dims];
       for (int i = dims - 1; i >= 0; i--) sizes[i] = s.reg.popLong();
-      s.reg.pushObject(new ChuckArray(t, (int) sizes[0]));
+      s.reg.pushObject(createMultiDimArray(t, sizes, 0));
+    }
+
+    private ChuckArray createMultiDimArray(String type, long[] sizes, int dimIdx) {
+      int size = (int) sizes[dimIdx];
+      ChuckArray arr = new ChuckArray(type, size);
+      if (dimIdx < sizes.length - 1) {
+        for (int i = 0; i < size; i++) {
+          arr.setObject(i, createMultiDimArray(type, sizes, dimIdx + 1));
+        }
+      }
+      return arr;
     }
   }
 
@@ -146,7 +157,13 @@ public class ArrayInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      ChuckArray a = new ChuckArray(vt, count);
+      String type = vt;
+      if (type == null && count > 0) {
+        if (s.reg.isDouble(0)) type = "float";
+        else if (s.reg.isObject(0)) type = "object";
+        else type = "int";
+      }
+      ChuckArray a = new ChuckArray(type, count);
       for (int i = count - 1; i >= 0; i--) {
         if (s.reg.isObject(0)) a.setObject(i, s.reg.popObject());
         else if (s.reg.isDouble(0)) a.setFloat(i, s.reg.popAsDouble());

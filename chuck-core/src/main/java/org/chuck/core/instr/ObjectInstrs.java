@@ -109,10 +109,16 @@ public class ObjectInstrs {
       if (obj instanceof ChuckShred sh) {
         switch (mName) {
           case "args" -> {
-            String[] sargs = sh.args();
-            ChuckArray arr = new ChuckArray(ChuckType.ARRAY, sargs.length);
-            for (int i = 0; i < sargs.length; i++) arr.setObject(i, new ChuckString(sargs[i]));
-            s.reg.pushObject(arr);
+            s.reg.push((long) sh.args().length);
+            return;
+          }
+          case "arg" -> {
+            int idx = (int) s.reg.popLong();
+            if (idx >= 0 && idx < sh.args().length) {
+              s.reg.pushObject(new ChuckString(sh.args()[idx]));
+            } else {
+              s.reg.pushObject(new ChuckString(""));
+            }
             return;
           }
           case "numArgs" -> {
@@ -441,17 +447,14 @@ public class ObjectInstrs {
           // Static call on a built-in class
           try {
             Class<?> cls = Class.forName("org.chuck.core.ai." + sName);
-            System.err.println("[CallMethod] found AI class: " + cls.getName());
             reflMethods = cls.getMethods();
             targetObj = null; // Static call
           } catch (ClassNotFoundException e) {
             try {
               Class<?> cls = Class.forName("org.chuck.core." + sName);
-              System.err.println("[CallMethod] found core class: " + cls.getName());
               reflMethods = cls.getMethods();
               targetObj = null;
             } catch (ClassNotFoundException e2) {
-              System.err.println("[CallMethod] could not find class: " + sName);
               reflMethods = new java.lang.reflect.Method[0];
             }
           }

@@ -6,13 +6,18 @@ import org.chuck.core.ChuckEvent;
 import org.chuck.core.ChuckVM;
 
 /** Represents an HID device (Keyboard, Mouse, etc.). In ChucK, Hid extends Event. */
-public class Hid extends ChuckEvent {
+public class Hid extends ChuckEvent implements AutoCloseable {
   private final Deque<HidMsg> queue = new ArrayDeque<>();
   private boolean opened = false;
   private String deviceType = "";
 
   public Hid() {
     // No explicit type needed if we just use the class
+  }
+
+  @Override
+  public void close() {
+    opened = false;
   }
 
   public int openKeyboard(int index, ChuckVM vm) {

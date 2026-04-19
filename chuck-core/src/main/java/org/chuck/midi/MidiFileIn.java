@@ -12,7 +12,7 @@ import org.chuck.core.ChuckType;
  * ChucK MidiFileIn — reads Standard MIDI (.mid) files for sequencing. Supports multi-track reading
  * and provides timing information.
  */
-public class MidiFileIn extends ChuckObject {
+public class MidiFileIn extends ChuckObject implements AutoCloseable {
   private Sequence sequence;
   private List<List<TimedMessage>> trackMessages = new ArrayList<>();
   private List<TimedMessage> mergedMessages = new ArrayList<>();

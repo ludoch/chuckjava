@@ -2,8 +2,11 @@ package org.chuck.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
+@Timeout(value = 10, unit = TimeUnit.SECONDS)
 public class TutorialsTest {
 
   private void runWithTimeout(String code, double virtualSeconds) {

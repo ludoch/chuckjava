@@ -8,7 +8,7 @@ import org.rtmidijava.RtMidi;
 import org.rtmidijava.RtMidiFactory;
 
 /** The ChucK MidiIn object. Support native RtMidi via ChuckMidiNative. */
-public class MidiIn extends ChuckEvent {
+public class MidiIn extends ChuckEvent implements AutoCloseable {
   private final ChuckMidiNative driver;
   private final ChuckMidi javaDriver;
   private final ConcurrentLinkedDeque<MidiMsg> queue = new ConcurrentLinkedDeque<>();

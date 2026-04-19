@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.antlr.v4.runtime.BaseErrorListener;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
@@ -22,11 +23,13 @@ import org.chuck.core.ChuckCode;
 import org.chuck.core.ChuckShred;
 import org.chuck.core.ChuckVM;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * ANTLR-based tests for high-priority new features: ternary ?:, switch/case, HPF/BPF/BRF filters,
  * BlitSaw/BlitSquare oscillators.
  */
+@Timeout(value = 30, unit = TimeUnit.SECONDS)
 public class ChuckAntlrNewFeaturesTest {
 
   /** Compile + run a ChucK snippet via the ANTLR pipeline. Returns print output. */

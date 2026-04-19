@@ -2,9 +2,12 @@ package org.chuck.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Quick probe to identify missing array/class API features. */
+@Timeout(value = 5, unit = TimeUnit.SECONDS)
 public class ArrayApiProbeTest {
 
   private String run(String code) {

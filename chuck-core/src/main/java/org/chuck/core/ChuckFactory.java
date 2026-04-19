@@ -82,12 +82,15 @@ public class ChuckFactory {
 
     ChuckUGen ugen = UGenRegistry.instantiate(t, sr, args);
     if (ugen != null) {
-      // System.err.println("ChuckFactory: instantiated UGen " + t);
+      if (s != null) s.registerUGen(ugen);
       return ugen;
     }
 
     ChuckObject chugin = ChuginLoader.instantiateChugin(t, sr, vm);
-    if (chugin != null) return chugin;
+    if (chugin != null) {
+      if (s != null && chugin instanceof ChuckUGen u) s.registerUGen(u);
+      return chugin;
+    }
 
     ChuckObject res =
         switch (t) {
@@ -103,25 +106,49 @@ public class ChuckFactory {
           case "vec4" -> new ChuckArray("vec4", 4);
           case "complex" -> new ChuckArray("complex", 2);
           case "polar" -> new ChuckArray("polar", 2);
-          case "MidiIn" -> new org.chuck.midi.MidiIn(vm);
+          case "MidiIn" -> {
+            org.chuck.midi.MidiIn mi = new org.chuck.midi.MidiIn(vm);
+            if (s != null) s.registerCloseable(mi);
+            yield mi;
+          }
           case "MidiOut" -> new MidiOut();
-          case "MidiFileIn" -> new MidiFileIn();
+          case "MidiFileIn" -> {
+            MidiFileIn mfi = new MidiFileIn();
+            if (s != null) s.registerCloseable(mfi);
+            yield mfi;
+          }
           case "MidiFileOut" -> new org.chuck.midi.MidiFileOut();
           case "MidiPlayer" -> new org.chuck.midi.MidiPlayer();
-          case "Hid" -> new org.chuck.hid.Hid();
+          case "Hid" -> {
+            org.chuck.hid.Hid h = new org.chuck.hid.Hid();
+            if (s != null) s.registerCloseable(h);
+            yield h;
+          }
           case "HidOut" -> new HidOut();
           case "ConsoleInput" -> new ConsoleInput();
           case "KBHit" -> new KBHit();
-          case "SerialIO" -> new SerialIO();
+          case "SerialIO" -> {
+            SerialIO sio = new SerialIO();
+            if (s != null) s.registerCloseable(sio);
+            yield sio;
+          }
           case "OscBundle" -> new OscBundle();
           case "RegEx" -> new RegEx();
           case "Reflect" -> new Reflect();
-          case "FileIO" -> new FileIO();
+          case "FileIO" -> {
+            FileIO fio = new FileIO();
+            if (s != null) s.registerCloseable(fio);
+            yield fio;
+          }
           case "StringTokenizer" -> new StringTokenizer();
           case "Object" -> new ChuckObject(ChuckType.OBJECT);
           case "Type" -> new ChuckTypeObj("void");
           case "Event" -> new ChuckEvent();
-          case "OscIn" -> new OscIn(vm);
+          case "OscIn" -> {
+            OscIn oi = new OscIn(vm);
+            if (s != null) s.registerCloseable(oi);
+            yield oi;
+          }
           case "OscEvent" -> new org.chuck.network.OscEvent(vm);
           case "OscOut" -> new OscOut();
           case "OscMsg" -> new OscMsg();

@@ -5,11 +5,14 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.antlr.v4.runtime.*;
 import org.chuck.core.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /** Tests for the full Machine shred API and me.* shred API. All tests use the ANTLR pipeline. */
+@Timeout(value = 10, unit = TimeUnit.SECONDS)
 public class ChuckMachineApiTest {
 
   private List<String> runChuck(String source, int samples) throws InterruptedException {
@@ -45,21 +48,19 @@ public class ChuckMachineApiTest {
             throw new RuntimeException("Parser: " + line + ":" + col + " – " + msg);
           }
         });
-    ChuckASTVisitor visitor = new ChuckASTVisitor();
-    @SuppressWarnings("unchecked")
-    List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
-
-    ChuckEmitter emitter = new ChuckEmitter();
-    ChuckCode code = emitter.emit(ast, "MachineApiTest");
-
     ChuckVM vm = new ChuckVM(44100);
     List<String> output = Collections.synchronizedList(new ArrayList<>());
     vm.addPrintListener(s1 -> output.add(s1.stripTrailing()));
 
-    ChuckShred shred = new ChuckShred(code);
-    vm.spork(shred);
-    Thread.sleep(200);
+    // Run using the new unified runner
+    vm.run(source, "MachineApiTest");
+
+    // Advance time to allow shred to run
     vm.advanceTime(samples);
+
+    // Brief pause to allow virtual threads to finish any final output
+    Thread.sleep(200);
+
     return output;
   }
 

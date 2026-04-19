@@ -2,8 +2,11 @@ package org.chuck.core;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
+@Timeout(value = 10, unit = TimeUnit.SECONDS)
 public class ChuckVMTest {
 
   @Test
@@ -32,6 +35,7 @@ public class ChuckVMTest {
 
     vm.advanceTime(10); // T=25
     assertEquals(25, vm.getCurrentTime());
+    Thread.sleep(50); // Give virtual thread time to finish and set isDone
     assertTrue(shred.isDone());
   }
 

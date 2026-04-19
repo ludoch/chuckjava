@@ -209,48 +209,6 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
                 de.doc(),
                 de.line(),
                 de.column()));
-      } else if (exp instanceof ChuckAST.BinaryExp be
-          && (be.op() == ChuckAST.Operator.CHUCK || be.op() == ChuckAST.Operator.AT_CHUCK)) {
-        if (be.lhs() instanceof ChuckAST.DeclExp de) {
-          stmts.add(
-              new ChuckAST.DeclStmt(
-                  de.type(),
-                  de.name(),
-                  de.arraySizes(),
-                  be.rhs(),
-                  de.isReference(),
-                  de.isStatic(),
-                  de.isGlobal(),
-                  de.isConst(),
-                  de.access(),
-                  de.doc(),
-                  de.line(),
-                  de.column()));
-          ChuckAST.IdExp id = new ChuckAST.IdExp(de.name(), "", de.line(), de.column());
-          stmts.add(
-              new ChuckAST.ExpStmt(
-                  new ChuckAST.BinaryExp(id, be.op(), be.rhs(), "", be.line(), be.column()),
-                  "",
-                  be.line(),
-                  be.column()));
-        } else if (be.rhs() instanceof ChuckAST.DeclExp de) {
-          stmts.add(
-              new ChuckAST.DeclStmt(
-                  de.type(),
-                  de.name(),
-                  de.arraySizes(),
-                  be.lhs(),
-                  de.isReference(),
-                  de.isStatic(),
-                  de.isGlobal(),
-                  de.isConst(),
-                  de.access(),
-                  de.doc(),
-                  de.line(),
-                  de.column()));
-        } else {
-          stmts.add(new ChuckAST.ExpStmt(exp, currentDoc, exp.line(), exp.column()));
-        }
       } else {
         stmts.add(new ChuckAST.ExpStmt(exp, currentDoc, exp.line(), exp.column()));
       }

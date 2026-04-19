@@ -38,7 +38,7 @@ public class ChuckDSL {
     ChuckShred current = ChuckShred.CURRENT_SHRED.get();
     ChuckVM vm = ChuckVM.CURRENT_VM.get();
     if (current != null && vm != null) {
-      current.yield(Math.round(duration.samples()));
+      current.suspendOnTime(Math.round(duration.samples()));
     }
   }
 
@@ -223,6 +223,10 @@ public class ChuckDSL {
     return replace(s, pos, sub.length(), sub);
   }
 
+  public static void print(Object msg) {
+    ChuckVM.CURRENT_VM.get().print(String.valueOf(msg));
+  }
+
   public static void _CHUCK_INTERNAL_ASSERT_(boolean condition, String message) {
     if (!condition) {
       throw new RuntimeException("ChucK Assertion Failed: " + message);
@@ -231,6 +235,35 @@ public class ChuckDSL {
 
   public static void _CHUCK_INTERNAL_ASSERT_(long condition, String message) {
     _CHUCK_INTERNAL_ASSERT_(condition != 0, message);
+  }
+
+  /** Compiles a Java DSL string into a Class that can be instantiated. */
+  public static Class<?> compileSource(String source, String className) throws Exception {
+    var compiler = javax.tools.ToolProvider.getSystemJavaCompiler();
+    if (compiler == null)
+      throw new RuntimeException("JDK Compiler not found. Ensure you are running on a full JDK.");
+
+    java.nio.file.Path tempDir = java.nio.file.Files.createTempDirectory("chuck_jit");
+    java.nio.file.Path sourceFile = tempDir.resolve(className + ".java");
+    java.nio.file.Files.writeString(sourceFile, source);
+
+    var fileManager = compiler.getStandardFileManager(null, null, null);
+    var compilationUnits = fileManager.getJavaFileObjects(sourceFile);
+
+    String classpath = System.getProperty("java.class.path");
+    var options =
+        java.util.List.of(
+            "-d", tempDir.toString(), "-cp", classpath, "--enable-preview", "--release", "25");
+
+    var task = compiler.getTask(null, fileManager, null, options, null, compilationUnits);
+    if (!task.call()) {
+      throw new RuntimeException("Compilation failed for " + className);
+    }
+
+    java.net.URLClassLoader loader =
+        new java.net.URLClassLoader(
+            new java.net.URL[] {tempDir.toUri().toURL()}, ChuckDSL.class.getClassLoader());
+    return loader.loadClass(className);
   }
 
   /**

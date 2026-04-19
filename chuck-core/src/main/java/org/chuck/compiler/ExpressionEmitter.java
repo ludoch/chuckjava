@@ -877,18 +877,18 @@ public class ExpressionEmitter {
             String lhsType = parent.getExprType(e.lhs());
             if (lhsType != null && parent.getUserClassRegistry().containsKey(lhsType)) {
               String opSymbol = parent.getOpSymbol(e.op());
-              if (opSymbol != null) {
+              String opWord = parent.getOpWord(e.op());
+              if (opSymbol != null && opWord != null) {
                 String rhsType = parent.getExprType(e.rhs());
                 List<String> bArgTypes =
                     (rhsType != null) ? List.of(lhsType, rhsType) : List.of(lhsType);
-                String fullKey = parent.getMethodKey("__pub_op__" + opSymbol, bArgTypes);
-                String privKey = parent.getMethodKey("__op__" + opSymbol, bArgTypes);
+                String fullKey = parent.getMethodKey("__pub_op__" + opWord, bArgTypes);
+                String privKey = parent.getMethodKey("__op__" + opWord, bArgTypes);
                 ChuckCode opFunc = parent.getFunctions().get(fullKey);
                 if (opFunc == null) opFunc = parent.getFunctions().get(privKey);
                 if (opFunc == null) {
-                  opFunc = parent.getFunctions().get("__pub_op__" + opSymbol + ":2");
-                  if (opFunc == null)
-                    opFunc = parent.getFunctions().get("__op__" + opSymbol + ":2");
+                  opFunc = parent.getFunctions().get("__pub_op__" + opWord + ":2");
+                  if (opFunc == null) opFunc = parent.getFunctions().get("__op__" + opWord + ":2");
                 }
                 if (opFunc != null) {
                   this.emitExpression(e.lhs(), code);
@@ -900,16 +900,15 @@ public class ExpressionEmitter {
                 if (desc != null) {
                   List<String> mArgTypes = (rhsType != null) ? List.of(rhsType) : new ArrayList<>();
                   String mPubKey =
-                      parent.resolveMethodKey(lhsType, "__pub_op__" + opSymbol, mArgTypes);
-                  String mPrivKey =
-                      parent.resolveMethodKey(lhsType, "__op__" + opSymbol, mArgTypes);
+                      parent.resolveMethodKey(lhsType, "__pub_op__" + opWord, mArgTypes);
+                  String mPrivKey = parent.resolveMethodKey(lhsType, "__op__" + opWord, mArgTypes);
                   if (desc.methods().containsKey(mPubKey)
                       || desc.staticMethods().containsKey(mPubKey)) {
                     this.emitExpression(e.lhs(), code);
                     this.emitExpression(e.rhs(), code);
                     if (code != null)
                       code.addInstruction(
-                          new ObjectInstrs.CallMethod("__pub_op__" + opSymbol, 1, mPubKey));
+                          new ObjectInstrs.CallMethod("__pub_op__" + opWord, 1, mPubKey));
                     return;
                   }
                   if (desc.methods().containsKey(mPrivKey)
@@ -918,7 +917,7 @@ public class ExpressionEmitter {
                     this.emitExpression(e.rhs(), code);
                     if (code != null)
                       code.addInstruction(
-                          new ObjectInstrs.CallMethod("__op__" + opSymbol, 1, mPrivKey));
+                          new ObjectInstrs.CallMethod("__op__" + opWord, 1, mPrivKey));
                     return;
                   }
                 }

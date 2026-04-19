@@ -195,6 +195,12 @@ public abstract class ChuckUGen extends ChuckObject {
     unchuckAll();
   }
 
+  public void tickSamples(long systemTime, long samples) {
+    if (samples <= 0) return;
+    float[] dummy = new float[(int) samples];
+    tick(dummy, 0, (int) samples, systemTime);
+  }
+
   public float tick(long systemTime) {
     if (systemTime != -1 && systemTime == lastTickTime) {
       return lastOut;

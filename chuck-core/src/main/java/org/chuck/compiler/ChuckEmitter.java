@@ -613,6 +613,23 @@ public class ChuckEmitter {
     };
   }
 
+  String getOpWord(ChuckAST.Operator op) {
+    return switch (op) {
+      case PLUS -> "plus";
+      case MINUS -> "minus";
+      case TIMES -> "times";
+      case DIVIDE -> "div";
+      case PERCENT -> "percent";
+      case LT -> "less";
+      case LE -> "lequal";
+      case GT -> "greater";
+      case GE -> "gequal";
+      case EQ -> "equal";
+      case NEQ -> "notequal";
+      default -> null;
+    };
+  }
+
   private void registerClassNames(ChuckAST.Stmt stmt) {
     if (stmt == null) return;
     switch (stmt) {
@@ -1132,6 +1149,9 @@ public class ChuckEmitter {
         }
 
         if (isPrimitive) {
+          if (useGlobal) {
+            globalVarTypes.put(e.name(), type);
+          }
           // 1. emitExpression(e) pushes value (0)
           // 2. Pop it
           // 3. Store the CHUCK result into the variable
@@ -1157,6 +1177,9 @@ public class ChuckEmitter {
             }
           }
         } else {
+          if (useGlobal) {
+            globalVarTypes.put(e.name(), type);
+          }
           if (op == ChuckAST.Operator.AT_CHUCK) {
             // For `@=> DeclExp`, we just want to store the source into the new variable,
             // NOT instantiate a new object first.

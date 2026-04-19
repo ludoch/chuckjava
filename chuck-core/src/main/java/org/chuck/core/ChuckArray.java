@@ -57,17 +57,18 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
       intData.add(0L);
       floatData.add(0.0);
       objectData.add(null);
-      types.add((byte) 1); // default to float/double for vec types
+      types.add((byte) 2); // default to object
     }
   }
 
   public ChuckArray(String elementTypeName, int size) {
     super(ChuckType.ARRAY);
-    if (elementTypeName != null) {
-      this.elementTypeName = elementTypeName.replaceAll("\\[\\]", "");
+    if (elementTypeName != null && elementTypeName.endsWith("[]")) {
+      this.elementTypeName = elementTypeName.substring(0, elementTypeName.length() - 2);
     } else {
-      this.elementTypeName = null;
+      this.elementTypeName = elementTypeName;
     }
+
     this.vecTag =
         (this.elementTypeName != null
                 && (this.elementTypeName.startsWith("vec")
@@ -75,12 +76,19 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
                     || this.elementTypeName.equals("polar")))
             ? this.elementTypeName
             : null;
+
     for (int i = 0; i < size; i++) {
       intData.add(0L);
       floatData.add(0.0);
-      if (this.elementTypeName != null
-          && (this.elementTypeName.equals("complex") || this.elementTypeName.equals("polar"))) {
-        objectData.add(new ChuckArray(this.elementTypeName, new double[] {0, 0}));
+      if (this.vecTag != null) {
+        int vSize =
+            switch (this.vecTag) {
+              case "vec2", "complex", "polar" -> 2;
+              case "vec3" -> 3;
+              case "vec4" -> 4;
+              default -> 2;
+            };
+        objectData.add(new ChuckArray(this.vecTag, new double[vSize]));
         types.add((byte) 2);
       } else {
         objectData.add(null);
@@ -94,7 +102,8 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
   public ChuckArray(String tag, double[] vals) {
     super(ChuckType.ARRAY);
     this.vecTag = tag;
-    this.elementTypeName = tag != null ? tag.replaceAll("\\[\\]", "") : null;
+    this.elementTypeName =
+        (tag != null && tag.endsWith("[]")) ? tag.substring(0, tag.length() - 2) : tag;
     for (double v : vals) {
       floatData.add(v);
       intData.add(0L);
@@ -105,12 +114,24 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
 
   public ChuckArray(String tag, long[] vals) {
     super(ChuckType.ARRAY);
-    this.elementTypeName = tag != null ? tag.replaceAll("\\[\\]", "") : null;
+    this.elementTypeName =
+        (tag != null && tag.endsWith("[]")) ? tag.substring(0, tag.length() - 2) : tag;
     for (long v : vals) {
       intData.add(v);
       floatData.add((double) v);
       objectData.add(null);
       types.add((byte) 0);
+    }
+  }
+
+  public ChuckArray(String tag, String[] vals) {
+    super(ChuckType.ARRAY);
+    this.elementTypeName = "string";
+    for (String v : vals) {
+      intData.add(0L);
+      floatData.add(0.0);
+      objectData.add(v);
+      types.add((byte) 2);
     }
   }
 
@@ -126,13 +147,22 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     while (types.size() <= index) {
       intData.add(0L);
       floatData.add(0.0);
-      if (elementTypeName != null
-          && (elementTypeName.equals("complex") || elementTypeName.equals("polar"))) {
-        objectData.add(new ChuckArray(elementTypeName, new double[] {0, 0}));
+      if (this.vecTag != null) {
+        int vSize =
+            switch (this.vecTag) {
+              case "vec2", "complex", "polar" -> 2;
+              case "vec3" -> 3;
+              case "vec4" -> 4;
+              default -> 2;
+            };
+        objectData.add(new ChuckArray(this.vecTag, new double[vSize]));
         types.add((byte) 2);
       } else {
         objectData.add(null);
-        byte t = (byte) ("float".equals(elementTypeName) ? 1 : 0);
+        byte t;
+        if ("float".equals(elementTypeName)) t = 1;
+        else if ("int".equals(elementTypeName)) t = 0;
+        else t = 2; // Default to object for nested arrays or user classes
         types.add(t);
       }
     }

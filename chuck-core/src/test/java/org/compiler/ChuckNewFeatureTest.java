@@ -5,10 +5,13 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import org.antlr.v4.runtime.*;
 import org.chuck.core.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
+@Timeout(value = 10, unit = TimeUnit.SECONDS)
 public class ChuckNewFeatureTest {
 
   @Test

@@ -81,6 +81,7 @@ public class MachineCall implements ChuckInstr {
           arr.setInt(i, ids[i]);
         }
         s.reg.pushObject(arr);
+        return;
       }
       case "crash" -> {
         vm.print("[chuck]: (VM) crash! (by request)\n");
@@ -89,17 +90,37 @@ public class MachineCall implements ChuckInstr {
       case "resetID" -> {
         vm.resetShredId();
         s.reg.push(0L);
+        return;
       }
       case "gc" -> {
         vm.gc();
         s.reg.push(0L);
+        return;
       }
-      case "version" -> s.reg.pushObject(new ChuckString(vm.getVersion()));
-      case "platform" -> s.reg.pushObject(new ChuckString(vm.getPlatform()));
-      case "jitter" -> s.reg.push(vm.getAverageJitter());
-      case "maxJitter" -> s.reg.push((double) vm.getMaxJitter());
-      case "drift" -> s.reg.push(vm.getAverageDrift());
-      case "maxDrift" -> s.reg.push(vm.getMaxDrift());
+      case "version" -> {
+        s.reg.pushObject(new ChuckString(vm.getVersion()));
+        return;
+      }
+      case "platform" -> {
+        s.reg.pushObject(new ChuckString(vm.getPlatform()));
+        return;
+      }
+      case "jitter" -> {
+        s.reg.push(vm.getAverageJitter());
+        return;
+      }
+      case "maxJitter" -> {
+        s.reg.push((double) vm.getMaxJitter());
+        return;
+      }
+      case "drift" -> {
+        s.reg.push(vm.getAverageDrift());
+        return;
+      }
+      case "maxDrift" -> {
+        s.reg.push(vm.getMaxDrift());
+        return;
+      }
       case "loglevel" -> {
         if (argc > 0 && args[0] != null) {
           vm.setLogLevel(((Number) args[0]).intValue());
@@ -107,32 +128,49 @@ public class MachineCall implements ChuckInstr {
         } else {
           s.reg.push((long) vm.getLogLevel());
         }
+        return;
       }
       case "setloglevel" -> {
         vm.setLogLevel(args.length > 0 && args[0] != null ? ((Number) args[0]).intValue() : 1);
         s.reg.push(0L);
+        return;
       }
-      case "timeofday" -> s.reg.push(Double.doubleToRawLongBits(vm.getTimeOfDay()));
+      case "timeofday" -> {
+        s.reg.push(vm.getTimeOfDay());
+        return;
+      }
       // alias: os() same as platform()
-      case "os" -> s.reg.pushObject(new ChuckString(vm.getPlatform()));
+      case "os" -> {
+        s.reg.pushObject(new ChuckString(vm.getPlatform()));
+        return;
+      }
       // intsize() — pointer/int size in bits on this platform
-      case "intsize" -> s.reg.push((long) (Long.SIZE));
+      case "intsize" -> {
+        s.reg.push((long) (Long.SIZE));
+        return;
+      }
       // printStatus() — dump active shreds to console
       case "printStatus" -> {
         vm.status();
         s.reg.push(0L);
+        return;
       }
       // printTimeCheck() — timing diagnostics (no-op stub; returns 0)
-      case "printTimeCheck" -> s.reg.push(0L);
+      case "printTimeCheck" -> {
+        s.reg.push(0L);
+        return;
+      }
       // removeLastShred() — remove most recently sporked shred
       case "removeLastShred" -> {
         int removed = vm.removeLastShred();
         s.reg.push((long) removed);
+        return;
       }
       // spork(string) — spork a .ck file by path, like Machine.add()
       case "spork" -> {
         String path = args.length > 0 ? String.valueOf(args[0]) : "";
         s.reg.push((long) vm.add(path));
+        return;
       }
       // eval(string, args[]) — eval ChucK source with argument array
       case "evalWithArgs" -> {
@@ -141,10 +179,17 @@ public class MachineCall implements ChuckInstr {
         long id = vm.evalWithArgs(src, argArr, s);
         s.reg.push(id);
         s.yield(0);
+        return;
       }
       // operator namespace stack stubs
-      case "operatorsPush", "operatorsPop" -> s.reg.push(0L);
-      case "operatorsStackLevel" -> s.reg.push(0L);
+      case "operatorsPush", "operatorsPop" -> {
+        s.reg.push(0L);
+        return;
+      }
+      case "operatorsStackLevel" -> {
+        s.reg.push(0L);
+        return;
+      }
       // refcount/sp debug stubs
       case "refcount", "sp_reg", "sp_mem" -> s.reg.push(0L);
       // silent()/realtime() already handled in emitter; keep here for dynamic dispatch

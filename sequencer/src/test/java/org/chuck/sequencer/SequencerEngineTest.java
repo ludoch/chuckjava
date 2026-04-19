@@ -16,7 +16,7 @@ public class SequencerEngineTest {
   private ChuckVM vm;
   private ChuckArray patternArray;
   private ChuckArray probabilityArray;
-  private final List<String> logs = new ArrayList<>();
+  private final List<String> logs = java.util.Collections.synchronizedList(new ArrayList<>());
 
   @BeforeEach
   void setUp() {
@@ -92,7 +92,7 @@ public class SequencerEngineTest {
   }
 
   @Test
-  void testNoCrashOnEmptyData() {
+  void testNoCrashOnEmptyData() throws InterruptedException {
     // Intentional bad data size to test robustness
     vm.setGlobalObject("seq_pattern", null);
 
@@ -100,7 +100,8 @@ public class SequencerEngineTest {
     vm.setLogLevel(2);
     vm.add(f.getAbsolutePath());
 
-    vm.advanceTime(44100);
+    vm.advanceTime(88200);
+    Thread.sleep(100);
 
     // In v3.2, it prints "STATUS: data array is NULL"
     boolean waitingLog = logs.stream().anyMatch(l -> l.contains("data array is NULL"));

@@ -18,6 +18,10 @@ public class StringTokenizer extends ChuckObject {
     pos = 0;
   }
 
+  public int size() {
+    return tokens.length;
+  }
+
   public boolean more() {
     return pos < tokens.length;
   }
@@ -25,6 +29,23 @@ public class StringTokenizer extends ChuckObject {
   public String next() {
     if (pos < tokens.length) return tokens[pos++];
     return "";
+  }
+
+  public String next(String ignored) {
+    return next();
+  }
+
+  public String get(int index) {
+    if (index >= 0 && index < tokens.length) return tokens[index];
+    return "";
+  }
+
+  public String get(int index, String ignored) {
+    return get(index);
+  }
+
+  public void delims(String d) {
+    // Simplified: we could use these as regex, but for now just stubbed
   }
 
   public void reset() {

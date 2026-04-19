@@ -7,12 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.PriorityQueue;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Phaser;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.prefs.Preferences;
 import org.antlr.v4.runtime.*;
@@ -262,18 +260,27 @@ public class ChuckVM {
   }
 
   public void setGlobalObject(String name, Object obj) {
+    if (obj == null) {
+      globalObjects.remove(name);
+      globalIsObject.put(name, false);
+      return;
+    }
     globalIsObject.put(name, true);
     globalIsInt.put(name, false);
     globalIsDouble.put(name, false);
-    if (obj == null) {
-      globalObjects.remove(name);
-    } else {
-      globalObjects.put(name, obj);
-    }
+    Object toStore = obj;
+    if (obj instanceof long[] l) toStore = new ChuckArray("int", l);
+    else if (obj instanceof double[] d) toStore = new ChuckArray("float", d);
+    else if (obj instanceof String[] s) toStore = new ChuckArray("string", s);
+    globalObjects.put(name, toStore);
   }
 
   public Object getGlobalObject(String name) {
-    return globalObjects.get(name);
+    Object obj = globalObjects.get(name);
+    // If it's a primitive array being fetched by a legacy test, and we stored it as ChuckArray,
+    // unwrap it?
+    // Actually, the DSL expects ChuckArray, so we keep it as ChuckArray.
+    return obj;
   }
 
   public void setGlobalDoc(String name, String doc) {
@@ -337,6 +344,11 @@ public class ChuckVM {
       desc.staticObjects().putAll(old.staticObjects());
     }
     userClassRegistry.put(name, desc);
+    if (desc.staticInitCode() != null && !isStaticInitialized(name)) {
+      setStaticInitialized(name);
+      ChuckShred s = new ChuckShred(desc.staticInitCode());
+      s.executeSynchronous(this, desc.staticInitCode());
+    }
   }
 
   public Map<String, String> getGlobalTypeMap() {
@@ -372,7 +384,11 @@ public class ChuckVM {
           }
           types.put(n, typeName);
         } else if (obj != null) {
-          types.put(n, obj.getClass().getSimpleName());
+          String typeName = obj.getClass().getSimpleName();
+          if (n.equals("Machine")) typeName = "Machine";
+          else if (n.equals("me")) typeName = "Shred";
+          else if (n.equals("dac") || n.equals("adc") || n.equals("blackhole")) typeName = "UGen";
+          types.put(n, typeName);
         }
       }
     }
@@ -380,8 +396,9 @@ public class ChuckVM {
   }
 
   public int run(Shred shred) {
-    ChuckShred s = new ChuckShred(null);
-    int id = s.getId();
+    ChuckShred s = new ChuckShred();
+    int id = nextShredId++;
+    s.setId(id);
     activeShreds.put(id, s);
 
     Thread.startVirtualThread(
@@ -425,7 +442,7 @@ public class ChuckVM {
                 int charPositionInLine,
                 String msg,
                 RecognitionException e) {
-              if (errors.isEmpty()) { // Only capture first error
+              if (errors.isEmpty()) {
                 errors.add(msg);
                 errorLines.add(line);
                 errorCols.add(charPositionInLine);
@@ -459,9 +476,13 @@ public class ChuckVM {
       // Register public functions/operators
       globalFunctions.putAll(emitter.getPublicFunctions());
 
-      // Register docs
-      result.globalDocs().forEach(this::setGlobalDoc);
-      result.functionDocs().forEach(this::setGlobalFunctionDoc);
+      // Register documentation
+      for (Map.Entry<String, String> entry : result.globalDocs().entrySet()) {
+        setGlobalDoc(entry.getKey(), entry.getValue());
+      }
+      for (Map.Entry<String, String> entry : result.functionDocs().entrySet()) {
+        setGlobalFunctionDoc(entry.getKey(), entry.getValue());
+      }
 
       if (synchronous) {
         if (caller != null) {
@@ -469,23 +490,22 @@ public class ChuckVM {
           return caller.getId();
         } else {
           ChuckShred shred = new ChuckShred(result.code());
-          int sid = shred.getId();
+          int sid = nextShredId++;
+          shred.setId(sid);
           activeShreds.put(sid, shred);
           shred.executeSynchronous(this, result.code());
+          activeShreds.remove(sid);
           return sid;
         }
       }
       ChuckShred shred = new ChuckShred(result.code());
+      int id = nextShredId++;
+      shred.setId(id);
+      activeShreds.put(id, shred);
       return spork(shred);
     } catch (Exception e) {
       String msg = "Machine.run error: " + e.getMessage();
-      if (logLevel >= 1) {
-        print(msg + "\n");
-        logger.log(Level.SEVERE, msg);
-      }
-      if (logLevel >= 2) {
-        logger.log(Level.SEVERE, "Machine.run stacktrace:", e);
-      }
+      print(msg + "\n");
       return -1;
     }
   }
@@ -583,7 +603,7 @@ public class ChuckVM {
   }
 
   public int spork(Runnable task) {
-    ChuckShred shred = new ChuckShred(null);
+    ChuckShred shred = new ChuckShred();
     if (shred.getId() <= 0) {
       shred.setId(nextShredId++);
     }
@@ -622,7 +642,11 @@ public class ChuckVM {
       new java.util.concurrent.atomic.AtomicLong(Long.MAX_VALUE);
 
   public long getNextWakeTime() {
-    return nextWakeTime.get();
+    long next = nextWakeTime.get();
+    for (TimeoutEntry t : pendingTimeouts) {
+      if (t.wakeTime() < next) next = t.wakeTime();
+    }
+    return next;
   }
 
   private void updateNextWakeTime() {
@@ -668,6 +692,7 @@ public class ChuckVM {
           t.event().removeWaitingShred(t.waitingShred());
           t.waitingShred().setEventWaitingOn(null);
           t.waitingShred().setWakeTime(currentTime);
+          schedule(t.waitingShred());
           t.waitingShred().resume(this);
         }
       }
@@ -688,15 +713,19 @@ public class ChuckVM {
       long currentTime = now.get();
       fireTimeouts(currentTime);
 
-      if (currentTime + 1 < nextWakeTime.get()) {
-        for (DacChannel chan : dacChannels) chan.tick(currentTime);
-        blackhole.tick(currentTime);
-        now.incrementAndGet();
-        continue;
+      long next = getNextWakeTime();
+      if (currentTime + 1 < next) {
+        long fastForward = Math.min(targetTime, next) - currentTime - 1;
+        if (fastForward > 0) {
+          for (DacChannel chan : dacChannels) chan.tickSamples(currentTime, fastForward);
+          blackhole.tickSamples(currentTime, fastForward);
+          now.addAndGet(fastForward);
+          continue;
+        }
       }
 
       int safety = 0;
-      while (safety++ < 1000) {
+      while (safety++ < 10) {
         readyShredsInternal.clear();
         shredulerLock.lock();
         try {
@@ -712,19 +741,20 @@ public class ChuckVM {
 
         if (readyShredsInternal.isEmpty()) break;
 
-        if (parallel && readyShredsInternal.size() > 1) {
-          final Phaser phaser = new Phaser(1);
-          for (ChuckShred nextShred : readyShredsInternal) {
-            updateJitter(currentTime, nextShred);
-            phaser.register();
-            nextShred.onNextPark(phaser::arriveAndDeregister);
-            nextShred.resume(this, false);
-          }
-          phaser.arriveAndAwaitAdvance();
-        } else {
-          for (ChuckShred nextShred : readyShredsInternal) {
-            updateJitter(currentTime, nextShred);
-            nextShred.resume(this, true);
+        for (ChuckShred nextShred : readyShredsInternal) {
+          updateJitter(currentTime, nextShred);
+
+          final CountDownLatch latch = new CountDownLatch(1);
+          nextShred.onNextPark(latch::countDown);
+          nextShred.resume(this, false);
+
+          try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+              print("[vm]: Timeout waiting for shred " + nextShred.getId() + " to park\n");
+            }
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            break;
           }
         }
       }

@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.tools.JavaCompiler;
@@ -16,11 +17,13 @@ import javax.tools.ToolProvider;
 import org.antlr.v4.runtime.CharStreams;
 import org.antlr.v4.runtime.CommonTokenStream;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 
 /**
  * Stress test for the ChuckToDSLConverter. Iterates through all .ck files in the samples directory,
  * translates them to Java DSL, and verifies they compile.
  */
+@Timeout(value = 60, unit = TimeUnit.SECONDS)
 public class TranslateAndCompileAllTest {
 
   @Test

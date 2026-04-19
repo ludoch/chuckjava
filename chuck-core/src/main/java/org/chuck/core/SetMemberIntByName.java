@@ -141,7 +141,8 @@ public class SetMemberIntByName implements ChuckInstr {
 
     // Push the value back so the chuck expression can be chained
     if (isObjVal) shred.reg.pushObject(valObj);
-    else shred.reg.push(doubleVal);
+    else if (isDoubleVal) shred.reg.push(doubleVal);
+    else shred.reg.push((long) doubleVal);
   }
 
   private boolean tryInvokeObj(Object obj, String setter, Object val) {
