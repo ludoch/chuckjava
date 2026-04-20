@@ -20,7 +20,7 @@ Welcome to the digital edition of the Synthstrom Audible Deluge, powered by Chuc
 
 The Deluge UI is divided into four primary interactive zones:
 
-![Hardware Overview](docs/images/hardware_overview.svg)
+![Hardware Overview](./docs/images/hardware_overview.svg)
 
 ### Transport & Modes
 *   **▶ PLAY / ■ STOP**: Controls the global transport.
@@ -30,7 +30,7 @@ The Deluge UI is divided into four primary interactive zones:
 ### The Matrix
 The heart of the Deluge. An 8-row by 16-column grid used for entering notes, launching clips, or visualizing the timeline.
 
-![Grid Transformation](docs/images/grid_transformation.svg)
+![Grid Transformation](./docs/images/grid_transformation.svg)
 
 ---
 
