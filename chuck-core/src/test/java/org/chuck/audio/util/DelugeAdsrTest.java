@@ -24,6 +24,18 @@ public class DelugeAdsrTest {
   }
 
   @Test
+  void testStartupSilence() {
+    // Should be zero on startup
+    assertEquals(0.0f, adsr.tick(1.0f), "ADSR must be silent on startup");
+    
+    adsr.keyOn();
+    assertTrue(adsr.tick(1.0f) > 0, "ADSR should produce signal after keyOn");
+    
+    adsr.forceMute();
+    assertEquals(0.0f, adsr.tick(1.0f), "ADSR must be silent after forceMute");
+  }
+
+  @Test
   void testAttackDecaySustainRelease() {
     // 100ms attack, 100ms decay, 0.5 sustain, 100ms release
     adsr.set(0.1, 0.1, 0.5, 0.1);
