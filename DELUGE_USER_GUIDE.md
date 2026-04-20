@@ -1,11 +1,11 @@
 # ChucK-Java Deluge: Complete Reference Manual
 
-Version 1.9 — April 2026 (Compatible with Production Engine v1.7)
+Version 1.10 — April 2026 (Compatible with Production Engine v1.8)
 
 ---
 
 ## 1. Introduction & Philosophy
-The ChucK-Java Deluge Emulator is a high-fidelity recreation of the Synthstrom Audible Deluge 4.1 workflow. It combines the tactile immediacy of the hardware grid with the limitless sound-generation capabilities of the ChucK programming language.
+The ChucK-Java Deluge Emulator is a high-fidelity recreation of the Synthstrom Audible Deluge 4.1 workflow. It features a unique **Dual-Engine Architecture** that allows users to choose between classic ChucK scripting and high-performance native Java synthesis.
 
 ---
 
@@ -33,16 +33,23 @@ Select a mode, then **Vertical Drag** on the grid or track label to edit.
 
 ---
 
-## 3. The Synthesis & Audio Engine (v1.7)
+## 3. The Synthesis & Audio Engines
 
-### 3.1 FM Synth Architecture
-Each Synth track uses a dual-operator FM architecture:
-*   **Carrier**: Sine/Saw Morphing oscillator.
-*   **Modulator**: Internal frequency modulator.
-*   **FM Ratio/Amount**: **Per-track** parameters for unique harmonic complexity on every voice.
+### 3.1 Dual-Engine Architecture
+The emulator supports two distinct audio processing "brains." You can toggle between them in real-time during playback.
 
-### 3.2 Dynamic Sidechaining
-Hardwired to **Track 0 (KICK)**. Every kick trigger broadcasts a `sidechain_event` which dips the synth bus volume.
+*   **Classic ChucK (🎸)**: Runs the engine via the original `engine.ck` script. Best for compatibility and rapid prototyping of new DSP logic.
+*   **Native Java DSL (🚀)**: A high-performance implementation using the ChucK-Java DSL. It leverages **Java Virtual Threads (Loom)** for voice management and modern JIT optimizations.
+
+### 3.2 Engine Controls
+*   **Toggle Engine**: Press **Ctrl + G** to swap between ChucK and Java modes.
+*   **Verification**: The console will log: `🔄 Toggling Engine Mode: JAVA DSL`.
+
+### 3.3 Voice Architecture
+Each engine provides:
+*   **8-Voice Polyphony**: Independent FM operators and filters for 8 synth tracks.
+*   **Dynamic Sidechaining**: Kick-driven ducking for the main synth bus.
+*   **Master Bus**: Serial HPF -> Compressor -> Limiter chain.
 
 ---
 
@@ -50,16 +57,12 @@ Hardwired to **Track 0 (KICK)**. Every kick trigger broadcasts a `sidechain_even
 
 ### 4.1 The Unified Asset Browser
 Click **📂 LOAD XML** in the transport row to open the searchable OLED browser.
-*   **Active Track Loading**: The browser automatically identifies your currently selected track. If it's a Synth (Rows 5-8), it shows Synth Presets; if it's a Kit (Rows 1-4), it shows Drum Kits.
-*   **Search**: Type into the search bar to instantly filter the library (e.g., "808" or "Bass").
-*   **Categories**: 
-    *   **[F] Factory**: Hundreds of bundled official Deluge sounds loaded directly from the JAR.
-    *   **[U] User**: Custom sounds saved by the user.
+*   **Active Track Loading**: The browser identifies your selected track and shows either Synth or Kit presets.
+*   **Search**: Filter the library (e.g., "TR-808") via the integrated search bar.
+*   **Categories**: **[F] Factory** (bundled) and **[U] User** (local `/presets` folder).
 
 ### 4.2 Saving Custom Sounds
-Open the **⚙ (Gear Icon)** on any Synth track and click **💾 SAVE PRESET**. 
-*   Saved files are stored in the local `/presets` folder.
-*   They will automatically appear in the Asset Browser under the **[U]** prefix.
+Open the **⚙ (Gear Icon)** and click **💾 SAVE PRESET**. Sounds are stored as Deluge-compatible XMLs in the local `/presets` folder.
 
 ---
 
@@ -67,53 +70,31 @@ Open the **⚙ (Gear Icon)** on any Synth track and click **💾 SAVE PRESET**.
 
 Click the **⚙ (Gear Icon)** on any track to access deep parameters.
 
-### **ARPEGGIATOR**
-*   **ON / OFF**: Toggle per-track melodic animation.
-*   **RATE**: Set rhythmic speed (0.25x to 4.0x).
-*   **OCTAVES**: Range of pattern (1 to 4 octaves).
-
-### **FILTER**
-*   **MODE**: LPF 12dB, LPF 24dB, HPF, BPF.
-*   **CUTOFF**: Master frequency offset.
-*   **RES (Q)**: Filter resonance intensity.
-
-### **FM SYNTHESIS**
-*   **RATIO**: Modulator frequency multiplier.
-*   **AMOUNT**: Modulation intensity (FM Index).
+*   **ARPEGGIATOR**: Per-track patterns with Rate (0.25x to 4.0x) and Octave range (1-4).
+*   **FILTER**: Multi-mode SVF with Drive and Envelope modulation.
+*   **FM SYNTHESIS**: Per-track FM Ratio and Modulation Amount (Index).
 
 ---
 
-## 6. Sequencing & Recording
+## 6. MIDI & Hardware Integration
 
-### 6.1 Step Sequencing & Play Conditions
-*   **Note Toggle**: Single left-click.
-*   **Conditionals (Iteration Dependence)**: 
-    *   Set notes to only play on specific iterations (e.g., "1 of 2").
-    *   **Logic**: Includes "PREV" (plays if previous note did) and "FILL" (plays only when ribbon FILL is held).
-
-### 6.2 Live Automation Recording
-Enable **● REC**, press **▶ PLAY**, and perform **Vertical Drags**. The engine captures movement into the sequence steps in real-time.
+*   **MIDI Follow**: Incoming notes are routed to the **active track**.
+*   **MIDI Learning**: **Right-Click** any ribbon button -> **MIDI Learn** to bind external knobs.
 
 ---
 
-## 7. MIDI & Hardware Integration
-
-Incoming MIDI notes are routed to the **active track** in the UI. Binding hardware knobs is done via **Right-Click -> MIDI Learn** on any ribbon button.
-
----
-
-## 8. Quick Reference (Popular Commands)
+## 7. Quick Reference (Popular Commands)
 
 | Category | Interaction | Function |
 | :--- | :--- | :--- |
+| **Engine** | **Ctrl + G** | **Toggle between ChucK and Java DSL Engine** |
 | **Asset** | 📂 LOAD XML | Open Searchable Asset Browser |
 | **Asset** | 💾 SAVE PRESET | Save current sound to /presets |
 | **Grid** | Left-Click Pad | Toggle Step Note On/Off |
 | **Grid** | Vertical Drag Pad | Lock Parameter Value to Step |
 | **Track** | ⚙ Gear Icon | Open OLED Sound Editor |
 | **Perform** | Hold STUTTER | Trigger High-speed Beat Repeat |
-| **Song** | Click Section A-H | Launch Entire Column (Quantized) |
 
 ---
 
-*ChucK-Java Deluge Manual — Version 1.9 — April 2026*
+*ChucK-Java Deluge Manual — Version 1.10 — April 2026*
