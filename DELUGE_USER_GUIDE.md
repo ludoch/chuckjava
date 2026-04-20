@@ -30,6 +30,7 @@ The Deluge UI is divided into three primary interactive zones: Global Controls, 
 ### Global Controls (Top Panel)
 *   **VIEW MODE (CLIP / SONG / ARR)**: Toggles the central Matrix between Step Sequencing, Clip Launching, and Timeline Arrangement.
 *   **▶ PLAY**: Starts the global transport and internal ChucK clock.
+*   **● REC**: Toggles **Automation Recording**. When active (Glows Red), vertical drags on labels or pads are recorded into the sequence at the current playhead position.
 *   **■ STOP**: Stops playback and resets the playhead to Step 0.
 *   **TEMPO (BPM)**: Adjusts the playback speed (60 to 200 BPM).
 *   **SWING (%)**: Controls the timing offset for even-numbered 16th notes. 50% is "straight" timing.
@@ -132,8 +133,19 @@ Accessed via the **ARR** toggle. Provides a linear timeline of the song structur
 
 The emulator features a professional-grade ChucK audio engine (v1.4) with advanced modulation capabilities.
 
-### Parameter Locking
-Select a parameter from the **Ribbon** (e.g., FILTER), then **Vertical Drag** on an active step to "lock" a specific value to that point in time. 
+### Parameter Locking & Automation Recording
+The emulator supports two ways to create dynamic parameter movement:
+
+1.  **Manual Parameter Lock**: 
+    *   Select a parameter from the **Ribbon** (e.g., FILTER).
+    *   **Vertical Drag** on an active (lit) step on the grid.
+    *   Drag **Up** to increase, **Down** to decrease. This "locks" the value to that specific step.
+
+2.  **Live Automation Recording**: 
+    *   Click the **● REC** button (it will glow red).
+    *   Press **▶ PLAY**.
+    *   **Vertical Drag** on a **Track Label** or any **Sequencer Pad**.
+    *   The movement is captured in real-time and written into the steps as the playhead passes them. This allows you to "perform" filter sweeps or volume swells.
 
 ### Advanced Synth Modes
 *   **FM Synthesis**: Every synth voice includes a modulator and carrier. Adjust **FM Ratio** and **Amount** for metallic, evolving textures.
