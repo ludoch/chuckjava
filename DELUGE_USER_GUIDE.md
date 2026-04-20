@@ -20,7 +20,7 @@ Welcome to the digital edition of the Synthstrom Audible Deluge, powered by Chuc
 
 The Deluge UI is divided into four primary interactive zones:
 
-![Hardware Overview](docs/images/hardware_overview.svg)
+![Hardware Overview](docs/images/ui_overview.svg)
 
 ### Transport & Modes
 *   **▶ PLAY / ■ STOP**: Controls the global transport.
