@@ -1,178 +1,132 @@
-# ChucK-Java Deluge User Guide
+# ChucK-Java Deluge: Complete Reference Manual
 
-Welcome to the digital edition of the Synthstrom Audible Deluge, powered by ChucK-Java. This application replicates the workflow and soul of the Deluge hardware within a high-performance JavaFX environment.
-
----
-
-## Table of Contents
-1. [Hardware Overview](#1-hardware-overview)
-2. [Interface Reference](#2-interface-reference)
-3. [Getting Started](#3-getting-started)
-4. [Clip View](#4-clip-view)
-5. [MIDI Support (Hardware Integration)](#5-midi-support-hardware-integration)
-6. [Song Mode](#6-song-mode)
-7. [Arranger Mode](#7-arranger-mode)
-8. [Sound Design & Advanced DSP](#8-sound-design--advanced-dsp)
-9. [Current Limitations](#9-current-limitations)
+Version 1.5 — April 2026 (Compatible with Production Engine v1.4)
 
 ---
 
-## 1. Hardware Overview
-
-The Deluge UI is divided into three primary interactive zones: Global Controls, the Matrix Grid, and the Status Bar.
-
-![UI Overview](docs/images/ui_overview.svg?v=2)
+## 1. Introduction & Philosophy
+The ChucK-Java Deluge Emulator is a high-fidelity recreation of the Synthstrom Audible Deluge 4.1 workflow. It combines the tactile immediacy of the hardware grid with the limitless sound-generation capabilities of the ChucK programming language. This manual provides a comprehensive deep-dive into the engine architecture, UI interactions, and MIDI integration.
 
 ---
 
-## 2. Interface Reference
+## 2. Interface Reference (Hardware Emulation)
 
-### Global Controls (Top Panel)
-*   **VIEW MODE (CLIP / SONG / ARR)**: Toggles the central Matrix between Step Sequencing, Clip Launching, and Timeline Arrangement.
-*   **▶ PLAY**: Starts the global transport and internal ChucK clock.
-*   **● REC**: Toggles **Automation Recording**. When active (Glows Red), vertical drags on labels or pads are recorded into the sequence at the current playhead position.
-*   **■ STOP**: Stops playback and resets the playhead to Step 0.
-*   **TEMPO (BPM)**: Adjusts the playback speed (60 to 200 BPM).
-*   **SWING (%)**: Controls the timing offset for even-numbered 16th notes. 50% is "straight" timing.
-*   **MASTER VOL**: Sets the final output gain of the ChucK audio engine.
-*   **📂 LOAD XML**: Opens a file browser to load official Deluge Synth or Kit XML presets.
+### 2.1 The Master Control Row
+Located at the very top, these controls manage the global "heartbeat" of the engine.
 
-### The Matrix Grid
-The Matrix consists of 8 tracks (rows) and 16 steps (columns).
-*   **Audition Pad (Square)**: Located on the far left of each row. Click to trigger the track's sound manually.
-*   **Track Label**: Identifies the sound (e.g., KICK, SYNTH 1). Drag vertically to adjust Track Level or Filter.
-*   **Step Cells**: 16 interactive buttons for sequencing. Active steps are lit with the track's unique color.
-*   **Playhead**: A white highlight that moves across the columns during playback.
+*   **VIEW MODE (CLIP / SONG / ARR)**:
+    *   **CLIP**: The primary 16-step sequencer.
+    *   **SONG**: The 8x8 clip launcher (64 total patterns).
+    *   **ARR**: The linear arrangement timeline.
+*   **▶ PLAY**: Starts the internal ChucK clock. The engine uses virtual time to ensure sample-accurate playback regardless of CPU load.
+*   **● REC (Automation Recording)**: When active (Red Glow), any vertical drag performance on the UI is captured into the sequence at the current playhead position.
+*   **■ STOP**: Halts playback and resets all `SndBuf` and `MorphingWavetable` phase positions.
+*   **TEMPO / SWING**: Real-time rhythmic adjustment. Swing affects the 2nd and 4th 16th-notes of every beat (delayed by the swing percentage).
+*   **MASTER VOL**: Controls the gain of the `master_shred` final limiter stage.
 
----
+### 2.2 The Parameter Ribbon (The "Gold Knobs")
+The ribbon buttons select which parameter is currently "mapped" to the grid. In the emulator, **Vertical Dragging** on a pad or label replaces the hardware's Gold Knobs.
 
-## 3. Getting Started
-
-### Playback
-Click **▶ PLAY** in the top transport panel. The playhead will begin moving across the grid. Use **■ STOP** to reset the playhead to the beginning.
-
-### Adjusting Sound
-Drag the **TEMPO** or **SWING** sliders to change the groove in real-time. The ChucK engine uses virtual time to ensure these changes are sample-accurate.
-
----
-
-## 4. Clip View
-
-Clip view is the default sequencing environment. 
-
-### Track Layout
-*   **Rows 1-4**: Drum Kit tracks (Kick, Snare, HiHat, Open Hat).
-*   **Rows 5-8**: Polyphonic Synth tracks.
-
-### Sequencing & Parameter Editing
-*   **Left Click**: Toggle a note on (Track Color) or off (Dark).
-*   **Vertical Drag (on active step)**: Dynamically adjust the value of the currently selected parameter.
-*   **Right Click**: Open the **Step Editor** popover for precise numerical entry.
-*   **Shift + Right Click (Synth only)**: Open the **Note Entry** popover to select a specific pitch.
-
----
-
-## 5. MIDI Support (Hardware Integration)
-
-The ChucK-Java Deluge features robust integration with external MIDI hardware, emulating the Deluge 4.1 "MIDI Follow" and "Learning" workflows.
-
-### Connection
-The application automatically scans and opens **all available native MIDI input ports** on startup. No configuration is necessary.
-
-### Live Playing (MIDI Keyboard)
-You can play the internal synths using an external MIDI keyboard. 
-*   **Follow Mode**: Incoming MIDI notes are routed to the **currently selected track** in the UI.
-*   **Auditioning**: Playing a note will trigger a high-quality "Live" voice in the ChucK engine, allowing you to jam alongside your sequence.
-*   **Recording**: (Coming Soon) Playing notes while the transport is running will record them into the active clip.
-
-### MIDI Learning (CC Mapping)
-Map your hardware knobs or sliders directly to Deluge parameters:
-1.  **Right-Click** any button in the **Parameter Ribbon** (e.g., FILTER, DELAY, LEVEL).
-2.  Select **"MIDI Learn"** from the context menu.
-3.  **Move a knob** on your external MIDI controller.
-4.  The parameter is now bound! Moving that knob will update the global engine value in real-time.
-
-### Comparison: Emulator vs. Hardware 4.1
-| Feature | Hardware 4.1 | ChucK-Java Emulator |
+| Button | Mode | Engineering Detail |
 | :--- | :--- | :--- |
-| **Learning** | Hold Learn + Turn Knob | Right-Click Menu + Turn Knob |
-| **Note Input** | MIDI In (DIN/USB) | Auto-detect all System MIDI Ports |
-| **Mapping** | Persistent in XML | Session-based (Saving coming soon) |
-| **MPE** | Supported | Basic Note + Velocity only |
-| **MIDI Follow** | Optional | Always On (Active track receives MIDI) |
+| **LEVEL / VELO** | Level/Velocity | Controls `env.gain` (Synth) or `SndBuf.gain` (Kit). Scales with Master Level. |
+| **PAN** | Panning | Controls `Pan2.pan`. Smoothed via linear interpolation. |
+| **PITCH** | Pitch | Synth: `MorphingWavetable.freq`. Kit: `SndBuf.rate` (resampling pitch). |
+| **FILTER** | Cutoff | Offset for the `SVFilter.freq`. Range: 20Hz - 20,000Hz. |
+| **RESONANCE** | Resonance (Q) | Offset for `SVFilter.Q`. Range: 1.0 (flat) - 10.0 (whistling). |
+| **MOD FX** | Mod Amount | Controls the `Chorus.modDepth` of the global MOD bus. |
+| **DELAY** | Delay Send | Post-fader send to the `Echo` bus in `fx_bus_shred`. |
+| **REVERB** | Reverb Send | Post-fader send to the `JCRev` bus in `fx_bus_shred`. |
+| **STUTTER** | Stutter Trigger | Momentary trigger. Halts `g_current_step` increment and triggers 1/32 repeats. |
+| **GATE** | Note Length | Determines the `keyOff` timing. Visualized via dashed borders. |
+| **PROB** | Probability | A dice roll (0.0-1.0) compared against the step value at every trigger. |
+| **START/END** | Sample Range | Offsets the `SndBuf.pos` and monitors playback end in real-time. |
 
 ---
 
-## 6. Song Mode
+## 3. The Synthesis & Audio Engine (v1.4)
 
-Accessed via the **SONG** toggle. The matrix transforms into a **Clip Launcher** grid (8 tracks x 8 slots).
+### 3.1 FM Synth Architecture
+Each of the 4 Synth tracks (Rows 5-8) uses a dual-operator FM architecture:
+*   **Carrier**: A `MorphingWavetable` (interpolating between Sine and Saw).
+*   **Modulator**: A `MorphingWavetable` that modulates the Carrier's frequency.
+*   **FM Ratio**: Controlled via the global `g_fm_ratio`.
+*   **FM Amount**: Controlled via `g_fm_amount` (also known as FM Index).
 
-### Clip Library & Persistent Patterns
-Unlike standard sequencers, the Deluge Emulator stores up to **64 unique clips** (8 per track). 
-*   **Active Clip**: In Clip View, you are always editing the "active" clip for each track.
-*   **Automatic Sync**: Any changes you make in Clip View (adding notes, dragging velocity) are **automatically saved** into the corresponding slot in the Clip Library.
+### 3.2 Dynamic Sidechaining
+The emulator features a "Ghost Sidechain" hardwired to **Track 0 (KICK)**.
+*   Whenever a note is triggered on Track 0, a `sidechain_event` is broadcast.
+*   The `sidechain_shred` catches this event and applies a rapid volume dip to the `g_synth_bus` (Synths 1-4).
+*   **Recovery**: The recovery time is fixed at 100ms for a classic "pumping" electronic feel.
 
-### Launching Clips
-*   **Queueing**: Click a colored block in the Song Mode grid to queue that pattern. The cell will turn **Yellow** (Queued).
-*   **Quantized Launch**: The pattern will wait until the **next 1 bar boundary** (Step 16) to start.
-*   **Playing**: Once launched, the cell turns **Green** (Playing) and the sequencer grid in Clip View is automatically updated with the new pattern data.
-*   **Section Launch**: Click the letters (A, B, C...) in the top **Section Bar** to launch an entire column of clips simultaneously.
-
-### Stopping Clips
-*   Click an active (Green) clip to queue it to stop. It will return to its "Filled" state at the end of the bar.
-
----
-
-## 7. Arranger Mode
-
-Accessed via the **ARR** toggle. Provides a linear timeline of the song structure. Use this to record your clip-launching performance into a permanent arrangement.
+### 3.3 Master Signal Chain
+The final audio output is processed through a high-fidelity serial chain:
+`Synth/Kit Buses` → `HPF (20Hz)` → `Compressor (Dyno)` → `Limiter (Dyno)` → `Safety Gate` → `DAC`.
 
 ---
 
-## 8. Sound Design & Advanced DSP
+## 4. Sequencing Workflow
 
-The emulator features a professional-grade ChucK audio engine (v1.4) with advanced modulation capabilities.
+### 4.1 Step Sequencing (Clip View)
+*   **Note Toggle**: Single left-click on any grid cell.
+*   **Numerical Edit**: Right-click any cell to open the **Step Editor**. This allows precise 0-127 MIDI-style value entry for Velocity and Gate.
+*   **Melodic Entry**: On Synth tracks, **Shift + Right-Click** opens the **Note Entry** popover.
+    *   **Scale Folding**: If a Scale (e.g., Minor) is selected in the Transport Panel, out-of-key notes are automatically dimmed and disabled.
+    *   **Octave Control**: Use the ◄/► buttons to shift the grid range.
 
-### Parameter Locking & Automation Recording
-The emulator supports two ways to create dynamic parameter movement:
-
-1.  **Manual Parameter Lock**: 
-    *   Select a parameter from the **Ribbon** (e.g., FILTER).
-    *   **Vertical Drag** on an active (lit) step on the grid.
-    *   Drag **Up** to increase, **Down** to decrease. This "locks" the value to that specific step.
-
-2.  **Live Automation Recording**: 
-    *   Click the **● REC** button (it will glow red).
-    *   Press **▶ PLAY**.
-    *   **Vertical Drag** on a **Track Label** or any **Sequencer Pad**.
-    *   The movement is captured in real-time and written into the steps as the playhead passes them. This allows you to "perform" filter sweeps or volume swells.
-
-### Advanced Synth Modes
-*   **FM Synthesis**: Every synth voice includes a modulator and carrier. Adjust **FM Ratio** and **Amount** for metallic, evolving textures.
-*   **Sidechain Ducking**: The **Kick** drum (Track 0) is hardwired to a sidechain bus. Synths will automatically "duck" when the kick triggers, creating dynamic rhythmic movement.
-*   **Interpolation**: Parameter locks (like Filter sweeps) are **automatically smoothed** using linear interpolation, preventing clicks and "steppiness."
-
-### Global Master Chain
-The final output passes through a high-quality serial chain:
-1.  **HPF**: Removes infra-sonic mud below 20Hz.
-2.  **Compressor**: User-adjustable threshold via the **LEVEL** learn mapping.
-3.  **Limiter**: Prevents digital clipping.
-4.  **Safety Gate**: Ensures zero noise when the transport is stopped.
+### 4.2 Song Mode & Clip Library
+Song Mode provides a high-level view of your project's **64 available clips**.
+*   **Organization**: 8 tracks (rows) x 8 slots (columns A-H).
+*   **Launch Quantization**: Clips always launch on the **next bar boundary** (Step 16).
+*   **Section Launching**: Clicking the **Section Bar** (letters A-H) will queue all clips in that vertical column. This is equivalent to "launching a scene" in Ableton Live.
+*   **Persistence**: The emulator maintains a live "Shadow Copy" of all clips. Swapping clips in Song Mode instantly updates the Sequencer Grid with the new data.
 
 ---
 
-## 9. Current Limitations
+## 5. MIDI & Hardware Integration
 
-| Hardware Feature | Current Status | Workaround / Detail |
+The emulator replicates the Deluge 4.1 "MIDI Follow" behavior.
+
+### 5.1 MIDI Input Routing
+*   **Auto-Detection**: On startup, the app opens **all** native MIDI input ports.
+*   **Follow Active Track**: Any incoming MIDI Note-On/Off is routed to the **currently selected track** in the UI.
+*   **Live Performance**: Incoming notes trigger a high-quality "Live Voice" in the engine, which is mixed with the sequenced synth output.
+
+### 5.2 MIDI Learning (CC Mapping)
+You can bind external MIDI knobs to any global parameter:
+1.  **Right-Click** a parameter button in the ribbon (e.g., **FILTER**).
+2.  Select **"MIDI Learn"**.
+3.  Move the knob on your hardware controller.
+4.  **Verification**: The console will log: `MIDI LEARN: CC [num] -> g_filter`.
+
+---
+
+## 6. Project Management
+
+### 6.1 Loading Official Presets
+The app features an **official Deluge XML Parser**. 
+*   Click **📂 LOAD XML** to import files from a Deluge SD card.
+*   **Synths**: Maps `<osc1><type>`, `<filter><type>`, and `<env1>` parameters.
+*   **Kits**: Maps `<sample><fileName>` and `<row><pitch>` data.
+
+### 6.2 Saving & Persistence
+*   **Auto-Save**: The app automatically saves your current Clip Library to the internal `preferences.json` on exit.
+*   **Export**: (Under Development) Support for exporting 16-step patterns back to Deluge XML format.
+
+---
+
+## 7. Comparison with Hardware 4.1
+
+| Feature | Deluge Hardware | ChucK-Java Emulator |
 | :--- | :--- | :--- |
-| **Polyphony** | 4 Voices | Total voices across synth tracks. |
-| **Automation Rec** | Planned | Manual parameter locking only. |
-| **Sampling** | Static | Internal wav samples only; no live line-in sampling. |
-| **Resampling** | Not Possible | Use external system recording. |
-| **Unison** | Not Possible | Single voice per synth track. |
-| **Undo / Redo** | Model only | Logic exists in code but lacks UI buttons. |
-| **Midi Out** | Experimental | Basic routing available in bridge. |
+| **Grid** | 128 (8x16) RGB Pads | 128 (8x16) JavaFX Pads |
+| **Knobs** | 2 Gold, 2 Silver | Vertical Dragging (Simulated) |
+| **Polyphony** | Limited by CPU | 4 Voices (Strict Virtual Time) |
+| **Audio Quality** | 24-bit / 44.1kHz | 32-bit Floating Point / 44.1kHz |
+| **Synthesis** | Subtractive, FM, Multi | Subtractive (v1.1), FM (v1.3) |
+| **Sampling** | Live Line-In / Mic | File-based `.wav` loading |
+| **Song Mode** | Unlimited Scenes | 8 Sections (A-H) |
 
 ---
 
-*Manual version 1.3 — April 2026*
+*ChucK-Java Deluge Manual — Version 1.5 — April 2026*
