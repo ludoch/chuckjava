@@ -5,12 +5,18 @@ import static org.chuck.audio.VectorAudio.SPECIES;
 import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 
-/** A resonance filter. Adapted from SuperCollider's ResonZ via ChucK. */
+/**
+ * A resonance filter. Adapted from SuperCollider's ResonZ via ChucK. Uses double precision
+ * internally to prevent limit cycles.
+ */
 public class ResonZ extends ChuckUGen {
   private float freq = 220.0f;
   private float Q = 1.0f;
-  private float a0, b1, b2;
-  private float y1, y2;
+
+  // Filter coefficients and state (using double for precision)
+  private double a0, b1, b2;
+  private double y1, y2;
+
   private final float sampleRate;
 
   public ResonZ(float sampleRate) {
@@ -30,9 +36,9 @@ public class ResonZ extends ChuckUGen {
     double R22 = R * R;
     double cost = (R2 * Math.cos(pfreq)) / (1.0 + R22);
 
-    this.b1 = (float) (R2 * cost);
-    this.b2 = (float) (-R22);
-    this.a0 = (float) ((1.0 - R22) * 0.5);
+    this.b1 = R2 * cost;
+    this.b2 = -R22;
+    this.a0 = (1.0 - R22) * 0.5;
   }
 
   public void setFreq(float freq) {
@@ -74,13 +80,13 @@ public class ResonZ extends ChuckUGen {
       if (buffer != null) System.arraycopy(buffer, offset, inputSum, 0, length);
     }
 
-    // 2. Apply filter (recursive, scalar)
+    // 2. Apply filter (recursive, scalar, using double state)
     for (int i = 0; i < length; i++) {
-      float y0 = inputSum[i] + b1 * y1 + b2 * y2;
-      float result = a0 * (y0 - y2);
+      double y0 = inputSum[i] + b1 * y1 + b2 * y2;
+      double result = a0 * (y0 - y2);
       y2 = y1;
       y1 = y0;
-      blockCache[i] = result;
+      blockCache[i] = (float) result * gain;
       if (buffer != null) buffer[offset + i] = blockCache[i];
     }
 
@@ -92,10 +98,10 @@ public class ResonZ extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
-    float y0 = input + b1 * y1 + b2 * y2;
-    float result = a0 * (y0 - y2);
+    double y0 = input + b1 * y1 + b2 * y2;
+    double result = a0 * (y0 - y2);
     y2 = y1;
     y1 = y0;
-    return result;
+    return (float) result;
   }
 }

@@ -2,7 +2,9 @@ package org.chuck.audio.fx;
 
 import org.chuck.audio.ChuckUGen;
 
-/** A comb filter UGen. Adapted from STK. Uses double precision internally to prevent limit cycles. */
+/**
+ * A comb filter UGen. Adapted from STK. Uses double precision internally to prevent limit cycles.
+ */
 public class Comb extends ChuckUGen {
   private final double[] buffer;
   private int writePos = 0;

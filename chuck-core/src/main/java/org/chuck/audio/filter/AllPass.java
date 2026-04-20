@@ -5,7 +5,10 @@ import static org.chuck.audio.VectorAudio.SPECIES;
 import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 
-/** An all-pass filter UGen. Adapted from STK. Uses double precision internally to prevent limit cycles. */
+/**
+ * An all-pass filter UGen. Adapted from STK. Uses double precision internally to prevent limit
+ * cycles.
+ */
 public class AllPass extends ChuckUGen {
   private final double[] buffer;
   private int writePos = 0;

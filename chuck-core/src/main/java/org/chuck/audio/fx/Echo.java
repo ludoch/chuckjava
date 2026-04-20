@@ -15,6 +15,10 @@ public class Echo extends StereoUGen {
   private double lastWetR = 0.0;
   private final float sampleRate;
 
+  public Echo() {
+    this(44100, 44100.0f);
+  }
+
   public Echo(int maxDelaySamples) {
     this(maxDelaySamples, 44100.0f);
   }

@@ -7,6 +7,7 @@ import org.chuck.audio.ChuckUGen;
 
 /** A specialized UGen for DAC channels that supports vectorized summing. */
 public class DacChannel extends ChuckUGen {
+  public static volatile boolean DEBUG_AUDIO = false;
   private final int channelIndex;
 
   public DacChannel(int channelIndex) {
@@ -62,6 +63,9 @@ public class DacChannel extends ChuckUGen {
       if (!Float.isFinite(sum)) sum = 0.0f;
 
       lastOut = sum * gain;
+      if (DEBUG_AUDIO && Math.abs(lastOut) > 0.0001f) {
+        System.out.printf("[DAC-%d] Non-zero sample: %f\n", channelIndex, lastOut);
+      }
       lastTickTime = systemTime;
       blockStartTime = systemTime;
       blockLength = 0; // Scalar tick resets block window
@@ -104,8 +108,14 @@ public class DacChannel extends ChuckUGen {
 
     // Apply local gain and master gain, then write to outSeg
     float totalGain = gain * masterGain;
+    boolean foundSignal = false;
+    float maxAbs = 0;
     for (int i = 0; i < length; i++) {
       float sample = block[i] * totalGain;
+      if (Math.abs(sample) > 0.0001f) {
+        foundSignal = true;
+        maxAbs = Math.max(maxAbs, Math.abs(sample));
+      }
       short s16 = (short) (Math.max(-1f, Math.min(1f, sample)) * 32767f);
 
       // Fill visualization buffer
@@ -124,6 +134,10 @@ public class DacChannel extends ChuckUGen {
         lastOut = sample;
         lastTickTime = systemTime + length - 1;
       }
+    }
+    if (DEBUG_AUDIO && foundSignal) {
+      System.out.printf(
+          "[DAC-%d] Signal detected! Max abs: %f (length: %d)\n", channelIndex, maxAbs, length);
     }
   }
 

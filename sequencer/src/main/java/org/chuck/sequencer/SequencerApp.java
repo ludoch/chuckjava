@@ -131,6 +131,15 @@ public class SequencerApp extends Application {
     Button loadBtn = new Button("📂 Load...");
     loadBtn.setOnAction(e -> sequencerPanel.loadPattern());
 
+    Button debugBtn = new Button("🐞 DAC Debug: OFF");
+    debugBtn.setOnAction(
+        e -> {
+          org.chuck.audio.util.DacChannel.DEBUG_AUDIO =
+              !org.chuck.audio.util.DacChannel.DEBUG_AUDIO;
+          debugBtn.setText(
+              "🐞 DAC Debug: " + (org.chuck.audio.util.DacChannel.DEBUG_AUDIO ? "ON" : "OFF"));
+        });
+
     Button quitBtn = new Button("❌ Quit");
     quitBtn.setOnAction(e -> shutdown());
 
@@ -145,6 +154,8 @@ public class SequencerApp extends Application {
             new Separator(Orientation.VERTICAL),
             saveBtn,
             loadBtn,
+            new Separator(Orientation.VERTICAL),
+            debugBtn,
             new Separator(Orientation.VERTICAL),
             quitBtn);
 
