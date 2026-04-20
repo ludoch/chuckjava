@@ -21,7 +21,7 @@ Welcome to the digital edition of the Synthstrom Audible Deluge, powered by Chuc
 
 The Deluge UI is divided into three primary interactive zones: Global Controls, the Matrix Grid, and the Status Bar.
 
-![UI Overview](docs/images/ui_overview.svg)
+![UI Overview](docs/images/ui_overview.svg?v=2)
 
 ---
 
@@ -80,7 +80,7 @@ Clip view is the default sequencing environment.
 
 Accessed via the **SONG** toggle. The matrix transforms into a **Clip Launcher**.
 
-![Grid Transformation](docs/images/grid_transformation.svg)
+![Grid Transformation](docs/images/grid_transformation.svg?v=2)
 
 ### Launching Clips
 *   Click a colored block to queue a clip. It will flash until the next bar boundary, then stay lit while playing.
