@@ -98,8 +98,13 @@ public class HPF extends ChuckUGen {
       y1 = y0;
       if (Math.abs(y1) < 1.0e-15) y1 = 0.0;
       if (Math.abs(y2) < 1.0e-15) y2 = 0.0;
-      blockCache[i] = (float) y0;
-      if (buffer != null) buffer[offset + i] = blockCache[i];
+
+      float out = (float) y0;
+      if (out > 2.0f) out = 2.0f;
+      if (out < -2.0f) out = -2.0f;
+
+      blockCache[i] = out;
+      if (buffer != null) buffer[offset + i] = out;
     }
 
     blockStartTime = systemTime;
@@ -118,6 +123,10 @@ public class HPF extends ChuckUGen {
     y1 = y0;
     if (Math.abs(y1) < 1.0e-15) y1 = 0.0;
     if (Math.abs(y2) < 1.0e-15) y2 = 0.0;
-    return (float) y0;
+
+    float out = (float) y0;
+    if (out > 2.0f) out = 2.0f;
+    if (out < -2.0f) out = -2.0f;
+    return out;
   }
 }

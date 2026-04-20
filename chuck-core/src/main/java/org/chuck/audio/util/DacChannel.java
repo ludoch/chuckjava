@@ -14,6 +14,11 @@ public class DacChannel extends ChuckUGen {
     this.channelIndex = channelIndex;
   }
 
+  public void reset() {
+    lastOut = 0.0f;
+    java.util.Arrays.fill(visBuffer, 0.0f);
+  }
+
   @Override
   public float getChannelLastOut(int i) {
     if (i == channelIndex) return lastOut;
@@ -66,6 +71,10 @@ public class DacChannel extends ChuckUGen {
       if (!Float.isFinite(sum)) sum = 0.0f;
 
       lastOut = sum * gain;
+      // FOOLPROOF SAFETY CLAMP: Final DAC output MUST be in [-1, 1]
+      if (lastOut > 1.0f) lastOut = 1.0f;
+      if (lastOut < -1.0f) lastOut = -1.0f;
+
       if (DEBUG_AUDIO && Math.abs(lastOut) > 0.0001f) {
         System.out.printf("[DAC-%d] Non-zero sample: %f\n", channelIndex, lastOut);
       }
@@ -115,6 +124,10 @@ public class DacChannel extends ChuckUGen {
     float maxAbs = 0;
     for (int i = 0; i < length; i++) {
       float sample = block[i] * totalGain;
+      // FOOLPROOF SAFETY CLAMP: Final DAC output MUST be in [-1, 1]
+      if (sample > 1.0f) sample = 1.0f;
+      if (sample < -1.0f) sample = -1.0f;
+
       if (Math.abs(sample) > 0.0001f) {
         foundSignal = true;
         maxAbs = Math.max(maxAbs, Math.abs(sample));

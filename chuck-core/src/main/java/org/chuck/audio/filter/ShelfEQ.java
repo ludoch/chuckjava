@@ -168,12 +168,17 @@ public class ShelfEQ extends ChuckUGen {
       t_lx1 = in;
       t_ly2 = t_ly1;
       t_ly1 = lOut;
+      if (Math.abs(t_ly1) < 1.0e-15) t_ly1 = 0.0;
+      if (Math.abs(t_ly2) < 1.0e-15) t_ly2 = 0.0;
 
       // Process High Shelf
       double hOut = hb0 * lOut + hb1 * t_hx1 + hb2 * t_hx2 - ha1 * t_hy1 - ha2 * t_hy2;
+      t_hx2 = t_hx1;
       t_hx1 = lOut;
       t_hy2 = t_hy1;
       t_hy1 = hOut;
+      if (Math.abs(t_hy1) < 1.0e-15) t_hy1 = 0.0;
+      if (Math.abs(t_hy2) < 1.0e-15) t_hy2 = 0.0;
 
       // Anti-denormal flush and safety clamp
       if (Math.abs(hOut) < 1.0e-15) hOut = 0.0;

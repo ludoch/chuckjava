@@ -138,14 +138,25 @@ public class DelugeAdsr extends ChuckUGen {
     return keyOn();
   }
 
-  public int keyOff() {
+  public void keyOff() {
     target = 0.0;
     state = RELEASE;
-    return 1;
   }
 
   public int keyOff(int ignored) {
-    return keyOff();
+    keyOff();
+    return 1;
+  }
+
+  public void forceMute() {
+    state = IDLE;
+    value = 0.0;
+    target = 0.0;
+  }
+
+  public int forceMute(int ignored) {
+    forceMute();
+    return 1;
   }
 
   public int fastRelease() {
@@ -203,6 +214,8 @@ public class DelugeAdsr extends ChuckUGen {
     }
 
     // Apply envelope to input
-    return (float) (input * value);
+    float out = (float) (input * value);
+    if (Math.abs(out) < 1.0e-15f) out = 0.0f;
+    return out;
   }
 }

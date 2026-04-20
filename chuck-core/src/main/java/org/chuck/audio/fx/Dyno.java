@@ -67,7 +67,12 @@ public class Dyno extends ChuckUGen {
       }
     }
 
-    return input * gainReduction * externalGain;
+    float out = input * gainReduction * externalGain;
+    // Hard safety clamp for limiter mode: never exceed thresh * 2.0 (headroom)
+    if (mode == LIMITER && Math.abs(out) > thresh * 2.0f) {
+      out = Math.signum(out) * thresh * 2.0f;
+    }
+    return out;
   }
 
   // --- Properties ---

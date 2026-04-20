@@ -69,6 +69,12 @@ public abstract class ChuckUGen extends ChuckObject {
   @SuppressWarnings("unused") // Used via introspection in ChucK scripts
   public float gain = 1.0f;
 
+  public void setGain(float gain) {
+    // Safety: Never allow gain > 1.0 in this environment to prevent re-amplification of noise
+    if (gain > 1.0f) gain = 1.0f;
+    this.gain = gain;
+  }
+
   protected long lastTickTime = -1;
   protected boolean isTicking = false;
 
@@ -256,6 +262,9 @@ public abstract class ChuckUGen extends ChuckObject {
 
       lastOut = compute(sum, systemTime) * gain;
       if (Math.abs(lastOut) < 1.0e-15f) lastOut = 0.0f;
+      // Safety clamp for intermediate UGens: Allow some headroom
+      if (lastOut > 4.0f) lastOut = 4.0f;
+      if (lastOut < -4.0f) lastOut = -4.0f;
       lastTickTime = systemTime;
       blockStartTime = systemTime;
       blockLength = 0; // When computing scalar, reset block window to prevent stale cache hits
@@ -302,14 +311,12 @@ public abstract class ChuckUGen extends ChuckObject {
   public double next(double val) {
     lastOut = compute((float) val, -1) * gain;
     if (Math.abs(lastOut) < 1.0e-15f) lastOut = 0.0f;
+    if (lastOut > 4.0f) lastOut = 4.0f;
+    if (lastOut < -4.0f) lastOut = -4.0f;
     return val;
   }
 
   protected abstract float compute(float input, long systemTime);
-
-  public void setGain(float gain) {
-    this.gain = gain;
-  }
 
   public float getGain() {
     return gain;
@@ -317,7 +324,7 @@ public abstract class ChuckUGen extends ChuckObject {
 
   /** ChucK-style gain(val) setter — called as p.gain(0.5) */
   public double gain(double val) {
-    this.gain = (float) val;
+    setGain((float) val);
     return val;
   }
 
@@ -447,7 +454,9 @@ public abstract class ChuckUGen extends ChuckObject {
       } else {
         out = tick(systemTime == -1 ? -1 : systemTime + i);
       }
-      // Note: out is already flushed inside tick(systemTime) or tick(in, systemTime)
+      // Safety clamp for intermediate UGens: Allow some headroom
+      if (out > 4.0f) out = 4.0f;
+      if (out < -4.0f) out = -4.0f;
       blockCache[i] = out;
       if (buffer != null) buffer[offset + i] = out;
     }

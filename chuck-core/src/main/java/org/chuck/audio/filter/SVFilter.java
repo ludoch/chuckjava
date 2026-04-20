@@ -122,10 +122,13 @@ public class SVFilter extends ChuckUGen {
 
         double lp = l_ic2eq + g * bp;
 
-        l_ic1eq = 2.0 * bp - l_ic1eq;
-        l_ic2eq = 2.0 * lp - l_ic2eq;
+        ic1eq = 2.0 * bp - ic1eq;
+        ic2eq = 2.0 * lp - ic2eq;
+        if (Math.abs(ic1eq) < 1.0e-15) ic1eq = 0.0;
+        if (Math.abs(ic2eq) < 1.0e-15) ic2eq = 0.0;
 
         if (step == 1) { // Take output on the second step
+
           out = cLow * lp + cBand * bp + cHigh * hp;
         }
       }
