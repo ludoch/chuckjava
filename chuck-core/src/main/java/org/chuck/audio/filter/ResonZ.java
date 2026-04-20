@@ -31,12 +31,10 @@ public class ResonZ extends ChuckUGen {
     double radiansPerSample = 2.0 * Math.PI / sampleRate;
     double pfreq = freq * radiansPerSample;
     double B = pfreq / Q;
-    double R = 1.0 - B * 0.5;
-    double R2 = 2.0 * R;
+    double R = Math.exp(-B * 0.5);
     double R22 = R * R;
-    double cost = (R2 * Math.cos(pfreq)) / (1.0 + R22);
 
-    this.b1 = R2 * cost;
+    this.b1 = 2.0 * R * Math.cos(pfreq);
     this.b2 = -R22;
     this.a0 = (1.0 - R22) * 0.5;
   }

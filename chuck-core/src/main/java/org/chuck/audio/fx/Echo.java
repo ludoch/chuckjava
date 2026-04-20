@@ -25,6 +25,7 @@ public class Echo extends StereoUGen {
 
   public Echo(int maxDelaySamples, float sampleRate) {
     super();
+    this.gain = 0.0f; // Default feedback to 0
     this.sampleRate = sampleRate;
     this.delayL = new Delay(maxDelaySamples, sampleRate, false);
     this.delayR = new Delay(maxDelaySamples, sampleRate, false);

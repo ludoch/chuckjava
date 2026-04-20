@@ -245,6 +245,7 @@ public abstract class ChuckUGen extends ChuckObject {
       }
 
       lastOut = compute(sum, systemTime) * gain;
+      if (Math.abs(lastOut) < 1.0e-15f) lastOut = 0.0f;
       lastTickTime = systemTime;
       blockStartTime = systemTime;
       blockLength = 0; // When computing scalar, reset block window to prevent stale cache hits
@@ -290,6 +291,7 @@ public abstract class ChuckUGen extends ChuckObject {
   /** ChucK-style: ugen.next(val) sets manual input for this tick */
   public double next(double val) {
     lastOut = compute((float) val, -1) * gain;
+    if (Math.abs(lastOut) < 1.0e-15f) lastOut = 0.0f;
     return val;
   }
 
@@ -435,7 +437,7 @@ public abstract class ChuckUGen extends ChuckObject {
       } else {
         out = tick(systemTime == -1 ? -1 : systemTime + i);
       }
-      if (Math.abs(out) < 1.0e-15f) out = 0.0f;
+      // Note: out is already flushed inside tick(systemTime) or tick(in, systemTime)
       blockCache[i] = out;
       if (buffer != null) buffer[offset + i] = out;
     }
