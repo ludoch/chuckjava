@@ -280,6 +280,7 @@ public abstract class ChuckUGen extends ChuckObject {
     }
 
     lastOut = compute(manualInput, systemTime) * gain;
+    if (Math.abs(lastOut) < 1.0e-15f) lastOut = 0.0f;
     lastTickTime = systemTime;
     blockStartTime = systemTime;
     blockLength = 0;
@@ -434,10 +435,9 @@ public abstract class ChuckUGen extends ChuckObject {
       } else {
         out = tick(systemTime == -1 ? -1 : systemTime + i);
       }
+      if (Math.abs(out) < 1.0e-15f) out = 0.0f;
       blockCache[i] = out;
-      if (buffer != null) {
-        buffer[offset + i] = out;
-      }
+      if (buffer != null) buffer[offset + i] = out;
     }
 
     blockStartTime = systemTime;

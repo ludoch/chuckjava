@@ -70,6 +70,7 @@ public abstract class MultiChannelUGen extends ChuckUGen {
       // 5. Apply gain to all channels and set master lastOut
       for (int i = 0; i < lastOutChannels.length; i++) {
         lastOutChannels[i] *= gain;
+        if (Math.abs(lastOutChannels[i]) < 1.0e-15f) lastOutChannels[i] = 0.0f;
       }
       lastOut = lastOutChannels.length > 0 ? lastOutChannels[0] : 0.0f;
 
