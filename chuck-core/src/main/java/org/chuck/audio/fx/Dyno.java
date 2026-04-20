@@ -50,12 +50,14 @@ public class Dyno extends ChuckUGen {
     else coeff = (float) Math.exp(-1.0 / (sampleRate * releaseTime));
 
     envelope = coeff * envelope + (1.0f - coeff) * target;
+    if (envelope < 1.0e-15f) envelope = 0.0f;
 
     float gainReduction = 1.0f;
     if (mode == COMPRESSOR || mode == LIMITER) {
+      float activeRatio = (mode == LIMITER && ratio <= 1.0f) ? 10.0f : ratio;
       if (envelope > thresh) {
         float over = envelope / thresh;
-        gainReduction = (float) Math.pow(over, (1.0 / ratio) - 1.0);
+        gainReduction = (float) Math.pow(over, (1.0 / activeRatio) - 1.0);
       }
     } else if (mode == EXPANDER || mode == GATE) {
       if (envelope < thresh) {

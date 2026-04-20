@@ -96,6 +96,8 @@ public class HPF extends ChuckUGen {
       x1 = x0;
       y2 = y1;
       y1 = y0;
+      if (Math.abs(y1) < 1.0e-15) y1 = 0.0;
+      if (Math.abs(y2) < 1.0e-15) y2 = 0.0;
       blockCache[i] = (float) y0;
       if (buffer != null) buffer[offset + i] = blockCache[i];
     }
@@ -114,6 +116,8 @@ public class HPF extends ChuckUGen {
     x1 = x0;
     y2 = y1;
     y1 = y0;
+    if (Math.abs(y1) < 1.0e-15) y1 = 0.0;
+    if (Math.abs(y2) < 1.0e-15) y2 = 0.0;
     return (float) y0;
   }
 }
