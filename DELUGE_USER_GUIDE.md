@@ -1,132 +1,154 @@
 # ChucK-Java Deluge: Complete Reference Manual
 
-Version 1.5 — April 2026 (Compatible with Production Engine v1.4)
+Version 1.8 — April 2026 (Compatible with Production Engine v1.5)
 
 ---
 
 ## 1. Introduction & Philosophy
-The ChucK-Java Deluge Emulator is a high-fidelity recreation of the Synthstrom Audible Deluge 4.1 workflow. It combines the tactile immediacy of the hardware grid with the limitless sound-generation capabilities of the ChucK programming language. This manual provides a comprehensive deep-dive into the engine architecture, UI interactions, and MIDI integration.
+The ChucK-Java Deluge Emulator is a high-fidelity recreation of the Synthstrom Audible Deluge 4.1 workflow. It combines the tactile immediacy of the hardware grid with the limitless sound-generation capabilities of the ChucK programming language.
 
 ---
 
 ## 2. Interface Reference (Hardware Emulation)
 
 ### 2.1 The Master Control Row
-Located at the very top, these controls manage the global "heartbeat" of the engine.
+*   **VIEW MODE (CLIP / SONG / ARR)**: Toggle between Sequencer, Launcher, and Timeline.
+*   **▶ PLAY**: Starts the internal ChucK clock (Sample-Accurate).
+*   **● REC**: Toggles Automation Recording.
+*   **TEMPO / SWING**: Global rhythmic adjustment.
 
-*   **VIEW MODE (CLIP / SONG / ARR)**:
-    *   **CLIP**: The primary 16-step sequencer.
-    *   **SONG**: The 8x8 clip launcher (64 total patterns).
-    *   **ARR**: The linear arrangement timeline.
-*   **▶ PLAY**: Starts the internal ChucK clock. The engine uses virtual time to ensure sample-accurate playback regardless of CPU load.
-*   **● REC (Automation Recording)**: When active (Red Glow), any vertical drag performance on the UI is captured into the sequence at the current playhead position.
-*   **■ STOP**: Halts playback and resets all `SndBuf` and `MorphingWavetable` phase positions.
-*   **TEMPO / SWING**: Real-time rhythmic adjustment. Swing affects the 2nd and 4th 16th-notes of every beat (delayed by the swing percentage).
-*   **MASTER VOL**: Controls the gain of the `master_shred` final limiter stage.
+### 2.2 The Parameter Ribbon (Simulated Gold Knobs)
+Select a mode, then **Vertical Drag** on the grid or track label to edit.
 
-### 2.2 The Parameter Ribbon (The "Gold Knobs")
-The ribbon buttons select which parameter is currently "mapped" to the grid. In the emulator, **Vertical Dragging** on a pad or label replaces the hardware's Gold Knobs.
-
-| Button | Mode | Engineering Detail |
+| Button | Mode | ChucK Hookup |
 | :--- | :--- | :--- |
-| **LEVEL / VELO** | Level/Velocity | Controls `env.gain` (Synth) or `SndBuf.gain` (Kit). Scales with Master Level. |
-| **PAN** | Panning | Controls `Pan2.pan`. Smoothed via linear interpolation. |
-| **PITCH** | Pitch | Synth: `MorphingWavetable.freq`. Kit: `SndBuf.rate` (resampling pitch). |
-| **FILTER** | Cutoff | Offset for the `SVFilter.freq`. Range: 20Hz - 20,000Hz. |
-| **RESONANCE** | Resonance (Q) | Offset for `SVFilter.Q`. Range: 1.0 (flat) - 10.0 (whistling). |
-| **MOD FX** | Mod Amount | Controls the `Chorus.modDepth` of the global MOD bus. |
-| **DELAY** | Delay Send | Post-fader send to the `Echo` bus in `fx_bus_shred`. |
-| **REVERB** | Reverb Send | Post-fader send to the `JCRev` bus in `fx_bus_shred`. |
-| **STUTTER** | Stutter Trigger | Momentary trigger. Halts `g_current_step` increment and triggers 1/32 repeats. |
-| **GATE** | Note Length | Determines the `keyOff` timing. Visualized via dashed borders. |
-| **PROB** | Probability | A dice roll (0.0-1.0) compared against the step value at every trigger. |
-| **START/END** | Sample Range | Offsets the `SndBuf.pos` and monitors playback end in real-time. |
+| **LEVEL / VELO** | Level/Velocity | `env.gain` / `SndBuf.gain` |
+| **PAN** | Panning | `Pan2.pan` (Interpolated) |
+| **PITCH** | Pitch | `Wavetable.freq` |
+| **FILTER** | Cutoff | `SVFilter.freq` (20Hz-20kHz) |
+| **RESONANCE** | Resonance (Q) | `SVFilter.Q` (1.0-10.0) |
+| **MOD FX** | Mod Amount | `Chorus.modDepth` |
+| **STUTTER** | Stutter Trigger | Rhythmic 1/32 repeats. |
+| **GATE** | Note Length | `keyOff` timing. |
 
 ---
 
-## 3. The Synthesis & Audio Engine (v1.4)
+## 3. The Synthesis & Audio Engine (v1.5)
 
 ### 3.1 FM Synth Architecture
-Each of the 4 Synth tracks (Rows 5-8) uses a dual-operator FM architecture:
-*   **Carrier**: A `MorphingWavetable` (interpolating between Sine and Saw).
-*   **Modulator**: A `MorphingWavetable` that modulates the Carrier's frequency.
-*   **FM Ratio**: Controlled via the global `g_fm_ratio`.
-*   **FM Amount**: Controlled via `g_fm_amount` (also known as FM Index).
+Each Synth track uses a dual-operator FM architecture:
+*   **Carrier**: Sine/Saw Morphing oscillator.
+*   **Modulator**: Internal frequency modulator.
+*   **FM Ratio/Amount**: Global parameters for harmonic complexity.
 
 ### 3.2 Dynamic Sidechaining
-The emulator features a "Ghost Sidechain" hardwired to **Track 0 (KICK)**.
-*   Whenever a note is triggered on Track 0, a `sidechain_event` is broadcast.
-*   The `sidechain_shred` catches this event and applies a rapid volume dip to the `g_synth_bus` (Synths 1-4).
-*   **Recovery**: The recovery time is fixed at 100ms for a classic "pumping" electronic feel.
-
-### 3.3 Master Signal Chain
-The final audio output is processed through a high-fidelity serial chain:
-`Synth/Kit Buses` → `HPF (20Hz)` → `Compressor (Dyno)` → `Limiter (Dyno)` → `Safety Gate` → `DAC`.
+Hardwired to **Track 0 (KICK)**. Every kick trigger broadcasts a `sidechain_event` which dips the `g_synth_bus` volume.
 
 ---
 
-## 4. Sequencing Workflow
+## 4. Sound Editor Reference (Nested Menus)
 
-### 4.1 Step Sequencing (Clip View)
-*   **Note Toggle**: Single left-click on any grid cell.
-*   **Numerical Edit**: Right-click any cell to open the **Step Editor**. This allows precise 0-127 MIDI-style value entry for Velocity and Gate.
-*   **Melodic Entry**: On Synth tracks, **Shift + Right-Click** opens the **Note Entry** popover.
-    *   **Scale Folding**: If a Scale (e.g., Minor) is selected in the Transport Panel, out-of-key notes are automatically dimmed and disabled.
-    *   **Octave Control**: Use the ◄/► buttons to shift the grid range.
+Click the **⚙ (Gear Icon)** on any track to access deep parameters.
 
-### 4.2 Song Mode & Clip Library
-Song Mode provides a high-level view of your project's **64 available clips**.
-*   **Organization**: 8 tracks (rows) x 8 slots (columns A-H).
-*   **Launch Quantization**: Clips always launch on the **next bar boundary** (Step 16).
-*   **Section Launching**: Clicking the **Section Bar** (letters A-H) will queue all clips in that vertical column. This is equivalent to "launching a scene" in Ableton Live.
-*   **Persistence**: The emulator maintains a live "Shadow Copy" of all clips. Swapping clips in Song Mode instantly updates the Sequencer Grid with the new data.
+### **OSC (Oscillators)**
+*   **TYPE**: Sine, Saw, Triangle, Square.
+*   **PW (Pulse Width)**: Active for Square waves.
+*   **SYNC**: Hard-sync modulator to carrier.
+
+### **FILT (Filters)**
+*   **MODE**: LPF 12dB, LPF 24dB, HPF, BPF.
+*   **ENV AMT**: Intensity of ENV2 modulation on cutoff.
+*   **TRACKING**: Cutoff increases/decreases based on note pitch.
+
+### **ENV (Envelopes)**
+*   **ENV 1 (Amp)**: Main volume ADSR.
+*   **ENV 2 (Mod)**: Dedicated filter/pitch ADSR.
+*   **VELO -> ENV**: How much velocity scales the envelope peak.
+
+### **LFO (Low Frequency Oscillators)**
+*   **SHAPE**: Sine, Triangle, Square, Saw, Random.
+*   **SYNC**: Sync to project BPM.
+*   **RETRIG**: Toggle if LFO restarts on every Note-On.
 
 ---
 
-## 5. MIDI & Hardware Integration
+## 5. Sequencing & Recording
 
-The emulator replicates the Deluge 4.1 "MIDI Follow" behavior.
+### 5.1 Step Sequencing & Play Conditions
+*   **Note Toggle**: Single left-click.
+*   **Conditionals (Iteration Dependence)**: 
+    *   Set notes to only play on specific iterations (e.g., "1 of 2").
+    *   **Logic**: Includes "PREV" (plays if previous note did) and "FILL" (plays only when ribbon FILL is held).
+*   **Vertical Drag**: Parameter Lock value to that specific step.
 
-### 5.1 MIDI Input Routing
-*   **Auto-Detection**: On startup, the app opens **all** native MIDI input ports.
-*   **Follow Active Track**: Any incoming MIDI Note-On/Off is routed to the **currently selected track** in the UI.
-*   **Live Performance**: Incoming notes trigger a high-quality "Live Voice" in the engine, which is mixed with the sequenced synth output.
+### 5.2 Live Automation Recording
+Enable **● REC**, press **▶ PLAY**, and perform **Vertical Drags**. The engine captures movement into the sequence steps in real-time.
 
-### 5.2 MIDI Learning (CC Mapping)
-You can bind external MIDI knobs to any global parameter:
-1.  **Right-Click** a parameter button in the ribbon (e.g., **FILTER**).
+---
+
+## 6. Arpeggiator & Performance
+
+### 6.1 Arpeggiator (Nested in Sound Menu)
+*   **MODE**: Up, Down, Up/Down, Random, As-Played.
+*   **RATE**: Rhythmic speed (1/16, 1/8T, etc.).
+*   **OCTAVE**: Range (1 to 4).
+
+### 6.2 Momentary Effects
+*   **STUTTER**: Repeats current 16th note at high speed.
+*   **FILL**: Triggers all notes marked with the "FILL" play condition.
+
+---
+
+## 7. MIDI & Hardware Integration
+
+### 7.1 MIDI Follow
+Incoming MIDI notes are routed to the **active track** in the UI and trigger a low-latency live voice.
+
+### 7.2 MIDI Learning
+1.  **Right-Click** any ribbon button.
 2.  Select **"MIDI Learn"**.
-3.  Move the knob on your hardware controller.
-4.  **Verification**: The console will log: `MIDI LEARN: CC [num] -> g_filter`.
+3.  Move a hardware knob to bind it.
+
+### 7.3 MIDI Implementation Chart
+| Message | Support | Mapping / Range |
+| :--- | :--- | :--- |
+| **Note On/Off** | Full | Mapped to Active Track; 0-127 Range |
+| **Velocity** | Full | 1:1 scaling with Engine Gain |
+| **CC (Control Change)** | Learning | User-assignable to any Ribbon Parameter |
+| **Pitch Bend** | Planned | Targeted for Engine v1.6 |
+| **Clock (Sync)** | Internal | Slave/Host sync under development |
 
 ---
 
-## 6. Project Management
-
-### 6.1 Loading Official Presets
-The app features an **official Deluge XML Parser**. 
-*   Click **📂 LOAD XML** to import files from a Deluge SD card.
-*   **Synths**: Maps `<osc1><type>`, `<filter><type>`, and `<env1>` parameters.
-*   **Kits**: Maps `<sample><fileName>` and `<row><pitch>` data.
-
-### 6.2 Saving & Persistence
-*   **Auto-Save**: The app automatically saves your current Clip Library to the internal `preferences.json` on exit.
-*   **Export**: (Under Development) Support for exporting 16-step patterns back to Deluge XML format.
-
----
-
-## 7. Comparison with Hardware 4.1
+## 8. Comparison with Hardware 4.1
 
 | Feature | Deluge Hardware | ChucK-Java Emulator |
 | :--- | :--- | :--- |
-| **Grid** | 128 (8x16) RGB Pads | 128 (8x16) JavaFX Pads |
-| **Knobs** | 2 Gold, 2 Silver | Vertical Dragging (Simulated) |
-| **Polyphony** | Limited by CPU | 4 Voices (Strict Virtual Time) |
-| **Audio Quality** | 24-bit / 44.1kHz | 32-bit Floating Point / 44.1kHz |
-| **Synthesis** | Subtractive, FM, Multi | Subtractive (v1.1), FM (v1.3) |
-| **Sampling** | Live Line-In / Mic | File-based `.wav` loading |
-| **Song Mode** | Unlimited Scenes | 8 Sections (A-H) |
+| **Grid** | 128 (8x16) RGB | 128 (8x16) OLED-Style |
+| **Knobs** | 4 (Gold/Silver) | Vertical Drag (Simulated) |
+| **Polyphony** | Variable | 8 Voices (Strict) |
+| **Sampling** | Live Input | File-based `.wav` |
 
 ---
 
-*ChucK-Java Deluge Manual — Version 1.5 — April 2026*
+## 9. Quick Reference (Popular Commands)
+
+| Category | Interaction | Function |
+| :--- | :--- | :--- |
+| **Transport** | ▶ PLAY | Toggle Global Playback |
+| **Transport** | ■ STOP | Stop & Reset Playhead to Step 0 |
+| **Grid** | Left-Click Pad | Toggle Step Note On/Off |
+| **Grid** | Vertical Drag Pad | Lock Parameter Value to Step |
+| **Grid** | Right-Click Pad | Open Step Editor (Numerical Entry) |
+| **Grid** | Shift + Right-Click | Open Note Entry (Pitch Select) |
+| **Track** | Click Track Label | Toggle Track Mute (Red = Muted) |
+| **Track** | Drag Track Label | Perform Track-wide Parameter Sweeps |
+| **Track** | ⚙ Gear Icon | Open Deep Sound Editor Menus |
+| **Ribbon** | Left-Click Button | Change Active Parameter Mode |
+| **Ribbon** | Right-Click Button | Enter MIDI Learn Mode |
+| **Perform** | Hold STUTTER | Trigger High-speed Beat Repeat |
+| **Song** | Click Section A-H | Launch Entire Column (Quantized) |
+
+---
+
+*ChucK-Java Deluge Manual — Version 1.8 — April 2026*
