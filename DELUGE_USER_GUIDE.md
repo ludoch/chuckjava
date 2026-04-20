@@ -20,24 +20,7 @@ Welcome to the digital edition of the Synthstrom Audible Deluge, powered by Chuc
 
 The Deluge UI is divided into four primary interactive zones:
 
-<svg width="600" height="400" viewBox="0 0 600 400" xmlns="http://www.w3.org/2000/svg">
-  <!-- Main Frame -->
-  <rect x="10" y="10" width="580" height="380" rx="10" fill="#1a1a1a" stroke="#444" stroke-width="2"/>
-  
-  <!-- Top: Transport & Ribbon -->
-  <rect x="30" y="30" width="540" height="80" rx="5" fill="#2b2b2b" stroke="#3d3d3d"/>
-  <text x="300" y="55" fill="#e0e0e0" font-family="Arial" font-size="14" text-anchor="middle">TRANSPORT & PARAMETERS</text>
-  <rect x="40" y="65" width="60" height="30" rx="3" fill="#2e7d32"/> <!-- Play -->
-  <rect x="110" y="65" width="60" height="30" rx="3" fill="#c62828"/> <!-- Stop -->
-  
-  <!-- Center: Matrix -->
-  <rect x="30" y="120" width="540" height="220" rx="5" fill="#111" stroke="#3d3d3d"/>
-  <text x="300" y="145" fill="#888" font-family="Arial" font-size="12" text-anchor="middle">THE GRID (16 x 8)</text>
-  
-  <!-- Bottom: Status -->
-  <rect x="30" y="350" width="540" height="30" rx="5" fill="#222" stroke="#333"/>
-  <text x="50" y="370" fill="#aaa" font-family="Arial" font-size="10">OLED STATUS BAR</text>
-</svg>
+![Hardware Overview](docs/images/hardware_overview.svg)
 
 ### Transport & Modes
 *   **▶ PLAY / ■ STOP**: Controls the global transport.
@@ -47,25 +30,7 @@ The Deluge UI is divided into four primary interactive zones:
 ### The Matrix
 The heart of the Deluge. An 8-row by 16-column grid used for entering notes, launching clips, or visualizing the timeline.
 
-<svg width="600" height="200" viewBox="0 0 600 200" xmlns="http://www.w3.org/2000/svg">
-  <!-- CLIP MODE -->
-  <rect x="20" y="20" width="260" height="160" rx="5" fill="#111" stroke="#333"/>
-  <text x="150" y="45" fill="#e0e0e0" font-family="Arial" font-size="12" text-anchor="middle">CLIP VIEW (SEQUENCER)</text>
-  <circle cx="50" cy="80" r="8" fill="#d4af37"/> <!-- Active Note -->
-  <circle cx="80" cy="80" r="8" fill="#333"/>
-  <circle cx="110" cy="80" r="8" fill="#d4af37"/>
-  <rect x="40" y="100" width="220" height="4" fill="#555" rx="2"/> <!-- Track Line -->
-  
-  <!-- Arrow -->
-  <path d="M 300 100 L 340 100 M 330 90 L 340 100 L 330 110" stroke="#888" stroke-width="2" fill="none"/>
-
-  <!-- SONG MODE -->
-  <rect x="360" y="20" width="220" height="160" rx="5" fill="#111" stroke="#333"/>
-  <text x="470" y="45" fill="#e0e0e0" font-family="Arial" font-size="12" text-anchor="middle">SONG VIEW (LAUNCHER)</text>
-  <rect x="380" y="70" width="40" height="25" rx="3" fill="#2e7d32"/> <!-- Active Clip -->
-  <rect x="430" y="70" width="40" height="25" rx="3" fill="#444"/> <!-- Inactive Clip -->
-  <rect x="380" y="105" width="40" height="25" rx="3" fill="#1565c0"/> <!-- Clip B -->
-</svg>
+![Grid Transformation](docs/images/grid_transformation.svg)
 
 ---
 
