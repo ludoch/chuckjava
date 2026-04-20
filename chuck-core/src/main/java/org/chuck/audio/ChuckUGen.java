@@ -60,7 +60,7 @@ public abstract class ChuckUGen extends ChuckObject {
   }
 
   public String getName() {
-    return ugenName != null ? ugenName : getChuckType().getName();
+    return ugenName != null ? ugenName : getType().getName();
   }
 
   @SuppressWarnings("unused") // Used via introspection in ChucK scripts
