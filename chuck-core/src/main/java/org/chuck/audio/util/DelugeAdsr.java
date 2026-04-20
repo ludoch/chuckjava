@@ -22,7 +22,7 @@ public class DelugeAdsr extends ChuckUGen {
 
   private float sampleRate;
 
-  private int state = IDLE;
+  private volatile int state = IDLE;
   private double value = 0.0;
   private double target = 0.0;
 
@@ -166,6 +166,7 @@ public class DelugeAdsr extends ChuckUGen {
   protected float compute(float input, long systemTime) {
     switch (state) {
       case IDLE:
+        value = 0.0;
         break;
       case ATTACK:
         value = attackBase + value * attackCoef;

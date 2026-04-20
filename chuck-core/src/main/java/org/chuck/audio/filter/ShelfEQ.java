@@ -80,6 +80,11 @@ public class ShelfEQ extends ChuckUGen {
     return trebleGainDB;
   }
 
+  public void reset() {
+    lx1 = lx2 = ly1 = ly2 = 0.0;
+    hx1 = hx2 = hy1 = hy2 = 0.0;
+  }
+
   private void calcCoeffs() {
     // 1. Low Shelf calculations (Cookbook formulas)
     double A = Math.pow(10.0, bassGainDB / 40.0);
@@ -166,10 +171,14 @@ public class ShelfEQ extends ChuckUGen {
 
       // Process High Shelf
       double hOut = hb0 * lOut + hb1 * t_hx1 + hb2 * t_hx2 - ha1 * t_hy1 - ha2 * t_hy2;
-      t_hx2 = t_hx1;
       t_hx1 = lOut;
       t_hy2 = t_hy1;
       t_hy1 = hOut;
+
+      // Anti-denormal flush and safety clamp
+      if (Math.abs(hOut) < 1.0e-15) hOut = 0.0;
+      if (hOut > 2.0) hOut = 2.0;
+      if (hOut < -2.0) hOut = -2.0;
 
       blockCache[i] = (float) hOut * gain;
       if (buffer != null) buffer[offset + i] = blockCache[i];

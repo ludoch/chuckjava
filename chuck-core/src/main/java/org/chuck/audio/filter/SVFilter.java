@@ -57,6 +57,11 @@ public class SVFilter extends ChuckUGen {
     return morph;
   }
 
+  public void reset() {
+    ic1eq = 0.0;
+    ic2eq = 0.0;
+  }
+
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
     if (systemTime != -1
@@ -124,6 +129,11 @@ public class SVFilter extends ChuckUGen {
           out = cLow * lp + cBand * bp + cHigh * hp;
         }
       }
+
+      // Anti-denormal flush and safety clamp
+      if (Math.abs(out) < 1.0e-15) out = 0.0;
+      if (out > 2.0) out = 2.0;
+      if (out < -2.0) out = -2.0;
 
       blockCache[i] = (float) out * gain;
       if (buffer != null) buffer[offset + i] = blockCache[i];
