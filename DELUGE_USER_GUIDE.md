@@ -95,27 +95,50 @@ Accessed via the **ARR** toggle. Provides a linear timeline of the song structur
 
 ---
 
-## 7. Sound Design
+## 7. Sound Design and Parameter Locking
 
-Click the **⚙** icon on any track to open the engine configuration.
+One of the Deluge's most powerful features is **Parameter Locking**. You can adjust almost any parameter on a per-step basis.
 
-### Synth Engine
-*   **Oscillators**: Select waveforms (Sine, Saw, etc.).
-*   **Filter**: Control Cutoff and Resonance for the SVF filter.
-*   **Envelopes**: Adjust the Attack curve of the exponential ADSR.
+### The Parameter Ribbon
+The second row of buttons above the matrix selects which parameter is currently active for editing and visualization.
 
-### Kit Engine
-*   **Sample Selection**: Use the internal browser to load `.wav` files.
-*   **Pitch**: Shift samples by +/- 24 semitones.
+| Button | Mode | Grid Visual |
+| :--- | :--- | :--- |
+| **LEVEL / VELO** | Velocity | Pad Brightness (Bright = Loud) |
+| **PAN** | Panning | Pad Brightness (Bright = Extreme Left/Right) |
+| **PITCH** | Pitch | Semitone Offset Label (e.g. +7, -12) |
+| **FILTER** | Cutoff | Pad Brightness (Bright = Filter Open) |
+| **MOD FX** | Chorus Depth | Pad Brightness (Bright = Deep Mod) |
+| **DELAY** | Delay Send | Pad Brightness (Bright = More Delay) |
+| **REVERB** | Reverb Send | Pad Brightness (Bright = More Reverb) |
+| **GATE** | Note Length | Dashed Border (Longer dashes = Longer gate) |
+| **PROB** | Probability | Pad Brightness (Dim = Likely to skip) |
+| **START/END** | Sample Start | Pad Brightness (Bright = Starts later) |
 
+### How to Edit
+1.  Select a parameter from the **Ribbon** (e.g., FILTER).
+2.  Locate an **active (lit)** step on the grid.
+3.  **Click and Drag Vertically** on the pad:
+    *   **Drag Up**: Increases the value (or offsets it positively).
+    *   **Drag Down**: Decreases the value.
+4.  The pad's visual state will update in real-time to reflect the new "locked" value.
+
+### Performance Controls
+*   **STUTTER**: This button is a momentary trigger. Hold it down to loop the current 16th note at a high speed (1/32 or 1/64). Release it to resume normal playback.
+
+### Track Management
+The labels on the far left (e.g., KICK, SYNTH 1) are interactive:
+*   **Single Click**: Toggle **MUTE**. The label text will turn red when the track is silenced.
+*   **Vertical Drag**: Adjust track-wide offsets for the current parameter.
 ---
 
 ## 8. Advanced Features
 
 ### Loading Hardware Files
+The Java edition can parse official Deluge `.XML` files!
 1.  Click **📂 LOAD XML**.
-2.  Select a Synth or Kit XML file.
-3.  The app maps XML parameters (like `<osc1><type>`) directly to ChucK UGen properties.
+2.  Select a Synth or Kit XML file from your Deluge SD card.
+3.  The app will attempt to map parameters (like `<osc1><type>`) directly to the ChucK engine.
 
 ---
 
