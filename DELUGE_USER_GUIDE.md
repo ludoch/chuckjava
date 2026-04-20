@@ -69,9 +69,10 @@ Clip view is the default sequencing environment.
 *   **Rows 1-4**: Drum Kit tracks (Kick, Snare, HiHat, Open Hat).
 *   **Rows 5-8**: Polyphonic Synth tracks.
 
-### Sequencing
+### Sequencing & Parameter Editing
 *   **Left Click**: Toggle a note on (Track Color) or off (Dark).
-*   **Right Click**: Open the **Step Editor** popover to adjust Velocity, Gate length, and Probability.
+*   **Vertical Drag (on active step)**: Dynamically adjust the value of the currently selected parameter (Velocity, Gate, Probability, or Pitch).
+*   **Right Click**: Open the **Step Editor** popover for precise numerical entry of Velocity, Gate length, and Probability.
 *   **Shift + Right Click (Synth only)**: Open the **Note Entry** popover to select a specific pitch for that step.
 
 ---
