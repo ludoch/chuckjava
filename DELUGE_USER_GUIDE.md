@@ -6,49 +6,64 @@ Welcome to the digital edition of the Synthstrom Audible Deluge, powered by Chuc
 
 ## Table of Contents
 1. [Hardware Overview](#1-hardware-overview)
-2. [Getting Started](#2-getting-started)
-3. [Clip View](#3-clip-view)
-4. [Song Mode](#4-song-mode)
-5. [Arranger Mode](#5-arranger-mode)
-6. [Sound Design](#6-sound-design)
-7. [Advanced Features](#7-advanced-features)
-8. [Current Limitations](#8-current-limitations)
+2. [Interface Reference](#2-interface-reference)
+3. [Getting Started](#3-getting-started)
+4. [Clip View](#4-clip-view)
+5. [Song Mode](#5-song-mode)
+6. [Arranger Mode](#6-arranger-mode)
+7. [Sound Design](#7-sound-design)
+8. [Advanced Features](#8-advanced-features)
+9. [Current Limitations](#9-current-limitations)
 
 ---
 
 ## 1. Hardware Overview
 
-The Deluge UI is divided into four primary interactive zones:
+The Deluge UI is divided into three primary interactive zones: Global Controls, the Matrix Grid, and the Status Bar.
 
-![Hardware Overview](docs/images/ui_overview.svg)
-
-### Transport & Modes
-*   **▶ PLAY / ■ STOP**: Controls the global transport.
-*   **VIEW MODES**: Toggle between **CLIP** (Sequencing), **SONG** (Launching), and **ARR** (Arranging).
-*   **TEMPO / SWING**: Adjustable sliders for the global clock.
-
-### The Matrix
-The heart of the Deluge. An 8-row by 16-column grid used for entering notes, launching clips, or visualizing the timeline.
-
-![Grid Transformation](docs/images/grid_transformation.svg)
+![UI Overview](docs/images/ui_overview.svg)
 
 ---
 
-## 2. Getting Started
+## 2. Interface Reference
+
+### Global Controls (Top Panel)
+*   **VIEW MODE (CLIP / SONG / ARR)**: Toggles the central Matrix between Step Sequencing, Clip Launching, and Timeline Arrangement.
+*   **▶ PLAY**: Starts the global transport and internal ChucK clock.
+*   **■ STOP**: Stops playback and resets the playhead to Step 0.
+*   **TEMPO (BPM)**: Adjusts the playback speed (60 to 200 BPM).
+*   **SWING (%)**: Controls the timing offset for even-numbered 16th notes. 50% is "straight" timing.
+*   **MASTER VOL**: Sets the final output gain of the ChucK audio engine.
+*   **📂 LOAD XML**: Opens a file browser to load official Deluge Synth or Kit XML presets.
+*   **🐞 BUG (Debug)**: Toggles real-time console logging for DAC attribution (shows which UGens are outputting signal).
+
+### The Matrix Grid
+The Matrix consists of 8 tracks (rows) and 16 steps (columns).
+*   **Audition Pad (Square)**: Located on the far left of each row. Click to trigger the track's sound manually.
+*   **Track Label**: Identifies the sound (e.g., KICK, SYNTH 1).
+*   **⚙ (Gear Icon)**: Opens the detailed configuration dialog for that specific track.
+*   **Step Cells**: 16 interactive buttons for sequencing. Active steps are lit with the track's unique color.
+*   **Beat Separators**: A vertical dark bar appears every 4 cells (after steps 4, 8, and 12) to help visualize the 4/4 time signature.
+*   **Playhead**: A white highlight that moves across the columns during playback.
+
+### Status Bar (Bottom)
+Provides real-time feedback on the current step, active BPM, Swing percentage, and engine health status.
+
+---
+
+## 3. Getting Started
 
 ### Playback
-Click **▶ PLAY** in the top transport panel. The playhead (highlighted column) will begin moving across the grid. Use **■ STOP** to reset the playhead to the beginning.
+Click **▶ PLAY** in the top transport panel. The playhead will begin moving across the grid. Use **■ STOP** to reset the playhead to the beginning.
 
-### Global Parameters
-*   **Tempo**: Drag the **TEMPO** slider to adjust BPM (60 - 200).
-*   **Swing**: Drag the **SWING** slider to add "groove" to your patterns. 50% is straight, >50% pushes even 16th notes.
-*   **Master Vol**: Controls the final output level of the ChucK engine.
+### Adjusting Sound
+Drag the **TEMPO** or **SWING** sliders to change the groove in real-time. The ChucK engine uses virtual time to ensure these changes are sample-accurate.
 
 ---
 
-## 3. Clip View
+## 4. Clip View
 
-Clip view is where you create your patterns. The grid is split into **Kit** tracks and **Synth** tracks.
+Clip view is the default sequencing environment. 
 
 ### Track Layout
 *   **Rows 1-4**: Drum Kit tracks (Kick, Snare, HiHat, Open Hat).
@@ -58,65 +73,52 @@ Clip view is where you create your patterns. The grid is split into **Kit** trac
 *   **Left Click**: Toggle a note on (Track Color) or off (Dark).
 *   **Right Click**: Open the **Step Editor** popover to adjust Velocity, Gate length, and Probability.
 *   **Shift + Right Click (Synth only)**: Open the **Note Entry** popover to select a specific pitch for that step.
-*   **Audition**: Click the square **Audition Pad** on the far left of any row to hear the sound instantly.
-*   **Configuration**: Click the **⚙ (Gear)** icon to open the Track Settings.
 
 ---
 
-## 4. Song Mode
+## 5. Song Mode
 
-Accessed by clicking the **SONG** toggle. In this mode, the matrix transforms from a step sequencer into a **Clip Launcher**.
+Accessed via the **SONG** toggle. The matrix transforms into a **Clip Launcher**.
+
+![Grid Transformation](docs/images/grid_transformation.svg)
 
 ### Launching Clips
-*   Each row represents a track.
-*   The colored blocks represent saved clips/patterns.
-*   Click a block to "queue" it for the next bar.
-*   The Deluge uses **Launch Quantization** to ensure all clips stay in sync.
+*   Click a colored block to queue a clip. It will flash until the next bar boundary, then stay lit while playing.
+*   Clicking an active clip will queue it to stop at the end of the current bar.
 
 ---
 
-## 5. Arranger Mode
+## 6. Arranger Mode
 
-Accessed by clicking the **ARR** toggle. Arranger mode provides a linear "DAW-style" timeline of your entire track.
-
-### Timeline Navigation
-*   Horizontal axis represents time (Bars/Beats).
-*   Vertical axis represents tracks.
-*   You can see exactly when clips are triggered and how long they play.
+Accessed via the **ARR** toggle. Provides a linear timeline of the song structure. Use this to record your clip-launching performance into a permanent arrangement.
 
 ---
 
-## 6. Sound Design
+## 7. Sound Design
 
-Click the **⚙** icon on any track to dive into the engine.
+Click the **⚙** icon on any track to open the engine configuration.
 
 ### Synth Engine
-*   **Oscillators**: Choose between Sine, Saw, Square, Triangle, and Analog-modeled waveforms.
-*   **Filter**: State Variable Filter (SVF) with Lowpass, Highpass, and Bandpass modes. Adjustable **Cutoff** and **Resonance**.
-*   **Envelopes**: Exponential Attack/Decay/Sustain/Release. *Currently supporting Attack adjustment via UI.*
+*   **Oscillators**: Select waveforms (Sine, Saw, etc.).
+*   **Filter**: Control Cutoff and Resonance for the SVF filter.
+*   **Envelopes**: Adjust the Attack curve of the exponential ADSR.
 
 ### Kit Engine
-*   **Sample Selection**: Open the **Browser** to load custom `.wav` files into any drum slot.
-*   **Pitch**: Shift the sample pitch by +/- 24 semitones.
+*   **Sample Selection**: Use the internal browser to load `.wav` files.
+*   **Pitch**: Shift samples by +/- 24 semitones.
 
 ---
 
-## 7. Advanced Features
+## 8. Advanced Features
 
 ### Loading Hardware Files
-The Java edition can parse official Deluge `.XML` files!
-1.  Click **📂 LOAD XML** in the transport panel.
-2.  Select a Synth or Kit XML file from your Deluge SD card.
-3.  The app will attempt to map parameters to the ChucK engine.
-
-### Debugging
-Click the **🐞 DEBUG** button to enable real-time audio tracing in the console. This shows which UGens are active and their current output levels.
+1.  Click **📂 LOAD XML**.
+2.  Select a Synth or Kit XML file.
+3.  The app maps XML parameters (like `<osc1><type>`) directly to ChucK UGen properties.
 
 ---
 
-## 8. Current Limitations
-
-While the Java edition is powerful, some hardware features are currently in development. Understanding these gaps will help you plan your patches:
+## 9. Current Limitations
 
 | Hardware Feature | Current Status | Workaround / Detail |
 | :--- | :--- | :--- |
@@ -135,4 +137,4 @@ While the Java edition is powerful, some hardware features are currently in deve
 
 ---
 
-*Manual version 1.1 — April 2026*
+*Manual version 1.2 — April 2026*
