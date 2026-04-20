@@ -57,6 +57,9 @@ public class DacChannel extends ChuckUGen {
         if (src.getNumOutputs() > 1) {
           val = src.getChannelLastOut(channelIndex);
         }
+        if (DEBUG_AUDIO && Math.abs(val) > 0.01f) {
+          System.out.printf("  [Source: %s] Value: %f\n", src.getName(), val);
+        }
         if (Float.isFinite(val)) sum += val;
       }
       // Safety check: prevent NaNs or Infinity from reaching output

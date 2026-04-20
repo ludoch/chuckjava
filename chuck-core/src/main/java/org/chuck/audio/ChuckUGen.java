@@ -53,6 +53,16 @@ public abstract class ChuckUGen extends ChuckObject {
   protected final List<ChuckUGen> targets = new ArrayList<>();
   protected final ReentrantLock ugenLock = new ReentrantLock();
 
+  protected String ugenName = null;
+
+  public void setName(String name) {
+    this.ugenName = name;
+  }
+
+  public String getName() {
+    return ugenName != null ? ugenName : getChuckType().getName();
+  }
+
   @SuppressWarnings("unused") // Used via introspection in ChucK scripts
   public float lastOut = 0.0f;
 
