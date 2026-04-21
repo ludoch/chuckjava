@@ -239,6 +239,17 @@ public class ChuckVM {
     globalIsObject.put(name, false);
   }
 
+  public void setGlobalString(String name, String val) {
+    setGlobalObject(name, val);
+  }
+
+  public void broadcastGlobalEvent(String name) {
+    Object obj = getGlobalObject(name);
+    if (obj instanceof ChuckEvent event) {
+      event.broadcast(this);
+    }
+  }
+
   public long getGlobalInt(String name) {
     return globalInts.getOrDefault(name, 0L);
   }
@@ -277,9 +288,6 @@ public class ChuckVM {
 
   public Object getGlobalObject(String name) {
     Object obj = globalObjects.get(name);
-    // If it's a primitive array being fetched by a legacy test, and we stored it as ChuckArray,
-    // unwrap it?
-    // Actually, the DSL expects ChuckArray, so we keep it as ChuckArray.
     return obj;
   }
 
@@ -338,7 +346,6 @@ public class ChuckVM {
   public void registerUserClass(String name, UserClassDescriptor desc) {
     UserClassDescriptor old = userClassRegistry.get(name);
     if (old != null) {
-      // Preserve static field values
       desc.staticInts().putAll(old.staticInts());
       desc.staticIsDouble().putAll(old.staticIsDouble());
       desc.staticObjects().putAll(old.staticObjects());
@@ -370,16 +377,13 @@ public class ChuckVM {
           types.put(n, uo.className);
         } else if (obj instanceof ChuckObject co) {
           String typeName = co.getType().getName();
-          // If the runtime object has a generic type name but we know its specific class,
-          // use the class name to avoid type conflicts on reload.
           if (obj instanceof org.chuck.audio.ChuckUGen
               && (typeName.equals("UGen") || typeName.equals("Osc") || typeName.equals("ChuGen"))) {
             typeName = obj.getClass().getSimpleName();
-            // Map common internal names back to ChucK names
             if (typeName.endsWith("UGen") && !typeName.equals("UGen")) {
               typeName = typeName.substring(0, typeName.length() - 4);
             } else if (typeName.equals("LPF")) {
-              typeName = "LPF"; // ChucK canonical name
+              typeName = "LPF";
             }
           }
           types.put(n, typeName);
@@ -473,10 +477,8 @@ public class ChuckVM {
       ChuckEmitter emitter = new ChuckEmitter(userClassRegistry, globalFunctions);
       ChuckEmitter.EmitResult result = emitter.emitWithDocs(ast, name, getGlobalTypeMap());
 
-      // Register public functions/operators
       globalFunctions.putAll(emitter.getPublicFunctions());
 
-      // Register documentation
       for (Map.Entry<String, String> entry : result.globalDocs().entrySet()) {
         setGlobalDoc(entry.getKey(), entry.getValue());
       }
@@ -538,7 +540,6 @@ public class ChuckVM {
 
       int id = run(source, file.getAbsolutePath());
 
-      // Pass arguments if any
       if (id > 0 && parts.length > 1 && baseFilename.equals(parts[0])) {
         ChuckShred ns = activeShreds.get(id);
         if (ns != null) {
@@ -632,7 +633,7 @@ public class ChuckVM {
                 deadShreds.add(shred);
                 while (deadShreds.size() > 50) deadShreds.poll();
                 liveThreadCount.decrementAndGet();
-                shred.notifyParked(); // Fix: Must be very last to prevent concurrent cleanup!
+                shred.notifyParked();
               }
             });
 
@@ -681,12 +682,11 @@ public class ChuckVM {
   }
 
   private void fireTimeouts(long currentTime) {
-    // Avoid removeIf which can allocate/lambda
     for (int i = 0; i < pendingTimeouts.size(); i++) {
       TimeoutEntry t = pendingTimeouts.get(i);
       if (currentTime >= t.wakeTime()) {
         pendingTimeouts.remove(i);
-        i--; // Adjust index
+        i--;
         if (t.waitingShred().isWaiting()
             && (t.waitingShred().getEventWaitingOn() == t.event()
                 || t.waitingShred().getEventWaitingOn() == null)) {
@@ -708,7 +708,6 @@ public class ChuckVM {
 
   public void advanceTime(long samples) {
     long targetTime = now.get() + samples;
-    boolean parallel = PARALLEL_ENGINE;
 
     while (now.get() < targetTime) {
       long currentTime = now.get();
@@ -910,14 +909,12 @@ public class ChuckVM {
       s.cleanup(this);
     }
 
-    // Unchuck all global objects that are UGens from DAC
     for (Object obj : globalObjects.values()) {
       if (obj instanceof org.chuck.audio.ChuckUGen ugen) {
         ugen.unchuckAll();
       }
     }
 
-    // Clear global state
     globalInts.clear();
     globalIsInt.clear();
     globalIsDouble.clear();
@@ -928,22 +925,16 @@ public class ChuckVM {
     globalFunctionDocs.clear();
     userClassRegistry.clear();
 
-    // Ensure audio outputs are fully silenced
     for (DacChannel chan : dacChannels) {
       chan.unchuckAll();
     }
     if (multiChannelDac != null) multiChannelDac.unchuckAll();
     if (blackhole != null) blackhole.unchuckAll();
 
-    // Re-initialize special globals (dac, adc, etc. if needed)
     setGlobalObject("dac", multiChannelDac);
     setGlobalObject("blackhole", blackhole);
   }
 
-  /**
-   * Aborts all active shreds and waits for their virtual threads to exit. Use this for clean
-   * teardown in tests or when the VM will no longer be used, so the GC can reclaim all memory.
-   */
   public void shutdown() {
     java.util.List<ChuckShred> shreds = new java.util.ArrayList<>(activeShreds.values());
     activeShreds.clear();
@@ -956,7 +947,6 @@ public class ChuckVM {
     for (ChuckShred s : shreds) {
       s.abort();
     }
-    // Wait up to 2 seconds for all virtual threads to exit their finally blocks
     long deadline = System.currentTimeMillis() + 2000;
     while (liveThreadCount.get() > 0 && System.currentTimeMillis() < deadline) {
       try {
