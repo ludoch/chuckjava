@@ -751,7 +751,7 @@ public class ChuckVM {
           nextShred.resume(this, false);
 
           try {
-            if (!latch.await(5, TimeUnit.SECONDS)) {
+            if (!latch.await(10, TimeUnit.SECONDS)) {
               String msg = "[vm]: Timeout waiting for shred " + nextShred.getId() + " to park";
               print(msg + "\n");
               throw new RuntimeException(msg);
