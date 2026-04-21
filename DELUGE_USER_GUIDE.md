@@ -6,6 +6,7 @@ Welcome to the digital edition of the Synthstrom Audible Deluge, powered by Chuc
 
 ## Table of Contents
 1. [Hardware Overview](#1-hardware-overview)
+1.5. [Object Model Architecture](#15-object-model-architecture)
 2. [Interface Reference](#2-interface-reference)
 3. [Getting Started](#3-getting-started)
 4. [Clip View](#4-clip-view)
@@ -22,6 +23,18 @@ Welcome to the digital edition of the Synthstrom Audible Deluge, powered by Chuc
 The Deluge UI is divided into three primary interactive zones: Global Controls, the Matrix Grid, and the Status Bar.
 
 ![UI Overview](docs/images/ui_overview.svg?v=2)
+
+---
+
+## 1.5 Object Model Architecture
+
+To understand how the Deluge emulator organizes musical data, it is critical to understand its core object model, which mirrors the original hardware:
+
+*   **Project (Song):** The highest-level container. A Project holds all global settings (Tempo, Swing, Master levels), a collection of all Instruments (Synths and Kits) loaded into memory, and the Arranger timeline which dictates when specific Clips are played.
+*   **Track:** In the Deluge paradigm, a "Track" is synonymous with an **Instrument Instance** combined with its **Sequence Data**. A Track can either be a **Synth** (polyphonic, melodic) or a **Kit** (a collection of drum sounds).
+*   **Clip (Pattern):** A Clip is the actual sequence of notes and parameter locks (e.g., a 16-step bassline or a 32-step drum beat). Clips belong to a specific Track. When you are looking at the main 8x16 LED grid, you are editing the sequence data for *one specific Clip* at a time.
+*   **Synth:** An instrument type designed for melodic playback. A Synth Track takes up the entire editing grid, where rows represent different musical pitches (like a piano roll), and columns represent time.
+*   **Kit:** An instrument type designed for percussion. A Kit is a collection of distinct **Sounds** (e.g., Kick, Snare, Hihat). When a Kit Track is active, the editing grid changes: each **Row** represents a completely different Sound within the Kit, rather than different pitches of the same sound. Loading a Deluge KIT XML populates these rows with the individual WAV files and settings defined in the XML.
 
 ---
 
@@ -63,11 +76,12 @@ Drag the **TEMPO** or **SWING** sliders to change the groove in real-time. The C
 
 ## 4. Clip View
 
-Clip view is the default sequencing environment. 
+Clip view is the default sequencing environment. In this mode, you are looking at the sequence data for a single **Clip** belonging to the currently active **Track**.
 
 ### Track Layout
-*   **Rows 1-4**: Drum Kit tracks (Kick, Snare, HiHat, Open Hat).
-*   **Rows 5-8**: Polyphonic Synth tracks.
+Depending on the type of Track you are currently editing, the rows of the Matrix Grid behave differently:
+*   **Kit Track (Drum Mode):** Each row represents a distinct Sound within the kit (e.g., Kick, Snare, Hihat). Pressing a pad on a row triggers that specific Sound.
+*   **Synth Track (Melodic Mode):** The rows represent different musical pitches (a piano roll). Pressing a pad triggers the single polyphonic Synth engine at the row's designated pitch.
 
 ### Sequencing & Parameter Editing
 *   **Left Click**: Toggle a note on (Track Color) or off (Dark).
