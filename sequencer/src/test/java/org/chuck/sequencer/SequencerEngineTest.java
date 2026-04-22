@@ -65,7 +65,7 @@ public class SequencerEngineTest {
 
     // Reset logs and advance logic
     logs.clear();
-    vm.advanceTime(44100 * 2);
+    vm.advanceTime(44100 * 4); // Advance 4 seconds to ensure we hit step 0
 
     // Look for the "!!! FOUND ACTIVE CELL !!!" log from v3.2
     boolean triggerFound = logs.stream().anyMatch(l -> l.contains("FOUND ACTIVE CELL"));

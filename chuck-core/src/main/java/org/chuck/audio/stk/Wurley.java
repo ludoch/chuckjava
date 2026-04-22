@@ -3,6 +3,7 @@ package org.chuck.audio.stk;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.osc.SinOsc;
 import org.chuck.audio.util.Adsr;
+import org.chuck.core.ChuckVM;
 
 /**
  * Wurley — Wurlitzer electric piano using 2-operator FM synthesis. More nasal and honky than
@@ -19,6 +20,10 @@ public class Wurley extends ChuckUGen {
   @SuppressWarnings("unused")
   private final float sampleRate;
 
+  public Wurley() {
+    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public Wurley(float sampleRate) {
     this.sampleRate = sampleRate;
     this.carrier = new SinOsc(sampleRate);
@@ -32,6 +37,10 @@ public class Wurley extends ChuckUGen {
     // Wurlitzer: characteristic nasal tone
     carrierEnv.set(0.002f, 1.2f, 0.0f, 0.08f);
     modulatorEnv.set(0.001f, 0.3f, 0.0f, 0.05f);
+  }
+
+  public void freq(float f) {
+    setFreq(f);
   }
 
   public void setFreq(double freq) {

@@ -79,6 +79,7 @@ public class UGenRegistry {
     register("PRCRev", (sr, args) -> new PRCRev(sr));
     register("GVerb", (sr, args) -> new GVerb(sr));
     register("FreeVerb", (sr, args) -> new FreeVerb());
+    register("MVerb", (sr, args) -> new MVerb());
     register("PitShift", (sr, args) -> new PitShift());
     register("LentPitShift", (sr, args) -> new LentPitShift());
     register("Distortion", (sr, args) -> new Distortion());

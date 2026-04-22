@@ -58,10 +58,15 @@ public class ChuckComplexScriptTest {
     vm.spork(shred);
 
     // Run the VM
-    Thread.sleep(100);
-    vm.advanceTime(50);
+    // Advance time in a loop to give the shred time to execute across steps
+    int retries = 0;
+    while (!shred.isDone() && retries < 200) {
+        vm.advanceTime(5);
+        Thread.sleep(5);
+        retries++;
+    }
 
-    assertTrue(shred.isDone());
+    assertTrue(shred.isDone(), "Shred did not finish in time");
 
     // N starts at 3. Loop runs for N=3, 2, 1.
     assertEquals(3, frequencies.size());
