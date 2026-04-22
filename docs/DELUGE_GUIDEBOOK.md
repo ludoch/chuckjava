@@ -19,6 +19,10 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 -   Our implementation is inspired by the Synthstrom Deluge hardware.
 -   We have expanded the Java DSL engine to support up to **64 simultaneous tracks** (e.g., 8 kits of 8 sounds each), allowing you to play multiple kits at once.
 
+### 1.4 Auditioning
+-   Before placing notes in the sequence, you can audition (preview) the sound of a given row.
+-   In **Clip Mode**, click the rightmost pad/button of a row to hear the pitch or sound assigned to it.
+
 ---
 
 ## 2. SONG CREATION & LOADING
@@ -60,6 +64,11 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 ▌ MUTING A TRACK
 1. In Song View, locate the **[M]** button on the right side of the track row (next to Launch and Color).
 2. Click it to mute the track. The button turns yellow.
+3. Click it again to unmute.
+
+▌ INDIVIDUAL ROW MUTE IN KITS
+1. When working with a **Kit** clip (where each row is a different sound, like Kick, Snare, etc.), you can mute individual sounds.
+2. Click the **M** button on the right side of the row to mute just that sound. It will turn yellow.
 3. Click it again to unmute.
 
 ---
@@ -144,3 +153,20 @@ Pressing the **● REC** button enables live recording mode. Incoming notes will
 ### Preferences Dialog
 The application preferences can be accessed via **Settings > Preferences...**.
 ![Preferences Dialog](preferences_dialog_annotated.png)
+
+
+---
+
+## 7. QUICK REFERENCE (SOFTWARE EQUIVALENTS)
+
+Here is a map of common hardware actions to their software equivalents in our emulation:
+
+| Hardware Action | Software UI Equivalent |
+| :--- | :--- |
+| **Audition Pad** (Far Right) | Click the label or audition button on the right of the row. |
+| **Toggle Step** | Click any cell in the 16x8 grid (Clip Mode). |
+| **Launch Clip** | Click the **L** button on the right side of the row (Song Mode). |
+| **Mute Track** | Click the **M** button on the right side of the row (Song Mode). |
+| **Change Color** | Click the **C** button on the right side of the row (Song Mode). |
+| **Scroll Vertically** | Use the scroll bar or mouse wheel on the grid. |
+| **Zoom Horizontal** | (Not yet supported via UI, fixed at 16th notes by default). |
