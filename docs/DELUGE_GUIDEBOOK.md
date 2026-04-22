@@ -54,6 +54,23 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
    - Move a physical knob or fader on your MIDI controller.
 3. The CC number is captured and bound to that parameter. Mappings are saved persistently across sessions.
 
+▌ CLEARING A MAPPING (UNLEARN)
+1. Right-click the slider you want to unbind in the **MASTER FX** panel.
+2. Select **Clear MIDI Mapping** from the context menu.
+3. The parameter will stop responding to the MIDI controller, and the mapping is removed from preferences.
+
+▌ DISPLAYING ACTIVE MAPPINGS
+1. Go to **Settings > Mappings...** in the menu.
+2. A list at the bottom of the dialog will show all active mappings in the format `parameter -> CC number`.
+
+▌ EXAMPLE: SETTING UP A KORG NANOKONTROL2
+1. Connect your Korg nanoKONTROL2 via USB.
+2. Open **Settings > Mappings...** in the menu.
+3. In the **MIDI Input** dropdown, look for **"Slider/Knob"** (or "nanoKONTROL2" if explicitly named). On some systems, generic names like "Slider/Knob" are used for class-compliant controllers.
+4. Select it, click OK, and **restart the application**.
+5. Right-click the **Reverb Mix** slider in the **MASTER FX** panel and select **MIDI Learn**.
+6. Move a fader on the nanoKONTROL2. The on-screen slider will now follow your physical movements!
+
 ---
 
 ## 4. AUTO-SCROLLING
