@@ -2,11 +2,12 @@ package org.chuck.audio.fx;
 
 import java.util.Arrays;
 import org.chuck.audio.ChuckUGen;
+import org.chuck.audio.util.StereoUGen;
 import org.chuck.core.ChuckVM;
 import org.chuck.core.doc;
 
 @doc("ProceduralReverb: A simple comb filter reverb.")
-public class ProceduralReverb extends ChuckUGen {
+public class ProceduralReverb extends StereoUGen {
   private float decayFactor;
   private int delayLength;
   private float[] delayBuffer;
@@ -50,11 +51,20 @@ public class ProceduralReverb extends ChuckUGen {
   }
 
   @Override
-  protected float compute(float input, long systemTime) {
+  protected void computeStereo(float left, float right, long systemTime) {
+    float input = (left + right) * 0.5f;
     float delayedSample = delayBuffer[writeIndex];
     float feedbackSample = input + (delayedSample * decayFactor);
     delayBuffer[writeIndex] = feedbackSample;
     writeIndex = (writeIndex + 1) % delayLength;
-    return feedbackSample * gain;
+    
+    float out = feedbackSample * gain;
+    lastOutChannels[0] = out;
+    lastOutChannels[1] = out;
+  }
+
+  @Override
+  protected void computeStereo(float input, long systemTime) {
+    computeStereo(input, input, systemTime);
   }
 }
