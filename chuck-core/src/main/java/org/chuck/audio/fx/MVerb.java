@@ -532,6 +532,32 @@ public class MVerb extends StereoUGen {
     };
   }
 
+  public void dampingFreq(float value) { setParameter(DAMPINGFREQ, value); }
+  public float dampingFreq() { return (float) getParameter(DAMPINGFREQ); }
+
+  public void density(float value) { setParameter(DENSITY, value); }
+  public float density() { return (float) getParameter(DENSITY); }
+
+  public void bandwidthFreq(float value) { setParameter(BANDWIDTHFREQ, value); }
+  public float bandwidthFreq() { return (float) getParameter(BANDWIDTHFREQ); }
+
+  public void predelay(float value) { setParameter(PREDELAY, value); }
+  public float predelay() { return (float) getParameter(PREDELAY); }
+
+  public void size(float value) { setParameter(SIZE, value); }
+  public float size() { return (float) getParameter(SIZE); }
+
+  public void decay(float value) { setParameter(DECAY, value); }
+  public float decay() { return (float) getParameter(DECAY); }
+
+
+
+  public void mix(float value) { setParameter(MIX, value); }
+  public float mix() { return (float) getParameter(MIX); }
+
+  public void earlyMix(float value) { setParameter(EARLYMIX, value); }
+  public float earlyMix() { return (float) getParameter(EARLYMIX); }
+
   @Override
   protected void computeStereo(float left, float right, long systemTime) {
     double l = left;

@@ -31,6 +31,13 @@ public class ChuckVMTest {
 
     vm.advanceTime(10); // T=15
     assertEquals(15, vm.getCurrentTime());
+    
+    // Give virtual thread time to update wakeTime
+    int retries2 = 0;
+    while (shred.getWakeTime() != 22 && retries2 < 100) {
+        Thread.sleep(5);
+        retries2++;
+    }
     assertEquals(22, shred.getWakeTime());
 
     vm.advanceTime(10); // T=25

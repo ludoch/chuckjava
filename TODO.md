@@ -24,6 +24,7 @@
 - [ ] Implement true Sidechain routing (Source -> Target).
 - [ ] Add 4 Envelopes and 4 LFOs per Synth voice (following `UNIFIED_DESIGN.md`).
 - [ ] Wire SVFilter morphing to the UI.
+- [ ] Integrate MVerb and ProceduralReverb as options in the Deluge Synth engine UI.
 
 ## Future Ideas / Community Inspired
 - [ ] Implement Actions to generate things (e.g. Random Patch/Kit) inspired by [Deluge_Random_Patch](https://github.com/adwuard/Deluge_Random_Patch).
