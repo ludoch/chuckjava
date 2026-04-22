@@ -15,8 +15,8 @@ Welcome to the ChucK-Java Deluge Workstation, a software emulation of the Synths
 ## 2. Using Song Mode
 
 ### 2.1 The Grid
-In Song Mode, the grid displays the clips available for each track.
--   **Rows**: Represent **Tracks** (Instruments) in our current implementation.
+In Song Mode, the grid displays the clips.
+-   **Rows**: Represent **Clips** (following the hardware model).
 -   **Columns**: Represent clip slots.
 
 ### 2.2 Actions
@@ -25,19 +25,21 @@ In Song Mode, the grid displays the clips available for each track.
 -   **Move Clip**: Click and drag a filled clip cell to another cell to move it.
 -   **Mute Track**: Click the **[M]** button next to the track name to mute/unmute the track.
 
-## 3. Hardware Parity and Gaps
+## 3. Hardware Parity
 
-Our implementation is inspired by the Synthstrom Deluge hardware but has some differences to accommodate software paradigms and current engine limits.
+Our implementation is inspired by the Synthstrom Deluge hardware and aims to replicate its workflow.
 
-### 3.1 Song Mode Model Gap
--   **Real Deluge**: Song View uses **Rows as Clips**. You can have many clips for the same instrument on different rows. The leftmost pads (Launch pads) trigger the clip in that row.
--   **JavaFX Implementation**: We use a more traditional DAW approach where **Rows are Tracks** and columns are clip slots (similar to Ableton Session View). This makes it easier to visualize full tracks on screen.
-
-### 3.2 Engine Capabilities
+### 3.1 Engine Capabilities
 -   We have expanded the Java DSL engine to support up to **64 simultaneous tracks** (e.g., 8 kits of 8 sounds each), allowing you to play multiple kits at once.
 
-## 4. Quick Start
+## 4. Advanced Features
+
+-   **Live Recording**: Record notes from grid or MIDI at playhead position.
+-   **MIDI Learn**: Map physical CC controls to parameters persistently.
+-   **Persistence**: Save/Load projects to Deluge-compatible XML on disk.
+
+## 5. Quick Start
 
 1.  **Load a Kit**: Select a kit from the sidebar. It will be added as a new track.
-2.  **Create a Sequence**: Go to Clip Mode and click steps to create a rhythm.
-3.  **Use Song Mode**: Switch to Song Mode to see your track, add clips, and use the Mute buttons to control the mix.
+2.  **Create a Sequence**: Go to Clip Mode and click steps to create a rhythm, or use Record mode to play live!
+3.  **Use Song Mode**: Switch to Song Mode to see your clips and launch them.
