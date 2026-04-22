@@ -240,6 +240,21 @@ public class ChuckDSL {
   public static final ChuckIO chout = new ChuckIO(false);
   public static final ChuckIO cherr = new ChuckIO(true);
 
+  public static class ChIO {
+    public static String newline() { return "\n"; }
+    public static String nl() { return "\n"; }
+  }
+
+  public static long random(long min, long max) {
+    return min + (long)(Math.random() * (max - min + 1));
+  }
+  public static double randomf(double min, double max) {
+    return min + Math.random() * (max - min);
+  }
+  public static double randomf() {
+    return Math.random();
+  }
+
   public static void _CHUCK_INTERNAL_ASSERT_(boolean condition, String message) {
     if (!condition) {
       throw new RuntimeException("ChucK Assertion Failed: " + message);

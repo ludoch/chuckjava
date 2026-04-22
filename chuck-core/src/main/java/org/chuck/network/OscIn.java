@@ -39,10 +39,19 @@ public class OscIn extends ChuckEvent implements AutoCloseable {
     }
   }
 
+  public int port() {
+    if (socket != null) return socket.getLocalPort();
+    return 0;
+  }
+
   public void addAddress(String addr) {
     // addr may be like "/test", "/test, i f s", "/test/*, is"
     String path = addr.contains(",") ? addr.substring(0, addr.indexOf(",")).trim() : addr.trim();
     addresses.add(path);
+  }
+
+  public void listenAll() {
+    addAddress("*");
   }
 
   public boolean recv(OscMsg msg) {
