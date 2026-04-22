@@ -61,6 +61,12 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 2. **Double-click on the row header** (the label on the left showing the clip name) to open it in the Clip Editor.
 3. The view will automatically switch to **CLIP** mode, and the Matrix grid will be populated with the sequence from that clip.
 
+▌ OPENING THE SOUND EDITOR
+1. In **SONG** view, locate the **E** button on the right side of the track row.
+2. Click it to focus and populate the dynamic **EDITOR** tab on the left sidebar, letting you tweak its parameters.
+
+---
+
 ▌ MUTING A TRACK
 1. In Song View, locate the **[M]** button on the right side of the track row (next to Launch and Color).
 2. Click it to mute the track. The button turns yellow.
@@ -153,6 +159,10 @@ Pressing the **● REC** button enables live recording mode. Incoming notes will
 ### Preferences Dialog
 The application preferences can be accessed via **Settings > Preferences...**.
 ![Preferences Dialog](preferences_dialog_annotated.png)
+
+### Preset Sound Editor
+Clicking the **E** button in Song View or the **🎹 EDIT PRESET** button at the bottom of the Clip View opens the Sound Editor.
+![Preset Sound Editor](preset_editor_annotated.png)
 
 
 ---
