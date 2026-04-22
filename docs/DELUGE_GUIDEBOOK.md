@@ -4,7 +4,24 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 
 ---
 
-## 1. SONG CREATION & LOADING
+## 1. CORE CONCEPTS
+
+### 1.1 View Modes
+-   **Song Mode**: This view consolidates tracks and allows you to launch clips and manage the overall arrangement. Rows represent Clips (following the hardware model), and columns represent clip slots.
+-   **Clip Mode**: This is where you edit the sequence for a single track. For a Kit track, rows represent different sounds (Kick, Snare, etc.). For a Synth track, rows represent pitches.
+-   **Arranger Mode**: Used for linear arrangement of clips over time.
+
+### 1.2 Instruments
+-   **KIT**: A sample-based instrument. Loading a kit populates rows with different drum sounds.
+-   **SYNTH**: A synthesis engine track for melodic lines.
+
+### 1.3 Hardware Parity & Limits
+-   Our implementation is inspired by the Synthstrom Deluge hardware.
+-   We have expanded the Java DSL engine to support up to **64 simultaneous tracks** (e.g., 8 kits of 8 sounds each), allowing you to play multiple kits at once.
+
+---
+
+## 2. SONG CREATION & LOADING
 
 ▌ LOADING AN EXISTING SONG FROM LIBRARY
 1. Open the **Project Manager** sidebar on the left.
@@ -12,6 +29,10 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 3. Expand the **SONGS** folder.
 4. **Double-click** on a song file (e.g., `song1.xml`) to load it.
 5. The status bar will indicate when the song is loaded, and the audio engine will load the associated samples.
+
+▌ PROJECT EXPLORER VS. LIBRARY
+-   **PROJECT Tab**: Shows the active tracks and clips in the current project.
+-   **LIBRARY Tab**: This is the functional file browser where you can load Kits, Synths, and Songs from resources or external folders.
 
 ▌ CREATING A NEW CLIP FROM SONG VIEW
 *Note: In our software emulation, rows represent tracks/instruments, and columns represent clip slots.*
@@ -21,7 +42,7 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 
 ---
 
-## 2. SONG MODE OPERATIONS
+## 3. SONG MODE OPERATIONS
 
 ▌ LAUNCHING CLIPS
 1. Switch to **SONG** view.
@@ -36,9 +57,14 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 2. **Double-click on the row header** (the label on the left showing the clip name) to open it in the Clip Editor.
 3. The view will automatically switch to **CLIP** mode, and the Matrix grid will be populated with the sequence from that clip.
 
+▌ MUTING A TRACK
+1. In Song View, locate the **[M]** button on the right side of the track row (next to Launch and Color).
+2. Click it to mute the track. The button turns yellow.
+3. Click it again to unmute.
+
 ---
 
-## 3. RECORDING & MIDI SUPPORT
+## 4. RECORDING & MIDI SUPPORT
 
 ▌ LIVE GRID RECORDING
 1. Click the **● REC** button in the Transport panel to enable Record mode.
@@ -47,7 +73,7 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 4. Recorded notes will appear on the grid and play back in the next loop. Note duration is calculated precisely based on Note-Off events.
 
 ▌ MIDI INPUT & LEARN
-1. Open **Settings > Mappings...** to select your MIDI Input device from the dropdown.
+1. Open **Settings > Preferences...** to select your MIDI Input device from the dropdown.
 2. To bind a physical controller to a parameter:
    - Right-click any slider in the **MASTER FX** panel (e.g., Reverb Mix or Size).
    - Select **MIDI Learn** from the context menu.
@@ -60,12 +86,17 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 3. The parameter will stop responding to the MIDI controller, and the mapping is removed from preferences.
 
 ▌ DISPLAYING ACTIVE MAPPINGS
-1. Go to **Settings > Mappings...** in the menu.
+1. Go to **Settings > Preferences...** in the menu.
 2. A list at the bottom of the dialog will show all active mappings in the format `parameter -> CC number`.
+
+▌ MIDI GRID CONTROLLER MODE
+1. Go to **Settings > Preferences...** and check **"MIDI Grid Mode"**.
+2. In this mode, incoming MIDI notes are mapped to grid coordinates (Row = note / 16, Column = note % 16).
+3. Pressing a pad on your controller will toggle the step on the grid instead of playing a note!
 
 ▌ EXAMPLE: SETTING UP A KORG NANOKONTROL2
 1. Connect your Korg nanoKONTROL2 via USB.
-2. Open **Settings > Mappings...** in the menu.
+2. Open **Settings > Preferences...** in the menu.
 3. In the **MIDI Input** dropdown, look for **"Slider/Knob"** (or "nanoKONTROL2" if explicitly named). On some systems, generic names like "Slider/Knob" are used for class-compliant controllers.
 4. Select it, click OK, and **restart the application**.
 5. Right-click the **Reverb Mix** slider in the **MASTER FX** panel and select **MIDI Learn**.
@@ -73,15 +104,16 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 
 ---
 
-## 4. AUTO-SCROLLING
+## 5. AUTO-SCROLLING
 
 ▌ FOLLOWING THE PLAYHEAD
 - The grid automatically supports **auto-scrolling** to follow the playhead across pages.
 - When the playhead moves past step 15, the view shifts to show steps 16-31, and so on.
 - This ensures you always see the active step during long sequences or live recording.
+
 ---
 
-## 5. VISUAL WALKTHROUGH (E2E SCENARIO)
+## 6. VISUAL WALKTHROUGH (E2E SCENARIO)
 
 This section provides a step-by-step visual guide to a common user scenario: loading a song, editing steps, and controlling playback.
 
