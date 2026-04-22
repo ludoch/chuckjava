@@ -87,24 +87,24 @@ This section provides a step-by-step visual guide to a common user scenario: loa
 
 ### Step 0: Initial State
 When the application starts, the grid is empty, and the transport is stopped.
-![Initial State](file:///usr/local/google/home/ludo/a/chuckjava/docs/step0_start.png)
+![Initial State](step0_start.png)
 
 ### Step 1: Song Loaded
 After loading `song1.xml` from the library, the grid is populated with the song's patterns.
-![Song Loaded](file:///usr/local/google/home/ludo/a/chuckjava/docs/step1_loaded.png)
+![Song Loaded](step1_loaded.png)
 
 ### Step 2: Editing Cells
 Clicking on cells or receiving MIDI Grid notes toggles the steps. Here, steps 0, 4, 8, and 12 are enabled on the first track.
-![Cells Edited](file:///usr/local/google/home/ludo/a/chuckjava/docs/step2_edited.png)
+![Cells Edited](step2_edited.png)
 
 ### Step 3: Playing
 Pressing the **▶ PLAY** button starts the playhead moving across the grid.
-![Playing](file:///usr/local/google/home/ludo/a/chuckjava/docs/step3_playing.png)
+![Playing](step3_playing.png)
 
 ### Step 4: Recording
 Pressing the **● REC** button enables live recording mode. Incoming notes will be captured at the current step.
-![Recording](file:///usr/local/google/home/ludo/a/chuckjava/docs/step4_recording.png)
+![Recording](step4_recording.png)
 
 ### Preferences Dialog
 The application preferences can be accessed via **Settings > Preferences...**.
-![Preferences Dialog](file:///usr/local/google/home/ludo/a/chuckjava/docs/preferences_dialog_annotated.png)
+![Preferences Dialog](preferences_dialog_annotated.png)
