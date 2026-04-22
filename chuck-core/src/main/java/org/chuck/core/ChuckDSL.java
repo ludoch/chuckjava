@@ -289,6 +289,10 @@ public class ChuckDSL {
   }
 
   public static class HidMsg {
+    public int which() {
+      return 0;
+    }
+
     public int ascii() {
       return 0;
     }
@@ -306,63 +310,15 @@ public class ChuckDSL {
     }
   }
 
-  public static class MidiIn extends ChuckEvent {
-    public boolean open(int i) {
-      return false;
-    }
-
-    public boolean recv(MidiMsg msg) {
-      return false;
-    }
-  }
-
-  public static class MidiOut {
-    public boolean open(int i) {
-      return false;
-    }
-
-    public void send(MidiMsg msg) {}
-  }
-
-  public static class MidiMsg {
-    public int data1;
-    public int data2;
-    public int data3;
-
-    public void data1(float v) {
-      data1 = (int) v;
-    }
-
-    public void data2(float v) {
-      data2 = (int) v;
-    }
-
-    public void data3(float v) {
-      data3 = (int) v;
-    }
-
-    public int data1() {
-      return data1;
-    }
-
-    public int data2() {
-      return data2;
-    }
-
-    public int data3() {
-      return data3;
-    }
-  }
-
-  public static void setData1(MidiMsg msg, float v) {
+  public static void setData1(org.chuck.midi.MidiMsg msg, float v) {
     msg.data1 = (int) v;
   }
 
-  public static void setData2(MidiMsg msg, float v) {
+  public static void setData2(org.chuck.midi.MidiMsg msg, float v) {
     msg.data2 = (int) v;
   }
 
-  public static void setData3(MidiMsg msg, float v) {
+  public static void setData3(org.chuck.midi.MidiMsg msg, float v) {
     msg.data3 = (int) v;
   }
 

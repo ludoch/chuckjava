@@ -1,6 +1,7 @@
 package org.chuck.audio.stk;
 
 import org.chuck.audio.ChuckUGen;
+import org.chuck.core.ChuckVM;
 
 /**
  * ModalBar — modal-resonance bar physical model. Models a struck bar (xylophone, vibraphone,
@@ -27,9 +28,33 @@ public class ModalBar extends ChuckUGen {
   private double freq = 440.0;
   private final float sampleRate;
 
+  public ModalBar() {
+    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public ModalBar(float sr) {
     this.sampleRate = sr;
     setFreq(440.0);
+  }
+
+  public void freq(float f) {
+    setFreq(f);
+  }
+
+  public void mode(float v) {
+    // Dummy implementation
+  }
+
+  public void modeRatio(float v) {
+    // Dummy implementation
+  }
+
+  public void modeGain(float v) {
+    // Dummy implementation
+  }
+
+  public void modeRadius(float v) {
+    // Dummy implementation
   }
 
   public void setFreq(double f) {

@@ -1,6 +1,7 @@
 package org.chuck.audio.util;
 
 import org.chuck.audio.ChuckUGen;
+import org.chuck.core.ChuckVM;
 
 /** A simple linear envelope UGen. */
 public class Envelope extends ChuckUGen {
@@ -8,6 +9,10 @@ public class Envelope extends ChuckUGen {
   private float value = 0.0f;
   private float rate = 0.001f;
   private final float sampleRate;
+
+  public Envelope() {
+    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
 
   public Envelope(float sampleRate) {
     this(sampleRate, true);

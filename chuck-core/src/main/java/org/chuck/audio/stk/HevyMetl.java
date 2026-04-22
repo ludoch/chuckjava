@@ -44,6 +44,14 @@ public class HevyMetl extends ChuckUGen {
     env2.set(0.001f, 0.2f, 0.0f, 0.05f);
   }
 
+  public void lfoSpeed(float v) {
+    // Dummy implementation
+  }
+
+  public void lfoDepth(float v) {
+    // Dummy implementation
+  }
+
   public void freq(float freq) {
     setFreq(freq);
   }

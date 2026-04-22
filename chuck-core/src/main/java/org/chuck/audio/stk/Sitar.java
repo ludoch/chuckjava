@@ -4,6 +4,7 @@ import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.filter.OnePole;
 import org.chuck.audio.fx.DelayL;
 import org.chuck.audio.osc.Noise;
+import org.chuck.core.ChuckVM;
 
 /**
  * Sitar: STK physical model of a sitar. Uses a plucked string with a non-linear bridge reflection.
@@ -15,6 +16,10 @@ public class Sitar extends ChuckUGen {
   private final float sampleRate;
   private float loopGain = 0.99f;
   private float ampmult = 0.0f;
+
+  public Sitar() {
+    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
 
   public Sitar(float sampleRate) {
     this.sampleRate = sampleRate;
@@ -29,6 +34,10 @@ public class Sitar extends ChuckUGen {
   public void setFreq(double f) {
     double delay = sampleRate / f - 0.5;
     delayLine.setDelay(delay);
+  }
+
+  public void freq(float f) {
+    setFreq(f);
   }
 
   public void noteOn(float velocity) {

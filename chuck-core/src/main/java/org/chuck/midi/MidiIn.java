@@ -17,6 +17,10 @@ public class MidiIn extends ChuckEvent implements AutoCloseable {
   private final java.util.List<MidiPoly> targets =
       new java.util.concurrent.CopyOnWriteArrayList<>();
 
+  public MidiIn() {
+    this(ChuckVM.CURRENT_VM.get());
+  }
+
   public MidiIn(ChuckVM vm) {
     this.driver = new ChuckMidiNative(vm, this, this.queue);
     this.javaDriver = new ChuckMidi(vm, this);

@@ -48,6 +48,7 @@ public class ChuckToDSLConverter {
     sb.append("import org.chuck.audio.util.*;\n");
     sb.append("import org.chuck.audio.chugins.*;\n");
     sb.append("import org.chuck.network.*;\n");
+    sb.append("import org.chuck.midi.*;\n");
     sb.append("import org.chuck.core.*;\n\n");
 
     sb.append("public class ").append(className).append(" implements Shred {\n");
@@ -1054,8 +1055,10 @@ public class ChuckToDSLConverter {
         String idxCode = wrapInt(aae.indices().get(0));
 
         if (elemType.equals("String")) return "(String)" + baseCode + ".getObject(" + idxCode + ")";
-        if (elemType.equals("double")) return baseCode + ".getFloat(" + idxCode + ")";
-        if (elemType.equals("long")) return baseCode + ".getInt(" + idxCode + ")";
+        if (elemType.equals("double") || elemType.equals("float"))
+          return baseCode + ".getFloat(" + idxCode + ")";
+        if (elemType.equals("long") || elemType.equals("int"))
+          return baseCode + ".getInt(" + idxCode + ")";
 
         // Detect if this is an intermediate array level
         String type = varTypes.get(baseCode);
