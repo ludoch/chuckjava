@@ -170,3 +170,28 @@ Here is a map of common hardware actions to their software equivalents in our em
 | **Change Color** | Click the **C** button on the right side of the row (Song Mode). |
 | **Scroll Vertically** | Use the scroll bar or mouse wheel on the grid. |
 | **Zoom Horizontal** | (Not yet supported via UI, fixed at 16th notes by default). |
+---
+
+## 8. PLANNED FEATURES / FUTURE VISION
+
+*Note: The following features are described in the original design documents but are **not yet implemented** in the current software version. They represent the roadmap for future development.*
+
+### 8.1 Advanced Object Model
+-   **Clips**: Duplicate via `Alt + Drag`.
+-   **Synth/Kit**: Edit via a full Node-based Graph Editor.
+
+### 8.2 Advanced Interface Concepts
+-   **Marquee Selection**: Click and drag a box over notes or clips to select multiple objects.
+-   **Shift + Drag**: Disable "Snap to Grid" for fine-grained, humanized timing.
+-   **Drag-and-Drop**: Drag Synth/Kit XMLs directly from the library onto clips to load presets.
+
+### 8.3 Visual Editors
+-   **OSC & FM Matrix**: A node-based editor for connecting operators via drag-and-drop.
+-   **Multisampling Editor**: A waveform view where users drag `.wav` files onto a virtual piano keyboard for automatic pitch mapping.
+-   **Automation Graphs**: Draw Bezier curves over the grid for parameter modulation.
+
+### 8.4 Planned Shortcuts
+-   `Ctrl + Mouse Wheel`: Zoom (Horizontal).
+-   `Shift + Mouse Wheel`: Zoom (Vertical).
+-   `Middle-click + Drag`: Scroll (Hand Tool).
+-   `P` key: Open visual arpeggiator pattern editor with Euclidean toggle.
