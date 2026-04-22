@@ -159,7 +159,7 @@ public class SndBuf extends ChuckUGen {
         }
       }
       logger.log(
-          Level.INFO, "[Audio] SndBuf: Loaded " + path + " (" + samples.length + " samples)");
+          Level.FINE, "[Audio] SndBuf: Loaded " + path + " (" + samples.length + " samples)");
       ais.close();
     } catch (Exception e) {
       logger.log(
