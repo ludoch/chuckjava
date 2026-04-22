@@ -7,6 +7,7 @@ import org.chuck.audio.osc.Noise;
 import org.chuck.audio.osc.SinOsc;
 import org.chuck.audio.util.Envelope;
 import org.chuck.audio.util.ReedTable;
+import org.chuck.core.ChuckVM;
 import org.chuck.core.doc;
 
 /**
@@ -26,6 +27,10 @@ public class Clarinet extends ChuckUGen {
   private float vibratoGain = 0.1f;
   private float outputGain = 1.0f;
   private final float sampleRate;
+
+  public Clarinet() {
+    this(50.0f, ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
 
   public Clarinet(float lowestFrequency, float sampleRate) {
     this.sampleRate = sampleRate;

@@ -364,6 +364,10 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
     return allocator;
   }
 
+  public String dir() {
+    return ".";
+  }
+
   public String dir(int level) {
     return ".";
   }

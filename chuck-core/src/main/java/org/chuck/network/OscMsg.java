@@ -20,6 +20,7 @@ public class OscMsg extends org.chuck.core.ChuckObject {
     }
     return sb.toString();
   }
+
   private final List<Object> args = new ArrayList<>();
 
   public OscMsg() {

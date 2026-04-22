@@ -135,6 +135,17 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     }
   }
 
+  public ChuckArray(String tag, ChuckArray[] vals) {
+    super(ChuckType.ARRAY);
+    this.elementTypeName = tag;
+    for (ChuckArray v : vals) {
+      intData.add(0L);
+      floatData.add(0.0);
+      objectData.add(v);
+      types.add((byte) 2);
+    }
+  }
+
   public int size() {
     return types.size();
   }

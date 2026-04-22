@@ -229,7 +229,11 @@ public class ChuckDSL {
 
   public static class ChuckIO {
     private final boolean isErr;
-    public ChuckIO(boolean isErr) { this.isErr = isErr; }
+
+    public ChuckIO(boolean isErr) {
+      this.isErr = isErr;
+    }
+
     public ChuckIO print(Object o) {
       if (isErr) System.err.print(o);
       else System.out.print(o);
@@ -241,18 +245,125 @@ public class ChuckDSL {
   public static final ChuckIO cherr = new ChuckIO(true);
 
   public static class ChIO {
-    public static String newline() { return "\n"; }
-    public static String nl() { return "\n"; }
+    public static String newline() {
+      return "\n";
+    }
+
+    public static String nl() {
+      return "\n";
+    }
   }
 
   public static long random(long min, long max) {
-    return min + (long)(Math.random() * (max - min + 1));
+    return min + (long) (Math.random() * (max - min + 1));
   }
+
   public static double randomf(double min, double max) {
     return min + Math.random() * (max - min);
   }
+
   public static double randomf() {
     return Math.random();
+  }
+
+  public static class Hid extends ChuckEvent {
+    public boolean open(int i) {
+      return false;
+    }
+
+    public boolean open(String s) {
+      return false;
+    }
+
+    public boolean openKeyboard(long i) {
+      return false;
+    }
+
+    public String name() {
+      return "Dummy Hid";
+    }
+
+    public boolean recv(HidMsg msg) {
+      return false;
+    }
+  }
+
+  public static class HidMsg {
+    public int ascii() {
+      return 0;
+    }
+
+    public int key() {
+      return 0;
+    }
+
+    public boolean isButtonDown() {
+      return false;
+    }
+
+    public boolean isButtonUp() {
+      return false;
+    }
+  }
+
+  public static class MidiIn extends ChuckEvent {
+    public boolean open(int i) {
+      return false;
+    }
+
+    public boolean recv(MidiMsg msg) {
+      return false;
+    }
+  }
+
+  public static class MidiOut {
+    public boolean open(int i) {
+      return false;
+    }
+
+    public void send(MidiMsg msg) {}
+  }
+
+  public static class MidiMsg {
+    public int data1;
+    public int data2;
+    public int data3;
+
+    public void data1(float v) {
+      data1 = (int) v;
+    }
+
+    public void data2(float v) {
+      data2 = (int) v;
+    }
+
+    public void data3(float v) {
+      data3 = (int) v;
+    }
+
+    public int data1() {
+      return data1;
+    }
+
+    public int data2() {
+      return data2;
+    }
+
+    public int data3() {
+      return data3;
+    }
+  }
+
+  public static void setData1(MidiMsg msg, float v) {
+    msg.data1 = (int) v;
+  }
+
+  public static void setData2(MidiMsg msg, float v) {
+    msg.data2 = (int) v;
+  }
+
+  public static void setData3(MidiMsg msg, float v) {
+    msg.data3 = (int) v;
   }
 
   public static void _CHUCK_INTERNAL_ASSERT_(boolean condition, String message) {

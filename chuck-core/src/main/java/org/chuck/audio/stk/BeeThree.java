@@ -3,6 +3,7 @@ package org.chuck.audio.stk;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.osc.SinOsc;
 import org.chuck.audio.util.Adsr;
+import org.chuck.core.ChuckVM;
 
 /**
  * BeeThree — Hammond-style B3 organ using 3-operator FM + additive mixing. Produces characteristic
@@ -14,6 +15,10 @@ public class BeeThree extends ChuckUGen {
   private final SinOsc op2; // second harmonic
   private final SinOsc op3; // sub-harmonic
   private final Adsr env;
+
+  public BeeThree() {
+    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
 
   public BeeThree(float sampleRate) {
     this.op1 = new SinOsc(sampleRate);
@@ -29,6 +34,10 @@ public class BeeThree extends ChuckUGen {
     op1.setFreq(freq); // fundamental (8' drawbar)
     op2.setFreq(freq * 2.0); // octave (4' drawbar)
     op3.setFreq(freq * 0.5); // sub-octave (16' drawbar)
+  }
+
+  public void freq(float freq) {
+    setFreq(freq);
   }
 
   public void noteOn(float velocity) {
