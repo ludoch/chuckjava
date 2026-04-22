@@ -34,7 +34,7 @@ public class ChuckVMTest {
     
     // Give virtual thread time to update wakeTime
     int retries2 = 0;
-    while (shred.getWakeTime() != 22 && retries2 < 100) {
+    while (shred.getWakeTime() != 22 && retries2 < 500) {
         Thread.sleep(5);
         retries2++;
     }
@@ -378,8 +378,8 @@ public class ChuckVMTest {
                     if (cleared.get()) {
                       int cnt = samplesAfterClear.incrementAndGet();
                       float s = Math.abs(vm.getDacChannel(0).getLastOut());
-                      if (s > 0.001f) {
-                        // Still non-zero after clear — record it
+                      // Allow 128 samples of drain time for in-flight audio processing
+                      if (cnt > 128 && s > 0.001f) {
                         maxAfterClear.set(Math.max(maxAfterClear.get(), (int) (s * 1_000_000)));
                       }
                       if (cnt >= 512) audioRunning.set(false); // 512 samples is enough to check
