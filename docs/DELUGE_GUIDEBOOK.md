@@ -182,7 +182,65 @@ Here is a map of common hardware actions to their software equivalents in our em
 | **Zoom Horizontal** | (Not yet supported via UI, fixed at 16th notes by default). |
 ---
 
-## 8. PLANNED FEATURES / FUTURE VISION
+## 8. SOUND EDITORS & CONTROLS WORKFLOW (MANUAL)
+
+This section highlights all Sound and parameters editors workspace validation checks dynamically and each of their individual fields. 
+
+### 8.1 Sidebar Sound Preset Editor 
+Exposes synthesis preset sound parameters categorized inside visually premium dynamic folding Accordion categorisation groupings workspace: 
+#### Category: OSCILLATORS
+Contains inner sub accordions categorization grouping setups: 
+- **OSCILLATOR 1 & 2**:
+  - **Type**: Wave generator live inputs choices (SINE, SAW, SQUARE, TRIANGLE, SAMPLE). 
+  - **Volume**: Individual oscillator amplitude level values. 
+  - **Transpose**: Individual transposition values.
+  - **Sync Checkbox**: Syncs with live frequency retrigger phase assignments bounds rules checks. 
+  - **Pulse Width**: live dynamic pulse duty width slider. 
+  - **Retrig phase**: note trigger phase degrees (0 to 360). 
+- **MODULATOR 1 & 2 (FM Synthesis)**: 
+  - **Transpose**: FM transposition values. 
+  - **Amount**: visual modular amounts depth level. 
+  - **Feedback**: Amplitude modulator live feedback assignments depth levels. 
+  - **Destination (on MOD 2 only)**: destination combos logic dropdown (CARS, MOD1). 
+
+#### Category: FILTERS 
+- **LPF Frequency**: Low-pass cutoff frequency dynamic values. 
+- **LPF Resonance**: filter frequency visual resonance cutoff depth. 
+
+#### Category: MASTER FX 
+- **Delay Amount**: visual Delay depth amount depth. 
+- **Reverb Amount**: visual live Reverb depth values. 
+
+> [!NOTE]
+> Both Oscillator 1 volume and Low pass filter Cutoff parameters are modulated with dynamic live interactive patching logic visual matrix popups depth values assignments bounds. Click the Little dynamic **`M`** button next to parameter inputs values sliders to open live depth modulation matrices depth assignments popups. Modulations sources: LFO1, LFO2, ENV1, ENV2, RANDOM probabilities odds paths, dynamic velocities, step sidechains compressor levels assignments. 
+
+---
+
+### 8.2 Step effects Parameter visual visualizer lane Workspace 
+Sitting dynamic line-by-line alignment underneath the sequence Matrix Grid workspace. Tapping visual path over step effects visualizer bars canvas workspace enables live visual dynamic automation drawing paths. Parameters steps and cutoff values supported: 
+- VELOCITY, GATE note duration timing percentage 
+- PITCH transposition, PROBABILITY odds
+- FILTER sweeps cutoff paths automation, RESONANCE 
+- PAN sweeps, master delay and master reverb amount depth paths live logic validation bounds checks 
+
+---
+
+### 8.3 Global Visual parameters Workspace lane
+Sitting underneath the sequence visual dynamic Step effects visualizer lane visual workspace. Exposes track global visual sliders: 
+- **TRACK LEVEL**: Controls active global track level volume. 
+- **TRANSPOSE**: track global scale note transpose level values. 
+
+---
+
+### 8.4 live visual Euclidean visual visualizer arpeggiation popup
+Press active Grid Workspace **`P`** validation onboard key. dynamic Visual step Euclidean rhythm live step sequencer distributions dynamically: 
+- **Hits ($K$)**: Active sequencing notes active. 
+- **Steps ($N$)**: Sequence duration validation checks duration. 
+- **Offset ($O$)**: Step sequence horizontal timeline shift offset. 
+
+---
+
+## 9. PLANNED FEATURES / FUTURE VISION
 
 *Note: The following features are described in the original design documents but are **not yet implemented** in the current software version. They represent the roadmap for future development.*
 
