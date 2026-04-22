@@ -89,19 +89,23 @@ This section provides a step-by-step visual guide to a common user scenario: loa
 When the application starts, the grid is empty, and the transport is stopped.
 ![Initial State](step0_start.png)
 
-### Step 1: Song Loaded
-After loading `song1.xml` from the library, the grid is populated with the song's patterns.
-![Song Loaded](step1_loaded.png)
+### Step 1: Song View
+After double-clicking `song1.xml` in the Library explorer, the Song View opens, showing active clips as colored pads.
+![Song View](step1_loaded_songview.png)
 
-### Step 2: Editing Cells
+### Step 2: Clip View
+Double-clicking a clip in Song View opens it in the Clip Editor, showing the note sequence on the grid.
+![Clip View](step1_loaded_clipview.png)
+
+### Step 3: Editing Cells
 Clicking on cells or receiving MIDI Grid notes toggles the steps. Here, steps 0, 4, 8, and 12 are enabled on the first track.
 ![Cells Edited](step2_edited.png)
 
-### Step 3: Playing
+### Step 4: Playing
 Pressing the **▶ PLAY** button starts the playhead moving across the grid.
 ![Playing](step3_playing.png)
 
-### Step 4: Recording
+### Step 5: Recording
 Pressing the **● REC** button enables live recording mode. Incoming notes will be captured at the current step.
 ![Recording](step4_recording.png)
 
