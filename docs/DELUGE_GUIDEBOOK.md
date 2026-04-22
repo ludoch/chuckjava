@@ -79,3 +79,32 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 - The grid automatically supports **auto-scrolling** to follow the playhead across pages.
 - When the playhead moves past step 15, the view shifts to show steps 16-31, and so on.
 - This ensures you always see the active step during long sequences or live recording.
+---
+
+## 5. VISUAL WALKTHROUGH (E2E SCENARIO)
+
+This section provides a step-by-step visual guide to a common user scenario: loading a song, editing steps, and controlling playback.
+
+### Step 0: Initial State
+When the application starts, the grid is empty, and the transport is stopped.
+![Initial State](file:///usr/local/google/home/ludo/a/chuckjava/docs/step0_start.png)
+
+### Step 1: Song Loaded
+After loading `song1.xml` from the library, the grid is populated with the song's patterns.
+![Song Loaded](file:///usr/local/google/home/ludo/a/chuckjava/docs/step1_loaded.png)
+
+### Step 2: Editing Cells
+Clicking on cells or receiving MIDI Grid notes toggles the steps. Here, steps 0, 4, 8, and 12 are enabled on the first track.
+![Cells Edited](file:///usr/local/google/home/ludo/a/chuckjava/docs/step2_edited.png)
+
+### Step 3: Playing
+Pressing the **▶ PLAY** button starts the playhead moving across the grid.
+![Playing](file:///usr/local/google/home/ludo/a/chuckjava/docs/step3_playing.png)
+
+### Step 4: Recording
+Pressing the **● REC** button enables live recording mode. Incoming notes will be captured at the current step.
+![Recording](file:///usr/local/google/home/ludo/a/chuckjava/docs/step4_recording.png)
+
+### Preferences Dialog
+The application preferences can be accessed via **Settings > Preferences...**.
+![Preferences Dialog](file:///usr/local/google/home/ludo/a/chuckjava/docs/preferences_dialog_annotated.png)
