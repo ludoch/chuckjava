@@ -617,4 +617,9 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     result.setFloat(2, a1 * b2 - a2 * b1);
     return result;
   }
+
+  public ChuckArray chuck(ChuckArray other) {
+    other.copyFrom(this);
+    return this;
+  }
 }

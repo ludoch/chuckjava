@@ -227,6 +227,19 @@ public class ChuckDSL {
     ChuckVM.CURRENT_VM.get().print(String.valueOf(msg));
   }
 
+  public static class ChuckIO {
+    private final boolean isErr;
+    public ChuckIO(boolean isErr) { this.isErr = isErr; }
+    public ChuckIO print(Object o) {
+      if (isErr) System.err.print(o);
+      else System.out.print(o);
+      return this;
+    }
+  }
+
+  public static final ChuckIO chout = new ChuckIO(false);
+  public static final ChuckIO cherr = new ChuckIO(true);
+
   public static void _CHUCK_INTERNAL_ASSERT_(boolean condition, String message) {
     if (!condition) {
       throw new RuntimeException("ChucK Assertion Failed: " + message);

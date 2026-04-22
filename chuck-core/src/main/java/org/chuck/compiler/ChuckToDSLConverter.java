@@ -25,6 +25,7 @@ public class ChuckToDSLConverter {
     varTypes.clear();
     arraysToInit.clear();
     fields.clear();
+    currentClassName = className;
 
     for (ChuckAST.Stmt s : program) {
       if (s instanceof ChuckAST.DeclStmt ds) {
@@ -403,14 +404,16 @@ public class ChuckToDSLConverter {
       String count = visitExp(rs.count());
       return "for (int i = 0; i < " + count + "; i++) " + ensureBraces(visitStmt(rs.body()));
     } else if (stmt instanceof ChuckAST.ForEachStmt fes) {
-      return "for ("
-          + mapType(fes.iterType())
-          + " "
-          + fes.iterName()
+      String iterType = mapType(fes.iterType());
+      String body = visitStmt(fes.body());
+      return "for (Object "
+          + fes.iterName() + "_obj"
           + " : "
           + visitExp(fes.collection())
-          + ") "
-          + ensureBraces(visitStmt(fes.body()));
+          + ") {\n"
+          + indent(iterType + " " + fes.iterName() + " = (" + iterType + ") " + fes.iterName() + "_obj;", 1) + "\n"
+          + indent(body, 1) + "\n"
+          + "}";
     } else if (stmt instanceof ChuckAST.WhileStmt ws) {
       String cond = visitExp(ws.condition());
       if (cond.equals("1")) cond = "true";
@@ -671,7 +674,7 @@ public class ChuckToDSLConverter {
           || be.op() == ChuckAST.Operator.GT
           || be.op() == ChuckAST.Operator.LE
           || be.op() == ChuckAST.Operator.LT) {
-        if (typeOf(be.lhs()).equals("String") || typeOf(be.rhs()).equals("String")) {
+        if (typeOf(be.lhs()).equals("String") && typeOf(be.rhs()).equals("String")) {
           String op = mapOp(be.op());
           return "(" + lhsCode + ".compareTo(" + rhsCode + ") " + op + " 0)";
         }
@@ -769,10 +772,19 @@ public class ChuckToDSLConverter {
         }
 
         // Handle primitive or array assignment via =>
-        if (be.rhs() instanceof ChuckAST.IdExp) {
-          if (rhsType != null && (isPrimitive(rhsType) || rhsType.endsWith("[]"))) {
+        System.out.println("DEBUG: file: " + currentClassName + ", => RHS class: " + be.rhs().getClass().getSimpleName() + ", rhsType: " + rhsType);
+        if (be.rhs() instanceof ChuckAST.IdExp || be.rhs() instanceof ChuckAST.DeclExp) {
+          if (be.op() == ChuckAST.Operator.AT_CHUCK) {
+            if (rhsType != null && !isPrimitive(rhsType) && !rhsType.endsWith("[]") && !"ChuckArray".equals(rhsType)) {
+              String cast = "(" + rhsType + ")";
+              String typePrefix = (be.rhs() instanceof ChuckAST.DeclExp) ? rhsType + " " : "";
+              return typePrefix + rhsCode + " = " + cast + "(" + lhsCode + ")";
+            }
+          }
+          if (rhsType != null && (isPrimitive(rhsType) || rhsType.endsWith("[]") || "ChuckArray".equals(rhsType))) {
             String cast = isPrimitive(rhsType) ? "(" + rhsType + ")" : "";
-            return rhsCode + " = " + cast + "(" + lhsCode + ")";
+            String typePrefix = (be.rhs() instanceof ChuckAST.DeclExp) ? rhsType + " " : "";
+            return typePrefix + rhsCode + " = " + cast + "(" + lhsCode + ")";
           }
           if (rhsType == null) {
             String inferredType = typeOf(be.lhs());
@@ -819,6 +831,14 @@ public class ChuckToDSLConverter {
       }
       if (lhsCode.equals("now()")) lhsCode = "samp(now())";
       if (rhsCode.equals("now()")) rhsCode = "samp(now())";
+      
+      if (be.op() == ChuckAST.Operator.LE) {
+        if ("cherr".equals(lhsCode) || "chout".equals(lhsCode) 
+            || lhsCode.startsWith("cherr.print") || lhsCode.startsWith("chout.print")) {
+          return lhsCode + ".print(" + rhsCode + ")";
+        }
+      }
+      
       return "(" + lhsCode + " " + mapOp(be.op()) + " " + rhsCode + ")";
     } else if (exp instanceof ChuckAST.LogicalExp le) {
       List<String> ops = new ArrayList<>();
@@ -841,6 +861,7 @@ public class ChuckToDSLConverter {
       String base = visitExp(ce.base());
       if (base.equals("assert")) base = "org.chuck.core.ChuckDSL._CHUCK_INTERNAL_ASSERT_";
       if (base.equals("me") || base.equals("me()")) base = "org.chuck.core.ChuckDSL.me";
+      if (base.equals("IO.newline")) return "\"\\n\"";
 
       // If the base is a DotExp or IdExp and not already a method call, add ()
       if (!base.endsWith(")") && !base.contains("Math.") && !base.contains("Std.")) {
@@ -1078,7 +1099,8 @@ public class ChuckToDSLConverter {
       return op + "(" + inner + ")";
     } else if (exp instanceof ChuckAST.DeclExp de) {
       String type = mapType(de.type());
-      return "new " + type + "()";
+      varTypes.put(safeName(de.name()), type);
+      return safeName(de.name());
     }
     return "// Unsupported expression: " + exp.getClass().getSimpleName();
   }
@@ -1096,6 +1118,7 @@ public class ChuckToDSLConverter {
           || id.name().equals("week")) {
         return "ChuckDuration";
       }
+      if ("cherr".equals(id.name()) || "chout".equals(id.name())) return "ChuckIO";
       String type = varTypes.get(id.name());
       if (type != null) {
         if (type.contains("[]") || type.equals("ChuckArray")) return "ChuckArray";
@@ -1107,6 +1130,7 @@ public class ChuckToDSLConverter {
     if (exp instanceof ChuckAST.IntExp) return "long";
     if (exp instanceof ChuckAST.FloatExp) return "double";
     if (exp instanceof ChuckAST.StringExp) return "String";
+    if (exp instanceof ChuckAST.ArrayLitExp) return "ChuckArray";
     if (exp instanceof ChuckAST.BinaryExp be) {
       if (be.op() == ChuckAST.Operator.EQ
           || be.op() == ChuckAST.Operator.NEQ
