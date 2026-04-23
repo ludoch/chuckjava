@@ -284,3 +284,74 @@ A lightweight, pure Java desktop UI alternative built entirely on Swing (accessi
 
 - **Step 1b: Clip View (Sequencer Editor pads)**
   ![Swing Clip View](../docs/swing_step1_loaded_clipview.png)
+
+---
+
+## 11. FORMAL UI DESIGN SPECIFICATION
+
+### 11.1 Architectural Layout (Framework-Independent)
+The UI follows a classic Digital Audio Workstation (DAW) topography, divided into five primary regions using a border-layout or grid-bag approach:
+1. **Top Panel**: Transport & Global Controls
+2. **Left Panel**: Navigation & Preset Editing (Sidebar)
+3. **Center Panel**: The Matrix Grid (Primary Workspace)
+4. **Right Panel**: Real-time Audio Visualizers
+5. **Bottom Panel**: Step Modifiers & Global Track Controls
+
+### 11.2 Component Breakdown
+
+#### Top Panel (Header Strip)
+*   **Mode Toggles**: A distinct button group to switch the Center Workspace context (`CLIP`, `SONG`, `ARR`).
+*   **Transport Controls**:
+    *   `PLAY` (Green accent, playback toggle)
+    *   `STOP` (Red accent, playback stop/reset)
+    *   `REC` (Dark with red indicator, arm recording)
+*   **Global Parameters**:
+    *   `TEMPO` / `BPM` (Slider with numeric readout, e.g., 120.0)
+    *   `SWING %` (Slider, 0-100%)
+    *   `MASTER VOL` (Slider)
+*   **Action Buttons**: `LOAD XML` for loading legacy or external project files.
+
+#### Left Panel (Sidebar)
+*   **Tabbed Interface**:
+    *   **LIBRARY Tab**: A tree/hierarchical view displaying the file system (SD CARD) with folders for `KITS`, `SYNTHS`, `SONGS`, and `EXTERNAL SAMPLES`. Double-clicking a file loads it into the global model.
+    *   **EDITOR Tab**: A dynamic property inspector. When a track is selected, it displays nested accordion menus (e.g., OSCILLATORS, FILTERS, MASTER FX). Each category contains sliders (Volume, Cutoff, Reverb) with inline modulation toggle buttons (e.g., an `M` button for modulation matrices) and MIDI-learn context menus.
+    *   **MIDI Tab**: (Primarily in Swing) For mapping and routing overviews.
+
+#### Center Panel (The Matrix)
+*   **The Grid**: A responsive 2D matrix (default 8 rows x 16 columns) representing step pads.
+    *   **Row Headers (Left side of grid)**: Labels for the row (e.g., "EMPTY", "PAD 1", or Note Names). Includes a quick Audition `>` button to preview the row's sound.
+    *   **Track Controls (Right side of grid)**: Contextual buttons for `L` (Launch), `C` (Color cycle), `M` (Mute) that appear per track.
+*   **Bottom Anchor (Clip Mode)**:
+    *   **Piano Roll**: A clickable piano keyboard graphic spanning the width of the grid, enabling melodic input. Includes a horizontal scrollbar above it to page through time (auto-scrolling tracks the playhead).
+*   **Parameter Ribbon**: A horizontal strip of toggle buttons immediately below the grid used to select the active Step Effects lane (e.g., `LEVEL`, `PAN`, `PITCH`, `FILTER`, `RESONANCE`, `MOD FX`, `DELAY`, `REVERB`, `PROBABILITY`, `GATE`, `VELOCITY`, `START/END`).
+
+#### Right Panel (Visualizer Stack)
+A vertically stacked column of four real-time graphical scopes mapping to the master audio bus:
+1.  **Spectrum** (FFT Analysis)
+2.  **Oscilloscope** (Waveform Time-Domain)
+3.  **Waterfall** (3D Spectrogram)
+4.  **Stereo Phase** (Goniometer / Lissajous curve)
+
+#### Bottom Panel (Step Effects & Status)
+*   **Step Effects Visualizer Lane**: A 16-step horizontal bar chart corresponding to the grid's columns. When a parameter (like Velocity or Pitch) is selected in the Ribbon above, this lane allows the user to draw dynamic per-step automation.
+*   **Track Global Controls**:
+    *   `TRACK LEVEL` slider.
+    *   `TRANSPOSE` slider (ranged -24 to +24).
+    *   `GLOBAL TEMPO` slider (mirrors top panel or acts as override).
+    *   `SCALE` dropdown (e.g., "Major", "Minor").
+*   **Status Bar (Footer)**:
+    *   System messaging ("Waiting for Engine...", "MIDI: Ready").
+    *   Application Branding module ("DELUGE").
+    *   Performance metrics ("SHREDS: 0", indicating active concurrent Chuck threads).
+
+### 11.3 Core Interaction Paradigms
+*   **Contextual Drill-Down**: Double-clicking a track/clip row in Song Mode immediately shifts the view to Clip Mode, populating the matrix with that clip's specific step data.
+*   **Grid Toggling & Recording**: Single clicks on grid cells toggle step activation. When Record (`REC`) is active, clicking cells acts as live trigger pads. In "MIDI Grid mode", incoming physical MIDI notes map directly to grid coordinates.
+*   **Continuous Automation Drawing**: Clicking and dragging across the Step Effects Visualizer Lane (Bottom Panel) draws a curve for the selected parameter.
+*   **MIDI Learn Context Menus**: Right-clicking virtually any slider (e.g., Reverb Mix) triggers a context menu to map or clear a physical MIDI CC assignment.
+
+### 11.4 Conceptual View Modes
+*   **SONG MODE**: The macro view. Rows represent Instruments/Tracks. Columns represent Clip Slots (blocks of arrangement).
+*   **CLIP MODE**: The micro view. Rows represent Drum Sounds (Kit) or Pitches (Synth). Columns represent Time Steps (16th notes by default).
+*   **ARRANGER MODE**: A linear timeline track view (slated for future implementation).
+
