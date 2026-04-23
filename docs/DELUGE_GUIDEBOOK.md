@@ -51,15 +51,18 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 ▌ LAUNCHING CLIPS
 1. Switch to **SONG** view.
 2. Each row corresponds to a track, and columns are clip slots.
-3. On the **right side** of the grid, locate the control buttons for each row:
-   - **L** (Launch): Click this button to start playback of the clip. It turns **green** when playing.
-   - **C** (Color): Click this button to cycle through pad colors for that row.
-4. The pads in the grid are solid colored when filled, matching the hardware pad style.
+3. On the **Right edge** of the grid (Columns 17 and 18), locate the dedicated hardware-style operation pads:
+   - **Col 17 (MUTE)**: Toggles channel mute state. Turns Red when Muted. 
+     - *Modifier*: `Shift + Click` fully erases the notes programmed in the sequencer track.
+   - **Col 18 (EDIT / SOLO)**:
+     - *In Clip View*: Acts as a Solo track toggle (Turns Green).
+     - *In Song View*: Triggers manual Audition Previews, or focus-switches to the sound EDITOR.
 
 ▌ SELECTING A CLIP TO EDIT
 1. Switch to **SONG** view.
-2. **Double-click on the row header** (the label on the left showing the clip name) to open it in the Clip Editor.
+2. **Click on the row header** (the label on the left showing the clip name) to open it in the Clip Editor.
 3. The view will automatically switch to **CLIP** mode, and the Matrix grid will be populated with the sequence from that clip.
+
 
 ▌ OPENING THE SOUND EDITOR
 1. In **SONG** view, locate the **E** button on the right side of the track row.
@@ -449,6 +452,10 @@ Song projects store file paths pointers resolving execution dependencies at load
 <instrument type="CHUCK">
   <scriptPath>/CHUCKS/custom_fm.ck</scriptPath>
 </instrument>
+
+### 15.2 Debug Execution Log Consoles
+Workstation sidebar editors expose script execution stdout readouts catching compilation syntax errors diagnostic feedback securely.
+
 ```
  
 
