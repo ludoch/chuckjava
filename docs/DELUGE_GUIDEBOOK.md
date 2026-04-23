@@ -409,5 +409,24 @@ Based on practical field feedback from Deluge Workstation power-users, this sect
         - `Shift + Dragging` a pad square pushes the active clip block across empty cell lanes displacement targets.
         - Contextual dropdown menus on empty cells offer `Insert blank clip row` (pushes all clips belonging to instrument lower down the column stack one slot back).
 
+---
+
+## 13. PERSISTENCE & STATE STORAGE SPECIFICATION
+
+### 13.1 Directory structure resolution
+The application reads and writes configurations matching standard local hierarchy mappings:
+```text
+[App Root Path or preferences directory mapping]
+├── SONGS/          # Holds Master Project configuration state triggers .xml 
+├── KITS/           # Holds instrument percussion elements allocations .xml
+├── SYNTHS/         # Holds instrument synthesis node parameters .xml
+└── SAMPLES/        # Binary PCM .wav / .aif acoustic streams assets
+```
+
+### 13.2 Saving streams execution
+- **Songs backup triggers**: Bound across Master navigation ribbon setups providing manual serializations loops.
+- **Active presets exports**: Triggered atop editing dials drawer pipelines backing updates to disk pointers.
+
+
 
 
