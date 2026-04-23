@@ -437,6 +437,21 @@ graph TD
 ### 14.2 Deployment Pad layouts geometry
 - **Pad Aspect bounding boxes ratios**: Preserved at `1:1` squares mapping matrix grids spans symmetrically. 
 
+---
+
+## 15. CHUCK LIVE NODE INSTRUMENTS (THE [C] CLIP)
+
+Bypassing fixed subtractive synthesis XML models, the workstation enables hosting raw algorithmic synthesis scripts directly sequenced inside arrangement grids timelines.
+
+### 15.1 Serialization schema
+Song projects store file paths pointers resolving execution dependencies at load times:
+```xml
+<instrument type="CHUCK">
+  <scriptPath>/CHUCKS/custom_fm.ck</scriptPath>
+</instrument>
+```
+ 
+
 
 
 
