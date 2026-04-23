@@ -350,8 +350,27 @@ A vertically stacked column of four real-time graphical scopes mapping to the ma
 *   **Continuous Automation Drawing**: Clicking and dragging across the Step Effects Visualizer Lane (Bottom Panel) draws a curve for the selected parameter.
 *   **MIDI Learn Context Menus**: Right-clicking virtually any slider (e.g., Reverb Mix) triggers a context menu to map or clear a physical MIDI CC assignment.
 
-### 11.4 Conceptual View Modes
-*   **SONG MODE**: The macro view. Rows represent Instruments/Tracks. Columns represent Clip Slots (blocks of arrangement).
-*   **CLIP MODE**: The micro view. Rows represent Drum Sounds (Kit) or Pitches (Synth). Columns represent Time Steps (16th notes by default).
-*   **ARRANGER MODE**: A linear timeline track view (slated for future implementation).
+### 11.5 Logical Model Connections (The Bridge Contract)
+
+The User Interface interacts with the sample-accurate synthesis engine entirely via shared static memory arrays managed by `org.chuck.deluge.BridgeContract`. There is no network overhead; UI changes map instantly to ChucK virtual machine shreds.
+
+#### Global Scalars (Live bindings)
+- `g_bpm` (Float): Master tempo. Mapped to slider drag events on the top transport ribbon.
+- `g_swing` (Float): Shuffle ratio (0.5 = straight, 0.75 = heavy swing).
+- `g_play` (Integer): Playback trigger bit. (`0` = stop, `1` = play).
+- `g_current_step` (Integer): Read-only sequence step cursor. Drives playhead highlights framing rendering cycles.
+- `g_master_vol` (Float): Output master audio gain attenuation.
+
+#### Distributed Shared Arrays (Midi/Automation state mapping)
+- `g_pattern` [Size: 128] (Integer): 1/0 bitmask storing note activity. Index computed via `trackIdx * 16 + stepIdx`.
+- `g_velocity` [Size: 128] (Float): Per-step velocity automation values.
+- `g_filter` [Size: 16] (Float pairs): Consecutive track frequency cutoff and resonance values tuples. 
+
+### 11.6 Application State & Preferences Registry
+
+Persistent preferences are handled through `org.chuck.deluge.project.PreferencesManager` and configure hardware boundaries on application boot cycles:
+- `midi.input` (String): Descriptors name of incoming physical interface hardware port.
+- `reverb.model` (String): Algorithmic architecture selection switch (`JCRev`, `FreeVerb`, `ProceduralReverb`).
+- `show.visualizers` (Boolean): GPU acceleration optimization toggles gating FFT analyzer pipeline loops.
+
 
