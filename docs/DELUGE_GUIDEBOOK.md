@@ -63,6 +63,14 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 2. **Click on the row header** (the label on the left showing the clip name) to open it in the Clip Editor.
 3. The view will automatically switch to **CLIP** mode, and the Matrix grid will be populated with the sequence from that clip.
 
+▌ MULTI-TAB TRACK INSPECTOR (DESKTOP EXCLUSIVE)
+1. **Right-Click** any active pad square inside the arrangement timeline grid.
+2. Opens a modular operations inspector deck containing:
+   - **PRESETS Tab**: Hot-swapping active instrument sounds references immediately.
+   - **CLIPBOARD Tab**: Triggering rapid variations duplicate chains (`Clone Clip`).
+   - **MIXER Tab**: Master headroom amplification decks routing attenuation sliders.
+
+
 
 ▌ OPENING THE SOUND EDITOR
 1. In **SONG** view, locate the **E** button on the right side of the track row.
