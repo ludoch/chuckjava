@@ -379,5 +379,35 @@ Persistent preferences are handled through `org.chuck.deluge.project.Preferences
 - `midi.input` (String): Descriptors name of incoming physical interface hardware port.
 - `reverb.model` (String): Algorithmic architecture selection switch (`JCRev`, `FreeVerb`, `ProceduralReverb`).
 - `show.visualizers` (Boolean): GPU acceleration optimization toggles gating FFT analyzer pipeline loops.
+- `preset.linking.policy` (String): Governs composition save files structure (`EMBED` vs `LINK_LIVE` references).
+
+> [!WARNING]
+> **Hardware Parity Compatibility Constraint**:
+> - `EMBED` is the default factory configuration. It guarantees full backward compatibility with official Synthstrom Deluge physical hardware.
+> - Switching to `LINK_LIVE` means Songs will store file references instead of duplicate definitions. 
+> - **Side Effects**: Exporting `.xml` Songs built with `LINK_LIVE` policy onto an SD Card to be loaded on real Deluge hardware will fail to recognize sound generators, as the native unit expects embedded parameters explicitly.
+
+
+
+---
+
+## 12. UX PROPOSALS: RESOLVING CORE WORKFLOW FRICTION
+
+Based on practical field feedback from Deluge Workstation power-users, this section outlines structural interface design amendments to mitigate sequence and instrument architectural friction.
+
+### 12.1 Problem 1: Instrument Presets Disconnect in Saved Songs
+*   **Context**: Edits applied back to global Presets (Kits or Synths) in library directories do not reflect back retroactively in older `.xml` Songs referencing them, because Songs traditionally embed full duplicate attributes of presets rather than referring to their path pointers.
+*   **Proposal: Linked Presets Architecture**:
+    - Introduce a `[ ] LINK TO GLOBAL PRESET` checkbox beside Preset titles on inspector accordions.
+    - When checked, the workstation saves only a path pointer (`<presetRef path="SYNTHS/001_Bass.xml"/>`) inside the Song file. 
+    - Modifying synthesis sliders prompts: `[Update Global Preset]` (overwrites original path to match new sounds universally everywhere) or `[Local Branch Only]` (breaks linkage and embeds state localized within the current open composition).
+
+### 12.2 Problem 2: Shuffling and Re-ordering Clips in Song View (Session Lanes)
+*   **Context**: Organizing structure layouts horizontally or vertically requires space displacements or clip dragging. 
+*   **Proposal: Pad Shifting focused accelerators**:
+    - When running the sequencer in Song Mode Workspace:
+        - `Shift + Dragging` a pad square pushes the active clip block across empty cell lanes displacement targets.
+        - Contextual dropdown menus on empty cells offer `Insert blank clip row` (pushes all clips belonging to instrument lower down the column stack one slot back).
+
 
 
