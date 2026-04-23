@@ -88,6 +88,10 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 2. Click the **M** button on the right side of the row to mute just that sound. It will turn yellow.
 3. Click it again to unmute.
 
+▌ SIDECHAIN COMPRESSOR DUCKING
+- Active sequencing on **Row 1 (The Kick Drum instrument)** drives a global compressor envelope ducking all collateral channels headroom temporarily (120 milliseconds recovery), establishing timeline pulse pumping aesthetics.
+
+
 ▌ VERTICAL PAD SHIFTING (RE-ORDERING CLIPS)
 1. In **SONG** view, reorganize the vertical stacking of clips by holding the `SHIFT` key and clicking any active Pad.
 2. This accelerator shifts the clip block focus up/down displacement targets to group sections structurally.
