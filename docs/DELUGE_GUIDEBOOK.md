@@ -314,7 +314,14 @@ The UI follows a classic Digital Audio Workstation (DAW) topography, divided int
 #### Left Panel (Sidebar)
 *   **Tabbed Interface**:
     *   **LIBRARY Tab**: A tree/hierarchical view displaying the file system (SD CARD) with folders for `KITS`, `SYNTHS`, `SONGS`, and `EXTERNAL SAMPLES`. Double-clicking a file loads it into the global model.
-    *   **EDITOR Tab**: A dynamic property inspector. When a track is selected, it displays nested accordion menus (e.g., OSCILLATORS, FILTERS, MASTER FX). Each category contains sliders (Volume, Cutoff, Reverb) with inline modulation toggle buttons (e.g., an `M` button for modulation matrices) and MIDI-learn context menus.
+    *   **EDITOR Tab**: A dynamic property inspector. When a track is selected, it displays nested accordion menus:
+        - **OSCILLATORS**: Type select (Sine, Saw, Square, Triangle, Noise), Volume, Transposition, and Pulse Width.
+        - **MODULATORS**: Modulator matrix depth (FM synthesis amounts).
+        - **FILTERS**: Low-pass and High-pass Cutoff sweeps, filter types select.
+        - **ENVELOPES**: Complete Attack, Decay, Release, and Sustain ADSR curve limits.
+        - **DISTORTIONS**: Bit-depth decimation limits and drive limits.
+        - **MASTER FX**: Global visual reverb room sizes and delays send loops.
+
     *   **MIDI Tab**: (Primarily in Swing) For mapping and routing overviews.
 
 #### Center Panel (The Matrix)
