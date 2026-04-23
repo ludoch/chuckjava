@@ -77,7 +77,12 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 2. Click the **M** button on the right side of the row to mute just that sound. It will turn yellow.
 3. Click it again to unmute.
 
+▌ VERTICAL PAD SHIFTING (RE-ORDERING CLIPS)
+1. In **SONG** view, reorganize the vertical stacking of clips by holding the `SHIFT` key and clicking any active Pad.
+2. This accelerator shifts the clip block focus up/down displacement targets to group sections structurally.
+
 ---
+
 
 ## 4. RECORDING & MIDI SUPPORT
 
@@ -391,23 +396,6 @@ Persistent preferences are handled through `org.chuck.deluge.project.Preferences
 
 ---
 
-## 12. UX PROPOSALS: RESOLVING CORE WORKFLOW FRICTION
-
-Based on practical field feedback from Deluge Workstation power-users, this section outlines structural interface design amendments to mitigate sequence and instrument architectural friction.
-
-### 12.1 Problem 1: Instrument Presets Disconnect in Saved Songs
-*   **Status: RESOLVED** via the global `preset.linking.policy` Preference registry key.
-*   **Behavior**: When the user activates `LINK_LIVE` in Preferences, Songs automatically treat external Preset changes as source pointers instead of making clones.
-
-
-### 12.2 Problem 2: Shuffling and Re-ordering Clips in Song View (Session Lanes)
-*   **Context**: Organizing structure layouts horizontally or vertically requires space displacements or clip dragging. 
-*   **Proposal: Pad Shifting focused accelerators**:
-    - When running the sequencer in Song Mode Workspace:
-        - `Shift + Dragging` a pad square pushes the active clip block across empty cell lanes displacement targets.
-        - Contextual dropdown menus on empty cells offer `Insert blank clip row` (pushes all clips belonging to instrument lower down the column stack one slot back).
-
----
 
 ## 13. PERSISTENCE & STATE STORAGE SPECIFICATION
 
