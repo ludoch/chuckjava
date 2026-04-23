@@ -396,11 +396,9 @@ Persistent preferences are handled through `org.chuck.deluge.project.Preferences
 Based on practical field feedback from Deluge Workstation power-users, this section outlines structural interface design amendments to mitigate sequence and instrument architectural friction.
 
 ### 12.1 Problem 1: Instrument Presets Disconnect in Saved Songs
-*   **Context**: Edits applied back to global Presets (Kits or Synths) in library directories do not reflect back retroactively in older `.xml` Songs referencing them, because Songs traditionally embed full duplicate attributes of presets rather than referring to their path pointers.
-*   **Proposal: Linked Presets Architecture**:
-    - Introduce a `[ ] LINK TO GLOBAL PRESET` checkbox beside Preset titles on inspector accordions.
-    - When checked, the workstation saves only a path pointer (`<presetRef path="SYNTHS/001_Bass.xml"/>`) inside the Song file. 
-    - Modifying synthesis sliders prompts: `[Update Global Preset]` (overwrites original path to match new sounds universally everywhere) or `[Local Branch Only]` (breaks linkage and embeds state localized within the current open composition).
+*   **Status: RESOLVED** via the global `preset.linking.policy` Preference registry key.
+*   **Behavior**: When the user activates `LINK_LIVE` in Preferences, Songs automatically treat external Preset changes as source pointers instead of making clones.
+
 
 ### 12.2 Problem 2: Shuffling and Re-ordering Clips in Song View (Session Lanes)
 *   **Context**: Organizing structure layouts horizontally or vertically requires space displacements or clip dragging. 
