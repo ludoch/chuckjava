@@ -263,3 +263,24 @@ Press active Grid Workspace **`P`** validation onboard key. dynamic Visual step 
 -   `Shift + Mouse Wheel`: Zoom (Vertical).
 -   `Middle-click + Drag`: Scroll (Hand Tool).
 -   `P` key: Open visual arpeggiator pattern editor with Euclidean toggle.
+---
+
+## 10. SWING UI EDITION REFERENCE
+
+A lightweight, pure Java desktop UI alternative built entirely on Swing (accessible by launching with the `--swing` argument). Ideal for environments with native layout render bottlenecks.
+
+▌ INTERFACE TOPOGRAPHY
+- **Grid Layout partitions (GridBagLayout)**:
+    - **Top strip**: Houses full modular views switches buttons (CLIP, SONG, ARR), global sequence controls (Play, Stop, Rec, Load XML), and speed modulators (BPM, Swing, Master volume sliders).
+    - **Center Viewports canvas**: Confined behind centered scrollbars containment viewports locking cell pads proportions securely.
+    - **Southern strip arrays**: Spans stacked parameter modifier ribbons layer toggling graphical draws step plots.
+
+▌ VISUAL WALKTHROUGH (SWING)
+- **Step 0: Pure Swing Workspace Launch**
+  ![Swing Initial State](../docs/swing_step0_start.png)
+
+- **Step 1: Song View (Loaded project)**
+  ![Swing Loaded State](../docs/swing_step1_loaded_songview.png)
+
+- **Step 1b: Clip View (Sequencer Editor pads)**
+  ![Swing Clip View](../docs/swing_step1_loaded_clipview.png)

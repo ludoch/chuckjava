@@ -47,45 +47,15 @@ jobs:
         cache: maven
         server-id: github
 
-    - name: Build Linux fat jar
-      run: mvn -pl deluge -am clean package -DskipTests -nsu -Djavafx.platform=linux
+    - name: Build Swing-only fat jar
+      run: mvn -pl deluge -am clean package -Pswing-dist -DskipTests -nsu
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Store Linux fat jar
-      run: cp deluge/target/deluge-1.0-SNAPSHOT.jar deluge-linux.jar
-
-    - name: Build macOS Intel fat jar
-      run: mvn -pl deluge -am clean package -DskipTests -nsu -Djavafx.platform=mac
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Store macOS Intel fat jar
-      run: cp deluge/target/deluge-1.0-SNAPSHOT.jar deluge-mac-x64.jar
-
-    - name: Build macOS ARM fat jar
-      run: mvn -pl deluge -am clean package -DskipTests -nsu -Djavafx.platform=mac-aarch64
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Store macOS ARM fat jar
-      run: cp deluge/target/deluge-1.0-SNAPSHOT.jar deluge-mac-aarch64.jar
-
-    - name: Build Windows fat jar
-      run: mvn -pl deluge -am clean package -DskipTests -nsu -Djavafx.platform=win
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Store Windows fat jar
-      run: cp deluge/target/deluge-1.0-SNAPSHOT.jar deluge-win.jar
 
     - name: Prepare Release Assets
       run: |
         mkdir -p release_assets
-        cp deluge-linux.jar release_assets/
-        cp deluge-mac-x64.jar release_assets/
-        cp deluge-mac-aarch64.jar release_assets/
-        cp deluge-win.jar release_assets/
+        cp deluge/target/deluge-swing.jar release_assets/
         cp deluge/run.sh release_assets/
         cp deluge/run.bat release_assets/
         chmod +x release_assets/run.sh
@@ -101,11 +71,9 @@ jobs:
         prerelease: false
         files: |
           deluge-workstation.zip
-          release_assets/deluge-linux.jar
-          release_assets/deluge-mac-x64.jar
-          release_assets/deluge-mac-aarch64.jar
-          release_assets/deluge-win.jar
+          release_assets/deluge-swing.jar
           release_assets/run.sh
           release_assets/run.bat
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
