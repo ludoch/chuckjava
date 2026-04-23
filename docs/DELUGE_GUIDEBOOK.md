@@ -345,9 +345,8 @@ The UI follows a classic Digital Audio Workstation (DAW) topography, divided int
 #### Center Panel (The Matrix)
 *   **The Grid**: A responsive 2D matrix (default 8 rows x 16 columns) representing step pads.
     *   **Row Headers (Left side of grid)**: Labels for the row (e.g., "EMPTY", "PAD 1", or Note Names). Includes a quick Audition `>` button to preview the row's sound.
-    *   **Track Controls (Right side of grid)**: 
-        - *JavaFX*: Contextual buttons for `L` (Launch), `C` (Color cycle), `M` (Mute), `E` (Edit) flanking the row.
-        - *Swing*: Dedicated grid Columns 17 (MUTE) and 18 (SOLO/LAUNCH) replacing text buttons.
+    *   **Track Controls (Right side of grid)**: Dedicated pads at Column 17 (MUTE - toggles track activity) and Column 18 (EDIT / SOLO).
+
 
 *   **Bottom Anchor (Clip Mode)**:
     *   **Piano Roll**: A clickable piano keyboard graphic spanning the width of the grid, enabling melodic input. Includes a horizontal scrollbar above it to page through time (auto-scrolling tracks the playhead).
