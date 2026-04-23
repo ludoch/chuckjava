@@ -102,6 +102,10 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 2. Press **▶ PLAY** to start the playhead.
 3. Click cells on the grid. They will act as trigger pads, recording notes at the current playhead position (`currentStep`) rather than toggling the step where you clicked.
 4. Recorded notes will appear on the grid and play back in the next loop. Note duration is calculated precisely based on Note-Off events.
+
+▌ MIDI OUTBOUND SEQUENCING
+- Sequencer pad notes emit outbound triggers on the first operational hardware port connected via native `RtMidiOut` pipeline integration.
+
 ▌ CHORD GENERATION ACCELERATOR
 - When working inside **Clip View** sequence matrix, holding the `SHIFT` modifier key while programming sequencer steps automatically writes full polyphonic **Triads Chords harmonies** (Root + Major Third + Perfect Fifth) locked exactly atop your timeline cursor bars!
 
