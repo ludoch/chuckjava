@@ -413,6 +413,31 @@ The application reads and writes configurations matching standard local hierarch
 - **Songs backup triggers**: Bound across Master navigation ribbon setups providing manual serializations loops.
 - **Active presets exports**: Triggered atop editing dials drawer pipelines backing updates to disk pointers.
 
+---
+
+## 14. ADVANCED ENGINEERING SCHEMATICS
+
+### 14.1 Concurrent Thread Boundaries
+To maintain zero-latency graphics response alongside sample-accurate synthesis timings, the application spans three isolated thread realms governed through lock-free boundaries:
+
+```mermaid
+graph TD
+    subgraph "Java UI Thread Realm (Swing / JavaFX)"
+        UI[Interaction Handlers] -->|Update| Arrays[Shared Memory BridgeContract]
+    end
+    subgraph "Virtual Machine audio Thread Realm (ChucK)"
+        Arrays -->|Poll| Spork[Distributed Shreds]
+        Spork -->|Compute| Audio[Sample buffers]
+    end
+    subgraph "Hardware Controller Realm (Midi In)"
+        Midi[Hardware Port] -->|Interrupt| UI
+    end
+```
+
+### 14.2 Deployment Pad layouts geometry
+- **Pad Aspect bounding boxes ratios**: Preserved at `1:1` squares mapping matrix grids spans symmetrically. 
+
+
 
 
 
