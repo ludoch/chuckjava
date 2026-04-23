@@ -90,6 +90,8 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 
 ▌ SIDECHAIN COMPRESSOR DUCKING
 - Active sequencing on **Row 1 (The Kick Drum instrument)** drives a global compressor envelope ducking all collateral channels headroom temporarily (120 milliseconds recovery), establishing timeline pulse pumping aesthetics.
+- **Gain Reduction (GR) Meter (Desktop Exclusive)**: A responsive orange bar renders on the visualizer pane viewport edges illustrating live ducking headroom compression.
+
 
 
 ▌ VERTICAL PAD SHIFTING (RE-ORDERING CLIPS)
