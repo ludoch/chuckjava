@@ -181,13 +181,13 @@ Here is a map of common hardware actions to their software equivalents in our em
 
 | Hardware Action | Software UI Equivalent |
 | :--- | :--- |
-| **Audition Pad** (Far Right) | Click the label or audition button on the right of the row. |
+| **Audition Pad** (Far Right) | Click the Audition button `>` on the left of the row. |
 | **Toggle Step** | Click any cell in the 16x8 grid (Clip Mode). |
-| **Launch Clip** | Click the **L** button on the right side of the row (Song Mode). |
-| **Mute Track** | Click the **M** button on the right side of the row (Song Mode). |
-| **Change Color** | Click the **C** button on the right side of the row (Song Mode). |
-| **Scroll Vertically** | Use the scroll bar or mouse wheel on the grid. |
-| **Zoom Horizontal** | (Not yet supported via UI, fixed at 16th notes by default). |
+| **Launch Clip** | Click Pad 18 on the right edge of the grid (Song Mode). |
+| **Mute Track** | Click Pad 17 on the right edge of the grid. (`Shift + Click` clears notes). |
+| **Change Color** | Right-Click the Track Row label text (Far Left). |
+| **QWERTY Piano Play** | Press keyboard rows `Z-M` (White keys) and `S-J` (Black keys). |
+
 ---
 
 ## 8. SOUND EDITORS & CONTROLS WORKFLOW (MANUAL)
