@@ -82,6 +82,10 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 1. In Song View, locate the **[M]** button on the right side of the track row (next to Launch and Color).
 2. Click it to mute the track. The button turns yellow.
 3. Click it again to unmute.
+▌ LOOP-BOUNDARY MUTE (QUEUED MUTES)
+1. In Song View, hold the `Shift` key and click the **[M]** mute button on the right side of the track row.
+2. The Mute pad will flash, indicating that the mute operation is ARMED and queued.
+3. As the playback playhead crosses loop step 0 (the end of the current sequence cycle), the track will fully and instantaneously mute.
 
 ▌ INDIVIDUAL ROW MUTE IN KITS
 1. When working with a **Kit** clip (where each row is a different sound, like Kick, Snare, etc.), you can mute individual sounds.
