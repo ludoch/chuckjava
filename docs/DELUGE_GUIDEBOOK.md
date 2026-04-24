@@ -112,6 +112,8 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 ▌ MIDI OUTBOUND SEQUENCING
 - Sequencer pad notes emit outbound triggers on the first operational hardware port connected via native `RtMidiOut` pipeline integration.
 - **Dedicated MIDI Track (Track Type 2)**: Mutes internal software synthesis acoustics to map operations strictly delivering output sequence integers over continuous physical chords pipelines.
+- **Outbound Activity LEDs**: Pads flash momentarily yellow providing execution stream indicators on MIDI deliveries.
+
 
 
 ▌ CHORD GENERATION ACCELERATOR
