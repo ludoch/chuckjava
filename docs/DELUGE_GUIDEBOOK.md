@@ -116,8 +116,14 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 
 
 
-▌ CHORD GENERATION ACCELERATOR
-- When working inside **Clip View** sequence matrix, holding the `SHIFT` modifier key while programming sequencer steps automatically writes full polyphonic **Triads Chords harmonies** (Root + Major Third + Perfect Fifth) locked exactly atop your timeline cursor bars!
+▌ CLIP STUTTER ROLL ACCELERATOR
+- Hold down any active sequence Pad on a drum kit track to repetitively re-trigger sound bursts at division rate intervals (1/8th note rolls).
+- Release the pad stops the repeating triggers.
+
+▌ ONE-SHOT (ONCE) TIMELINE CLIPS
+- Toggles a track to automatically silence itself after playing exactly one sequence pass loop. 
+- `SHIFT + Click` the left row header label text to engage the mode (appends `(1SH)` indicator tag).
+
 
 ▌ MIDI INPUT & LEARN
 1. Open **Settings > Preferences...** to select your MIDI Input device from the dropdown.
