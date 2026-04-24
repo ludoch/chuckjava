@@ -229,7 +229,8 @@ Exposes synthesis preset sound parameters categorized inside visually premium dy
 #### Category: OSCILLATORS
 Contains inner sub accordions categorization grouping setups: 
 - **OSCILLATOR 1 & 2**:
-  - **Type**: Wave generator live inputs choices (SINE, SAW, SQUARE, TRIANGLE, SAMPLE). 
+  - **Type**: Wave generator live inputs choices (SINE, SAW, SQUARE, TRIANGLE, SAMPLE, DX7 FM SYNTH). 
+ 
   - **Volume**: Individual oscillator amplitude level values. 
   - **Transpose**: Individual transposition values.
   - **Sync Checkbox**: Syncs with live frequency retrigger phase assignments bounds rules checks. 
