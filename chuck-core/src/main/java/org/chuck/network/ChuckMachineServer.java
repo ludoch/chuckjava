@@ -21,6 +21,10 @@ public class ChuckMachineServer {
     oscIn.addAddress("/chuck/replace");
     oscIn.addAddress("/chuck/status");
     oscIn.addAddress("/chuck/kill");
+    oscIn.addAddress("/chuck/remove/all");
+    oscIn.addAddress("/chuck/clear");
+    oscIn.addAddress("/chuck/time");
+    oscIn.addAddress("/chuck/reset/id");
     oscIn.port(port);
     logger.info("Machine Server listening on port " + port);
 
@@ -43,6 +47,12 @@ public class ChuckMachineServer {
                         logger.info("Received OSC: remove " + id);
                         vm.removeShred(id);
                       }
+                      case "/chuck/remove/all" -> {
+                        logger.info("Received OSC: remove.all");
+                        for (org.chuck.core.ChuckShred s : vm.getAllShreds()) {
+                          vm.removeShred(s.getId());
+                        }
+                      }
                       case "/chuck/replace" -> {
                         int id = msg.getInt(0);
                         String file = msg.getString(1);
@@ -53,6 +63,21 @@ public class ChuckMachineServer {
                       case "/chuck/status" -> {
                         logger.info("Received OSC: status");
                         System.out.println(vm.status());
+                      }
+                      case "/chuck/time" -> {
+                        logger.info("Received OSC: time");
+                        double secs = (double) vm.getCurrentTime() / vm.getSampleRate();
+                        System.out.println(
+                            String.format(
+                                "time: %d samples / %.2f seconds", vm.getCurrentTime(), secs));
+                      }
+                      case "/chuck/clear" -> {
+                        logger.info("Received OSC: clear.vm");
+                        vm.clear();
+                      }
+                      case "/chuck/reset/id" -> {
+                        logger.info("Received OSC: reset.id");
+                        vm.resetShredId();
                       }
                       case "/chuck/kill" -> {
                         logger.info("Received OSC: kill");

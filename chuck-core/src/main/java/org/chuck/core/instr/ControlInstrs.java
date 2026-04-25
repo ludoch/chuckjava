@@ -43,8 +43,13 @@ public class ControlInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      long val = s.reg.popAsLong();
-      if (val == 0) {
+      boolean isTrue = false;
+      if (s.reg.isObject(0)) {
+        isTrue = s.reg.popObject() != null;
+      } else {
+        isTrue = s.reg.popAsLong() != 0;
+      }
+      if (!isTrue) {
         s.setPc(target);
       }
     }
@@ -63,8 +68,13 @@ public class ControlInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      long val = s.reg.popAsLong();
-      if (val != 0) s.setPc(target);
+      boolean isTrue = false;
+      if (s.reg.isObject(0)) {
+        isTrue = s.reg.popObject() != null;
+      } else {
+        isTrue = s.reg.popAsLong() != 0;
+      }
+      if (isTrue) s.setPc(target);
     }
   }
 
@@ -81,7 +91,14 @@ public class ControlInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      if (s.reg.peekLong(0) == 0) {
+      boolean isTrue = false;
+      if (s.reg.isObject(0)) {
+        isTrue = s.reg.peekObject(0) != null;
+      } else {
+        isTrue = s.reg.peekLong(0) != 0;
+      }
+
+      if (!isTrue) {
         s.setPc(target);
       } else {
         s.reg.pop();
@@ -102,7 +119,14 @@ public class ControlInstrs {
 
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      if (s.reg.peekLong(0) != 0) {
+      boolean isTrue = false;
+      if (s.reg.isObject(0)) {
+        isTrue = s.reg.peekObject(0) != null;
+      } else {
+        isTrue = s.reg.peekLong(0) != 0;
+      }
+
+      if (isTrue) {
         s.setPc(target);
       } else {
         s.reg.pop();

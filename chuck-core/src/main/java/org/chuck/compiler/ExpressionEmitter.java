@@ -68,7 +68,7 @@ public class ExpressionEmitter {
         if (code != null) {
           switch (e.op()) {
             case MINUS -> code.addInstruction(new ArithmeticInstrs.NegateAny());
-            case S_OR -> code.addInstruction(new LogicInstrs.LogicalNot());
+            case S_OR, LOGICAL_NOT -> code.addInstruction(new LogicInstrs.LogicalNot());
             case PLUS -> {}
             default -> {}
           }
@@ -1098,6 +1098,16 @@ public class ExpressionEmitter {
 
               case S_OR -> code.addInstruction(new ArithmeticInstrs.BitwiseOrAny());
               case S_AND -> code.addInstruction(new ArithmeticInstrs.BitwiseAndAny());
+              case S_XOR -> code.addInstruction(new ArithmeticInstrs.BitwiseXorAny());
+              case SHIFT_LEFT -> {
+                String lt = parent.getExprType(e.lhs());
+                if (lt != null && lt.contains("[]")) {
+                  code.addInstruction(new ArrayInstrs.ShiftLeftOrAppend(lt));
+                } else {
+                  code.addInstruction(new ArithmeticInstrs.LeftShiftAny());
+                }
+              }
+              case SHIFT_RIGHT -> code.addInstruction(new ArithmeticInstrs.RightShiftAny());
               case LT -> {
                 if (isInt) code.addInstruction(new LogicInstrs.LtInt());
                 else if (isFloat) code.addInstruction(new LogicInstrs.LtFloat());
@@ -1177,9 +1187,6 @@ public class ExpressionEmitter {
                   code.replaceInstruction(jumpIdx, new ControlInstrs.JumpIfTrueAndPushTrue(endIdx));
                 }
               }
-              case SHIFT_LEFT ->
-                  code.addInstruction(
-                      new ArrayInstrs.ShiftLeftOrAppend(parent.getExprType(e.lhs())));
               default -> {}
             }
           } else {

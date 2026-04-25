@@ -301,6 +301,7 @@ public class StatementEmitter {
         // "Foo" may be a user class. Compute the element type for ctor dispatch.
         String elemTypeS = parent.getBaseType(s.type());
         boolean isUserClassElem = parent.getUserClassRegistry().containsKey(elemTypeS);
+        boolean isAutoInst = parent.isAutoInstantiable(s.type());
         boolean isObject = parent.isObjectType(s.type());
         boolean forceGlobal = s.isGlobal();
         boolean useGlobal =
@@ -349,7 +350,7 @@ public class StatementEmitter {
                     .methods()
                     .containsKey(elemTypeS + ":0");
         boolean isArrayDeclS = !s.arraySizes().isEmpty();
-        if (isUserClass
+        if ((isUserClass || isAutoInst)
             && !s.isReference()
             && !isArrayDeclS
             && (hasExplicitCallArgs || hasZeroArgCtor)) {
@@ -446,33 +447,34 @@ public class StatementEmitter {
 
           boolean isArrayDecl = !s.arraySizes().isEmpty();
           if (parent.isInPreCtor()) {
-            code.addInstruction(new StackInstrs.PushThis());
-            code.addInstruction(
-                new ObjectInstrs.InstantiateSetAndPushField(
-                    parent.getBaseType(s.type()),
-                    s.name(),
-                    argCount,
-                    s.isReference(),
-                    isArrayDecl,
-                    parent.getUserClassRegistry()));
-            code.addInstruction(new StackInstrs.Pop());
+            if (isAutoInst && !s.isReference()) {
+              code.addInstruction(new StackInstrs.PushThis());
+              code.addInstruction(
+                  new ObjectInstrs.InstantiateSetAndPushField(
+                      parent.getBaseType(s.type()),
+                      s.name(),
+                      argCount,
+                      s.isReference(),
+                      isArrayDecl,
+                      parent.getUserClassRegistry()));
+              code.addInstruction(new StackInstrs.Pop());
+            }
           } else if (useGlobal) {
-            if ("HMM".equals(s.type()))
-              System.out.println(
-                  "DEBUG: Emitting InstantiateSetAndPushGlobal for HMM, name="
-                      + s.name()
-                      + ", argCount="
-                      + argCount);
             parent.getGlobalVarTypes().put(s.name(), s.type());
-            code.addInstruction(
-                new ObjectInstrs.InstantiateSetAndPushGlobal(
-                    parent.getBaseType(s.type()),
-                    s.name(),
-                    argCount,
-                    s.isReference(),
-                    isArrayDecl,
-                    parent.getUserClassRegistry()));
-            code.addInstruction(new StackInstrs.Pop());
+            if (isAutoInst && !s.isReference()) {
+              code.addInstruction(
+                  new ObjectInstrs.InstantiateSetAndPushGlobal(
+                      parent.getBaseType(s.type()),
+                      s.name(),
+                      argCount,
+                      s.isReference(),
+                      isArrayDecl,
+                      parent.getUserClassRegistry()));
+              code.addInstruction(new StackInstrs.Pop());
+            } else if (isObject) {
+              code.addInstruction(
+                  new VarInstrs.SetGlobalObjectOrInt(s.name())); // init with null (0)
+            }
           } else {
             Map<String, Integer> scope = parent.getLocalScopes().peek();
             Integer offset = scope.get(s.name());
@@ -486,15 +488,21 @@ public class StatementEmitter {
               if (isArrayDecl && !fullType.endsWith("[]")) {
                 fullType += "[]";
               }
-              code.addInstruction(
-                  new ObjectInstrs.InstantiateSetAndPushLocal(
-                      parent.getBaseType(fullType),
-                      offset,
-                      argCount,
-                      s.isReference(),
-                      isArrayDecl,
-                      parent.getUserClassRegistry()));
-              code.addInstruction(new StackInstrs.Pop());
+              if (isAutoInst && !s.isReference()) {
+                code.addInstruction(
+                    new ObjectInstrs.InstantiateSetAndPushLocal(
+                        parent.getBaseType(fullType),
+                        offset,
+                        argCount,
+                        s.isReference(),
+                        isArrayDecl,
+                        parent.getUserClassRegistry()));
+                code.addInstruction(new StackInstrs.Pop());
+              } else if (isObject) {
+                code.addInstruction(new PushInstrs.PushNull());
+                code.addInstruction(new VarInstrs.StoreLocal(offset));
+                code.addInstruction(new StackInstrs.Pop());
+              }
             }
           }
         }
@@ -504,6 +512,9 @@ public class StatementEmitter {
           parent.emitExpression(exp, code);
         }
         code.addInstruction(new ChuckPrint(s.expressions().size()));
+      }
+      case ChuckAST.ExampleStmt s -> {
+        // No-op at runtime
       }
       case ChuckAST.FuncDefStmt s -> {
         // Validate operator overloads

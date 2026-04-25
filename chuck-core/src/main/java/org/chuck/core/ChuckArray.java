@@ -154,6 +154,16 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     return types.size();
   }
 
+  public int capacity() {
+    return types.size();
+  }
+
+  public int capacity(int c) {
+    // In Java implementation using ArrayList, we don't strictly manage capacity manually
+    // but we can ensure internal capacity if needed.
+    return capacity();
+  }
+
   private void ensureCapacity(int index) {
     while (types.size() <= index) {
       intData.add(0L);

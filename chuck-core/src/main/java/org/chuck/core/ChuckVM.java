@@ -107,6 +107,7 @@ public class ChuckVM {
 
   private void rebuildGraph() {
     if (!graphDirty) return;
+    System.out.println("[VM] Rebuilding audio graph...");
 
     List<org.chuck.audio.ChuckUGen> result = new ArrayList<>();
     java.util.Set<org.chuck.audio.ChuckUGen> visited =
@@ -717,9 +718,9 @@ public class ChuckVM {
       if (currentTime + 1 < next) {
         long fastForward = Math.min(targetTime, next) - currentTime - 1;
         if (fastForward > 0) {
-          for (DacChannel chan : dacChannels) chan.tickSamples(currentTime, fastForward);
-          blackhole.tickSamples(currentTime, fastForward);
           now.addAndGet(fastForward);
+          for (DacChannel chan : dacChannels) chan.tickSamples(now.get(), fastForward);
+          blackhole.tickSamples(now.get(), fastForward);
           continue;
         }
       }
@@ -763,9 +764,9 @@ public class ChuckVM {
         }
       }
 
-      for (DacChannel chan : dacChannels) chan.tick(currentTime);
-      blackhole.tick(currentTime);
       now.incrementAndGet();
+      for (DacChannel chan : dacChannels) chan.tick(now.get());
+      blackhole.tick(now.get());
     }
   }
 
@@ -786,14 +787,14 @@ public class ChuckVM {
 
       if (blockSize > 1) {
         rebuildGraph();
+        now.addAndGet(blockSize);
         for (org.chuck.audio.ChuckUGen ugen : sortedUGens) {
-          ugen.tick(null, 0, blockSize, currentTime);
+          ugen.tick(null, 0, blockSize, now.get() - blockSize + 1);
         }
         for (int c = 0; c < numChannels; c++) {
           System.arraycopy(
               dacChannels[c].getBlockCache(), 0, dacBuffers[c], offset + processed, blockSize);
         }
-        now.addAndGet(blockSize);
         processed += blockSize;
       } else {
         advanceTime(1);

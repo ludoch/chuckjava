@@ -212,6 +212,10 @@ public class UGenRegistry {
   }
 
   private static void register(String name, UGenFactory factory) {
+    if (REGISTRY.containsKey(name)) {
+      // System.out.println("[chuck]: skipping duplicate registration for UGen: " + name);
+      return;
+    }
     REGISTRY.put(name, factory);
   }
 

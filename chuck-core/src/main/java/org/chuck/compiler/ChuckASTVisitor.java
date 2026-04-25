@@ -85,7 +85,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
       return new ChuckAST.ImportStmt(
           path, currentDoc, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
-    if (ctx.ID() != null && ctx.ID().getText().equals("doc")) {
+    if (ctx.ID() != null && !ctx.ID().isEmpty() && ctx.ID(0).getText().equals("doc")) {
       if (ctx.STRING() != null) {
         String text = ctx.STRING().getText();
         if (text.startsWith("\"") && text.endsWith("\"")) {
@@ -100,48 +100,12 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
   // --- Statement Adapter Methods (Mapping grammar labels to implementation) ---
 
   @Override
-  public ChuckAST.Stmt visitIfStmt(IfStmtContext ctx) {
-    return (ChuckAST.Stmt) visit(ctx.ifStatement());
-  }
-
-  @Override
-  public ChuckAST.Stmt visitSwitchStmt(SwitchStmtContext ctx) {
-    return (ChuckAST.Stmt) visit(ctx.switchStatement());
-  }
-
-  @Override
-  public ChuckAST.Stmt visitWhileStmt(WhileStmtContext ctx) {
-    return (ChuckAST.Stmt) visit(ctx.whileStatement());
-  }
-
-  @Override
-  public ChuckAST.Stmt visitUntilStmt(UntilStmtContext ctx) {
-    return (ChuckAST.Stmt) visit(ctx.untilStatement());
-  }
-
-  @Override
-  public ChuckAST.Stmt visitForStmt(ForStmtContext ctx) {
-    return (ChuckAST.Stmt) visit(ctx.forStatement());
-  }
-
-  @Override
-  public ChuckAST.Stmt visitRepeatStmt(RepeatStmtContext ctx) {
-    return (ChuckAST.Stmt) visit(ctx.repeatStatement());
-  }
-
-  @Override
-  public ChuckAST.Stmt visitDoStmt(DoStmtContext ctx) {
-    return (ChuckAST.Stmt) visit(ctx.doStatement());
-  }
-
-  @Override
-  public ChuckAST.Stmt visitReturnStmt(ReturnStmtContext ctx) {
-    return (ChuckAST.Stmt) visit(ctx.returnStatement());
-  }
-
-  @Override
-  public ChuckAST.Stmt visitPrintStmt(PrintStmtContext ctx) {
-    return (ChuckAST.Stmt) visit(ctx.printStatement());
+  public ChuckAST.Stmt visitExampleStmt(ExampleStmtContext ctx) {
+    captureDoc(ctx);
+    String currentDoc = consumeDoc();
+    String name = ctx.exampleStatement().ID(1).getText();
+    return new ChuckAST.ExampleStmt(
+        name, currentDoc, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
   }
 
   @Override
@@ -569,6 +533,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
             case ">>" -> ChuckAST.Operator.SHIFT_RIGHT;
             case "|" -> ChuckAST.Operator.S_OR;
             case "&" -> ChuckAST.Operator.S_AND;
+            case "^" -> ChuckAST.Operator.S_XOR;
             default -> ChuckAST.Operator.NONE;
           };
       if (op != ChuckAST.Operator.NONE) break;

@@ -6,14 +6,9 @@ import static org.chuck.audio.VectorAudio.SPECIES;
 import java.util.List;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorMask;
+import org.chuck.audio.ChuckUGen;
 
-/**
- * Band-limited pulse wave oscillator using PolyBLEP correction.
- *
- * <p>A pulse wave has two discontinuities per cycle: a rising edge at phase=0 and a falling edge at
- * phase=width. Both are corrected independently with PolyBLEP, giving clean output even at high
- * frequencies.
- */
+/** Pulse wave oscillator. Matches native ChucK (non-band-limited, samples BEFORE increment). */
 public class PulseOsc extends Osc {
   public PulseOsc() {
     super();
@@ -25,24 +20,16 @@ public class PulseOsc extends Osc {
 
   @Override
   protected double computeOsc(double phase) {
-    double dt = freq / sampleRate;
-
-    // Naive pulse
-    double out = (phase < width) ? 1.0 : -1.0;
-
-    // Rising edge at phase = 0
-    out += polyBlep(phase, dt);
-
-    // Falling edge at phase = width
-    double t2 = phase - width;
-    if (t2 < 0.0) t2 += 1.0;
-    out -= polyBlep(t2, dt);
-
-    return out;
+    return (phase < width) ? 1.0 : -1.0;
   }
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
+    tick(buffer, offset, length, systemTime, null);
+  }
+
+  @Override
+  public void tick(float[] buffer, int offset, int length, long systemTime, float[] manualInput) {
     if (systemTime != -1
         && systemTime == blockStartTime
         && blockCache != null
@@ -58,11 +45,10 @@ public class PulseOsc extends Osc {
     }
 
     int i = 0;
-    List<org.chuck.audio.ChuckUGen> srcs = getSources();
-    if (srcs.isEmpty()) {
-      float f_freq = (float) freq;
+    List<ChuckUGen> srcs = getSources();
+    if (srcs.isEmpty() && manualInput == null) {
       float f_phase = (float) phase;
-      float f_inc = f_freq / sampleRate;
+      float f_inc = (float) num;
       float f_width = (float) width;
 
       int bound = SPECIES.loopBound(length);
@@ -73,30 +59,19 @@ public class PulseOsc extends Osc {
       FloatVector vMinusOne = FloatVector.broadcast(SPECIES, -1.0f);
 
       for (; i < bound; i += SPECIES.length()) {
-        // Raw phase
-        FloatVector vPRaw = vOffsets.add(1.0f).mul(vInc).add(f_phase);
+        // Raw phase (No +1 offset to match ChucK's sample-before-increment)
+        FloatVector vPhases = vOffsets.mul(vInc).add(f_phase);
 
-        // p % 1.0
+        // Wrap phases to [0, 1]
         var intSpecies = jdk.incubator.vector.VectorSpecies.of(int.class, SPECIES.vectorShape());
-        var vIntP = vPRaw.castShape(intSpecies, 0);
+        var vIntP = vPhases.castShape(intSpecies, 0);
         var vFloorP = vIntP.castShape(SPECIES, 0);
-        FloatVector vP = vPRaw.sub(vFloorP);
+        vPhases = vPhases.sub(vFloorP);
 
-        VectorMask<Float> mask = vP.compare(jdk.incubator.vector.VectorOperators.LT, vWidth);
+        VectorMask<Float> mask = vPhases.compare(jdk.incubator.vector.VectorOperators.LT, vWidth);
 
         // Naive pulse (SIMD)
         FloatVector vOut = vMinusOne.blend(vOne, mask);
-
-        // Rising edge at phase 0
-        vOut = vOut.add(vPolyBlep(vP, vInc));
-
-        // Falling edge at phase width
-        FloatVector vP2 = vP.sub(vWidth);
-        // Wrap vP2 to [0, 1]
-        VectorMask<Float> maskNeg = vP2.compare(jdk.incubator.vector.VectorOperators.LT, 0.0f);
-        vP2 = vP2.add(vOne.blend(FloatVector.zero(SPECIES), maskNeg));
-
-        vOut = vOut.sub(vPolyBlep(vP2, vInc));
 
         FloatVector vGainOut = vOut.mul(gain);
         vGainOut.intoArray(blockCache, i);
@@ -112,7 +87,8 @@ public class PulseOsc extends Osc {
 
     // Scalar fallback for remainder or if we have sources
     for (; i < length; i++) {
-      float t = tick(systemTime == -1 ? -1 : systemTime + i);
+      float in = (manualInput != null) ? manualInput[i] : 0.0f;
+      float t = tick(in, systemTime == -1 ? -1 : systemTime + i);
       blockCache[i] = t;
       if (buffer != null) {
         buffer[offset + i] = t;

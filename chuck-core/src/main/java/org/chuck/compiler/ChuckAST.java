@@ -34,6 +34,7 @@ public sealed interface ChuckAST {
     OR,
     S_OR,
     S_AND,
+    S_XOR,
     LOGICAL_NOT,
     SHIFT_LEFT,
     SHIFT_RIGHT,
@@ -147,6 +148,8 @@ public sealed interface ChuckAST {
       implements Stmt {}
 
   record ReturnStmt(Exp exp, String doc, int line, int column) implements Stmt {}
+
+  record ExampleStmt(String name, String doc, int line, int column) implements Stmt {}
 
   record BlockStmt(List<Stmt> statements, boolean isScoped, String doc, int line, int column)
       implements Stmt {}

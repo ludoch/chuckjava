@@ -53,19 +53,22 @@ public abstract class MultiChannelUGen extends ChuckUGen {
     isTicking = true;
 
     try {
-      // 3. Sum inputs from mono sources
-      float sum = 0.0f;
+      // 3. Sum inputs channel-wise from all sources
+      float[] sums = new float[lastOutChannels.length];
       final ChuckUGen[] sources = this.sourcesArray;
       final int count = this.sourcesCount;
-      for (int i = 0; i < count; i++) {
-        ChuckUGen src = sources[i];
+      for (int s = 0; s < count; s++) {
+        ChuckUGen src = sources[s];
         if (src != null) {
-          sum += src.tick(systemTime);
+          src.tick(systemTime);
+          for (int i = 0; i < sums.length; i++) {
+            sums[i] += src.getChannelLastOut(i, systemTime);
+          }
         }
       }
 
       // 4. Compute multi-channel samples
-      computeMulti(sum, systemTime);
+      computeMulti(sums, systemTime);
 
       // 5. Apply gain to all channels and set master lastOut
       for (int i = 0; i < lastOutChannels.length; i++) {
@@ -87,11 +90,24 @@ public abstract class MultiChannelUGen extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
-    computeMulti(input, systemTime);
+    // Legacy single-input fallback
+    float[] inputs = new float[lastOutChannels.length];
+    java.util.Arrays.fill(inputs, input);
+    computeMulti(inputs, systemTime);
     return lastOutChannels.length > 0 ? lastOutChannels[0] : 0.0f;
   }
 
-  /** Subclasses implement this to fill lastOutChannels based on input. */
+  /** Subclasses should implement this to fill lastOutChannels based on multi-channel input. */
+  protected void computeMulti(float[] inputs, long systemTime) {
+    // Default fallback to legacy single-float computeMulti
+    float sum = 0;
+    for (float f : inputs) sum += f;
+    // Standard ChucK behavior when summing multi-channel input to mono?
+    // Usually it's just a sum.
+    computeMulti(sum, systemTime);
+  }
+
+  /** Legacy mono-input compute. Subclasses should migrate to the array version. */
   protected abstract void computeMulti(float input, long systemTime);
 
   @Override

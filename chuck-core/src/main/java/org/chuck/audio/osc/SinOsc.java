@@ -1,14 +1,12 @@
 package org.chuck.audio.osc;
 
-import static org.chuck.audio.VectorAudio.OFFSETS;
-import static org.chuck.audio.VectorAudio.SPECIES;
-
 import java.util.List;
-import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.core.doc;
 
-/** A sine wave oscillator using high-accuracy SIMD polynomial approximation. */
+/**
+ * A sine wave oscillator. To match native ChucK, this uses Math.sin and samples BEFORE increment.
+ */
 @doc("A sine wave oscillator.")
 public class SinOsc extends Osc {
   public SinOsc() {
@@ -25,22 +23,16 @@ public class SinOsc extends Osc {
 
   @Override
   protected double computeOsc(double phase) {
-    // Use the same polynomial as SIMD for bit-exact parity
-    // Wrap phase to [-0.5, 0.5] for better polynomial accuracy
-    float p = (float) (phase > 0.5 ? phase - 1.0 : phase);
-    float x = p * (float) (2.0 * Math.PI);
-    float x2 = x * x;
-
-    // 9th order minimax polynomial for sin(x)
-    float s = x2 * -1.9841269841269841e-4f; // c4 = -1/5040
-    s = (s + 0.008333333333333333f) * x2; // c3 = 1/120
-    s = (s - 0.16666666666666666f) * x2; // c2 = -1/6
-    s = (s + 1.0f) * x;
-    return s;
+    return Math.sin(phase * 2.0 * Math.PI);
   }
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
+    tick(buffer, offset, length, systemTime, null);
+  }
+
+  @Override
+  public void tick(float[] buffer, int offset, int length, long systemTime, float[] manualInput) {
     if (systemTime != -1
         && systemTime == blockStartTime
         && blockCache != null
@@ -52,6 +44,9 @@ public class SinOsc extends Osc {
 
     // If we have sources (modulation), we must sum them first
     float[] inputSum = new float[length];
+    if (manualInput != null) {
+      System.arraycopy(manualInput, 0, inputSum, 0, length);
+    }
     List<ChuckUGen> srcs = getSources();
     if (!srcs.isEmpty()) {
       for (ChuckUGen src : srcs) {
@@ -61,64 +56,46 @@ public class SinOsc extends Osc {
       }
     }
 
-    float f_freq = (float) freq;
-    float f_phase = (float) phase;
-    float f_inc = f_freq / sampleRate;
-
+    double f_phase = phase;
     int i = 0;
-    int bound = SPECIES.loopBound(length);
-    FloatVector vOffsets = FloatVector.fromArray(SPECIES, OFFSETS, 0);
-    FloatVector vInc = FloatVector.broadcast(SPECIES, f_inc);
-    FloatVector vOne = FloatVector.broadcast(SPECIES, 1.0f);
-    FloatVector vHalf = FloatVector.broadcast(SPECIES, 0.5f);
-    FloatVector vTwoPi = FloatVector.broadcast(SPECIES, (float) (2.0 * Math.PI));
+    // Scalar compute to ensure 100% parity with Math.sin() and correct sample timing
+    for (; i < length; i++) {
+      boolean inc_phase = true;
+      double d_num = this.num;
 
-    for (; i < bound; i += SPECIES.length()) {
-      // vPhases = (phase + (offsets + 1) * inc)
-      // ChucK increments phase BEFORE computing the sample
-      FloatVector vP = vOffsets.add(1.0f).mul(vInc).add(f_phase);
-
-      // Wrap phases to [0, 1]
-      var intSpecies = jdk.incubator.vector.VectorSpecies.of(int.class, SPECIES.vectorShape());
-      var vIntP = vP.castShape(intSpecies, 0);
-      var vFloorP = vIntP.castShape(SPECIES, 0);
-      vP = vP.sub(vFloorP);
-
-      // Wrap [0, 1] to [-0.5, 0.5] for better polynomial accuracy
-      var vMask = vP.compare(jdk.incubator.vector.VectorOperators.GT, vHalf);
-      FloatVector vWrappedP = vP.sub(vOne.blend(FloatVector.zero(SPECIES), vMask.not()));
-
-      FloatVector vX = vWrappedP.mul(vTwoPi);
-
-      // SIMD Sine Approximation (9th order)
-      FloatVector x2 = vX.mul(vX);
-      FloatVector vSin = x2.mul(-1.9841269841269841e-4f);
-      vSin = vSin.add(0.008333333333333333f).mul(x2);
-      vSin = vSin.sub(0.16666666666666666f).mul(x2);
-      vSin = vSin.add(1.0f).mul(vX);
-
-      // Add modulation
-      FloatVector vMod = FloatVector.fromArray(SPECIES, inputSum, i);
-      vSin = vSin.add(vMod);
-
-      FloatVector vOut = vSin.mul(gain);
-      vOut.intoArray(blockCache, i);
-      if (buffer != null) {
-        vOut.intoArray(buffer, offset + i);
+      if (!srcs.isEmpty() || manualInput != null) {
+        float in = inputSum[i];
+        switch (sync) {
+          case 0 -> {
+            d_num = in / sampleRate;
+            if (d_num >= 1.0) d_num -= Math.floor(d_num);
+            else if (d_num <= -1.0) d_num += Math.floor(d_num);
+          }
+          case 1 -> {
+            f_phase = in;
+            inc_phase = false;
+          }
+          case 2 -> {
+            d_num = (freq + in) / sampleRate;
+            if (d_num >= 1.0) d_num -= Math.floor(d_num);
+            else if (d_num <= -1.0) d_num += Math.floor(d_num);
+          }
+        }
       }
 
-      f_phase = (f_phase + f_inc * SPECIES.length()) % 1.0f;
-      if (f_phase < 0) f_phase += 1.0f;
-    }
-
-    // Scalar fallback for remainder
-    this.phase = f_phase;
-    for (; i < length; i++) {
-      float out = tick(systemTime == -1 ? -1 : systemTime + i);
+      // 1. Compute current sample based on current phase
+      float out = (float) (Math.sin(f_phase * 2.0 * Math.PI) * gain);
       blockCache[i] = out;
       if (buffer != null) buffer[offset + i] = out;
+
+      // 2. Advance phase
+      if (inc_phase) {
+        f_phase += d_num;
+        if (f_phase >= 1.0 || f_phase < 0.0) f_phase -= Math.floor(f_phase);
+      }
     }
 
+    this.phase = f_phase;
     blockStartTime = systemTime;
     blockLength = length;
     lastTickTime = systemTime + length - 1;

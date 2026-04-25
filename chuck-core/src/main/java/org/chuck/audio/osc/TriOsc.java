@@ -6,14 +6,9 @@ import static org.chuck.audio.VectorAudio.SPECIES;
 import java.util.List;
 import jdk.incubator.vector.FloatVector;
 import jdk.incubator.vector.VectorMask;
+import org.chuck.audio.ChuckUGen;
 
-/**
- * Triangle wave oscillator.
- *
- * <p>Triangle is C0-continuous (no amplitude discontinuities) and its harmonics roll off as 1/n²,
- * so aliasing is inherently low. Unlike SawOsc and PulseOsc, no PolyBLEP correction is needed or
- * applied here.
- */
+/** Triangle wave oscillator. Matches native ChucK (non-band-limited, samples BEFORE increment). */
 public class TriOsc extends Osc {
   public TriOsc() {
     super();
@@ -27,17 +22,21 @@ public class TriOsc extends Osc {
   protected double computeOsc(double phase) {
     // Shift phase by 0.25 to match ChucK's TriOsc definition
     double p = phase + 0.25;
+    // Native ChucK uses > 1.0, not >= 1.0!
+    // "t_CKFLOAT phase = d->phase + .25; if( phase > 1.0 ) phase -= 1.0;"
     if (p > 1.0) p -= 1.0;
 
     if (p < width) {
+      // (d->width == 0.0) ? 1.0 : -1.0 + 2.0 * phase / d->width
       return (width == 0.0) ? 1.0 : -1.0 + 2.0 * p / width;
     } else {
+      // (d->width == 1.0) ? 0 : 1.0 - 2.0 * (phase - d->width) / (1.0 - d->width)
       return (width == 1.0) ? 0.0 : 1.0 - 2.0 * (p - width) / (1.0 - width);
     }
   }
 
   @Override
-  public void tick(float[] buffer, int offset, int length, long systemTime) {
+  public void tick(float[] buffer, int offset, int length, long systemTime, float[] manualInput) {
     if (systemTime != -1
         && systemTime == blockStartTime
         && blockCache != null
@@ -53,11 +52,10 @@ public class TriOsc extends Osc {
     }
 
     int i = 0;
-    List<org.chuck.audio.ChuckUGen> srcs = getSources();
-    if (srcs.isEmpty()) {
-      float f_freq = (float) freq;
+    List<ChuckUGen> srcs = getSources();
+    if (srcs.isEmpty() && manualInput == null) {
       float f_phase = (float) phase;
-      float f_inc = f_freq / sampleRate;
+      float f_inc = (float) num;
       float f_width = (float) width;
 
       int bound = SPECIES.loopBound(length);
@@ -65,8 +63,6 @@ public class TriOsc extends Osc {
       FloatVector vInc = FloatVector.broadcast(SPECIES, f_inc);
       FloatVector vWidth = FloatVector.broadcast(SPECIES, f_width);
       FloatVector vOne = FloatVector.broadcast(SPECIES, 1.0f);
-      @SuppressWarnings("unused")
-      FloatVector vTwo = FloatVector.broadcast(SPECIES, 2.0f);
       FloatVector vZero = FloatVector.zero(SPECIES);
 
       float widthFactor1 = (f_width == 0.0f) ? 0.0f : 2.0f / f_width;
@@ -76,7 +72,7 @@ public class TriOsc extends Osc {
 
       for (; i < bound; i += SPECIES.length()) {
         // Raw phase
-        FloatVector vPRaw = vOffsets.add(1.0f).mul(vInc).add(f_phase).add(0.25f);
+        FloatVector vPRaw = vOffsets.mul(vInc).add(f_phase).add(0.25f);
 
         // p % 1.0 (approximated for positive phases)
         var intSpecies = jdk.incubator.vector.VectorSpecies.of(int.class, SPECIES.vectorShape());
@@ -86,12 +82,11 @@ public class TriOsc extends Osc {
 
         VectorMask<Float> mask = vP.compare(jdk.incubator.vector.VectorOperators.LT, vWidth);
 
-        // True branch: -1.0 + 2.0 * p / width  ->  p * widthFactor1 - 1.0
+        // True branch: -1.0 + 2.0 * p / width
         FloatVector vTrue = vP.mul(vWidthFactor1).sub(vOne);
-        // Edge case width == 0
         if (f_width == 0.0f) vTrue = vOne;
 
-        // False branch: 1.0 - 2.0 * (p - width) / (1.0 - width) -> 1.0 - (p - width) * widthFactor2
+        // False branch: 1.0 - 2.0 * (p - width) / (1.0 - width)
         FloatVector vFalse = vOne.sub(vP.sub(vWidth).mul(vWidthFactor2));
         if (f_width == 1.0f) vFalse = vZero;
 
@@ -108,9 +103,10 @@ public class TriOsc extends Osc {
       this.phase = f_phase;
     }
 
-    // Scalar fallback for remainder or if we have sources
+    // Scalar fallback
     for (; i < length; i++) {
-      float t = tick(systemTime == -1 ? -1 : systemTime + i);
+      float in = (manualInput != null) ? manualInput[i] : 0.0f;
+      float t = tick(in, systemTime == -1 ? -1 : systemTime + i);
       blockCache[i] = t;
       if (buffer != null) {
         buffer[offset + i] = t;
@@ -119,9 +115,14 @@ public class TriOsc extends Osc {
 
     blockStartTime = systemTime;
     blockLength = length;
-    lastTickTime = systemTime + length - 1;
     if (length > 0) {
       lastOut = blockCache[length - 1];
+      lastTickTime = systemTime + length - 1;
     }
+  }
+
+  @Override
+  public void tick(float[] buffer, int offset, int length, long systemTime) {
+    tick(buffer, offset, length, systemTime, null);
   }
 }
