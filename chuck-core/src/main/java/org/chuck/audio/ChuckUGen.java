@@ -100,8 +100,10 @@ public abstract class ChuckUGen extends ChuckObject {
         if (current != null) {
           current.registerUGen(this);
         }
-      } catch (Exception ignored) {
+      } catch (Exception e) {
+        System.err.println("[UGen] Error registering UGen: " + e.getMessage());
       }
+
     }
   }
 
@@ -161,10 +163,12 @@ public abstract class ChuckUGen extends ChuckObject {
   }
 
   private void invalidateVmGraph() {
+    System.out.println("[UGen] invalidateVmGraph... bound: " + org.chuck.core.ChuckVM.CURRENT_VM.isBound());
     if (org.chuck.core.ChuckVM.CURRENT_VM.isBound()) {
       org.chuck.core.ChuckVM.CURRENT_VM.get().invalidateGraph();
     }
   }
+
 
   public void chuckTo(ChuckUGen target) {
     if (target != null) {
@@ -227,13 +231,16 @@ public abstract class ChuckUGen extends ChuckObject {
     tick(dummy, 0, (int) samples, systemTime);
   }
 
+  public boolean cacheEnabled = true;
+
   public float tick(long systemTime) {
-    if (systemTime != -1 && systemTime == lastTickTime) {
+    if (cacheEnabled && systemTime != -1 && systemTime == lastTickTime) {
       return lastOut;
     }
 
     // Check if this sample is already in our block cache
-    if (systemTime != -1
+    if (cacheEnabled
+        && systemTime != -1
         && blockLength > 0
         && systemTime >= blockStartTime
         && systemTime < blockStartTime + blockLength) {
@@ -284,12 +291,13 @@ public abstract class ChuckUGen extends ChuckObject {
   }
 
   public float tick(float manualInput, long systemTime) {
-    if (systemTime != -1 && systemTime == lastTickTime) {
+    if (cacheEnabled && systemTime != -1 && systemTime == lastTickTime) {
       return lastOut;
     }
 
     // Check if this sample is already in our block cache
-    if (systemTime != -1
+    if (cacheEnabled
+        && systemTime != -1
         && blockLength > 0
         && systemTime >= blockStartTime
         && systemTime < blockStartTime + blockLength) {
@@ -298,6 +306,7 @@ public abstract class ChuckUGen extends ChuckObject {
       lastTickTime = systemTime;
       return lastOut;
     }
+
 
     lastOut = compute(manualInput, systemTime) * gain;
     if (Math.abs(lastOut) < 1.0e-15f) lastOut = 0.0f;

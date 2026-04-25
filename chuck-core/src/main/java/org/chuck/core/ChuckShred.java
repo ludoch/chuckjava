@@ -413,8 +413,15 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
   }
 
   public void registerUGen(ChuckUGen ugen) {
+    System.out.println("[Shred] registerUGen called for: " + ugen.getClass().getName());
     registeredUGens.add(ugen);
   }
+
+
+  public List<ChuckUGen> getRegisteredUGens() {
+    return registeredUGens;
+  }
+
 
   public void registerDestructible(UserObject uo) {
     registeredDestructibles.add(uo);

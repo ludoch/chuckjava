@@ -22,9 +22,21 @@ public class WvOut2 extends StereoUGen implements AutoCloseable {
   }
 
   @Override
+  public void addSource(org.chuck.audio.ChuckUGen src) {
+    super.addSource(src);
+    if (src != null) {
+      src.cacheEnabled = false;
+    }
+  }
+
+
+  @Override
   protected void computeStereo(float left, float right, long systemTime) {
     lastOutChannels[0] = left;
     lastOutChannels[1] = right;
+
+    System.out.println("[WvOut2] computeStereo called: " + left + ", " + right);
+
 
     if (fos != null && recording) {
       try {
@@ -45,8 +57,10 @@ public class WvOut2 extends StereoUGen implements AutoCloseable {
   public String wavFilename(String filename) {
     try {
       openFile(filename);
-    } catch (IOException e) {
+    } catch (java.io.IOException e) {
+      System.err.println("[WvOut2] Error opening file: " + e.getMessage());
     }
+
     return filename;
   }
 

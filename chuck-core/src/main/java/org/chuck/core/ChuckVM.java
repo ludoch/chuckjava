@@ -115,14 +115,22 @@ public class ChuckVM {
     java.util.Set<org.chuck.audio.ChuckUGen> stack =
         java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 
-    // Traverse from roots: dacChannels and blackhole
+    // Traverse from roots: dacChannels, blackhole and all Shred's registered UGens
     for (DacChannel chan : dacChannels) {
       sortDFS(chan, visited, stack, result);
     }
     sortDFS(blackhole, visited, stack, result);
+    for (ChuckShred shred : getAllShreds()) {
+      for (org.chuck.audio.ChuckUGen ugen : shred.getRegisteredUGens()) {
+        sortDFS(ugen, visited, stack, result);
+      }
+    }
+
 
     this.sortedUGens = result.toArray(new org.chuck.audio.ChuckUGen[0]);
+    System.out.println("[VM] Rebuilding audio graph... sortedUGens size: " + sortedUGens.length);
     graphDirty = false;
+
   }
 
   private void sortDFS(
@@ -537,7 +545,9 @@ public class ChuckVM {
         }
       }
       String source = java.nio.file.Files.readString(file.toPath());
+      System.out.println("[VM] Loaded source from " + file.getAbsolutePath() + ":\n" + source);
       ChuckConfig.setCurrentScriptDir(file.getParent());
+
 
       int id = run(source, file.getAbsolutePath());
 
@@ -710,6 +720,8 @@ public class ChuckVM {
   public void advanceTime(long samples) {
     long targetTime = now.get() + samples;
 
+
+
     while (now.get() < targetTime) {
       long currentTime = now.get();
       fireTimeouts(currentTime);
@@ -719,9 +731,12 @@ public class ChuckVM {
         long fastForward = Math.min(targetTime, next) - currentTime - 1;
         if (fastForward > 0) {
           now.addAndGet(fastForward);
-          for (DacChannel chan : dacChannels) chan.tickSamples(now.get(), fastForward);
-          blackhole.tickSamples(now.get(), fastForward);
+          rebuildGraph();
+          for (org.chuck.audio.ChuckUGen ugen : sortedUGens) {
+            ugen.tick(null, 0, (int) fastForward, now.get() - fastForward + 1);
+          }
           continue;
+
         }
       }
 
@@ -765,8 +780,11 @@ public class ChuckVM {
       }
 
       now.incrementAndGet();
-      for (DacChannel chan : dacChannels) chan.tick(now.get());
-      blackhole.tick(now.get());
+      rebuildGraph();
+      for (org.chuck.audio.ChuckUGen ugen : sortedUGens) {
+        ugen.tick(now.get());
+      }
+
     }
   }
 

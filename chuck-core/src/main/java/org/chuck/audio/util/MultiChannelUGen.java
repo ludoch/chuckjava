@@ -44,9 +44,10 @@ public abstract class MultiChannelUGen extends ChuckUGen {
   @Override
   public float tick(long systemTime) {
     // 1. Standard sample-caching check
-    if (systemTime != -1 && systemTime == lastTickTime) {
+    if (cacheEnabled && systemTime != -1 && systemTime == lastTickTime) {
       return lastOut;
     }
+
 
     // 2. Circular dependency protection
     if (isTicking) return lastOut;

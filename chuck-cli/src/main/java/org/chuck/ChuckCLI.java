@@ -19,7 +19,9 @@ public class ChuckCLI {
   private int timeoutSeconds = 0;
 
   private final List<String> filesToAdd = new ArrayList<>();
+  private final List<String[]> fileArgs = new ArrayList<>();
   private final List<String> otfCommands = new ArrayList<>();
+
 
   public void run(String[] args) {
     parseArgs(args);
@@ -128,7 +130,17 @@ public class ChuckCLI {
             if (arg.startsWith("-")) {
               System.err.println("Unknown option: " + arg);
             } else {
-              filesToAdd.add(arg);
+              if (arg.contains(":")) {
+                String[] parts = arg.split(":");
+                filesToAdd.add(parts[0]);
+                String[] shredArgs = new String[parts.length - 1];
+                System.arraycopy(parts, 1, shredArgs, 0, parts.length - 1);
+                fileArgs.add(shredArgs);
+              } else {
+                filesToAdd.add(arg);
+                fileArgs.add(new String[0]);
+              }
+
             }
           }
         }
@@ -206,18 +218,28 @@ public class ChuckCLI {
       }
 
       List<ChuckShred> initialShreds = new ArrayList<>();
-      for (String fileName : filesToAdd) {
+      System.out.println("[CLI] filesToAdd size: " + filesToAdd.size());
+      for (int fileIdx = 0; fileIdx < filesToAdd.size(); fileIdx++) {
+
+        String fileName = filesToAdd.get(fileIdx);
         try {
           if (fileName.endsWith(".java")) {
             Runnable task = org.chuck.core.ChuckDSL.load(Paths.get(fileName));
             int id = vm.spork(task);
             ChuckShred shred = vm.getShred(id);
-            if (shred != null) initialShreds.add(shred);
+            if (shred != null) {
+              shred.setArgs(fileArgs.get(fileIdx));
+              initialShreds.add(shred);
+            }
           } else {
             int id = vm.add(fileName);
             ChuckShred shred = vm.getShred(id);
-            if (shred != null) initialShreds.add(shred);
+            if (shred != null) {
+              shred.setArgs(fileArgs.get(fileIdx));
+              initialShreds.add(shred);
+            }
           }
+
         } catch (ChuckCompilerException e) {
           printRichError(e);
         } catch (Exception e) {
@@ -264,9 +286,18 @@ public class ChuckCLI {
             break;
           }
           if (!loop && vm.getActiveShredCount() == 0) break;
-          Thread.sleep(100);
+          
+          if (silent) {
+            int samplesToAdvance = (int) (sampleRate * 0.1); // 100 ms
+            vm.advanceTime(samplesToAdvance);
+            try { Thread.sleep(10); } catch (Exception e) {} // Let virtual threads run
+          } else {
+            Thread.sleep(100);
+          }
+
         }
       }
+
 
       vm.shutdown();
       if (audio != null) audio.stop();
