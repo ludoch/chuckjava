@@ -1,7 +1,6 @@
 package org.chuck.audio.fx;
 
 import java.util.Arrays;
-import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.util.StereoUGen;
 import org.chuck.core.ChuckVM;
 import org.chuck.core.doc;
@@ -57,7 +56,7 @@ public class ProceduralReverb extends StereoUGen {
     float feedbackSample = input + (delayedSample * decayFactor);
     delayBuffer[writeIndex] = feedbackSample;
     writeIndex = (writeIndex + 1) % delayLength;
-    
+
     float out = feedbackSample * gain;
     lastOutChannels[0] = out;
     lastOutChannels[1] = out;

@@ -61,9 +61,9 @@ public class ChuckComplexScriptTest {
     // Advance time in a loop to give the shred time to execute across steps
     int retries = 0;
     while (!shred.isDone() && retries < 200) {
-        vm.advanceTime(5);
-        Thread.sleep(5);
-        retries++;
+      vm.advanceTime(5);
+      Thread.sleep(5);
+      retries++;
     }
 
     assertTrue(shred.isDone(), "Shred did not finish in time");

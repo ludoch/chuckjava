@@ -31,12 +31,12 @@ public class ChuckVMTest {
 
     vm.advanceTime(10); // T=15
     assertEquals(15, vm.getCurrentTime());
-    
+
     // Give virtual thread time to update wakeTime
     int retries2 = 0;
     while (shred.getWakeTime() != 22 && retries2 < 500) {
-        Thread.sleep(5);
-        retries2++;
+      Thread.sleep(5);
+      retries2++;
     }
     assertEquals(22, shred.getWakeTime());
 
@@ -45,8 +45,8 @@ public class ChuckVMTest {
     // Give virtual thread time to finish and set isDone
     int retries = 0;
     while (!shred.isDone() && retries < 100) {
-        Thread.sleep(5);
-        retries++;
+      Thread.sleep(5);
+      retries++;
     }
     assertTrue(shred.isDone(), "Shred did not finish in time");
   }

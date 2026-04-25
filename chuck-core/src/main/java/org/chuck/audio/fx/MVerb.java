@@ -405,7 +405,8 @@ public class MVerb extends StereoUGen {
     preDelayTime = 100.0 * (sampleRate / 1000.0);
     mixSmooth =
         earlyLateSmooth =
-            bandwidthSmooth = dampingSmooth = predelaySmooth = sizeSmooth = decaySmooth = densitySmooth = 0.0;
+            bandwidthSmooth =
+                dampingSmooth = predelaySmooth = sizeSmooth = decaySmooth = densitySmooth = 0.0;
     controlRate = (int) (sampleRate / 1000.0);
     controlRateCounter = 0;
 
@@ -473,9 +474,12 @@ public class MVerb extends StereoUGen {
         (int) (0.067 * sampleRate * size),
         (int) (0.011 * sampleRate * size),
         (int) (0.121 * sampleRate * size));
-    staticDelayLine[1].setIndex(0, (int) (0.036 * sampleRate * size), (int) (0.089 * sampleRate * size), 0);
-    staticDelayLine[2].setIndex(0, (int) (0.0089 * sampleRate * size), (int) (0.099 * sampleRate * size), 0);
-    staticDelayLine[3].setIndex(0, (int) (0.067 * sampleRate * size), (int) (0.0041 * sampleRate * size), 0);
+    staticDelayLine[1].setIndex(
+        0, (int) (0.036 * sampleRate * size), (int) (0.089 * sampleRate * size), 0);
+    staticDelayLine[2].setIndex(
+        0, (int) (0.0089 * sampleRate * size), (int) (0.099 * sampleRate * size), 0);
+    staticDelayLine[3].setIndex(
+        0, (int) (0.067 * sampleRate * size), (int) (0.0041 * sampleRate * size), 0);
 
     earlyReflectionsDelayLine[0].setLength((int) (0.089 * sampleRate));
     earlyReflectionsDelayLine[0].setIndex(
@@ -532,31 +536,69 @@ public class MVerb extends StereoUGen {
     };
   }
 
-  public void dampingFreq(float value) { setParameter(DAMPINGFREQ, value); }
-  public float dampingFreq() { return (float) getParameter(DAMPINGFREQ); }
+  public void dampingFreq(float value) {
+    setParameter(DAMPINGFREQ, value);
+  }
 
-  public void density(float value) { setParameter(DENSITY, value); }
-  public float density() { return (float) getParameter(DENSITY); }
+  public float dampingFreq() {
+    return (float) getParameter(DAMPINGFREQ);
+  }
 
-  public void bandwidthFreq(float value) { setParameter(BANDWIDTHFREQ, value); }
-  public float bandwidthFreq() { return (float) getParameter(BANDWIDTHFREQ); }
+  public void density(float value) {
+    setParameter(DENSITY, value);
+  }
 
-  public void predelay(float value) { setParameter(PREDELAY, value); }
-  public float predelay() { return (float) getParameter(PREDELAY); }
+  public float density() {
+    return (float) getParameter(DENSITY);
+  }
 
-  public void size(float value) { setParameter(SIZE, value); }
-  public float size() { return (float) getParameter(SIZE); }
+  public void bandwidthFreq(float value) {
+    setParameter(BANDWIDTHFREQ, value);
+  }
 
-  public void decay(float value) { setParameter(DECAY, value); }
-  public float decay() { return (float) getParameter(DECAY); }
+  public float bandwidthFreq() {
+    return (float) getParameter(BANDWIDTHFREQ);
+  }
 
+  public void predelay(float value) {
+    setParameter(PREDELAY, value);
+  }
 
+  public float predelay() {
+    return (float) getParameter(PREDELAY);
+  }
 
-  public void mix(float value) { setParameter(MIX, value); }
-  public float mix() { return (float) getParameter(MIX); }
+  public void size(float value) {
+    setParameter(SIZE, value);
+  }
 
-  public void earlyMix(float value) { setParameter(EARLYMIX, value); }
-  public float earlyMix() { return (float) getParameter(EARLYMIX); }
+  public float size() {
+    return (float) getParameter(SIZE);
+  }
+
+  public void decay(float value) {
+    setParameter(DECAY, value);
+  }
+
+  public float decay() {
+    return (float) getParameter(DECAY);
+  }
+
+  public void mix(float value) {
+    setParameter(MIX, value);
+  }
+
+  public float mix() {
+    return (float) getParameter(MIX);
+  }
+
+  public void earlyMix(float value) {
+    setParameter(EARLYMIX, value);
+  }
+
+  public float earlyMix() {
+    return (float) getParameter(EARLYMIX);
+  }
 
   @Override
   protected void computeStereo(float left, float right, long systemTime) {
@@ -566,9 +608,11 @@ public class MVerb extends StereoUGen {
     double oneOverSampleFrames = 1.0; // Assuming sample-by-sample processing
     double MixDelta = (mix - mixSmooth) * oneOverSampleFrames;
     double EarlyLateDelta = (earlyMix - earlyLateSmooth) * oneOverSampleFrames;
-    double BandwidthDelta = (((bandwidthFreq * 18400.0) + 100.0) - bandwidthSmooth) * oneOverSampleFrames;
+    double BandwidthDelta =
+        (((bandwidthFreq * 18400.0) + 100.0) - bandwidthSmooth) * oneOverSampleFrames;
     double DampingDelta = (((dampingFreq * 18400.0) + 100.0) - dampingSmooth) * oneOverSampleFrames;
-    double PredelayDelta = ((preDelayTime * 200.0 * (sampleRate / 1000.0)) - predelaySmooth) * oneOverSampleFrames;
+    double PredelayDelta =
+        ((preDelayTime * 200.0 * (sampleRate / 1000.0)) - predelaySmooth) * oneOverSampleFrames;
     double SizeDelta = (size - sizeSmooth) * oneOverSampleFrames;
     double DecayDelta = (((0.7995 * decay) + 0.005) - decaySmooth) * oneOverSampleFrames;
     double DensityDelta = (((0.7995 * density1) + 0.005) - densitySmooth) * oneOverSampleFrames;
