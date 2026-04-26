@@ -29,14 +29,10 @@ public class WvOut2 extends StereoUGen implements AutoCloseable {
     }
   }
 
-
   @Override
   protected void computeStereo(float left, float right, long systemTime) {
     lastOutChannels[0] = left;
     lastOutChannels[1] = right;
-
-    System.out.println("[WvOut2] computeStereo called: " + left + ", " + right);
-
 
     if (fos != null && recording) {
       try {
@@ -83,8 +79,10 @@ public class WvOut2 extends StereoUGen implements AutoCloseable {
   }
 
   public void closeFile() {
+    System.out.println("[WvOut2] closeFile called. fos is: " + (fos != null));
     try {
       if (fos != null) {
+
         finalizeWav();
         fos.close();
         fos = null;

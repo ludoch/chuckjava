@@ -14,6 +14,7 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
   private static final Logger logger = Logger.getLogger(ChuckShred.class.getName());
   private static final AtomicInteger ID_GENERATOR = new AtomicInteger(1);
   public static final ScopedValue<ChuckShred> CURRENT_SHRED = ScopedValue.newInstance();
+  public static final ThreadLocal<ChuckShred> CURRENT_SHRED_TL = new ThreadLocal<>();
 
   @Override
   public int compareTo(ChuckShred other) {
@@ -49,6 +50,11 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
   private ChuckEvent eventWaitingOn = null;
   private boolean wasSignaled = false;
   private final ChuckObjectPool.ShredAllocator allocator = new ChuckObjectPool.ShredAllocator();
+  private ChuckVM vm;
+
+  public ChuckVM getVM() {
+    return vm;
+  }
 
   private String lastExceptionMessage = null;
   private volatile Runnable onNextPark = null;
@@ -178,7 +184,9 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
   }
 
   public void execute(ChuckVM vm) {
+    this.vm = vm;
     lock.lock();
+
     try {
       while (!isDone && code != null) {
         while (!isRunning && !isDone) {
@@ -413,15 +421,12 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
   }
 
   public void registerUGen(ChuckUGen ugen) {
-    System.out.println("[Shred] registerUGen called for: " + ugen.getClass().getName());
     registeredUGens.add(ugen);
   }
-
 
   public List<ChuckUGen> getRegisteredUGens() {
     return registeredUGens;
   }
-
 
   public void registerDestructible(UserObject uo) {
     registeredDestructibles.add(uo);

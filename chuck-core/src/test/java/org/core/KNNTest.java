@@ -122,7 +122,7 @@ public class KNNTest {
     StringBuilder out = new StringBuilder();
     vm.addPrintListener(out::append);
     String code =
-        "KNN knn;\n"
+        "new KNN @=> KNN knn;\n"
             + "float f[3][2];\n"
             + "0.0 => f[0][0]; 0.0 => f[0][1];\n"
             + "1.0 => f[1][0]; 1.0 => f[1][1];\n"
@@ -144,7 +144,7 @@ public class KNNTest {
     StringBuilder out = new StringBuilder();
     vm.addPrintListener(out::append);
     String code =
-        "KNN2 knn;\n"
+        "new KNN2 @=> KNN2 knn;\n"
             + "float f[3][2];\n"
             + "0.0 => f[0][0]; 0.0 => f[0][1];\n"
             + "1.0 => f[1][0]; 1.0 => f[1][1];\n"

@@ -105,7 +105,7 @@ public class WekinatorTest {
     StringBuilder out = new StringBuilder();
     vm.addPrintListener(out::append);
     String code =
-        "Wekinator wek;\n"
+        "new Wekinator @=> Wekinator wek;\n"
             + "<<< \"modelType:\", wek.modelTypeName() >>>;\n"
             + "<<< \"taskType:\", wek.taskTypeName() >>>;\n";
     vm.run(code, "test");

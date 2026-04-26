@@ -18,6 +18,11 @@ public class Pan4 extends MultiChannelUGen {
   }
 
   @Override
+  protected void computeMulti(float[] inputs, long systemTime) {
+    float in = inputs.length > 0 ? inputs[0] : 0.0f;
+    computeMulti(in, systemTime);
+  }
+
   protected void computeMulti(float input, long systemTime) {
     // Map pan -1..1 to 0..3
     float p = (pan + 1.0f) * 1.5f;

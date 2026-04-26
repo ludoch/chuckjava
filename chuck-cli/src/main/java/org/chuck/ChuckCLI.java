@@ -22,7 +22,6 @@ public class ChuckCLI {
   private final List<String[]> fileArgs = new ArrayList<>();
   private final List<String> otfCommands = new ArrayList<>();
 
-
   public void run(String[] args) {
     parseArgs(args);
 
@@ -140,7 +139,6 @@ public class ChuckCLI {
                 filesToAdd.add(arg);
                 fileArgs.add(new String[0]);
               }
-
             }
           }
         }
@@ -286,18 +284,19 @@ public class ChuckCLI {
             break;
           }
           if (!loop && vm.getActiveShredCount() == 0) break;
-          
+
           if (silent) {
             int samplesToAdvance = (int) (sampleRate * 0.1); // 100 ms
             vm.advanceTime(samplesToAdvance);
-            try { Thread.sleep(10); } catch (Exception e) {} // Let virtual threads run
+            try {
+              Thread.sleep(10);
+            } catch (Exception e) {
+            } // Let virtual threads run
           } else {
             Thread.sleep(100);
           }
-
         }
       }
-
 
       vm.shutdown();
       if (audio != null) audio.stop();

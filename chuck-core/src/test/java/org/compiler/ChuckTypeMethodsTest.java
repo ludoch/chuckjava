@@ -39,7 +39,7 @@ public class ChuckTypeMethodsTest {
             + "    fun void foo(int a) {} "
             + "    fun float bar() { return 0.0; } "
             + "} "
-            + "MyClass mc; "
+            + "new MyClass @=> MyClass mc; "
             + "typeof(mc) => Type t; "
             + "t.methods() => Function[] m; "
             + "<<< m.size() >>>; "

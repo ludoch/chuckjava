@@ -50,7 +50,7 @@ public class HMMTest {
     StringBuilder out = new StringBuilder();
     vm.addPrintListener(out::append);
     String code =
-        "HMM hmm;\n"
+        "new HMM @=> HMM hmm;\n"
             + "float init[3]; 0.6 => init[0]; 0.2 => init[1]; 0.2 => init[2];\n"
             + "float trans[3][3];\n"
             + "0.8 => trans[0][0]; 0.1 => trans[0][1]; 0.1 => trans[0][2];\n"
@@ -76,7 +76,7 @@ public class HMMTest {
     StringBuilder out = new StringBuilder();
     vm.addPrintListener(out::append);
     String code =
-        "HMM hmm;\n"
+        "new HMM @=> HMM hmm;\n"
             + "int obs[12];\n"
             + "0 => obs[0]; 1 => obs[1]; 2 => obs[2]; 0 => obs[3];\n"
             + "1 => obs[4]; 2 => obs[5]; 0 => obs[6]; 1 => obs[7];\n"

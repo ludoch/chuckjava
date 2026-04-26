@@ -7,6 +7,11 @@ public class Mix4 extends MultiChannelUGen {
   }
 
   @Override
+  protected void computeMulti(float[] inputs, long systemTime) {
+    float in = inputs.length > 0 ? inputs[0] : 0.0f;
+    computeMulti(in, systemTime);
+  }
+
   protected void computeMulti(float input, long systemTime) {
     for (int i = 0; i < 4; i++) {
       lastOutChannels[i] = input;

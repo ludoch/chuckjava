@@ -48,7 +48,6 @@ public abstract class MultiChannelUGen extends ChuckUGen {
       return lastOut;
     }
 
-
     // 2. Circular dependency protection
     if (isTicking) return lastOut;
     isTicking = true;

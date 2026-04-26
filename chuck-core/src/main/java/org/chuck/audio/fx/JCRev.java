@@ -10,11 +10,14 @@ public class JCRev extends StereoUGen {
   private final Delay outLeft, outRight;
   private float mix = 0.3f; // STK default effectMix_
 
+  private float sampleRate;
+
   public JCRev() {
     this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
   }
 
   public JCRev(float sampleRate) {
+    this.sampleRate = sampleRate;
     // Delay lengths for 44.1kHz from STK
     allpass[0] = new AllPass(225, false);
     allpass[1] = new AllPass(341, false);
@@ -37,7 +40,7 @@ public class JCRev extends StereoUGen {
   }
 
   public void setT60(double t60) {
-    float sr = org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate();
+    float sr = this.sampleRate;
     // From STK: combCoefficient_[i] = pow(10.0, (-3.0 * combDelays_[i].getDelay() / (T60 *
     // Stk::sampleRate())));
     comb[0].setCoefficient(Math.pow(10.0, -3.0 * 1116 / (t60 * sr)));

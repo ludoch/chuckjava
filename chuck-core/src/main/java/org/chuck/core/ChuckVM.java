@@ -106,8 +106,6 @@ public class ChuckVM {
   }
 
   private void rebuildGraph() {
-    if (!graphDirty) return;
-    System.out.println("[VM] Rebuilding audio graph...");
 
     List<org.chuck.audio.ChuckUGen> result = new ArrayList<>();
     java.util.Set<org.chuck.audio.ChuckUGen> visited =
@@ -115,22 +113,17 @@ public class ChuckVM {
     java.util.Set<org.chuck.audio.ChuckUGen> stack =
         java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
 
-    // Traverse from roots: dacChannels, blackhole and all Shred's registered UGens
+    // Traverse from roots: dacChannels, blackhole and all globally created UGens
     for (DacChannel chan : dacChannels) {
       sortDFS(chan, visited, stack, result);
     }
     sortDFS(blackhole, visited, stack, result);
-    for (ChuckShred shred : getAllShreds()) {
-      for (org.chuck.audio.ChuckUGen ugen : shred.getRegisteredUGens()) {
-        sortDFS(ugen, visited, stack, result);
-      }
+    for (org.chuck.audio.ChuckUGen ugen : org.chuck.audio.ChuckUGen.ALL_UGENS) {
+      sortDFS(ugen, visited, stack, result);
     }
 
-
     this.sortedUGens = result.toArray(new org.chuck.audio.ChuckUGen[0]);
-    System.out.println("[VM] Rebuilding audio graph... sortedUGens size: " + sortedUGens.length);
     graphDirty = false;
-
   }
 
   private void sortDFS(
@@ -183,7 +176,10 @@ public class ChuckVM {
     this.adc = new Adc();
     this.blackhole = new Blackhole();
 
+    org.chuck.audio.ChuckUGen.ALL_UGENS.clear();
+
     // Initialize special globals
+
     setGlobalObject("dac", multiChannelDac);
     setGlobalObject("blackhole", blackhole);
     setGlobalObject("adc", adc);
@@ -548,7 +544,6 @@ public class ChuckVM {
       System.out.println("[VM] Loaded source from " + file.getAbsolutePath() + ":\n" + source);
       ChuckConfig.setCurrentScriptDir(file.getParent());
 
-
       int id = run(source, file.getAbsolutePath());
 
       if (id > 0 && parts.length > 1 && baseFilename.equals(parts[0])) {
@@ -596,12 +591,15 @@ public class ChuckVM {
         .start(
             () -> {
               shred.setThread(Thread.currentThread());
+              org.chuck.core.ChuckShred.CURRENT_SHRED_TL.set(shred);
               try {
                 ScopedValue.where(CURRENT_VM, this)
-                    .where(ChuckShred.CURRENT_SHRED, shred)
+                    .where(org.chuck.core.ChuckShred.CURRENT_SHRED, shred)
                     .run(() -> shred.execute(this));
               } finally {
+                org.chuck.core.ChuckShred.CURRENT_SHRED_TL.remove();
                 activeShreds.remove(shred.getId());
+
                 shred.setDone(true);
                 shred.cleanup(this);
                 shred.broadcast(this);
@@ -720,8 +718,6 @@ public class ChuckVM {
   public void advanceTime(long samples) {
     long targetTime = now.get() + samples;
 
-
-
     while (now.get() < targetTime) {
       long currentTime = now.get();
       fireTimeouts(currentTime);
@@ -736,7 +732,6 @@ public class ChuckVM {
             ugen.tick(null, 0, (int) fastForward, now.get() - fastForward + 1);
           }
           continue;
-
         }
       }
 
@@ -784,7 +779,6 @@ public class ChuckVM {
       for (org.chuck.audio.ChuckUGen ugen : sortedUGens) {
         ugen.tick(now.get());
       }
-
     }
   }
 
