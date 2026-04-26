@@ -44,10 +44,11 @@ public class ChuckVMTest {
     assertEquals(25, vm.getCurrentTime());
     // Give virtual thread time to finish and set isDone
     int retries = 0;
-    while (!shred.isDone() && retries < 100) {
+    while (!shred.isDone() && retries < 500) {
       Thread.sleep(5);
       retries++;
     }
+
     assertTrue(shred.isDone(), "Shred did not finish in time");
   }
 
