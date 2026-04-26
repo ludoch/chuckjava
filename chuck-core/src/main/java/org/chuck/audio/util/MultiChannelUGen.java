@@ -60,7 +60,9 @@ public abstract class MultiChannelUGen extends ChuckUGen {
       for (int s = 0; s < count; s++) {
         ChuckUGen src = sources[s];
         if (src != null) {
-          src.tick(systemTime);
+          if (systemTime == -1 || src.getLastTickTime() < systemTime) {
+            src.tick(systemTime);
+          }
           for (int i = 0; i < sums.length; i++) {
             sums[i] += src.getChannelLastOut(i, systemTime);
           }

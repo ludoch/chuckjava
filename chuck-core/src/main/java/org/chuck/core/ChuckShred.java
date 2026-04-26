@@ -18,10 +18,15 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
 
   @Override
   public int compareTo(ChuckShred other) {
-    return Long.compare(this.wakeTime, other.wakeTime);
+    int cmp = Long.compare(this.wakeTime, other.wakeTime);
+    if (cmp == 0) {
+      return Long.compare(this.insertionOrder, other.insertionOrder);
+    }
+    return cmp;
   }
 
   private int id;
+  private long insertionOrder = 0;
   private String name = "shred";
   private String[] args = new String[0];
 
@@ -120,6 +125,14 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
 
   public long getWakeTime() {
     return wakeTime;
+  }
+
+  public long getInsertionOrder() {
+    return insertionOrder;
+  }
+
+  public void setInsertionOrder(long order) {
+    this.insertionOrder = order;
   }
 
   public void setRunning(boolean running) {

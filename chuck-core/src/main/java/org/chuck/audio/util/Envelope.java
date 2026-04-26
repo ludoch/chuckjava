@@ -21,6 +21,7 @@ public class Envelope extends ChuckUGen {
   public Envelope(float sampleRate, boolean autoRegister) {
     super(autoRegister);
     this.sampleRate = sampleRate;
+    setTime(0.040f); // Native ChucK default: 40ms
   }
 
   public void setTarget(float target) {

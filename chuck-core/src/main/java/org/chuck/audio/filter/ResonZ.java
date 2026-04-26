@@ -1,105 +1,72 @@
 package org.chuck.audio.filter;
 
-import static org.chuck.audio.VectorAudio.SPECIES;
-
-import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 
-/**
- * A resonance filter. Adapted from SuperCollider's ResonZ via ChucK. Uses double precision
- * internally to prevent limit cycles.
- */
+/** Resonance filter with equal-gain zeroes. Matches native ChucK (SuperCollider-style). */
 public class ResonZ extends ChuckUGen {
-  private float freq = 220.0f;
-  private float Q = 1.0f;
-
-  // Filter coefficients and state (using double for precision)
-  private double a0, b1, b2;
-  private double y1, y2;
-
+  private double b0, b1, b2, a1, a2;
+  private double x1, x2, y1, y2;
+  private double freq = 440.0;
+  private double Q = 1.0;
   private final float sampleRate;
 
+  public ResonZ() {
+    this(44100.0f, true);
+  }
+
   public ResonZ(float sampleRate) {
+    this(sampleRate, true);
+  }
+
+  public ResonZ(float sampleRate, boolean autoRegister) {
+    super(autoRegister);
     this.sampleRate = sampleRate;
-    set(freq, Q);
+    set(440.0, 1.0);
   }
 
-  public void set(float freq, float Q) {
-    this.freq = freq;
-    this.Q = Q;
-
-    double radiansPerSample = 2.0 * Math.PI / sampleRate;
-    double pfreq = freq * radiansPerSample;
-    double B = pfreq / Q;
-    double R = Math.exp(-B * 0.5);
-    double R22 = R * R;
-
-    this.b1 = 2.0 * R * Math.cos(pfreq);
-    this.b2 = -R22;
-    this.a0 = (1.0 - R22) * 0.5;
+  public double freq(double f) {
+    set(f, Q);
+    return f;
   }
 
-  public void setFreq(float freq) {
-    set(freq, this.Q);
+  public double Q(double q) {
+    set(freq, q);
+    return q;
   }
 
-  public void setQ(float Q) {
-    set(this.freq, Q);
+  public void setFreq(float f) {
+    freq(f);
   }
 
-  @Override
-  public void tick(float[] buffer, int offset, int length, long systemTime) {
-    if (systemTime != -1
-        && systemTime == blockStartTime
-        && blockCache != null
-        && blockLength >= length) {
-      if (buffer != null) System.arraycopy(blockCache, 0, buffer, offset, length);
-      return;
-    }
-    if (blockCache == null || blockCache.length < length) blockCache = new float[length];
+  public void setQ(float q) {
+    Q(q);
+  }
 
-    // 1. Sum inputs using SIMD
-    float[] inputSum = new float[length];
-    if (getNumSources() > 0) {
-      for (ChuckUGen src : getSources()) {
-        float[] temp = new float[length];
-        src.tick(temp, 0, length, systemTime);
+  private void set(double f, double q) {
+    this.freq = f;
+    this.Q = q;
 
-        int i = 0;
-        int bound = SPECIES.loopBound(length);
-        for (; i < bound; i += SPECIES.length()) {
-          FloatVector v1 = FloatVector.fromArray(SPECIES, inputSum, i);
-          FloatVector v2 = FloatVector.fromArray(SPECIES, temp, i);
-          v1.add(v2).intoArray(inputSum, i);
-        }
-        for (; i < length; i++) inputSum[i] += temp[i];
-      }
-    } else {
-      if (buffer != null) System.arraycopy(buffer, offset, inputSum, 0, length);
-    }
-
-    // 2. Apply filter (recursive, scalar, using double state)
-    for (int i = 0; i < length; i++) {
-      double y0 = inputSum[i] + b1 * y1 + b2 * y2;
-      double result = a0 * (y0 - y2);
-      y2 = y1;
-      y1 = y0;
-      blockCache[i] = (float) result * gain;
-      if (buffer != null) buffer[offset + i] = blockCache[i];
-    }
-
-    blockStartTime = systemTime;
-    blockLength = length;
-    lastTickTime = (systemTime == -1) ? -1 : systemTime + length - 1;
-    if (length > 0) lastOut = blockCache[length - 1];
+    double fr = 2.0 * Math.PI * f / sampleRate;
+    double B = fr / q;
+    double R = 1.0 - 0.5 * B;
+    double R2 = R * R;
+    
+    double m_a0 = 0.5 * (1.0 - R2);
+    
+    b0 = m_a0;
+    b1 = 0;
+    b2 = -m_a0;
+    a1 = - (4.0 * R2 * Math.cos(fr)) / (1.0 + R2);
+    a2 = R2;
   }
 
   @Override
   protected float compute(float input, long systemTime) {
-    double y0 = input + b1 * y1 + b2 * y2;
-    double result = a0 * (y0 - y2);
+    double out = b0 * input + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    x2 = x1;
+    x1 = input;
     y2 = y1;
-    y1 = y0;
-    return (float) result;
+    y1 = out;
+    return (float) out;
   }
 }

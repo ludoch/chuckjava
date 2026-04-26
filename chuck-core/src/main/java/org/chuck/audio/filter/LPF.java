@@ -1,100 +1,68 @@
 package org.chuck.audio.filter;
 
-import static org.chuck.audio.VectorAudio.SPECIES;
-
-import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
-import org.chuck.core.doc;
 
-/**
- * A simple Low Pass Filter (One-pole). (Note: Class name is LPF, explicitly named to fix macOS
- * case-insensitive FS issues)
- */
-@doc("Low Pass Filter (1-pole).")
+/** 2nd order Butterworth Low Pass Filter. Matches native ChucK (SuperCollider-style). */
 public class LPF extends ChuckUGen {
-  private float cutoff = 1000.0f;
-  private float sampleRate;
-
-  // Filter state
-  private float v0 = 0.0f;
+  private double b0, b1, b2, a1, a2;
+  private double x1, x2, y1, y2;
+  private double freq = 10000.0;
+  private double Q = 1.0;
+  private final float sampleRate;
 
   public LPF() {
-    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+    this(44100.0f, true);
   }
 
   public LPF(float sampleRate) {
-    this.sampleRate = sampleRate;
+    this(sampleRate, true);
   }
 
-  public void setCutoff(float cutoff) {
-    this.cutoff = cutoff;
+  public LPF(float sampleRate, boolean autoRegister) {
+    super(autoRegister);
+    this.sampleRate = sampleRate;
+    set(10000.0, 1.0);
   }
 
   public double freq(double f) {
-    setCutoff((float) f);
+    set(f, Q);
     return f;
   }
 
-  public double freq() {
-    return cutoff;
+  public double Q(double q) {
+    set(freq, q);
+    return q;
   }
 
-  @Override
-  public void tick(float[] buffer, int offset, int length, long systemTime) {
-    if (systemTime != -1
-        && systemTime == blockStartTime
-        && blockCache != null
-        && blockLength >= length) {
-      if (buffer != null) System.arraycopy(blockCache, 0, buffer, offset, length);
-      return;
-    }
-    if (blockCache == null || blockCache.length < length) blockCache = new float[length];
+  public void setCutoff(float f) {
+    freq(f);
+  }
 
-    // 1. Sum inputs using SIMD
-    float[] inputSum = new float[length];
-    if (getNumSources() > 0) {
-      for (ChuckUGen src : getSources()) {
+  private void set(double f, double q) {
+    this.freq = f;
+    this.Q = q;
 
-        float[] temp = new float[length];
-        src.tick(temp, 0, length, systemTime);
-
-        int i = 0;
-        int bound = SPECIES.loopBound(length);
-        for (; i < bound; i += SPECIES.length()) {
-          FloatVector v1 = FloatVector.fromArray(SPECIES, inputSum, i);
-          FloatVector v2 = FloatVector.fromArray(SPECIES, temp, i);
-          v1.add(v2).intoArray(inputSum, i);
-        }
-        for (; i < length; i++) inputSum[i] += temp[i];
-      }
-    } else {
-      if (buffer != null) System.arraycopy(buffer, offset, inputSum, 0, length);
-    }
-
-    // 2. Apply filter
-    float alpha = (float) (2.0 * Math.PI * cutoff / sampleRate);
-    alpha = Math.min(Math.max(alpha, 0.0f), 1.0f);
-    float beta = 1.0f - alpha;
-
-    float localV0 = v0;
-    for (int i = 0; i < length; i++) {
-      localV0 = alpha * inputSum[i] + beta * localV0;
-      blockCache[i] = localV0 * gain;
-      if (buffer != null) buffer[offset + i] = blockCache[i];
-    }
-    v0 = localV0;
-
-    blockStartTime = systemTime;
-    blockLength = length;
-    lastTickTime = (systemTime == -1) ? -1 : systemTime + length - 1;
-    if (length > 0) lastOut = blockCache[length - 1];
+    double fr = Math.PI * f / sampleRate;
+    double C = 1.0 / Math.tan(fr);
+    double root2C = Math.sqrt(2.0) * C;
+    double C2 = C * C;
+    
+    double m_a0 = 1.0 / (1.0 + root2C + C2);
+    
+    b0 = m_a0;
+    b1 = 2.0 * m_a0;
+    b2 = m_a0;
+    a1 = 2.0 * (1.0 - C2) * m_a0;
+    a2 = (1.0 - root2C + C2) * m_a0;
   }
 
   @Override
   protected float compute(float input, long systemTime) {
-    float alpha = (float) (2.0 * Math.PI * cutoff / sampleRate);
-    alpha = Math.min(Math.max(alpha, 0.0f), 1.0f);
-    v0 = v0 + alpha * (input - v0);
-    return v0;
+    double out = b0 * input + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+    x2 = x1;
+    x1 = input;
+    y2 = y1;
+    y1 = out;
+    return (float) out;
   }
 }

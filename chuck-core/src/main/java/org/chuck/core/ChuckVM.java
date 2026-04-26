@@ -62,6 +62,8 @@ public class ChuckVM {
 
   private final PriorityQueue<ChuckShred> shreduler = new PriorityQueue<>();
   private final Map<Integer, ChuckShred> activeShreds = new ConcurrentHashMap<>();
+  private final java.util.concurrent.atomic.AtomicLong insertionCounter =
+      new java.util.concurrent.atomic.AtomicLong(0);
   private final java.util.Queue<ChuckShred> deadShreds =
       new java.util.concurrent.ConcurrentLinkedQueue<>();
   private final ReentrantLock shredulerLock = new ReentrantLock();
@@ -676,6 +678,7 @@ public class ChuckVM {
   public void schedule(ChuckShred shred) {
     shredulerLock.lock();
     try {
+      shred.setInsertionOrder(insertionCounter.getAndIncrement());
       shreduler.add(shred);
       if (shred.getWakeTime() < nextWakeTime.get()) {
         nextWakeTime.set(shred.getWakeTime());
@@ -803,6 +806,7 @@ public class ChuckVM {
         for (org.chuck.audio.ChuckUGen ugen : sortedUGens) {
           ugen.tick(null, 0, blockSize, now.get() - blockSize + 1);
         }
+        blackhole.tick(null, 0, blockSize, now.get() - blockSize + 1);
         for (int c = 0; c < numChannels; c++) {
           System.arraycopy(
               dacChannels[c].getBlockCache(), 0, dacBuffers[c], offset + processed, blockSize);

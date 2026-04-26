@@ -40,6 +40,15 @@ public class OnePole extends ChuckUGen {
     return f;
   }
 
+  public float pole(float p) {
+    setPole(p);
+    return p;
+  }
+
+  public float pole() {
+    return -a1;
+  }
+
   public void setPole(float pole) {
     if (pole > 0.0f) b0 = 1.0f - pole;
     else b0 = 1.0f + pole;

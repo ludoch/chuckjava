@@ -77,7 +77,6 @@ public class ChuckEvent extends UserObject {
     if (toWake != null) {
       toWake.setWakeTime(vm.getCurrentTime());
       vm.schedule(toWake);
-      toWake.resume(vm);
     }
   }
 
@@ -111,7 +110,6 @@ public class ChuckEvent extends UserObject {
     for (ChuckShred s : toWake) {
       s.setWakeTime(vm.getCurrentTime());
       vm.schedule(s);
-      s.resume(vm);
     }
   }
 

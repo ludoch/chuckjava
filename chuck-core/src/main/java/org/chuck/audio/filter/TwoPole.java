@@ -6,10 +6,8 @@ import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 
 /**
- * Two-pole resonance filter. H(z) = b0 / (1 + a1*z^-1 + a2*z^-2)
- *
- * <p>Use setResonance(freq, radius, normalize) for convenient resonant peak setup, or set raw
- * coefficients via setB0/setA1/setA2.
+ * Two-pole resonance filter. Matches native ChucK (ugen_filter.cpp).
+ * H(z) = b0 / (1 + a1*z^-1 + a2*z^-2)
  */
 public class TwoPole extends ChuckUGen {
   private double b0 = 1.0;
@@ -25,7 +23,16 @@ public class TwoPole extends ChuckUGen {
 
   private final float sampleRate;
 
+  public TwoPole() {
+    this(44100.0f, true);
+  }
+
   public TwoPole(float sampleRate) {
+    this(sampleRate, true);
+  }
+
+  public TwoPole(float sampleRate, boolean autoRegister) {
+    super(autoRegister);
     this.sampleRate = sampleRate;
   }
 
@@ -34,14 +41,15 @@ public class TwoPole extends ChuckUGen {
     resFreq = frequency;
     resRad = radius;
     resNorm = normalize;
+    
     a2 = radius * radius;
     a1 = -2.0 * radius * Math.cos(2.0 * Math.PI * frequency / sampleRate);
+    
     if (normalize) {
-      // Unity gain at resonance
-      double real =
-          1.0 - radius + (a2 - radius) * Math.cos(2.0 * Math.PI * 2.0 * frequency / sampleRate);
-      double imag = (a2 - radius) * Math.sin(2.0 * Math.PI * 2.0 * frequency / sampleRate);
-      b0 = Math.sqrt(real * real + imag * imag);
+      // Native ChucK normalization (ugen_filter.cpp: b0 = 0.5 - 0.5 * a2)
+      b0 = 0.5 - 0.5 * a2;
+    } else {
+      b0 = 1.0;
     }
   }
 
@@ -70,15 +78,15 @@ public class TwoPole extends ChuckUGen {
     return resRad;
   }
 
-  public double norm(double v) {
-    setResonance(resFreq, resRad, v != 0.0);
+  public int norm(int v) {
+    setResonance(resFreq, resRad, v != 0);
     return v;
   }
 
   // Raw coefficient setters
-  public void setA2(double v) {
-    a2 = v;
-  }
+  public void setB0(double v) { b0 = v; }
+  public void setA1(double v) { a1 = v; }
+  public void setA2(double v) { a2 = v; }
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {

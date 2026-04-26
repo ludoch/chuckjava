@@ -3,7 +3,7 @@ package org.chuck.core;
 /** Standard library functions for ChucK. */
 public class Std {
   /** Shared seeded Random instance for srandom/shuffle. */
-  public static java.util.Random rng = new java.util.Random();
+  public static MersenneTwister rng = new MersenneTwister();
 
   /** Converts a MIDI note number to a frequency in Hertz. */
   public static double mtof(double midiNote) {
@@ -78,16 +78,7 @@ public class Std {
       min = max;
       max = t;
     }
-    return min + (long) (Math.random() * (max - min + 1));
-  }
-
-  public static double rand2f(double min, double max) {
-    if (min > max) {
-      double t = min;
-      min = max;
-      max = t;
-    }
-    return min + Math.random() * (max - min);
+    return min + (long) ((rng.nextInt() & 0x7fffffffL) % (max - min + 1));
   }
 
   public static double fabs(double v) {
@@ -95,8 +86,7 @@ public class Std {
   }
 
   public static void srand(long seed) {
-    // Java's Math.random() doesn't expose seed easily,
-    // but for now we'll just ignore or use a shared Random instance.
+    rng.seed((int) seed);
   }
 
   public static long systemTime() {
@@ -166,31 +156,35 @@ public class Std {
   public static ChuckArray range(long start, long stop, long step) {
     ChuckArray arr = new ChuckArray(ChuckType.ARRAY, 0);
     if (step == 0) return arr;
-
-    // ChucK's Std.range automatically adjusts step sign to match direction if needed
     if (start < stop && step < 0) step = -step;
     if (start > stop && step > 0) step = -step;
 
     if (step > 0) {
-      for (long i = start; i < stop; i += step) {
-        arr.appendInt(i);
-      }
+      for (long i = start; i < stop; i += step) arr.appendInt(i);
     } else {
-      for (long i = start; i > stop; i += step) {
-        arr.appendInt(i);
-      }
+      for (long i = start; i > stop; i += step) arr.appendInt(i);
     }
     return arr;
   }
 
   /** Random integer in [0, RAND_MAX] (2147483647). */
   public static long rand() {
-    return (long) rng.nextInt(Integer.MAX_VALUE);
+    return (long) (rng.nextInt() & 0x7fffffff);
   }
 
-  /** Random float in [0.0, 1.0). */
+  /** Random float in [0.0, 1.0]. Matches native ck_random_f (random / RAND_MAX). */
   public static double randf() {
-    return rng.nextDouble();
+    return (double) rand() / 2147483647.0;
+  }
+
+  /** Random float in [min, max]. Matches native rand2f. */
+  public static double rand2f(double min, double max) {
+    if (min > max) {
+      double t = min;
+      min = max;
+      max = t;
+    }
+    return min + randf() * (max - min);
   }
 
   /**

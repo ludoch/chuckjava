@@ -1511,15 +1511,22 @@ public class ExpressionEmitter {
                       "systemTime",
                       "range",
                       "getenv",
-                      "setenv")
+                      "setenv",
+                      "sseed",
+                      "srandom")
                   .contains(mn)) {
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
             if (code != null) code.addInstruction(new MathInstrs.StdFunc(mn, argc));
             return;
           }
           if (bn.equals("Math")) {
-            if (mn.equals("random") || mn.equals("randf")) {
+            if (mn.equals("random") || mn.equals("randf") || mn.equals("randomf")) {
               if (code != null) code.addInstruction(new MathInstrs.MathRandom());
+              return;
+            }
+            if (mn.equals("sseed") || mn.equals("srandom")) {
+              for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
+              if (code != null) code.addInstruction(new MathInstrs.MathFunc("srandom"));
               return;
             }
             if (mn.equals("help")) {

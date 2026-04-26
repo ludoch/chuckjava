@@ -252,12 +252,16 @@ public abstract class ChuckUGen extends ChuckObject {
   public boolean cacheEnabled = true;
 
   public float tick(long systemTime) {
-    if (cacheEnabled && systemTime != -1 && systemTime == lastTickTime) {
+    return tick(systemTime, cacheEnabled);
+  }
+
+  public float tick(long systemTime, boolean useCache) {
+    if (useCache && systemTime != -1 && systemTime == lastTickTime) {
       return lastOut;
     }
 
     // Check if this sample is already in our block cache
-    if (cacheEnabled
+    if (useCache
         && systemTime != -1
         && blockLength > 0
         && systemTime >= blockStartTime
@@ -357,6 +361,10 @@ public abstract class ChuckUGen extends ChuckObject {
   /** ChucK-style gain() getter — called as p.gain() */
   public double gain() {
     return this.gain;
+  }
+
+  public long getLastTickTime() {
+    return lastTickTime;
   }
 
   public float getLastOut() {

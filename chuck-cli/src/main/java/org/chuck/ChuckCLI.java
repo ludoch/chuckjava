@@ -1,5 +1,6 @@
 package org.chuck;
 
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,7 +20,6 @@ public class ChuckCLI {
   private int timeoutSeconds = 0;
 
   private final List<String> filesToAdd = new ArrayList<>();
-  private final List<String[]> fileArgs = new ArrayList<>();
   private final List<String> otfCommands = new ArrayList<>();
 
   public void run(String[] args) {
@@ -76,28 +76,12 @@ public class ChuckCLI {
           case "--probe" -> {
             System.out.println("[chuck]: probing audio devices...");
             System.out.println("--- Output Devices ---");
-            for (org.chuck.audio.ChuckAudio.DeviceInfo info :
-                org.chuck.audio.ChuckAudio.getOutputDeviceInfo()) {
-              System.out.println(
-                  "  "
-                      + info.name()
-                      + " (max channels: "
-                      + info.maxOutputChannels()
-                      + ", rates: "
-                      + info.supportedSampleRates()
-                      + ")");
+            for (org.chuck.audio.ChuckAudio.DeviceInfo info : org.chuck.audio.ChuckAudio.getOutputDeviceInfo()) {
+              System.out.println("  " + info.name() + " (max channels: " + info.maxOutputChannels() + ", rates: " + info.supportedSampleRates() + ")");
             }
             System.out.println("--- Input Devices ---");
-            for (org.chuck.audio.ChuckAudio.DeviceInfo info :
-                org.chuck.audio.ChuckAudio.getInputDeviceInfo()) {
-              System.out.println(
-                  "  "
-                      + info.name()
-                      + " (max channels: "
-                      + info.maxInputChannels()
-                      + ", rates: "
-                      + info.supportedSampleRates()
-                      + ")");
+            for (org.chuck.audio.ChuckAudio.DeviceInfo info : org.chuck.audio.ChuckAudio.getOutputDeviceInfo()) {
+              System.out.println("  " + info.name() + " (max channels: " + info.maxInputChannels() + ", rates: " + info.supportedSampleRates() + ")");
             }
             System.exit(0);
           }
@@ -129,16 +113,7 @@ public class ChuckCLI {
             if (arg.startsWith("-")) {
               System.err.println("Unknown option: " + arg);
             } else {
-              if (arg.contains(":")) {
-                String[] parts = arg.split(":");
-                filesToAdd.add(parts[0]);
-                String[] shredArgs = new String[parts.length - 1];
-                System.arraycopy(parts, 1, shredArgs, 0, parts.length - 1);
-                fileArgs.add(shredArgs);
-              } else {
-                filesToAdd.add(arg);
-                fileArgs.add(new String[0]);
-              }
+              filesToAdd.add(arg);
             }
           }
         }
@@ -216,28 +191,18 @@ public class ChuckCLI {
       }
 
       List<ChuckShred> initialShreds = new ArrayList<>();
-      System.out.println("[CLI] filesToAdd size: " + filesToAdd.size());
-      for (int fileIdx = 0; fileIdx < filesToAdd.size(); fileIdx++) {
-
-        String fileName = filesToAdd.get(fileIdx);
+      for (String fileName : filesToAdd) {
         try {
           if (fileName.endsWith(".java")) {
             Runnable task = org.chuck.core.ChuckDSL.load(Paths.get(fileName));
             int id = vm.spork(task);
             ChuckShred shred = vm.getShred(id);
-            if (shred != null) {
-              shred.setArgs(fileArgs.get(fileIdx));
-              initialShreds.add(shred);
-            }
+            if (shred != null) initialShreds.add(shred);
           } else {
             int id = vm.add(fileName);
             ChuckShred shred = vm.getShred(id);
-            if (shred != null) {
-              shred.setArgs(fileArgs.get(fileIdx));
-              initialShreds.add(shred);
-            }
+            if (shred != null) initialShreds.add(shred);
           }
-
         } catch (ChuckCompilerException e) {
           printRichError(e);
         } catch (Exception e) {
@@ -260,8 +225,7 @@ public class ChuckCLI {
           System.exit(0);
         } else if (cmd.equals("time")) {
           double secs = (double) vm.getCurrentTime() / vm.getSampleRate();
-          System.out.println(
-              String.format("time: %d samples / %.2f seconds", vm.getCurrentTime(), secs));
+          System.out.println(String.format("time: %d samples / %.2f seconds", vm.getCurrentTime(), secs));
         } else if (cmd.equals("remove.all")) {
           for (org.chuck.core.ChuckShred s : vm.getAllShreds()) {
             vm.removeShred(s.getId());
@@ -276,6 +240,9 @@ public class ChuckCLI {
       }
 
       if (loop || !initialShreds.isEmpty()) {
+        // Wait briefly for virtual threads to start
+        Thread.sleep(50);
+        
         long startTime = System.currentTimeMillis();
         while (true) {
           if (timeoutSeconds > 0
@@ -283,15 +250,11 @@ public class ChuckCLI {
             if (verbose > 0) System.out.println("[CLI] Timeout reached, stopping...");
             break;
           }
+          
           if (!loop && vm.getActiveShredCount() == 0) break;
 
           if (silent) {
-            int samplesToAdvance = (int) (sampleRate * 0.1); // 100 ms
-            vm.advanceTime(samplesToAdvance);
-            try {
-              Thread.sleep(10);
-            } catch (Exception e) {
-            } // Let virtual threads run
+            vm.advanceTime(1);
           } else {
             Thread.sleep(100);
           }

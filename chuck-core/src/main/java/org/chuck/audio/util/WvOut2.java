@@ -4,6 +4,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import org.chuck.audio.ChuckUGen;
 import org.chuck.core.ChuckShred;
 
 /** WvOut2: Stereo recording UGen. Matches native ChucK. */
@@ -19,14 +20,6 @@ public class WvOut2 extends StereoUGen implements AutoCloseable {
   public WvOut2(float sampleRate) {
     super();
     this.sampleRate = sampleRate;
-  }
-
-  @Override
-  public void addSource(org.chuck.audio.ChuckUGen src) {
-    super.addSource(src);
-    if (src != null) {
-      src.cacheEnabled = false;
-    }
   }
 
   @Override
@@ -54,9 +47,7 @@ public class WvOut2 extends StereoUGen implements AutoCloseable {
     try {
       openFile(filename);
     } catch (java.io.IOException e) {
-      System.err.println("[WvOut2] Error opening file: " + e.getMessage());
     }
-
     return filename;
   }
 
@@ -79,10 +70,8 @@ public class WvOut2 extends StereoUGen implements AutoCloseable {
   }
 
   public void closeFile() {
-    System.out.println("[WvOut2] closeFile called. fos is: " + (fos != null));
     try {
       if (fos != null) {
-
         finalizeWav();
         fos.close();
         fos = null;
@@ -103,6 +92,7 @@ public class WvOut2 extends StereoUGen implements AutoCloseable {
     byte[] header = new byte[44];
     fos.write(header);
     totalSamples = 0;
+    this.recording = true;
 
     if (!registered && ChuckShred.CURRENT_SHRED.isBound()) {
       ChuckShred.CURRENT_SHRED.get().registerCloseable(this);

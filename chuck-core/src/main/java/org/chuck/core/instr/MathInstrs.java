@@ -64,6 +64,10 @@ public class MathInstrs {
           String key = k != null ? k.toString() : "";
           Std.setenv(key, val);
         }
+        case "sseed", "srandom" -> {
+          Std.srand(s.reg.popAsLong());
+          s.reg.push(0.0);
+        }
         case "range" -> {
           if (a == 1) {
             long stop = s.reg.popLong();
@@ -345,7 +349,7 @@ public class MathInstrs {
         }
         case "srandom" -> {
           long seed = (long) s.reg.popAsDouble();
-          Std.rng = new java.util.Random(seed);
+          Std.srand(seed);
           s.reg.push(0.0);
         }
         case "euclidean" -> {
@@ -532,7 +536,7 @@ public class MathInstrs {
   public static class MathRandom implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      s.reg.push(Math.random());
+      s.reg.push(Std.randf());
     }
   }
 

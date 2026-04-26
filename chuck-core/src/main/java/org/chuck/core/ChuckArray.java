@@ -150,18 +150,20 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     return types.size();
   }
 
-  public int cap() {
-    return types.size();
-  }
-
   public int capacity() {
     return types.size();
   }
 
-  public int capacity(int c) {
-    // In Java implementation using ArrayList, we don't strictly manage capacity manually
-    // but we can ensure internal capacity if needed.
-    return capacity();
+  public void set_size(long s) {
+    size((int) s);
+  }
+
+  public void set_capacity(long c) {
+    int cap = (int) c;
+    ((ArrayList<Long>) intData).ensureCapacity(cap);
+    ((ArrayList<Double>) floatData).ensureCapacity(cap);
+    ((ArrayList<Object>) objectData).ensureCapacity(cap);
+    ((ArrayList<Byte>) types).ensureCapacity(cap);
   }
 
   private void ensureCapacity(int index) {
@@ -241,6 +243,31 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     if (index < 0) index = objectData.size() + index;
     if (index < 0 || index >= objectData.size()) return null;
     return objectData.get(index);
+  }
+
+  public Object get(int index) {
+    if (index < 0) index = types.size() + index;
+    if (index < 0 || index >= types.size()) return null;
+    byte t = types.get(index);
+    return switch (t) {
+      case 0 -> intData.get(index);
+      case 1 -> floatData.get(index);
+      default -> objectData.get(index);
+    };
+  }
+
+  public void set(int index, long val) {
+    setInt(index, val);
+  }
+
+  public void set(int index, double val) {
+    setFloat(index, val);
+  }
+
+  public void set(int index, Object val) {
+    if (val instanceof Long l) setInt(index, l);
+    else if (val instanceof Double d) setFloat(index, d);
+    else setObject(index, val);
   }
 
   public void sort() {
@@ -336,9 +363,10 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
   }
 
   public void shuffle() {
-    java.util.Random rng = Std.rng;
+    MersenneTwister r = Std.rng;
+
     for (int i = types.size() - 1; i > 0; i--) {
-      int j = rng.nextInt(i + 1);
+      int j = Math.abs(r.nextInt()) % (i + 1);
 
       byte tj = types.get(j), ti = types.get(i);
       long ij = intData.get(j), ii = intData.get(i);
@@ -403,6 +431,10 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     }
   }
 
+  public void erase(long index) {
+    erase((int) index);
+  }
+
   public void erase(int begin, int end) {
     if (begin < 0) begin = 0;
     if (end > types.size()) end = types.size();
@@ -411,6 +443,10 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     for (int i = 0; i < end - begin; i++) {
       popOut(begin);
     }
+  }
+
+  public void erase(long begin, long end) {
+    erase((int) begin, (int) end);
   }
 
   public void appendInt(long val) {
@@ -469,6 +505,26 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     return assocObject.get(key);
   }
 
+  public Object get(String key) {
+    if (assocFloat.containsKey(key)) return assocFloat.get(key);
+    if (assocInt.containsKey(key)) return assocInt.get(key);
+    return assocObject.get(key);
+  }
+
+  public void set(String key, long val) {
+    setAssocInt(key, val);
+  }
+
+  public void set(String key, double val) {
+    setAssocFloat(key, val);
+  }
+
+  public void set(String key, Object val) {
+    if (val instanceof Long l) setAssocInt(key, l);
+    else if (val instanceof Double d) setAssocFloat(key, d);
+    else setAssocObject(key, val);
+  }
+
   /** ChucK API: {@code a.getKeys(outArr)} — fills {@code outArr} with all associative keys. */
   public ChuckArray getKeys(ChuckArray outArr) {
     if (outArr == null) return outArr;
@@ -494,9 +550,17 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     if (size() > 0) popOut(0);
   }
 
+  public void pop_front() {
+    popFront();
+  }
+
   /** Remove last element. */
   public void popBack() {
     if (size() > 0) popOut(size() - 1);
+  }
+
+  public void pop_back() {
+    popBack();
   }
 
   public void clear() {
