@@ -7,8 +7,8 @@ fun void hi( Event e, float f, string name ) {
     250::ms => now;
     w.closeFile();
 }
-spork ~ hi( e, 440, me.arg(0) + "_440.wav" );
-spork ~ hi( e, 880, me.arg(0) + "_880.wav" );
+spork ~ hi( e, 440, "comparison/java/06_event_broadcast_440.wav" );
+spork ~ hi( e, 880, "comparison/java/06_event_broadcast_880.wav" );
 100::ms => now;
 e.broadcast();
 500::ms => now;

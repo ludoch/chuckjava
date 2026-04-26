@@ -1,5 +1,5 @@
 Noise n => ResonZ f => WvOut2 w => blackhole;
-me.arg(0) => w.wavFilename;
+"comparison/java/02_filter_resonz.wav" => w.wavFilename;
 42 => Math.srandom;
 now => time start;
 while( now < start + 2::second ) {

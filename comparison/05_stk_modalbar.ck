@@ -1,5 +1,5 @@
 ModalBar m => WvOut2 w => blackhole;
-me.arg(0) => w.wavFilename;
+"comparison/java/05_stk_modalbar.wav" => w.wavFilename;
 42 => Math.srandom;
 for( int i; i < 8; i++ ) {
     440 * (i+1) => m.freq;

@@ -6,7 +6,7 @@ fun void play( float f, string name ) {
     w.closeFile();
 }
 for( int i; i < 5; i++ ) {
-    spork ~ play( 440 * (i+1), me.arg(0) + "_" + i + ".wav" );
+    spork ~ play( 440 * (i+1), "comparison/java/07_shred_spork_" + i + ".wav" );
     50::ms => now;
 }
 500::ms => now;

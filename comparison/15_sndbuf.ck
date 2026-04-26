@@ -1,5 +1,5 @@
 SndBuf b => WvOut2 w => blackhole;
-me.arg(0) => w.wavFilename;
+"comparison/java/15_sndbuf.wav" => w.wavFilename;
 "special:dope" => b.read;
 for( int i; i < 4; i++ ) {
     0 => b.pos;

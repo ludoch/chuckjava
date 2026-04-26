@@ -1,5 +1,5 @@
 Moog m => WvOut2 w => blackhole;
-me.arg(0) => w.wavFilename;
+"comparison/java/14_stk_moog.wav" => w.wavFilename;
 42 => Math.srandom;
 for( int i; i < 4; i++ ) {
     Std.mtof(60 + i) => m.freq;
