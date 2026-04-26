@@ -3,6 +3,7 @@ package org.chuck.audio.stk;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.osc.SinOsc;
 import org.chuck.audio.util.Adsr;
+import org.chuck.core.ChuckVM;
 
 /** A simple Fender Rhodes model using 2-operator FM synthesis. */
 public class Rhodey extends ChuckUGen {
@@ -17,6 +18,10 @@ public class Rhodey extends ChuckUGen {
 
   @SuppressWarnings("unused")
   private final float sampleRate;
+
+  public Rhodey() {
+    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
 
   public Rhodey(float sampleRate) {
     this.sampleRate = sampleRate;
@@ -33,6 +38,10 @@ public class Rhodey extends ChuckUGen {
     // Configure envelopes
     carrierEnv.set(0.001f, 1.5f, 0.0f, 0.05f);
     modulatorEnv.set(0.001f, 0.5f, 0.0f, 0.05f);
+  }
+
+  public void freq(float freq) {
+    setFreq(freq);
   }
 
   public void setFreq(double freq) {

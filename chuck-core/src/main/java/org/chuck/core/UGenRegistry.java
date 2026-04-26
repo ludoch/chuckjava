@@ -79,6 +79,8 @@ public class UGenRegistry {
     register("PRCRev", (sr, args) -> new PRCRev(sr));
     register("GVerb", (sr, args) -> new GVerb(sr));
     register("FreeVerb", (sr, args) -> new FreeVerb());
+    register("MVerb", (sr, args) -> new MVerb());
+    register("ProceduralReverb", (sr, args) -> new ProceduralReverb());
     register("PitShift", (sr, args) -> new PitShift());
     register("LentPitShift", (sr, args) -> new LentPitShift());
     register("Distortion", (sr, args) -> new Distortion());
@@ -210,6 +212,10 @@ public class UGenRegistry {
   }
 
   private static void register(String name, UGenFactory factory) {
+    if (REGISTRY.containsKey(name)) {
+      // System.out.println("[chuck]: skipping duplicate registration for UGen: " + name);
+      return;
+    }
     REGISTRY.put(name, factory);
   }
 

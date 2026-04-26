@@ -7,8 +7,8 @@ import org.chuck.audio.ChuckUGen;
 
 /** A mono-to-stereo unit generator for stereo panning. */
 public class Pan2 extends StereoUGen {
-  public final Gain left = new Gain();
-  public final Gain right = new Gain();
+  public final ChuckUGen left;
+  public final ChuckUGen right;
   private float pan = 0.0f; // -1 (left) to 1 (right)
   private int panType = 1; // 0: linear, 1: constant power
 
@@ -22,7 +22,8 @@ public class Pan2 extends StereoUGen {
     this.numInputs = 2;
     this.numOutputs = 2;
     this.inputChannels = new ChuckUGen[] {new Gain(), new Gain()};
-    this.outputChannels = new ChuckUGen[] {left, right};
+    this.left = chan(0);
+    this.right = chan(1);
 
     updateGains();
   }

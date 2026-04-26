@@ -2,12 +2,17 @@ package org.chuck.audio.fx;
 
 import org.chuck.audio.filter.AllPass;
 import org.chuck.audio.util.StereoUGen;
+import org.chuck.core.ChuckVM;
 
 /** PRCRev: Perry R. Cook's Reverb. */
 public class PRCRev extends StereoUGen {
   private final AllPass[] allpass = new AllPass[2];
   private final Comb[] comb = new Comb[2];
   private float mix = 0.5f;
+
+  public PRCRev() {
+    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
 
   public PRCRev(float sampleRate) {
     super();

@@ -1,5 +1,6 @@
 package org.chuck.core.instr;
 
+import org.chuck.audio.ChuckUGen;
 import org.chuck.core.*;
 
 public class ArrayInstrs {
@@ -68,7 +69,14 @@ public class ArrayInstrs {
         int i = a.resolveIndex(idx);
         if (s.reg.isObject(0)) {
           Object val = s.reg.peekObject(0);
-          a.setObject(i, val);
+          Object dest = a.getObject(i);
+          if (val instanceof ChuckUGen srcUgen && dest instanceof ChuckUGen destUgen) {
+            s.reg.popObject();
+            srcUgen.chuckTo(destUgen);
+            s.reg.pushObject(destUgen);
+          } else {
+            a.setObject(i, val);
+          }
         } else if (s.reg.isDouble(0)) {
           double val = s.reg.peekAsDouble(0);
           a.setFloat(i, val);

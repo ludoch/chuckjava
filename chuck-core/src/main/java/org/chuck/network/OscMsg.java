@@ -6,6 +6,21 @@ import java.util.List;
 /** Represents an OSC message. */
 public class OscMsg extends org.chuck.core.ChuckObject {
   public String address = "";
+
+  public String address() {
+    return address;
+  }
+
+  public String typetag() {
+    StringBuilder sb = new StringBuilder();
+    for (Object o : args) {
+      if (o instanceof Integer) sb.append("i");
+      else if (o instanceof Float || o instanceof Double) sb.append("f");
+      else if (o instanceof String) sb.append("s");
+    }
+    return sb.toString();
+  }
+
   private final List<Object> args = new ArrayList<>();
 
   public OscMsg() {

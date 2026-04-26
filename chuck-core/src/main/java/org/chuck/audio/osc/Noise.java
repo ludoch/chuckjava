@@ -1,11 +1,9 @@
 package org.chuck.audio.osc;
 
-import java.util.Random;
 import org.chuck.audio.ChuckUGen;
 
 /** A white noise generator UGen. */
 public class Noise extends ChuckUGen {
-  private final Random random = new Random();
 
   public Noise() {
     this(true);
@@ -17,7 +15,7 @@ public class Noise extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
-    // Generate a random float between -1.0 and 1.0
-    return input + (random.nextFloat() * 2.0f - 1.0f);
+    // Generate a random float between -1.0 and 1.0 using bit-exact MT19937
+    return input + (float) org.chuck.core.Std.rand2f(-1.0, 1.0);
   }
 }

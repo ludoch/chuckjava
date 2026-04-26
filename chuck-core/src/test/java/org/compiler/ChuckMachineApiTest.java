@@ -205,8 +205,9 @@ public class ChuckMachineApiTest {
   @Test
   public void testMachineEval() throws InterruptedException {
     // Machine.eval() returns a shred ID (> 0 on success).
-    // The VM also logs a "sporking" message, so there may be multiple output lines.
-    List<String> out = runChuck("Machine.eval(\"1 => now;\") => int sid; <<< sid >>>;", 10);
+    // We use a script that doesn't advance time because eval is now synchronous
+    // and yielding would cause it to be removed from active shreds prematurely.
+    List<String> out = runChuck("Machine.eval(\"2 + 2 => int x;\") => int sid; <<< sid >>>;", 10);
     assertFalse(out.isEmpty(), "Expected at least one output line");
     // Find the line that contains only the numeric shred ID
     long sid = -1;

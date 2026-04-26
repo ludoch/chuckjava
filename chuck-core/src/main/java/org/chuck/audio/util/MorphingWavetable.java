@@ -73,9 +73,20 @@ public class MorphingWavetable extends ChuckUGen {
     int t0 = (int) index;
     int t1 = Math.min(t0 + 1, numTables - 1);
     float tFrac = index - t0;
+    // Advance phase
+
+    phase += rate;
+    while (phase >= tableLen) {
+      phase -= tableLen;
+    }
+    while (phase < 0) {
+      phase += tableLen;
+    }
 
     // Phase interpolation (X-axis)
     int i0 = (int) phase;
+    if (i0 >= tableLen) i0 = tableLen - 1;
+    if (i0 < 0) i0 = 0;
     int i1 = (i0 + 1) % tableLen;
     float pFrac = (float) (phase - i0);
 
@@ -92,13 +103,6 @@ public class MorphingWavetable extends ChuckUGen {
     // Morph between the two
     float out = w0 + (w1 - w0) * tFrac;
 
-    // Advance phase
-    phase += rate;
-    if (phase >= tableLen) {
-      phase %= tableLen;
-    } else if (phase < 0) {
-      phase = tableLen + (phase % tableLen);
-    }
 
     return out * gain;
   }

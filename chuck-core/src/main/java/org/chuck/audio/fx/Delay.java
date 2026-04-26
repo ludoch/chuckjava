@@ -1,6 +1,7 @@
 package org.chuck.audio.fx;
 
 import org.chuck.audio.ChuckUGen;
+import org.chuck.core.ChuckVM;
 
 /** A delay-line UGen. */
 public class Delay extends ChuckUGen {
@@ -10,6 +11,10 @@ public class Delay extends ChuckUGen {
 
   @SuppressWarnings("unused")
   private final float sampleRate;
+
+  public Delay() {
+    this((int) ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
 
   public Delay(int maxDelaySamples) {
     this(maxDelaySamples, 44100.0f, true);
@@ -24,6 +29,10 @@ public class Delay extends ChuckUGen {
     this.buffer = new double[maxDelaySamples];
     this.delaySamples = 0; // Default to 0 delay
     this.sampleRate = sampleRate;
+  }
+
+  public org.chuck.core.ChuckDuration max(double m) {
+    return new org.chuck.core.ChuckDuration(m);
   }
 
   public void setDelay(int samples) {

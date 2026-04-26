@@ -3,21 +3,24 @@ package org.chuck.audio.fx;
 import org.chuck.audio.filter.AllPass;
 import org.chuck.audio.util.StereoUGen;
 
-/** John Chowning Reverb. */
+/** John Chowning Reverb. Matches STK JCRev behavior. */
 public class JCRev extends StereoUGen {
   private final AllPass[] allpass = new AllPass[3];
   private final Comb[] comb = new Comb[4];
   private final Delay outLeft, outRight;
-  private float mix = 0.5f;
+  private float mix = 0.3f; // STK default effectMix_
+
+  private float sampleRate;
 
   public JCRev() {
     this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
   }
 
   public JCRev(float sampleRate) {
-    // Delay lengths adapted for 44.1kHz. Disable auto-registration for internal parts.
+    this.sampleRate = sampleRate;
+    // Delay lengths for 44.1kHz from STK
     allpass[0] = new AllPass(225, false);
-    allpass[1] = new AllPass(556, false);
+    allpass[1] = new AllPass(341, false);
     allpass[2] = new AllPass(441, false);
 
     comb[0] = new Comb(1116, false);
@@ -25,24 +28,25 @@ public class JCRev extends StereoUGen {
     comb[2] = new Comb(1422, false);
     comb[3] = new Comb(1617, false);
 
-    // Set active delay lengths
-    allpass[0].delay(225);
-    allpass[1].delay(556);
-    allpass[2].delay(441);
-    comb[0].delay(1116);
-    comb[1].delay(1356);
-    comb[2].delay(1422);
-    comb[3].delay(1617);
+    for (int i = 0; i < 3; i++) allpass[i].setCoefficient(0.7);
+    for (int i = 0; i < 4; i++) comb[i].setPole(0.2);
 
-    comb[0].setCoefficient(0.891f);
-    comb[1].setCoefficient(0.863f);
-    comb[2].setCoefficient(0.841f);
-    comb[3].setCoefficient(0.822f);
+    outLeft = new Delay(211, sampleRate, false);
+    outRight = new Delay(179, sampleRate, false);
+    outLeft.delay(211);
+    outRight.delay(179);
 
-    outLeft = new Delay(100, sampleRate, false);
-    outRight = new Delay(157, sampleRate, false);
-    outLeft.delay(100);
-    outRight.delay(157);
+    setT60(1.0); // Default T60
+  }
+
+  public void setT60(double t60) {
+    float sr = this.sampleRate;
+    // From STK: combCoefficient_[i] = pow(10.0, (-3.0 * combDelays_[i].getDelay() / (T60 *
+    // Stk::sampleRate())));
+    comb[0].setCoefficient(Math.pow(10.0, -3.0 * 1116 / (t60 * sr)));
+    comb[1].setCoefficient(Math.pow(10.0, -3.0 * 1356 / (t60 * sr)));
+    comb[2].setCoefficient(Math.pow(10.0, -3.0 * 1422 / (t60 * sr)));
+    comb[3].setCoefficient(Math.pow(10.0, -3.0 * 1617 / (t60 * sr)));
   }
 
   public void mix(double mix) {
@@ -60,17 +64,20 @@ public class JCRev extends StereoUGen {
   @Override
   protected void computeStereo(float left, float right, long systemTime) {
     // Mono-sum for the reverb tail (standard Schroeder reverb behavior)
+    // By fixing MultiChannelUGen/StereoUGen, 'left' and 'right' are now correct!
     float input = (left + right) * 0.5f;
+
+    // Series AllPass
     float temp = input;
     for (int i = 0; i < 3; i++) {
       temp = allpass[i].tick(temp, systemTime);
     }
 
+    // Parallel Combs
     float filtout = 0;
     for (int i = 0; i < 4; i++) {
       filtout += comb[i].tick(temp, systemTime);
     }
-    filtout *= 0.5f;
 
     // Preserve original stereo dry signal
     float wetL = outLeft.tick(filtout, systemTime);
@@ -82,6 +89,6 @@ public class JCRev extends StereoUGen {
 
   @Override
   protected void computeStereo(float input, long systemTime) {
-    // Handled by 2-arg version
+    computeStereo(input, input, systemTime);
   }
 }

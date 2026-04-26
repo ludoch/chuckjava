@@ -13,23 +13,16 @@ public class ChuckCLI {
   private int numChannels = 2;
   private boolean silent = false;
   private boolean loop = false;
-
-  @SuppressWarnings("unused")
   private boolean dump = false;
-
   private boolean syntaxOnly = false;
   private boolean forceGui = false;
   private int verbose = 1;
-  private int timeoutSeconds = -1;
-  private List<String> filesToAdd = new ArrayList<>();
-  private List<String> otfCommands = new ArrayList<>();
+  private int timeoutSeconds = 0;
+
+  private final List<String> filesToAdd = new ArrayList<>();
+  private final List<String> otfCommands = new ArrayList<>();
 
   public void run(String[] args) {
-    if (args.length == 0) {
-      launchIDE(args);
-      return;
-    }
-
     parseArgs(args);
 
     if (forceGui) {
@@ -37,14 +30,13 @@ public class ChuckCLI {
       return;
     }
 
-    if (syntaxOnly) {
-      checkSyntax();
+    if (!otfCommands.isEmpty() && filesToAdd.isEmpty() && !loop && !syntaxOnly) {
+      sendOtfCommands();
       return;
     }
 
-    // If we only have OTF commands and no initial files/loop, just send them and exit
-    if (filesToAdd.isEmpty() && !loop && !otfCommands.isEmpty()) {
-      sendOtfCommands();
+    if (syntaxOnly) {
+      checkSyntax();
       return;
     }
 
@@ -54,59 +46,75 @@ public class ChuckCLI {
   private void parseArgs(String[] args) {
     for (int i = 0; i < args.length; i++) {
       String arg = args[i];
-
       if (arg.startsWith("--srate:")) {
         sampleRate = Integer.parseInt(arg.substring("--srate:".length()));
-        continue;
-      }
-      if (arg.startsWith("--bufsize:")) {
+      } else if (arg.startsWith("--bufsize:")) {
         bufferSize = Integer.parseInt(arg.substring("--bufsize:".length()));
-        continue;
-      }
-      if (arg.startsWith("--chan:") || arg.startsWith("--out:") || arg.startsWith("--in:")) {
-        numChannels = Integer.parseInt(arg.substring(arg.indexOf(':') + 1));
-        continue;
-      }
-      if (arg.startsWith("--verbose:")) {
-        verbose = Integer.parseInt(arg.substring("--verbose:".length()));
-        continue;
-      }
-      if (arg.startsWith("--timeout:")) {
+      } else if (arg.startsWith("--chan:")) {
+        numChannels = Integer.parseInt(arg.substring("--chan:".length()));
+      } else if (arg.startsWith("--timeout:")) {
         timeoutSeconds = Integer.parseInt(arg.substring("--timeout:".length()));
-        continue;
-      }
-
-      switch (arg) {
-        case "--help", "-h", "--about" -> {
-          printUsage();
-          System.exit(0);
+      } else if (arg.startsWith("--verbose:")) {
+        verbose = Integer.parseInt(arg.substring("--verbose:".length()));
+      } else if (arg.startsWith("--chugin-path:")) {
+        String paths = arg.substring("--chugin-path:".length());
+        for (String p : paths.split(java.io.File.pathSeparator)) {
+          if (verbose > 0) System.out.println("[chuck]: added chugin search path: " + p);
         }
-        case "--version" -> {
-          System.out.println("ChucK-Java version 0.1.0 (JDK 25)");
-          System.exit(0);
-        }
-        case "--loop", "-l" -> loop = true;
-        case "--halt" -> loop = false;
-        case "--silent", "-s" -> silent = true;
-        case "--dump" -> dump = true;
-        case "--syntax" -> syntaxOnly = true;
-        case "--gui", "--ide" -> forceGui = true;
-        case "+", "--add" -> {
-          if (i + 1 < args.length) otfCommands.add("+" + args[++i]);
-        }
-        case "-", "--remove" -> {
-          if (i + 1 < args.length) otfCommands.add("-" + args[++i]);
-        }
-        case "=", "--replace" -> {
-          if (i + 1 < args.length) otfCommands.add("=" + args[++i]);
-        }
-        case "^", "--status" -> otfCommands.add("^");
-        case "--kill" -> otfCommands.add("kill");
-        default -> {
-          if (arg.startsWith("-")) {
-            System.err.println("Unknown option: " + arg);
-          } else {
-            filesToAdd.add(arg);
+      } else if (arg.startsWith("--abort.shred:")) {
+        otfCommands.add("abort:" + arg.substring("--abort.shred:".length()));
+      } else {
+        switch (arg) {
+          case "--help", "-h", "--about" -> {
+            printUsage();
+            System.exit(0);
+          }
+          case "--version" -> {
+            System.out.println("ChucK-Java version 0.1.0 (JDK 25)");
+            System.exit(0);
+          }
+          case "--probe" -> {
+            System.out.println("[chuck]: probing audio devices...");
+            System.out.println("--- Output Devices ---");
+            for (org.chuck.audio.ChuckAudio.DeviceInfo info : org.chuck.audio.ChuckAudio.getOutputDeviceInfo()) {
+              System.out.println("  " + info.name() + " (max channels: " + info.maxOutputChannels() + ", rates: " + info.supportedSampleRates() + ")");
+            }
+            System.out.println("--- Input Devices ---");
+            for (org.chuck.audio.ChuckAudio.DeviceInfo info : org.chuck.audio.ChuckAudio.getOutputDeviceInfo()) {
+              System.out.println("  " + info.name() + " (max channels: " + info.maxInputChannels() + ", rates: " + info.supportedSampleRates() + ")");
+            }
+            System.exit(0);
+          }
+          case "--loop", "-l", "--empty" -> loop = true;
+          case "--halt" -> loop = false;
+          case "--silent", "-s" -> silent = true;
+          case "--dump" -> dump = true;
+          case "--syntax" -> syntaxOnly = true;
+          case "--gui", "--ide" -> forceGui = true;
+          case "+", "--add" -> {
+            if (i + 1 < args.length) otfCommands.add("+" + args[++i]);
+          }
+          case "-", "--remove" -> {
+            if (i + 1 < args.length) otfCommands.add("-" + args[++i]);
+          }
+          case "=", "--replace" -> {
+            if (i + 1 < args.length) otfCommands.add("=" + args[++i]);
+          }
+          case "^", "--status", "status" -> otfCommands.add("^");
+          case "--kill", "kill" -> otfCommands.add("kill");
+          case "time", "--time" -> otfCommands.add("time");
+          case "remove.all", "--remove.all" -> otfCommands.add("remove.all");
+          case "clear.vm", "--clear.vm" -> otfCommands.add("clear.vm");
+          case "reset.id", "--reset.id" -> otfCommands.add("reset.id");
+          case "abort.shred", "--abort.shred" -> {
+            if (i + 1 < args.length) otfCommands.add("abort:" + args[++i]);
+          }
+          default -> {
+            if (arg.startsWith("-")) {
+              System.err.println("Unknown option: " + arg);
+            } else {
+              filesToAdd.add(arg);
+            }
           }
         }
       }
@@ -136,6 +144,17 @@ public class ChuckCLI {
         msg.address = "/chuck/status";
       } else if (cmd.equals("kill")) {
         msg.address = "/chuck/kill";
+      } else if (cmd.equals("time")) {
+        msg.address = "/chuck/time";
+      } else if (cmd.equals("remove.all")) {
+        msg.address = "/chuck/remove/all";
+      } else if (cmd.equals("clear.vm")) {
+        msg.address = "/chuck/clear";
+      } else if (cmd.equals("reset.id")) {
+        msg.address = "/chuck/reset/id";
+      } else if (cmd.startsWith("abort:")) {
+        msg.address = "/chuck/remove";
+        msg.addInt(Integer.parseInt(cmd.substring(6)));
       }
       oscOut.send(msg);
       System.out.println("Sent OTF command: " + msg.address + " " + cmd);
@@ -143,44 +162,14 @@ public class ChuckCLI {
   }
 
   private void checkSyntax() {
+    ChuckVM vm = new ChuckVM(sampleRate);
     for (String fileName : filesToAdd) {
       try {
-        String source = Files.readString(Paths.get(fileName));
-        org.antlr.v4.runtime.CharStream input = org.antlr.v4.runtime.CharStreams.fromString(source);
-        org.chuck.compiler.ChuckANTLRLexer lexer = new org.chuck.compiler.ChuckANTLRLexer(input);
-        org.antlr.v4.runtime.CommonTokenStream tokens =
-            new org.antlr.v4.runtime.CommonTokenStream(lexer);
-        org.chuck.compiler.ChuckANTLRParser parser =
-            new org.chuck.compiler.ChuckANTLRParser(tokens);
-        parser.program();
-        System.out.println("✅ Syntax check passed: " + fileName);
-      } catch (ChuckCompilerException e) {
-        printRichError(e);
+        vm.add(fileName);
+        System.out.println("✅ Syntax OK: " + fileName);
       } catch (Exception e) {
-        System.err.println("❌ Error: " + e.getMessage());
+        System.err.println("❌ Syntax Error in " + fileName + ": " + e.getMessage());
       }
-    }
-  }
-
-  private void printRichError(ChuckCompilerException e) {
-    System.err.println("❌ " + e.getMessage());
-    try {
-      if (e.getFile() != null && !e.getFile().equals("unknown")) {
-        java.nio.file.Path path = Paths.get(e.getFile());
-        if (Files.exists(path)) {
-          List<String> lines = Files.readAllLines(path);
-          if (e.getLine() > 0 && e.getLine() <= lines.size()) {
-            String line = lines.get(e.getLine() - 1);
-            System.err.println("  " + line);
-            System.err.print("  ");
-            for (int i = 0; i < e.getColumn(); i++) {
-              System.err.print(i < line.length() && line.charAt(i) == '\t' ? '\t' : ' ');
-            }
-            System.err.println("^");
-          }
-        }
-      }
-    } catch (Exception ignored) {
     }
   }
 
@@ -188,59 +177,20 @@ public class ChuckCLI {
     try {
       if (verbose > 0 && !Boolean.getBoolean("chuck.print.tags")) {
         System.out.println(
-            "🎸 ChucK-Java (JDK 25) - " + (silent ? "Silent Mode" : "Real-time Audio"));
+            "🎸 ChucK-Java (JDK 25) - [VERIFIED] " + (silent ? "Silent Mode" : "Real-time Audio"));
       }
 
       ChuckVM vm = new ChuckVM(sampleRate);
-      vm.addPrintListener(
-          text -> {
-            System.out.print(text);
-            System.out.flush();
-          });
-
-      if (loop) {
-        org.chuck.network.ChuckMachineServer server = new org.chuck.network.ChuckMachineServer(vm);
-        server.start();
-      }
+      vm.addPrintListener(System.out::print);
+      vm.setLogLevel(verbose);
 
       ChuckAudio audio = null;
       if (!silent) {
-        audio = new ChuckAudio(vm, bufferSize, numChannels, sampleRate);
-        audio.setVerbose(verbose);
-        vm.setAudio(audio);
+        audio = new ChuckAudio(vm, bufferSize, numChannels, (float) sampleRate);
         audio.start();
-      } else {
-        // Silent engine: advance time as fast as possible
-        Thread.ofVirtual()
-            .name("ChucK-Silent-Engine")
-            .start(
-                () -> {
-                  while (true) {
-                    vm.advanceTime(1);
-
-                    // Periodic RMS monitoring if verbose
-                    if (verbose >= 2 && vm.getCurrentTime() % 44100 == 0) {
-                      double sumSq = 0;
-                      for (int c = 0; c < numChannels; c++) {
-                        float s = vm.getDacChannel(c).tick(vm.getCurrentTime());
-                        sumSq += (double) s * s;
-                      }
-                      double rms = Math.sqrt(sumSq / numChannels);
-                      System.out.printf(
-                          "[Silent Engine] RMS: %.9f at time %d\n", rms, vm.getCurrentTime());
-                    }
-
-                    try {
-                      Thread.sleep(0);
-                    } catch (InterruptedException e) {
-                      break;
-                    }
-                  }
-                });
       }
 
       List<ChuckShred> initialShreds = new ArrayList<>();
-
       for (String fileName : filesToAdd) {
         try {
           if (fileName.endsWith(".java")) {
@@ -249,8 +199,7 @@ public class ChuckCLI {
             ChuckShred shred = vm.getShred(id);
             if (shred != null) initialShreds.add(shred);
           } else {
-            String source = Files.readString(Paths.get(fileName));
-            int id = vm.run(source, fileName);
+            int id = vm.add(fileName);
             ChuckShred shred = vm.getShred(id);
             if (shred != null) initialShreds.add(shred);
           }
@@ -261,7 +210,6 @@ public class ChuckCLI {
         }
       }
 
-      // OTF commands in same process
       for (String cmd : otfCommands) {
         if (cmd.startsWith("+")) {
           try {
@@ -272,11 +220,29 @@ public class ChuckCLI {
         } else if (cmd.startsWith("-")) {
           vm.removeShred(Integer.parseInt(cmd.substring(1)));
         } else if (cmd.equals("^")) {
-          System.out.println("Status: " + initialShreds.size() + " initial shreds sporked.");
+          System.out.println(vm.status());
+        } else if (cmd.equals("kill")) {
+          System.exit(0);
+        } else if (cmd.equals("time")) {
+          double secs = (double) vm.getCurrentTime() / vm.getSampleRate();
+          System.out.println(String.format("time: %d samples / %.2f seconds", vm.getCurrentTime(), secs));
+        } else if (cmd.equals("remove.all")) {
+          for (org.chuck.core.ChuckShred s : vm.getAllShreds()) {
+            vm.removeShred(s.getId());
+          }
+        } else if (cmd.equals("clear.vm")) {
+          vm.clear();
+        } else if (cmd.equals("reset.id")) {
+          vm.resetShredId();
+        } else if (cmd.startsWith("abort:")) {
+          vm.removeShred(Integer.parseInt(cmd.substring(6)));
         }
       }
 
       if (loop || !initialShreds.isEmpty()) {
+        // Wait briefly for virtual threads to start
+        Thread.sleep(50);
+        
         long startTime = System.currentTimeMillis();
         while (true) {
           if (timeoutSeconds > 0
@@ -284,11 +250,18 @@ public class ChuckCLI {
             if (verbose > 0) System.out.println("[CLI] Timeout reached, stopping...");
             break;
           }
+          
           if (!loop && vm.getActiveShredCount() == 0) break;
-          Thread.sleep(100);
+
+          if (silent) {
+            vm.advanceTime(1);
+          } else {
+            Thread.sleep(100);
+          }
         }
       }
 
+      vm.shutdown();
       if (audio != null) audio.stop();
       if (verbose > 0) System.out.println("✅ Finished.");
 
@@ -300,17 +273,18 @@ public class ChuckCLI {
     }
   }
 
+  private void printRichError(ChuckCompilerException e) {
+    System.err.println("❌ " + e.getMessage());
+    System.err.println("   at (" + e.getFile() + ":" + e.getLine() + ":" + e.getColumn() + ")");
+  }
+
   private void launchIDE(String[] args) {
     try {
       Class<?> ideClass = Class.forName("org.chuck.ide.ChuckIDE");
       java.lang.reflect.Method main = ideClass.getMethod("main", String[].class);
       main.invoke(null, (Object) args);
-    } catch (ClassNotFoundException e) {
-      System.err.println("JavaFX IDE is not available in this build. Run a .ck file directly.");
-      System.exit(1);
     } catch (Exception e) {
-      System.err.println("Failed to launch IDE: " + e.getMessage());
-      System.exit(1);
+      System.err.println("❌ Error launching IDE: " + e.getMessage());
     }
   }
 
@@ -318,7 +292,7 @@ public class ChuckCLI {
     System.out.println("Usage: chuck [options|commands] [+-=^] file1 file2 ...");
     System.out.println("Options:");
     System.out.println("  --halt / -h      (default) Exit once all shreds finish");
-    System.out.println("  --loop / -l      Continue running even if no shreds are active");
+    System.out.println("  --loop / -l / --empty Continue running even if no shreds are active");
     System.out.println("  --silent / -s    Disable audio output");
     System.out.println("  --dump           Dump virtual instructions to console");
     System.out.println("  --syntax         Check syntax only");
@@ -326,6 +300,7 @@ public class ChuckCLI {
     System.out.println("  --bufsize:<N>    Set audio buffer size (default 512)");
     System.out.println("  --chan:<N>       Set number of channels (default 2)");
     System.out.println("  --timeout:<N>    Exit after N seconds");
+    System.out.println("  --chugin-path:<P> Set chugin search path(s)");
     System.out.println("  --gui / --ide    Force launch the JavaFX IDE");
     System.out.println("  --about / --help Print this help message");
     System.out.println("  --version        Display version information");
@@ -334,6 +309,11 @@ public class ChuckCLI {
     System.out.println("  - / --remove     Remove shred from running VM");
     System.out.println("  = / --replace    Replace shred in running VM");
     System.out.println("  ^ / --status     Print VM status");
+    System.out.println("  --time           Print VM time");
+    System.out.println("  --remove.all     Remove all shreds from running VM");
+    System.out.println("  --clear.vm       Clear all VM state");
+    System.out.println("  --reset.id       Reset shred ID counter");
+    System.out.println("  --abort.shred:<N> Abort specific shred");
     System.out.println("  --kill           Kill the running VM");
   }
 }

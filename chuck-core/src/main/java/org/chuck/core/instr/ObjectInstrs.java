@@ -182,7 +182,17 @@ public class ObjectInstrs {
             return;
           }
           case "cap", "capacity" -> {
-            s.reg.push((long) ca.cap());
+            s.reg.push((long) ca.capacity());
+            return;
+          }
+          case "set_capacity" -> {
+            if (a >= 1) ca.set_capacity(((Number) args[0]).longValue());
+            s.reg.pushObject(ca);
+            return;
+          }
+          case "set_size" -> {
+            if (a >= 1) ca.set_size(((Number) args[0]).longValue());
+            s.reg.pushObject(ca);
             return;
           }
           case "clear" -> {
@@ -191,8 +201,8 @@ public class ObjectInstrs {
             return;
           }
           case "erase" -> {
-            if (a == 1) ca.erase(((Number) args[0]).intValue());
-            else if (a == 2) ca.erase(((Number) args[0]).intValue(), ((Number) args[1]).intValue());
+            if (a == 1) ca.erase(((Number) args[0]).longValue());
+            else if (a == 2) ca.erase(((Number) args[0]).longValue(), ((Number) args[1]).longValue());
             s.reg.pushObject(ca);
             return;
           }

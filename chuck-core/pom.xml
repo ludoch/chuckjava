@@ -14,7 +14,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>org.rtmidijava</groupId>
+            <groupId>io.github.ludoch</groupId>
             <artifactId>rtmidijava</artifactId>
         </dependency>
         <dependency>

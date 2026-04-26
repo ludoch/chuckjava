@@ -283,6 +283,18 @@ public class ChuckEmitter {
     return ChuckLanguage.isObjectType(type) || userClassRegistry.containsKey(type);
   }
 
+  boolean isAutoInstantiable(String type) {
+    if (type == null) return false;
+    String baseType = getBaseType(type);
+    if (type.contains("[]")) return true;
+
+    // Core types like Object, string, etc should start NULL.
+    // Only actual audio UGens and Events auto-instantiate.
+    return (ChuckLanguage.CORE_UGENS.contains(baseType) || UGenRegistry.isRegistered(baseType))
+        && !baseType.equals("Object")
+        && !baseType.equals("string");
+  }
+
   boolean isKnownType(String type) {
     if (type == null) return false;
     String baseType = getBaseType(type);

@@ -3,6 +3,7 @@ package org.chuck.audio.stk;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.filter.OnePole;
 import org.chuck.audio.fx.DelayL;
+import org.chuck.core.ChuckVM;
 
 /** A stiff Karplus-Strong string physical model. */
 public class StifKarp extends ChuckUGen {
@@ -14,6 +15,10 @@ public class StifKarp extends ChuckUGen {
 
   private float lastInput = 0.0f;
   private final float sampleRate;
+
+  public StifKarp() {
+    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
 
   public StifKarp(float sampleRate) {
     this.sampleRate = sampleRate;
@@ -27,6 +32,14 @@ public class StifKarp extends ChuckUGen {
   public void setFreq(double f) {
     double delay = sampleRate / f - 0.5;
     delayLine.setDelay(delay);
+  }
+
+  public void freq(float freq) {
+    setFreq(freq);
+  }
+
+  public void stretch(float s) {
+    // Dummy implementation
   }
 
   public void pickupPos(float p) {

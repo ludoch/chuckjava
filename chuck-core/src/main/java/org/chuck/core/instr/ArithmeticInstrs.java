@@ -258,8 +258,18 @@ public class ArithmeticInstrs {
       if (s.reg.getSp() < 1) return;
       if (s.reg.isObject(0)) {
         Object o = s.reg.pop();
-        if (o instanceof ChuckDuration cd) s.reg.pushObject(s.getDuration(-cd.samples()));
-        else s.reg.push(0.0);
+        if (o instanceof ChuckDuration cd) {
+          s.reg.pushObject(s.getDuration(-cd.samples()));
+        } else if (o instanceof ChuckArray arr && arr.vecTag != null) {
+          // vec2, vec3, vec4, complex, polar
+          double[] res = new double[arr.size()];
+          for (int i = 0; i < res.length; i++) {
+            res[i] = -arr.getFloat(i);
+          }
+          s.reg.pushObject(new ChuckArray(arr.vecTag, res));
+        } else {
+          s.reg.push(0.0);
+        }
       } else if (s.reg.isDouble(0)) {
         s.reg.push(-s.reg.popAsDouble());
       } else {
@@ -281,6 +291,30 @@ public class ArithmeticInstrs {
     public void execute(ChuckVM vm, ChuckShred s) {
       long r = s.reg.popAsLong(), l = s.reg.popAsLong();
       s.reg.push(l | r);
+    }
+  }
+
+  public static class BitwiseXorAny implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long r = s.reg.popAsLong(), l = s.reg.popAsLong();
+      s.reg.push(l ^ r);
+    }
+  }
+
+  public static class LeftShiftAny implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long r = s.reg.popAsLong(), l = s.reg.popAsLong();
+      s.reg.push(l << r);
+    }
+  }
+
+  public static class RightShiftAny implements ChuckInstr {
+    @Override
+    public void execute(ChuckVM vm, ChuckShred s) {
+      long r = s.reg.popAsLong(), l = s.reg.popAsLong();
+      s.reg.push(l >> r);
     }
   }
 

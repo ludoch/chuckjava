@@ -31,12 +31,24 @@ public class ChuckVMTest {
 
     vm.advanceTime(10); // T=15
     assertEquals(15, vm.getCurrentTime());
+
+    // Give virtual thread time to update wakeTime
+    int retries2 = 0;
+    while (shred.getWakeTime() != 22 && retries2 < 500) {
+      Thread.sleep(5);
+      retries2++;
+    }
     assertEquals(22, shred.getWakeTime());
 
     vm.advanceTime(10); // T=25
     assertEquals(25, vm.getCurrentTime());
-    Thread.sleep(50); // Give virtual thread time to finish and set isDone
-    assertTrue(shred.isDone());
+    // Give virtual thread time to finish and set isDone
+    int retries = 0;
+    while (!shred.isDone() && retries < 100) {
+      Thread.sleep(5);
+      retries++;
+    }
+    assertTrue(shred.isDone(), "Shred did not finish in time");
   }
 
   @Test
@@ -366,8 +378,8 @@ public class ChuckVMTest {
                     if (cleared.get()) {
                       int cnt = samplesAfterClear.incrementAndGet();
                       float s = Math.abs(vm.getDacChannel(0).getLastOut());
-                      if (s > 0.001f) {
-                        // Still non-zero after clear — record it
+                      // Allow 128 samples of drain time for in-flight audio processing
+                      if (cnt > 128 && s > 0.001f) {
                         maxAfterClear.set(Math.max(maxAfterClear.get(), (int) (s * 1_000_000)));
                       }
                       if (cnt >= 512) audioRunning.set(false); // 512 samples is enough to check

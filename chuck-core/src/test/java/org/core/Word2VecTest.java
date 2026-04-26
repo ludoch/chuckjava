@@ -96,7 +96,7 @@ public class Word2VecTest {
     StringBuilder out = new StringBuilder();
     vm.addPrintListener(out::append);
     String code =
-        "Word2Vec w;\n"
+        "new Word2Vec @=> Word2Vec w;\n"
             + "if (!w.load(\""
             + MODEL_PATH.replace("\\", "\\\\")
             + "\")) { <<< \"load failed\" >>>; }\n"

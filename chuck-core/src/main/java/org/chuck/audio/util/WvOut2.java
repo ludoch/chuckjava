@@ -5,12 +5,17 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import org.chuck.audio.ChuckUGen;
+import org.chuck.core.ChuckShred;
 
-/** WvOut2: Stereo recording UGen. */
-public class WvOut2 extends StereoUGen {
+/** WvOut2: Stereo recording UGen. Matches native ChucK. */
+public class WvOut2 extends StereoUGen implements AutoCloseable {
   private FileOutputStream fos;
   private long totalSamples = 0;
   private float sampleRate = 44100.0f;
+  private String currentFilename = "";
+  private boolean recording = true;
+  private float fileGain = 1.0f;
+  private boolean registered = false;
 
   public WvOut2(float sampleRate) {
     super();
@@ -18,26 +23,14 @@ public class WvOut2 extends StereoUGen {
   }
 
   @Override
-  protected void computeStereo(float input, long systemTime) {
-    // PRC: computeStereo is called AFTER inputs are summed into 'input'
-    // But for WvOut2 we often want the inputs to remain separate if they were stereo.
-    // StereoUGen.tick sums all sources into 'input'.
-    // If we want real stereo recording of stereo sources, we should look at the sources.
-
-    float left = 0, right = 0;
-    for (ChuckUGen src : getSources()) {
-      // Sources are already ticked by StereoUGen.tick
-      left += src.getChannelLastOut(0);
-      right += src.getChannelLastOut(1);
-    }
-
+  protected void computeStereo(float left, float right, long systemTime) {
     lastOutChannels[0] = left;
     lastOutChannels[1] = right;
 
-    if (fos != null) {
+    if (fos != null && recording) {
       try {
-        writeSample(left);
-        writeSample(right);
+        writeSample(left * fileGain);
+        writeSample(right * fileGain);
         totalSamples++;
       } catch (IOException e) {
         closeFile();
@@ -45,11 +38,35 @@ public class WvOut2 extends StereoUGen {
     }
   }
 
-  public void wavWrite(String filename) {
+  @Override
+  protected void computeStereo(float input, long systemTime) {
+    computeStereo(input, input, systemTime);
+  }
+
+  public String wavFilename(String filename) {
     try {
       openFile(filename);
-    } catch (IOException e) {
+    } catch (java.io.IOException e) {
     }
+    return filename;
+  }
+
+  public float fileGain(float g) {
+    this.fileGain = g;
+    return g;
+  }
+
+  public int record(int status) {
+    this.recording = (status != 0);
+    return status;
+  }
+
+  public String filename() {
+    return currentFilename;
+  }
+
+  public void wavWrite(String filename) {
+    wavFilename(filename);
   }
 
   public void closeFile() {
@@ -63,12 +80,24 @@ public class WvOut2 extends StereoUGen {
     }
   }
 
+  @Override
+  public void close() throws Exception {
+    closeFile();
+  }
+
   private void openFile(String filename) throws IOException {
     if (fos != null) closeFile();
+    this.currentFilename = filename;
     fos = new FileOutputStream(filename);
     byte[] header = new byte[44];
     fos.write(header);
     totalSamples = 0;
+    this.recording = true;
+
+    if (!registered && ChuckShred.CURRENT_SHRED.isBound()) {
+      ChuckShred.CURRENT_SHRED.get().registerCloseable(this);
+      registered = true;
+    }
   }
 
   private void writeSample(float sample) throws IOException {
@@ -79,6 +108,14 @@ public class WvOut2 extends StereoUGen {
 
   private void finalizeWav() throws IOException {
     if (fos == null) return;
+    System.out.println("[WvOut2] Finalizing WAV: " + currentFilename + " samples: " + totalSamples);
+
+    fos.flush();
+    try {
+      fos.getFD().sync();
+    } catch (IOException ignored) {
+    }
+
     long byteRate = (long) sampleRate * 2 * 2;
     long dataSize = totalSamples * 2 * 2;
     long fileSize = 36 + dataSize;
@@ -90,17 +127,17 @@ public class WvOut2 extends StereoUGen {
     header.put("fmt ".getBytes());
     header.putInt(16);
     header.putShort((short) 1);
-    header.putShort((short) 2); // 2 channels
+    header.putShort((short) 2);
     header.putInt((int) sampleRate);
     header.putInt((int) byteRate);
-    header.putShort((short) 4); // block align
+    header.putShort((short) 4);
     header.putShort((short) 16);
     header.put("data".getBytes());
     header.putInt((int) dataSize);
 
-    try (java.nio.channels.FileChannel fc = fos.getChannel()) {
-      fc.position(0);
-      fc.write(header);
+    try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(currentFilename, "rw")) {
+      raf.seek(0);
+      raf.write(header.array());
     }
   }
 }

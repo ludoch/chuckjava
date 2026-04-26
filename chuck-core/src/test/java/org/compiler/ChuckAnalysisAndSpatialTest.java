@@ -105,10 +105,11 @@ public class ChuckAnalysisAndSpatialTest {
     List<String> out =
         runChuck(
             """
-            vec2 v;
+            @(0.0, 0.0) => vec2 v;
             5.0 => v.x;
             7.0 => v.y;
             <<< v.x, v.y >>>;
+
             """,
             1);
     assertFalse(out.isEmpty());
@@ -225,8 +226,9 @@ public class ChuckAnalysisAndSpatialTest {
                 fun int @operator<(Box other) { return val < other.val; }
                 fun int @operator==(Box other) { return val == other.val; }
             }
-            Box a; 1.0 => a.val;
-            Box b; 3.0 => b.val;
+            new Box @=> Box a; 1.0 => a.val;
+            new Box @=> Box b; 3.0 => b.val;
+
             <<< a.val, b.val >>>;
             <<< a < b >>>;
             <<< a == b >>>;

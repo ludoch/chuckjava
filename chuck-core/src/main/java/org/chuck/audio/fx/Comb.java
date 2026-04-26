@@ -4,12 +4,15 @@ import org.chuck.audio.ChuckUGen;
 
 /**
  * A comb filter UGen. Adapted from STK. Uses double precision internally to prevent limit cycles.
+ * Supports an optional low-pass pole in the feedback loop.
  */
 public class Comb extends ChuckUGen {
   private final double[] buffer;
   private int writePos = 0;
   private int delaySamples;
   private double coefficient = 0.7;
+  private double pole = 0.0;
+  private double lastFeedbackOut = 0.0;
 
   public Comb(int maxDelaySamples) {
     this(maxDelaySamples, true);
@@ -32,15 +35,23 @@ public class Comb extends ChuckUGen {
     this.coefficient = c;
   }
 
+  public void setPole(double p) {
+    this.pole = p;
+  }
+
   @Override
   protected float compute(float input, long systemTime) {
     int readPos = (writePos - delaySamples + buffer.length) % buffer.length;
-    double temp = buffer[readPos];
-    double out = input + coefficient * temp;
+    double delayed = buffer[readPos];
+
+    // Low-pass filter in feedback loop
+    lastFeedbackOut = delayed * (1.0 - pole) + lastFeedbackOut * pole;
+
+    double out = input + coefficient * lastFeedbackOut;
 
     buffer[writePos] = out;
     writePos = (writePos + 1) % buffer.length;
 
-    return (float) temp;
+    return (float) delayed;
   }
 }

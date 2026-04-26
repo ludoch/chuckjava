@@ -101,12 +101,10 @@ public class SVFilter extends ChuckUGen {
     double cHigh = m <= 0.5 ? 0.0 : 2.0 * (m - 0.5);
 
     // ZDF parameters (double sampled, so we use sampleRate * 2)
-    double g = Math.tan(Math.PI * cutoff / (sampleRate * 2.0));
+    double safeCutoff = Math.max(10.0, Math.min(sampleRate * 0.49, cutoff));
+    double g = Math.tan(Math.PI * safeCutoff / (sampleRate * 2.0));
     double R = 1.0 / (2.0 * resonance);
     double denom = 1.0 / (1.0 + 2.0 * R * g + g * g);
-
-    double l_ic1eq = ic1eq;
-    double l_ic2eq = ic2eq;
 
     for (int i = 0; i < length; i++) {
       double in = inputSum[i];
@@ -114,13 +112,13 @@ public class SVFilter extends ChuckUGen {
 
       // Double sampling loop
       for (int step = 0; step < 2; step++) {
-        double hp = (in - 2.0 * R * l_ic1eq - g * l_ic1eq - l_ic2eq) * denom;
-        double bp = l_ic1eq + g * hp;
+        double hp = (in - 2.0 * R * ic1eq - g * ic1eq - ic2eq) * denom;
+        double bp = ic1eq + g * hp;
 
         // Tanh saturation on bandpass state
         bp = Math.tanh(bp);
 
-        double lp = l_ic2eq + g * bp;
+        double lp = ic2eq + g * bp;
 
         ic1eq = 2.0 * bp - ic1eq;
         ic2eq = 2.0 * lp - ic2eq;
@@ -142,9 +140,6 @@ public class SVFilter extends ChuckUGen {
       if (buffer != null) buffer[offset + i] = blockCache[i];
     }
 
-    ic1eq = l_ic1eq;
-    ic2eq = l_ic2eq;
-
     blockStartTime = systemTime;
     blockLength = length;
     lastTickTime = (systemTime == -1) ? -1 : systemTime + length - 1;
@@ -158,7 +153,8 @@ public class SVFilter extends ChuckUGen {
     double cBand = m <= 0.5 ? 2.0 * m : 1.0 - 2.0 * (m - 0.5);
     double cHigh = m <= 0.5 ? 0.0 : 2.0 * (m - 0.5);
 
-    double g = Math.tan(Math.PI * cutoff / (sampleRate * 2.0));
+    double safeCutoff = Math.max(10.0, Math.min(sampleRate * 0.49, cutoff));
+    double g = Math.tan(Math.PI * safeCutoff / (sampleRate * 2.0));
     double R = 1.0 / (2.0 * resonance);
     double denom = 1.0 / (1.0 + 2.0 * R * g + g * g);
 

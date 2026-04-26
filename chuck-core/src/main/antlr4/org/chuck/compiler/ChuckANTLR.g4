@@ -8,6 +8,7 @@ program : (directive | statement | functionDef | classDefinition | DOC_COMMENT)*
 
 directive
     : REFERENCE_TAG IMPORT STRING                        // @import "file.ck"
+    | REFERENCE_TAG ID ID SEMI                             // @example ID;
     | REFERENCE_TAG ID STRING?                             // @doc "...", @global, etc.
     | DOC_COMMENT
     ;
@@ -23,6 +24,7 @@ statement
     | loopStatement                                        # loopStmt
     | returnStatement                                      # returnStmt
     | printStatement                                       # printStmt
+    | exampleStatement                                     # exampleStmt
     | blockStatement                                       # blockStmt
     | DOC_COMMENT? expression (COMMA expression)* SEMI     # expressionStmt
     | switchStatement                                      # switchStmt
@@ -43,6 +45,7 @@ loopStatement: DOC_COMMENT? LOOP statement ;
 doStatement: DOC_COMMENT? DO statement (WHILE|UNTIL) LPAREN expression RPAREN SEMI ;
 returnStatement: RETURN expression? SEMI ;
 printStatement: LTRIPLE expressionList? RTRIPLE SEMI ;
+exampleStatement: REFERENCE_TAG ID ID SEMI ;
 blockStatement: LBRACE (statement | DOC_COMMENT)* RBRACE ;
 switchStatement: SWITCH LPAREN expression RPAREN LBRACE switchCase* RBRACE ;
 switchCase: (CASE expression COLON | DEFAULT COLON) (statement | DOC_COMMENT)* ;

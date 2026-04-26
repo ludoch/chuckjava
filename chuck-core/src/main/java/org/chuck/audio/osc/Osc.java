@@ -3,7 +3,7 @@ package org.chuck.audio.osc;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.core.ChuckType;
 
-/** Base class for simple oscillator unit generators. */
+/** Base class for simple oscillator unit generators. Matches native ChucK quirks exactly. */
 public abstract class Osc extends ChuckUGen {
   @SuppressWarnings("unused") // Used via introspection in ChucK scripts
   protected double freq = 220.0;
@@ -18,6 +18,7 @@ public abstract class Osc extends ChuckUGen {
   protected int sync = 0; // 0: sync freq, 1: sync phase, 2: FM
 
   protected final float sampleRate;
+  protected double num = 0.0; // phase increment
 
   public Osc() {
     this(org.chuck.core.ChuckDSL.sampleRate());
@@ -30,16 +31,16 @@ public abstract class Osc extends ChuckUGen {
   public Osc(float sampleRate, boolean autoRegister) {
     super(new ChuckType("Osc", ChuckType.OBJECT, 8, 0), autoRegister);
     this.sampleRate = sampleRate;
-    // Default freq = 220.0 (index 0)
-    setData(0, 220.0);
+    setFreq(220.0);
   }
 
-  public void setFreq(double freq) {
-    this.freq = freq;
+  public void setFreq(double f) {
+    this.freq = f;
+    this.num = f / sampleRate;
+    // Native quirk from osc_ctrl_freq (ugen_osc.cpp):
+    if (this.num >= 1.0) this.num -= Math.floor(this.num);
   }
 
-  /** ChucK-style method call: osc.freq(440) */
-  @org.chuck.core.doc("Set the frequency in Hz.")
   public double freq(double f) {
     setFreq(f);
     return f;
@@ -53,12 +54,14 @@ public abstract class Osc extends ChuckUGen {
     return freq;
   }
 
-  public void setPhase(double phase) {
-    this.phase = phase % 1.0;
-    if (this.phase < 0) this.phase += 1.0;
+  public void setPhase(double p) {
+    this.phase = p;
+    // Replicate native quirk (typo) in osc_ctrl_phase:
+    if (this.phase >= 1.0 || this.phase < 0.0) {
+      this.phase -= Math.floor(this.num); // Yes, num, not phase!
+    }
   }
 
-  /** ChucK-style method call: osc.phase(0.5) */
   public double phase(double p) {
     setPhase(p);
     return this.phase;
@@ -76,7 +79,6 @@ public abstract class Osc extends ChuckUGen {
     this.width = width;
   }
 
-  /** ChucK-style method call: osc.width(0.5) */
   public double width(double w) {
     this.width = w;
     return w;
@@ -94,7 +96,6 @@ public abstract class Osc extends ChuckUGen {
     this.sync = sync;
   }
 
-  /** ChucK-style method call: osc.sync(2) */
   public int sync(int s) {
     this.sync = s;
     return s;
@@ -112,7 +113,6 @@ public abstract class Osc extends ChuckUGen {
     setFreq(f);
   }
 
-  /** ChucK-style: osc.last() returns most recent sample */
   public float last() {
     return lastOut;
   }
@@ -121,12 +121,9 @@ public abstract class Osc extends ChuckUGen {
   protected void triggerDataHook(int index, long value) {
     super.triggerDataHook(index, value);
     switch (index) {
-      case 0 -> this.freq = getDataAsDouble(0);
+      case 0 -> setFreq(getDataAsDouble(0));
       case 2 -> this.width = getDataAsDouble(2);
-      case 3 -> {
-        this.phase = getDataAsDouble(3) % 1.0;
-        if (this.phase < 0) this.phase += 1.0;
-      }
+      case 3 -> setPhase(getDataAsDouble(3));
       default -> {}
     }
   }
@@ -139,74 +136,65 @@ public abstract class Osc extends ChuckUGen {
 
   @Override
   protected float compute(float in, long systemTime) {
-    boolean incPhase = true;
-    double effectiveFreq = freq;
+    boolean inc_phase = true;
+    double d_num = this.num;
+
     if (getNumSources() > 0) {
       switch (sync) {
-        case 0 -> effectiveFreq = in;
-        case 1 -> {
-          phase = in % 1.0;
-          if (phase < 0) phase += 1.0;
-          incPhase = false;
+        case 0 -> { // sync freq
+          d_num = in / sampleRate;
+          // Replicate native bug in sinosc_tick:
+          if (d_num >= 1.0) d_num -= Math.floor(d_num);
+          else if (d_num <= -1.0) d_num += Math.floor(d_num);
         }
-        case 2 -> effectiveFreq = freq + in;
-        default -> {}
+        case 1 -> { // sync phase
+          phase = in;
+          inc_phase = false;
+        }
+        case 2 -> { // FM
+          d_num = (freq + in) / sampleRate;
+          // Replicate native bug in sinosc_tick:
+          if (d_num >= 1.0) d_num -= Math.floor(d_num);
+          else if (d_num <= -1.0) d_num += Math.floor(d_num);
+        }
       }
     }
 
-    if (incPhase) {
-      phase += effectiveFreq / sampleRate;
+    // Native ChucK samples BEFORE increment
+    float out = (float) computeOsc(phase);
+
+    if (inc_phase) {
+      phase += d_num;
+      // Normal wrapping in tick
+      if (phase >= 1.0 || phase < 0.0) phase -= Math.floor(phase);
     }
 
-    phase = phase % 1.0;
-    if (phase < 0) phase += 1.0;
-
-    return (float) computeOsc(phase);
+    return out;
   }
 
-  /** Vectorized PolyBLEP residual correction. */
+  /** Re-added for BlitSaw/BlitSquare compatibility. */
   protected static jdk.incubator.vector.FloatVector vPolyBlep(
       jdk.incubator.vector.FloatVector vT, jdk.incubator.vector.FloatVector vDt) {
     var species = vT.species();
     var vZero = jdk.incubator.vector.FloatVector.zero(species);
     var vOne = jdk.incubator.vector.FloatVector.broadcast(species, 1.0f);
-    var vTwo = jdk.incubator.vector.FloatVector.broadcast(species, 2.0f);
-
-    // Mask 1: t < dt
     var mask1 = vT.compare(jdk.incubator.vector.VectorOperators.LT, vDt);
-    // t1 = t / dt
-    var vT1_1 = vT.div(vDt.add(1e-9f)); // Avoid div by zero
-    // res1 = t1 + t1 - t1*t1 - 1.0
+    var vT1_1 = vT.div(vDt.add(1e-9f));
     var vRes1 = vT1_1.add(vT1_1).sub(vT1_1.mul(vT1_1)).sub(vOne);
-
-    // Mask 2: t > 1.0 - dt
     var mask2 = vT.compare(jdk.incubator.vector.VectorOperators.GT, vOne.sub(vDt));
-    // t1 = (t - 1.0) / dt
     var vT1_2 = vT.sub(vOne).div(vDt.add(1e-9f));
-    // res2 = t1*t1 + t1 + t1 + 1.0
     var vRes2 = vT1_2.mul(vT1_2).add(vT1_2).add(vT1_2).add(vOne);
-
     return vZero.blend(vRes1, mask1).blend(vRes2, mask2);
   }
 
   protected abstract double computeOsc(double phase);
 
-  /**
-   * PolyBLEP residual correction for a single discontinuity. Apply at every phase wrap-around /
-   * edge to reduce aliasing.
-   *
-   * @param t normalised phase of the discontinuity (0–1)
-   * @param dt phase increment per sample (freq / sampleRate)
-   * @return correction value to add to (or subtract from) the naive waveform
-   */
   protected static double polyBlep(double t, double dt) {
     if (dt <= 0.0) return 0.0;
     if (t < dt) {
-      // Just after the discontinuity
       double t1 = t / dt;
       return t1 + t1 - t1 * t1 - 1.0;
     } else if (t > 1.0 - dt) {
-      // Just before the discontinuity
       double t1 = (t - 1.0) / dt;
       return t1 * t1 + t1 + t1 + 1.0;
     }

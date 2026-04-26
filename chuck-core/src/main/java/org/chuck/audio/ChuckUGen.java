@@ -91,16 +91,28 @@ public abstract class ChuckUGen extends ChuckObject {
     this(true);
   }
 
+  public static final java.util.List<ChuckUGen> ALL_UGENS =
+      new java.util.concurrent.CopyOnWriteArrayList<>();
+
   public ChuckUGen(boolean autoRegister) {
     super(new ChuckType("UGen", ChuckType.OBJECT, 0, 0));
+    ALL_UGENS.add(this);
     if (autoRegister) {
+
       // Auto-register with current shred if running in a VM context
       try {
-        org.chuck.core.ChuckShred current = org.chuck.core.ChuckShred.CURRENT_SHRED.get();
+        org.chuck.core.ChuckShred current = null;
+        if (org.chuck.core.ChuckShred.CURRENT_SHRED.isBound()) {
+          current = org.chuck.core.ChuckShred.CURRENT_SHRED.get();
+        } else {
+          current = org.chuck.core.ChuckShred.CURRENT_SHRED_TL.get();
+        }
         if (current != null) {
           current.registerUGen(this);
         }
-      } catch (Exception ignored) {
+
+      } catch (Exception e) {
+        System.err.println("[UGen] Error registering UGen: " + e.getMessage());
       }
     }
   }
@@ -161,8 +173,18 @@ public abstract class ChuckUGen extends ChuckObject {
   }
 
   private void invalidateVmGraph() {
-    if (org.chuck.core.ChuckVM.CURRENT_VM.isBound()) {
-      org.chuck.core.ChuckVM.CURRENT_VM.get().invalidateGraph();
+    try {
+      org.chuck.core.ChuckShred current = null;
+      if (org.chuck.core.ChuckShred.CURRENT_SHRED.isBound()) {
+        current = org.chuck.core.ChuckShred.CURRENT_SHRED.get();
+      } else {
+        current = org.chuck.core.ChuckShred.CURRENT_SHRED_TL.get();
+      }
+      if (current != null) {
+        org.chuck.core.ChuckVM vm = current.getVM();
+        if (vm != null) vm.invalidateGraph();
+      }
+    } catch (Exception ignored) {
     }
   }
 
@@ -227,13 +249,20 @@ public abstract class ChuckUGen extends ChuckObject {
     tick(dummy, 0, (int) samples, systemTime);
   }
 
+  public boolean cacheEnabled = true;
+
   public float tick(long systemTime) {
-    if (systemTime != -1 && systemTime == lastTickTime) {
+    return tick(systemTime, cacheEnabled);
+  }
+
+  public float tick(long systemTime, boolean useCache) {
+    if (useCache && systemTime != -1 && systemTime == lastTickTime) {
       return lastOut;
     }
 
     // Check if this sample is already in our block cache
-    if (systemTime != -1
+    if (useCache
+        && systemTime != -1
         && blockLength > 0
         && systemTime >= blockStartTime
         && systemTime < blockStartTime + blockLength) {
@@ -284,12 +313,13 @@ public abstract class ChuckUGen extends ChuckObject {
   }
 
   public float tick(float manualInput, long systemTime) {
-    if (systemTime != -1 && systemTime == lastTickTime) {
+    if (cacheEnabled && systemTime != -1 && systemTime == lastTickTime) {
       return lastOut;
     }
 
     // Check if this sample is already in our block cache
-    if (systemTime != -1
+    if (cacheEnabled
+        && systemTime != -1
         && blockLength > 0
         && systemTime >= blockStartTime
         && systemTime < blockStartTime + blockLength) {
@@ -331,6 +361,10 @@ public abstract class ChuckUGen extends ChuckObject {
   /** ChucK-style gain() getter — called as p.gain() */
   public double gain() {
     return this.gain;
+  }
+
+  public long getLastTickTime() {
+    return lastTickTime;
   }
 
   public float getLastOut() {

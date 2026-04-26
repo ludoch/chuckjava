@@ -227,6 +227,101 @@ public class ChuckDSL {
     ChuckVM.CURRENT_VM.get().print(String.valueOf(msg));
   }
 
+  public static class ChuckIO {
+    private final boolean isErr;
+
+    public ChuckIO(boolean isErr) {
+      this.isErr = isErr;
+    }
+
+    public ChuckIO print(Object o) {
+      if (isErr) System.err.print(o);
+      else System.out.print(o);
+      return this;
+    }
+  }
+
+  public static final ChuckIO chout = new ChuckIO(false);
+  public static final ChuckIO cherr = new ChuckIO(true);
+
+  public static class ChIO {
+    public static String newline() {
+      return "\n";
+    }
+
+    public static String nl() {
+      return "\n";
+    }
+  }
+
+  public static long random(long min, long max) {
+    return min + (long) (Math.random() * (max - min + 1));
+  }
+
+  public static double randomf(double min, double max) {
+    return min + Math.random() * (max - min);
+  }
+
+  public static double randomf() {
+    return Math.random();
+  }
+
+  public static class Hid extends ChuckEvent {
+    public boolean open(int i) {
+      return false;
+    }
+
+    public boolean open(String s) {
+      return false;
+    }
+
+    public boolean openKeyboard(long i) {
+      return false;
+    }
+
+    public String name() {
+      return "Dummy Hid";
+    }
+
+    public boolean recv(HidMsg msg) {
+      return false;
+    }
+  }
+
+  public static class HidMsg {
+    public int which() {
+      return 0;
+    }
+
+    public int ascii() {
+      return 0;
+    }
+
+    public int key() {
+      return 0;
+    }
+
+    public boolean isButtonDown() {
+      return false;
+    }
+
+    public boolean isButtonUp() {
+      return false;
+    }
+  }
+
+  public static void setData1(org.chuck.midi.MidiMsg msg, float v) {
+    msg.data1 = (int) v;
+  }
+
+  public static void setData2(org.chuck.midi.MidiMsg msg, float v) {
+    msg.data2 = (int) v;
+  }
+
+  public static void setData3(org.chuck.midi.MidiMsg msg, float v) {
+    msg.data3 = (int) v;
+  }
+
   public static void _CHUCK_INTERNAL_ASSERT_(boolean condition, String message) {
     if (!condition) {
       throw new RuntimeException("ChucK Assertion Failed: " + message);

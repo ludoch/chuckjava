@@ -530,13 +530,14 @@ Class: `org.chuck.audio.fx.DelayP`
 - `shift()` -> double
 
 ## Distortion
-Description: Saturation effect suite: Overdrive, Fuzz, and Bitcrusher.
+Description: Saturation effect suite: Overdrive, Fuzz, Bitcrusher, and Foldback.
 
 Class: `org.chuck.audio.fx.Distortion`
 
 ### Parameters
 - `mode` (int)
 - `drive` (float)
+- `threshold` (float)
 - `bits` (int)
 - `downsample` (int)
 - `downsampleCounter` (int)
@@ -545,8 +546,9 @@ Class: `org.chuck.audio.fx.Distortion`
 ### Methods
 - `drive(float)` -> void : Set drive/gain factor.
 - `downsample(int)` -> void : Set downsampling factor for Bitcrusher (1 = none).
-- `mode(int)` -> void : Set distortion mode (0: Overdrive, 1: Fuzz, 2: Bitcrusher).
+- `mode(int)` -> void : Set distortion mode (0: Overdrive, 1: Fuzz, 2: Bitcrusher, 3: Foldback).
 - `bits(int)` -> void : Set bit depth for Bitcrusher (1 to 16).
+- `threshold(float)` -> void : Set threshold for Foldback mode.
 
 ## Dyno
 Class: `org.chuck.audio.fx.Dyno`
@@ -1279,6 +1281,28 @@ Class: `org.chuck.audio.stk.Moog`
 - `noteOff(float)` -> void
 - `filterQ(float)` -> void
 - `filterSweep(float)` -> void
+## MVerb
+Description: Studio quality, open-source reverb based on Dattorro's figure-of-eight structure.
+
+Class: `org.chuck.audio.fx.MVerb`
+
+### Methods
+- `mix(float)` -> void
+- `mix()` -> float
+- `earlyMix(float)` -> void
+- `earlyMix()` -> float
+- `decay(float)` -> void
+- `decay()` -> float
+- `size(float)` -> void
+- `size()` -> float
+- `dampingFreq(float)` -> void
+- `dampingFreq()` -> float
+- `density(float)` -> void
+- `density()` -> float
+- `bandwidthFreq(float)` -> void
+- `bandwidthFreq()` -> float
+- `predelay(float)` -> void
+- `predelay()` -> float
 
 ## NRev
 Class: `org.chuck.audio.fx.NRev`
@@ -1338,6 +1362,17 @@ Class: `org.chuck.audio.fx.PRCRev`
 ### Methods
 - `mix(float)` -> void
 - `mix()` -> float
+## ProceduralReverb
+Description: A simple comb filter reverb.
+
+Class: `org.chuck.audio.fx.ProceduralReverb`
+
+### Methods
+- `decayFactor(float)` -> void
+- `decayFactor()` -> float
+- `delayLength(int)` -> void
+- `delayLength()` -> int
+- `reset()` -> void
 
 ## Pan16
 Class: `org.chuck.audio.util.Pan16`

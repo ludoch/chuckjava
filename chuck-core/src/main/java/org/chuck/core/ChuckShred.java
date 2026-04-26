@@ -14,13 +14,19 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
   private static final Logger logger = Logger.getLogger(ChuckShred.class.getName());
   private static final AtomicInteger ID_GENERATOR = new AtomicInteger(1);
   public static final ScopedValue<ChuckShred> CURRENT_SHRED = ScopedValue.newInstance();
+  public static final ThreadLocal<ChuckShred> CURRENT_SHRED_TL = new ThreadLocal<>();
 
   @Override
   public int compareTo(ChuckShred other) {
-    return Long.compare(this.wakeTime, other.wakeTime);
+    int cmp = Long.compare(this.wakeTime, other.wakeTime);
+    if (cmp == 0) {
+      return Long.compare(this.insertionOrder, other.insertionOrder);
+    }
+    return cmp;
   }
 
   private int id;
+  private long insertionOrder = 0;
   private String name = "shred";
   private String[] args = new String[0];
 
@@ -49,6 +55,11 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
   private ChuckEvent eventWaitingOn = null;
   private boolean wasSignaled = false;
   private final ChuckObjectPool.ShredAllocator allocator = new ChuckObjectPool.ShredAllocator();
+  private ChuckVM vm;
+
+  public ChuckVM getVM() {
+    return vm;
+  }
 
   private String lastExceptionMessage = null;
   private volatile Runnable onNextPark = null;
@@ -116,6 +127,14 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
     return wakeTime;
   }
 
+  public long getInsertionOrder() {
+    return insertionOrder;
+  }
+
+  public void setInsertionOrder(long order) {
+    this.insertionOrder = order;
+  }
+
   public void setRunning(boolean running) {
     lock.lock();
     try {
@@ -178,7 +197,9 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
   }
 
   public void execute(ChuckVM vm) {
+    this.vm = vm;
     lock.lock();
+
     try {
       while (!isDone && code != null) {
         while (!isRunning && !isDone) {
@@ -364,6 +385,10 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
     return allocator;
   }
 
+  public String dir() {
+    return ".";
+  }
+
   public String dir(int level) {
     return ".";
   }
@@ -410,6 +435,10 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
 
   public void registerUGen(ChuckUGen ugen) {
     registeredUGens.add(ugen);
+  }
+
+  public List<ChuckUGen> getRegisteredUGens() {
+    return registeredUGens;
   }
 
   public void registerDestructible(UserObject uo) {

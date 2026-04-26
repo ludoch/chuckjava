@@ -25,13 +25,14 @@ public abstract class StereoUGen extends MultiChannelUGen {
   }
 
   @Override
-  protected void computeMulti(float input, long systemTime) {
-    // Use the already-summed mono input for stereo processing.
-    // Call the 2-arg version so subclasses that override computeStereo(left, right, t)
-    // (e.g. JCRev, Echo, NRev) are dispatched correctly.
-    // Subclasses that only override computeStereo(float, long) are reached via the
-    // default 2-arg fallback: computeStereo((left+right)*0.5f, t).
-    computeStereo(input, input, systemTime);
+  protected void computeMulti(float[] inputs, long systemTime) {
+    if (inputs.length >= 2) {
+      computeStereo(inputs[0], inputs[1], systemTime);
+    } else if (inputs.length == 1) {
+      computeStereo(inputs[0], inputs[0], systemTime);
+    } else {
+      computeStereo(0, 0, systemTime);
+    }
   }
 
   /** Subclasses can override this for true stereo processing. */
@@ -42,4 +43,9 @@ public abstract class StereoUGen extends MultiChannelUGen {
 
   /** Legacy mono-input stereo compute. Subclasses should migrate to the 2-arg version. */
   protected abstract void computeStereo(float input, long systemTime);
+
+  @Override
+  protected void computeMulti(float input, long systemTime) {
+    computeStereo(input, input, systemTime);
+  }
 }

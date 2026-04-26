@@ -3,6 +3,7 @@ package org.chuck.audio.stk;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.osc.SinOsc;
 import org.chuck.audio.util.Adsr;
+import org.chuck.core.ChuckVM;
 
 /**
  * HevyMetl — Heavy metal distorted FM synthesis. 4-operator FM with high modulation index for
@@ -19,6 +20,10 @@ public class HevyMetl extends ChuckUGen {
 
   @SuppressWarnings("unused")
   private final float sampleRate;
+
+  public HevyMetl() {
+    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
 
   public HevyMetl(float sampleRate) {
     this.sampleRate = sampleRate;
@@ -37,6 +42,22 @@ public class HevyMetl extends ChuckUGen {
     // Fast attack, medium decay — punchy metal sound
     env1.set(0.001f, 0.5f, 0.2f, 0.1f);
     env2.set(0.001f, 0.2f, 0.0f, 0.05f);
+  }
+
+  public void lfoSpeed(float v) {
+    // Dummy implementation
+  }
+
+  public void lfoDepth(float v) {
+    // Dummy implementation
+  }
+
+  public void freq(float freq) {
+    setFreq(freq);
+  }
+
+  public double freq() {
+    return baseFreq;
   }
 
   public void setFreq(double freq) {

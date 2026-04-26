@@ -69,7 +69,7 @@ public class ChuckAccessControlTest {
             + "    fun void setX(int v) { v => x; } "
             + "    fun int getX() { return x; } "
             + "} "
-            + "Foo f; f.setX(42); <<< f.getX() >>>;";
+            + "new Foo @=> Foo f; f.setX(42); <<< f.getX() >>>;";
 
     List<String> out = runChuck(code);
     assertEquals(1, out.size());
@@ -86,7 +86,7 @@ public class ChuckAccessControlTest {
             + "    fun void setX(int v) { v => x; } "
             + "    fun int getX() { return x; } "
             + "} "
-            + "Bar b; b.setX(100); <<< b.getX() >>>;";
+            + "new Bar @=> Bar b; b.setX(100); <<< b.getX() >>>;";
 
     List<String> out = runChuck(code);
     assertEquals(1, out.size(), "Output should have 1 line. Errors: " + errorOutput);

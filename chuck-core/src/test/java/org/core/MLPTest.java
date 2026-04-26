@@ -171,7 +171,7 @@ public class MLPTest {
     StringBuilder out = new StringBuilder();
     vm.addPrintListener(out::append);
     String code =
-        "MLP mlp;\n"
+        "new MLP @=> MLP mlp;\n"
             + "[3, 5, 2] @=> int nodes[];\n"
             + "mlp.init(nodes);\n"
             + "float X[2][3];\n"

@@ -1,204 +1,68 @@
-# ChucK-Java (JDK 25 Migration)
+# ChucK-Java
 
-## Progress Update (2026-04-16)
+ChucK-Java is a powerful port of the ChucK audio programming language to the Java platform, leveraging modern JDK 25 features like Project Loom (Virtual Threads) and the Vector API for high-performance audio synthesis.
 
-### Integration Test Coverage (Latest)
-
-| Suite | Total | Passed | Failed | Timed Out | Notes |
-|-------|-------|--------|--------|-----------|-------|
-| **Total** | **1126** | **1043 (93%)** | **45** | **38** | Synchronous eval and static persistence. |
-
-*Note: Remaining failures are primarily physical models and minor scientific notation differences.*
-
-### Session Improvements (Final)
-- **Machine.eval Synchronicity:** Successfully transitioned `eval` to a synchronous model, enabling full context sharing (locals, classes, globals) between the caller and the eval block.
-- **Static Persistence:** Improved the class registration model to preserve static field values across `eval` calls and re-registrations.
-- **Object Model Hardening:** Refined stack management for assignments and pseudo-class (vector/complex/polar) member access.
-- **Thread-Safety:** Hardened UGen graph traversal against concurrent modifications.
-
-## Features
-### Recent Enhancements (Pro MIDI & Audio)
-
-| Feature | Description | Status |
-|---|-----|--------|
-| **Native RtMidiJava** | Zero-setup, zero-GC native drivers via FFM API. | ✅ New |
-| **MidiPoly** | High-level automatic voice management for polyphonic MIDI instruments. | ✅ New |
-| **MIDI Learn** | Persistent MIDI mapping for global variables (saves to preferences). | ✅ Enhanced |
-| **MIDI Recorder** | One-click "REC" button to capture all MIDI to timestamped files. | ✅ New |
-| **MIDI Map Manager** | Central dashboard for all persistent variable bindings. | ✅ New |
-| **MIDI Thru Patchbay** | Route any physical input to any output at the IDE level. | ✅ New |
-| **MIDI Master Clock** | IDE acts as sync master (BPM + Start/Stop) for external gear. | ✅ New |
-| **MIDI Monitor** | Real-time diagnostics, CC Grid, and status bar activity tracking. | ✅ Enhanced |
-| **MidiPoly** | High-level voices with customizable **Velocity Curves**. | ✅ Enhanced |
-| **MidiPlayer** | High-level MIDI sequencer. Connects directly to `MidiPoly` (`file => player => poly;`). | ✅ New |
-| **Device Probing** | Robust audio/MIDI device discovery with native port names. | ✅ Fixed |
-| **Precision Time** | Sample-accurate MIDI timestamps (`msg.when`) for high-jitter protection. | ✅ Fixed |
-
-### New Features
-
-#### 🎹 Advanced MIDI & Musician Features
-- **Native RtMidiJava Support**: Ultra-low latency MIDI drivers via pure Java FFM (Panama). No native libraries to compile or install. Supports Windows (WinMM), macOS (CoreMIDI), and Linux (ALSA/JACK).
-- **Zero-GC Performance**: Optimized MIDI hot-path ensures no Java heap allocations during real-time MIDI processing.
-- **Native Port Sharing**: Run multiple `MidiIn` and `MidiOut` objects on the same physical hardware port safely (prevents "Device Busy" errors).
-- **`MidiPoly`**: Automatic high-level voice management. Map MIDI to STK instruments or custom UGens with zero manual sporking. Supports instrument selection, voice stealing, polyphonic pools, and custom microtonal tuning maps (`tuning(float[])`). Supports direct connections: `MidiIn min => MidiPoly poly;`.
-- **`MidiPlayer`**: A high-level MIDI sequencer. Load a `MidiFileIn`, connect it to an instrument (`player => poly`), and call `player.play()` for automatic, sample-accurate playback.
-- **`MidiMpe`**: Full MIDI Polyphonic Expression (MPE) support for per-note pitch bend and channel pressure.
-- **`MidiClock`**: Dedicated class for tracking MIDI 24ppq clock, start, stop, and continue messages, allowing tight transport sync (`onBeat()`, `onSixteenth()`, etc.).
-- **IDE MIDI Monitor**: Diagnostics tab with real-time Message Log, 128-knob CC Grid, and a Map Manager dashboard.
-- **Status Bar MIDI Tools**: Quick-access port selection, Thru Patchbay routing, Master Sync (BPM/Clock), a one-click **REC** button, and an "All Notes Off" Panic button (`!`).
-- **Persistent MIDI Learn**: Bind physical knobs to variables; mappings are automatically saved and restored across sessions.
-- **IDE MIDI Visualizer**: Real-time 88-key piano keyboard that highlights in Orange for physical input and Light Blue for generative code output.
-- **MidiFileOut**: Record generative MIDI performances directly to standard `.mid` files. Supports **SMF Format 1** (multi-track), Tempo Maps, Section Markers, and 14-bit NRPN high-resolution sweeps.
-- **MidiFileIn**: Upgraded to support multi-track reading, file metadata (`bpm()`, `tpq()`), and automatic delta-time calculation (`msg.when`).
-- **Precision Timestamps**: Incoming messages now include `msg.when` (seconds) from the native driver for jitter-free alignment.
-- **Visual Grid Sequencer**: TR-808 style 16-step drum sequencer tab in the IDE. Features 8-track (Kick, Snare, etc.) interactive grid with real-time bi-directional sync to the ChucK engine.
-
-#### ⚡ Audio Fidelity & Performance
-- **Idle CPU Optimization**: The audio engine automatically detects when the VM is idle (no active shreds). It applies a smooth global fade-out and puts the processing loop into a low-power sleep mode, reducing "doing nothing" CPU usage to near 0%.
-- **Pop/Click Prevention**: `SndBuf` and `SndBuf2` now feature an analytical 1ms fade-out when reaching the end of a sample, preventing abrupt DC-offset jumps that cause speaker pops.
-- **Project Loom Concurrency**: Uses Java Virtual Threads for shreds, allowing thousands of simultaneous oscillators and logic processes with minimal memory overhead.
-- **SIMD Audio Kernel**: Optimized Vector API paths for common UGen operations, utilizing modern CPU instructions for high-density synthesis.
-
-#### 🔍 Introspection & Documentation
-- **Reflection Docs**: Use `Reflect.doc(obj)` to retrieve class or method documentation strings at runtime.
-- **IDE Hover Docs**: Hover over any keyword, UGen, or method in the editor to see its documentation and signature.
-
-#### 🎨 IDE Enhancements (JavaFX)
-- **MIDI Keyboard Monitor**: Visual feedback for incoming MIDI notes and controllers in the bottom panel.
-- **MIDI Settings Tab**: Configure preferred APIs (e.g. JACK vs ALSA) and port filters.
-- **Multi-Tab Editor**: Open and work on multiple `.ck` and `.java` files simultaneously.
-- **Master Controls**: Integrated Global Volume slider, live VU meters, and VM Logical Time display.
-
----
-
-## ⌨️ Command Line Interface
-
-ChucK-Java supports a full-featured CLI that mirrors the original ChucK implementation, including full support for **on-the-fly (OTF)** programming.
-
-### Basic Usage
-```bash
-# Build all modules
-mvn install -DskipTests
-
-# Run the CLI (standard)
-java --enable-preview --add-modules jdk.incubator.vector \\
-     --enable-native-access=ALL-UNNAMED \\
-     -jar chuck-cli/target/chuck-cli-1.0-SNAPSHOT-shaded.jar examples/basic/bar.ck
-```
-
-### ⚡ Performance Optimization (Project Leyden)
-For near-instantaneous startup (comparable to the original ChucK), you can generate a **Class Data Sharing (CDS)** archive.
-
-1. **Generate the archive**:
-   ```bash
-   ./scripts/generate_cds.sh
-   ```
-2. **Run with the archive**:
-   ```bash
-   java -Xshare:on -XX:SharedArchiveFile=chuck.jsa \\
-        --enable-preview --add-modules jdk.incubator.vector \\
-        --enable-native-access=ALL-UNNAMED \\
-        -jar chuck-cli/target/chuck-cli-1.0-SNAPSHOT-shaded.jar your_script.ck
-   ```
-
-### Other Modes
-```bash
-# Launch JavaFX IDE
-mvn -pl chuck-ide javafx:run
-
-# Launch Standalone Visual Sequencer
-mvn -pl sequencer javafx:run
-```
-
----
-
-## 🛠️ Project Structure
-
-The project is divided into several Maven modules:
-- **`chuck-core`**: Core ChucK engine, compiler, and audio/MIDI logic.
-- **`chuck-samples`**: ChucK examples, audio data, and Java DSL shreds.
-- **`chuck-cli`**: Command-line interface and GraalVM native image entry point.
-- **`sequencer`**: JavaFX-based extensions, including the standalone Visual Sequencer.
-- **`chuck-ide`**: The main JavaFX IDE application.
-
-
----
-
-## 🛠️ Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
--   **JDK 25** (e.g., Zulu JDK 25)
--   **Maven**
+- **JDK 25** (with preview features enabled)
+- **Maven**
 
-### 📦 MIDI Support
-MIDI support is built-in via the **RtMidiJava** library. There are no native dependencies to install manually.
-Ensure you run with `--enable-native-access=ALL-UNNAMED`.
+### Building the Project
+To build all modules and install them to your local repository:
+```bash
+mvn install -DskipTests
+```
 
----
+### Running the Application
+You can run ChucK-Java in different modes:
+
+- **Command Line Interface (CLI)**:
+  ```bash
+  java --enable-preview --add-modules jdk.incubator.vector \
+       --enable-native-access=ALL-UNNAMED \
+       -jar chuck-cli/target/chuck-cli-1.0-SNAPSHOT-shaded.jar your_script.ck
+  ```
+
+- **JavaFX IDE**:
+  ```bash
+  mvn -pl chuck-ide javafx:run
+  ```
+
+- **Standalone Visual Sequencer**:
+  ```bash
+  mvn -pl sequencer javafx:run
+  ```
+
+## 🎹 Features
+
+- **Native RtMidiJava Support**: Ultra-low latency MIDI drivers via pure Java FFM (Panama).
+- **High-Performance Audio**: Optimized Vector API paths and Project Loom concurrency.
+- **Visual Grid Sequencer**: TR-808 style 16-step drum sequencer.
+- **Deluge Workstation Emulation**: Software emulation of the Synthstrom Deluge workflow.
 
 ## 📚 Documentation
 
-- **[Java DSL Guide](chuck-core/JAVA_DSL.md)**: Learn how to write ChucK code in pure Java.
-- **[UGen Reference](chuck-core/UGEN_REFERENCE.md)**: Detailed list of available Unit Generators and their parameters.
-- **[MIDI Guide](chuck-core/MIDI_GUIDE.md)**: How to use MIDI input, output, and polyphony.
-- **[Language Specification](chuck-core/LANGUAGE.md)**: Deep dive into the ChucK-Java language features.
-- **[Hosting Guide](chuck-core/HOSTING.md)**: Embed the ChucK engine into your own Java apps.
-- **[Testing Skill](chuck-core/CHUCK_TESTING_SKILL.md)**: How to run the massive E2E integration suite.
+Explore the detailed guides and documentation files available in this repository:
 
----
+### Core Guides
+- [Java DSL Guide](chuck-core/JAVA_DSL.md): Learn how to write ChucK code in pure Java.
+- [Language Specification](chuck-core/LANGUAGE.md): Deep dive into the ChucK-Java language features.
+- [Hosting Guide](chuck-core/HOSTING.md): Embed the ChucK engine into your own Java apps.
 
-## 🎹 Implemented Unit Generators (UGens)
+### Reference
+- [UGen Reference](chuck-core/UGEN_REFERENCE.md): Detailed list of available Unit Generators and their parameters.
+- [MIDI Guide](chuck-core/MIDI_GUIDE.md): How to use MIDI input, output, and polyphony.
 
-### Oscillators
-`SinOsc`, `SawOsc`, `TriOsc`, `PulseOsc`, `SqrOsc`, `Phasor`, `Blit`, `BlitSaw`, `BlitSquare`
+### Deluge Integration
+- [Deluge UI User Guide](docs/deluge_ui_user_guide.md): Operation of the JavaFX Deluge Emulator.
+- [Java Deluge User Guide](docs/java_deluge_user_guide.md): Workstation concepts and workflow.
+- [Deluge XML Examples](docs/deluge_xml_examples.md): Authoritative reference for Deluge song XML files.
 
-### Physical Models (STK)
-`Clarinet`, `Mandolin`, `Plucked`, `Rhodey`, `Wurley`, `BeeThree`, `HevyMetl`, `PercFlut`, `TubeBell`, `FMVoices`, `Bowed`, `StifKarp`, `Moog`, `Flute`, `Sitar`, `Brass`, `Saxofony`, `Shakers`, `ModalBar`, `VoicForm`
-
-### Filters
-`LPF`, `HPF`, `BPF`, `BRF`, `BiQuad`, `ResonZ`, `OnePole`, `OneZero`, `TwoPole`, `TwoZero`, `PoleZero`, `AllPass`
-
-### MIDI & Control
-`MidiPoly` (High-level Polyphony), `ADSR`, `Envelope`, `Gain`, `Step`, `Impulse`, `Noise`, `CNoise`
-
-### Effects & Delays
-`Chorus`, `Echo`, `Delay`, `DelayL`, `DelayA`, `JCRev`, `NRev`, `PRCRev`, `GVerb`, `PitShift`
-
-### Utilities
-`Pan2`, `SndBuf`, `SndBuf2`, `WvOut`, `Blackhole`, `LiSa`
-
-### Analysis (UAna)
-`FFT`, `IFFT`, `RMS`, `Centroid`, `ZCR`, `MFCC`, `SFM`, `Kurtosis`
-
----
-
-## 📦 Maven Artifact & Publishing
-
-### Using ChucK-Java in other projects
-To use ChucK-Java as a dependency in your Maven project, add the following to your `pom.xml`:
-
-```xml
-<repositories>
-    <repository>
-        <id>github</id>
-        <url>https://maven.pkg.github.com/ludoch/chuckjava</url>
-    </repository>
-</repositories>
-
-<dependencies>
-    <dependency>
-        <groupId>org.chuck</groupId>
-        <artifactId>chuck-java</artifactId>
-        <version>1.0-SNAPSHOT</version>
-    </dependency>
-</dependencies>
-```
-
-### Publishing a new version
-Publishing is handled via GitHub Actions and must be triggered manually:
-
-1.  (Optional) Update the version in `pom.xml` if you want to release a new version (e.g., from `1.0-SNAPSHOT` to `1.0.0`).
-2.  Go to the **Actions** tab in the GitHub repository.
-3.  Select the **Maven Publish** workflow.
-4.  Click **Run workflow** and select the branch (usually `main`).
-5.  This will build the project and deploy the artifact to GitHub Packages.
+### Project & Developer Notes
+- [JDK Roadmap](chuck-core/JDK_ROADMAP.md): Analysis of future JDK features for ChucK-Java.
+- [Maven Guide](MAVEN_GUIDE.md): How to use ChucK-Java as a dependency and publish artifacts.
+- [TODO List](TODO.md): Current task list and future ideas.
+- [Audio Stability Report](AUDIO_STABILITY_REPORT.md): Notes on audio engine stability.
+- [DSP Guidelines](DSP_GUIDELINES.md): Best practices for DSP development in Java.
+- [Project Guidelines](GEMINI.md): Foundational mandates for working on the project.
