@@ -7,8 +7,8 @@ This document tracks the mathematical and functional compatibility level of Chuc
 | Feature | Level | Status | Details |
 | :--- | :--- | :--- | :--- |
 | **Scheduler** | **Bit-Exact** | ✅ | Uses global `insertionOrder` to break ties for identical `now` times. |
-| **Event Sync** | **Bit-Exact** | ✅ | Deterministic `broadcast()` and `spork` execution order. |
-| **Core RNG** | **Bit-Exact** | ✅ | MT19937 implementation matching native `ck_random_f`. |
+| **Event Sync** | **Bit-Exact** | ✅ | Aligned `broadcast()` and `spork` synchronization order. |
+| **Core RNG** | **Bit-Exact** | ✅ | Custom MT19937 implementation matching native `ck_random_f`. |
 | **Filter (LPF/ResonZ)** | **Bit-Exact** | ✅ | Matches native SuperCollider-derived biquad formulas. |
 | **Filter (TwoPole/Zero)** | **Bit-Exact** | ✅ | Matches native STK-style implementations and normalization. |
 | **Oscillators** | **High Parity** | ✅ | Aligned sample-then-increment phase accumulation. |
@@ -16,11 +16,10 @@ This document tracks the mathematical and functional compatibility level of Chuc
 
 ## 2. On-Demand Regression Testing
 
-A manual regression suite is provided in the `comparison/` directory to verify bit-exact parity and prevent future divergence.
+A Java-based regression suite is provided to verify bit-exact parity and prevent future divergence.
 
 ### Prerequisites
 - Native `chuck` installed and available in the `$PATH`.
-- Python 3 with the `wave` and `struct` modules (standard library).
 - JDK 25 with the vector incubator module enabled.
 
 ### Running the Suite
@@ -31,12 +30,11 @@ A manual regression suite is provided in the `comparison/` directory to verify b
 
 2. **Execute Comparisons**:
    ```bash
-   cd comparison
-   python3 run_comparisons.py
+   java --add-modules jdk.incubator.vector -cp chuck-cli/target/chuck-cli-1.0-SNAPSHOT-shaded.jar org.chuck.ParityTester
    ```
 
 ### Output Interpretation
-The script generates `.wav` files for both native and Java implementations and calculates the Root Mean Square (RMS) difference.
+The utility generates `.wav` files for both native and Java implementations and calculates the Root Mean Square (RMS) difference.
 - **BIT-EXACT**: 0.0 RMS. The outputs are identical.
 - **NEAR-EXACT**: $< 10^{-6}$ RMS. Minor floating point differences.
 - **HIGH PARITY**: $< 0.05$ RMS. Audibly identical.
