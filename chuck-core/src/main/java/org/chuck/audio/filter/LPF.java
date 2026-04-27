@@ -46,9 +46,9 @@ public class LPF extends ChuckUGen {
     double C = 1.0 / Math.tan(fr);
     double root2C = Math.sqrt(2.0) * C;
     double C2 = C * C;
-    
+
     double m_a0 = 1.0 / (1.0 + root2C + C2);
-    
+
     b0 = m_a0;
     b1 = 2.0 * m_a0;
     b2 = m_a0;

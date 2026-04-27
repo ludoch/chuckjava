@@ -60,27 +60,6 @@ public class SndBuf extends ChuckUGen {
     if (path.equals(currentPath)) return; // Avoid redundant loads
     currentPath = path;
 
-    // Handle "special:..." paths
-    String p = path.toLowerCase();
-    if (p.startsWith("special:")) {
-      if (p.contains("doh")
-          || p.contains("kick")
-          || p.contains("hihat")
-          || p.contains("snare")
-          || p.contains("glot")
-          || p.contains("ooo")
-          || p.contains("dope")
-          || p.contains("mand")
-          || p.contains("auto")) {
-        samples = new float[4410]; // 0.1s dummy sound
-        for (int i = 0; i < samples.length; i++) {
-          samples[i] = (float) Math.sin(i * 0.1) * (1.0f - (float) i / samples.length);
-        }
-        pos = 0;
-        return;
-      }
-    }
-
     // Try loading as a real file
     try {
       java.io.File file = org.chuck.core.ChuckConfig.resolveFile(path);

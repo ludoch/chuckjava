@@ -6,8 +6,8 @@ import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 
 /**
- * Two-zero (FIR) notch filter. Matches native ChucK (ugen_filter.cpp).
- * H(z) = b0 + b1*z^-1 + b2*z^-2
+ * Two-zero (FIR) notch filter. Matches native ChucK (ugen_filter.cpp). H(z) = b0 + b1*z^-1 +
+ * b2*z^-2
  */
 public class TwoZero extends ChuckUGen {
   private double b0 = 1.0;
@@ -35,9 +35,7 @@ public class TwoZero extends ChuckUGen {
     this.sampleRate = sampleRate;
   }
 
-  /**
-   * Place two zeros at the given frequency (Hz) and radius.
-   */
+  /** Place two zeros at the given frequency (Hz) and radius. */
   public void setNotch(double frequency, double radius) {
     notchFreq = frequency;
     notchRad = radius;
@@ -68,9 +66,17 @@ public class TwoZero extends ChuckUGen {
   }
 
   // Raw coefficient setters
-  public void setB0(double v) { b0 = v; }
-  public void setB1(double v) { b1 = v; }
-  public void setB2(double v) { b2 = v; }
+  public void setB0(double v) {
+    b0 = v;
+  }
+
+  public void setB1(double v) {
+    b1 = v;
+  }
+
+  public void setB2(double v) {
+    b2 = v;
+  }
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {

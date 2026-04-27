@@ -27,10 +27,10 @@ public class DelugeAdsrTest {
   void testStartupSilence() {
     // Should be zero on startup
     assertEquals(0.0f, adsr.tick(1.0f), "ADSR must be silent on startup");
-    
+
     adsr.keyOn();
     assertTrue(adsr.tick(1.0f) > 0, "ADSR should produce signal after keyOn");
-    
+
     adsr.forceMute();
     assertEquals(0.0f, adsr.tick(1.0f), "ADSR must be silent after forceMute");
   }

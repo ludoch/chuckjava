@@ -6,8 +6,8 @@ import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 
 /**
- * Two-pole resonance filter. Matches native ChucK (ugen_filter.cpp).
- * H(z) = b0 / (1 + a1*z^-1 + a2*z^-2)
+ * Two-pole resonance filter. Matches native ChucK (ugen_filter.cpp). H(z) = b0 / (1 + a1*z^-1 +
+ * a2*z^-2)
  */
 public class TwoPole extends ChuckUGen {
   private double b0 = 1.0;
@@ -41,10 +41,10 @@ public class TwoPole extends ChuckUGen {
     resFreq = frequency;
     resRad = radius;
     resNorm = normalize;
-    
+
     a2 = radius * radius;
     a1 = -2.0 * radius * Math.cos(2.0 * Math.PI * frequency / sampleRate);
-    
+
     if (normalize) {
       // Native ChucK normalization (ugen_filter.cpp: b0 = 0.5 - 0.5 * a2)
       b0 = 0.5 - 0.5 * a2;
@@ -84,9 +84,17 @@ public class TwoPole extends ChuckUGen {
   }
 
   // Raw coefficient setters
-  public void setB0(double v) { b0 = v; }
-  public void setA1(double v) { a1 = v; }
-  public void setA2(double v) { a2 = v; }
+  public void setB0(double v) {
+    b0 = v;
+  }
+
+  public void setA1(double v) {
+    a1 = v;
+  }
+
+  public void setA2(double v) {
+    a2 = v;
+  }
 
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {

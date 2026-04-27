@@ -38,7 +38,7 @@ public class SetArrayInt implements ChuckInstr {
       Object value = shred.reg.popObject();
       // UGen chucking: wire src into dest if both are UGens
       Object dest = arr.getObject(index);
-if (value instanceof ChuckUGen srcUgen && dest instanceof ChuckUGen destUgen) {
+      if (value instanceof ChuckUGen srcUgen && dest instanceof ChuckUGen destUgen) {
         srcUgen.chuckTo(destUgen);
         shred.reg.pushObject(destUgen); // push dest for chaining
       } else {

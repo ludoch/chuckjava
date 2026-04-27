@@ -1,6 +1,5 @@
 package org.chuck;
 
-import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -76,12 +75,28 @@ public class ChuckCLI {
           case "--probe" -> {
             System.out.println("[chuck]: probing audio devices...");
             System.out.println("--- Output Devices ---");
-            for (org.chuck.audio.ChuckAudio.DeviceInfo info : org.chuck.audio.ChuckAudio.getOutputDeviceInfo()) {
-              System.out.println("  " + info.name() + " (max channels: " + info.maxOutputChannels() + ", rates: " + info.supportedSampleRates() + ")");
+            for (org.chuck.audio.ChuckAudio.DeviceInfo info :
+                org.chuck.audio.ChuckAudio.getOutputDeviceInfo()) {
+              System.out.println(
+                  "  "
+                      + info.name()
+                      + " (max channels: "
+                      + info.maxOutputChannels()
+                      + ", rates: "
+                      + info.supportedSampleRates()
+                      + ")");
             }
             System.out.println("--- Input Devices ---");
-            for (org.chuck.audio.ChuckAudio.DeviceInfo info : org.chuck.audio.ChuckAudio.getOutputDeviceInfo()) {
-              System.out.println("  " + info.name() + " (max channels: " + info.maxInputChannels() + ", rates: " + info.supportedSampleRates() + ")");
+            for (org.chuck.audio.ChuckAudio.DeviceInfo info :
+                org.chuck.audio.ChuckAudio.getOutputDeviceInfo()) {
+              System.out.println(
+                  "  "
+                      + info.name()
+                      + " (max channels: "
+                      + info.maxInputChannels()
+                      + ", rates: "
+                      + info.supportedSampleRates()
+                      + ")");
             }
             System.exit(0);
           }
@@ -225,7 +240,8 @@ public class ChuckCLI {
           System.exit(0);
         } else if (cmd.equals("time")) {
           double secs = (double) vm.getCurrentTime() / vm.getSampleRate();
-          System.out.println(String.format("time: %d samples / %.2f seconds", vm.getCurrentTime(), secs));
+          System.out.println(
+              String.format("time: %d samples / %.2f seconds", vm.getCurrentTime(), secs));
         } else if (cmd.equals("remove.all")) {
           for (org.chuck.core.ChuckShred s : vm.getAllShreds()) {
             vm.removeShred(s.getId());
@@ -242,7 +258,7 @@ public class ChuckCLI {
       if (loop || !initialShreds.isEmpty()) {
         // Wait briefly for virtual threads to start
         Thread.sleep(50);
-        
+
         long startTime = System.currentTimeMillis();
         while (true) {
           if (timeoutSeconds > 0
@@ -250,7 +266,7 @@ public class ChuckCLI {
             if (verbose > 0) System.out.println("[CLI] Timeout reached, stopping...");
             break;
           }
-          
+
           if (!loop && vm.getActiveShredCount() == 0) break;
 
           if (silent) {

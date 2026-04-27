@@ -103,7 +103,6 @@ public class MorphingWavetable extends ChuckUGen {
     // Morph between the two
     float out = w0 + (w1 - w0) * tFrac;
 
-
     return out * gain;
   }
 }

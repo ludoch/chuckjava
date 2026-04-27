@@ -79,10 +79,6 @@ public class WaveformGoldenTest {
       }
       if (bestDiff > 5e-2f) {
 
-
-
-
-
         fail(
             String.format(
                 "Waveform mismatch at sample %d in %s. Expected %.6f, got best match diff %.6f",
@@ -107,12 +103,13 @@ public class WaveformGoldenTest {
 
     for (String test : tests) {
       try {
-        String ckCode =
-            Files.readString(
-                Path.of(
-                    "/usr/local/google/home/ludo/.gemini/jetski/scratch/comparison/"
-                        + test
-                        + ".ck"));
+        Path ckPath =
+            Path.of(System.getProperty("java.io.tmpdir"), "chuck-comparison", test + ".ck");
+        if (!Files.exists(ckPath)) {
+          System.out.printf("%-20s | %-15s\n", test, "CK MISSING");
+          continue;
+        }
+        String ckCode = Files.readString(ckPath);
         float[] javaOut = renderToBuffer(ckCode, DURATION_SAMPLES);
 
         Path nativeWavPath = Path.of("/tmp/chuck_temp_wavs/native/" + test + ".wav");
@@ -160,10 +157,8 @@ public class WaveformGoldenTest {
 
     vm.run(code, "test");
 
-
     float[] buffer = new float[samples];
     boolean useBlock = true;
-
 
     if (!useBlock) {
       for (int i = 0; i < samples; i++) {

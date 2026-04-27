@@ -23,7 +23,9 @@ Operate using a **Research -> Strategy -> Execution** lifecycle.
 
 -   **Code Style:** Follow existing patterns in the codebase. Maintain the surgical nature of updates.
 -   **Types & Safety:** Rigorously adhere to the type system. Do not bypass or suppress warnings unless explicitly instructed.
--   **Testing:**
+- **Zero Hardcoding Policy**: NEVER hardcode resource paths (e.g., sample wave names like "808 Kick.wav", external URLs, or local directory strings) within the production source code (`src/main/java`). All resources MUST be resolved dynamically via the **Object Model** (loaded from XML/JSON files) or identified through runtime discovery logic. This ensures the application remains strictly data-driven and portable across different environments.
+- **Testing:**
+
     -   Always update or add tests for any change.
     -   **Always run `mvn spotless:apply`** to format the code before committing.
     -   **Always run `mvn clean package`** to trigger all regressions, including code style verification (Spotless) and full unit test suites.

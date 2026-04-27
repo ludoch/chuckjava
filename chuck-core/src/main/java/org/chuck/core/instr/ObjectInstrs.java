@@ -202,7 +202,8 @@ public class ObjectInstrs {
           }
           case "erase" -> {
             if (a == 1) ca.erase(((Number) args[0]).longValue());
-            else if (a == 2) ca.erase(((Number) args[0]).longValue(), ((Number) args[1]).longValue());
+            else if (a == 2)
+              ca.erase(((Number) args[0]).longValue(), ((Number) args[1]).longValue());
             s.reg.pushObject(ca);
             return;
           }

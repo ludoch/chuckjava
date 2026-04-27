@@ -50,13 +50,13 @@ public class ResonZ extends ChuckUGen {
     double B = fr / q;
     double R = 1.0 - 0.5 * B;
     double R2 = R * R;
-    
+
     double m_a0 = 0.5 * (1.0 - R2);
-    
+
     b0 = m_a0;
     b1 = 0;
     b2 = -m_a0;
-    a1 = - (4.0 * R2 * Math.cos(fr)) / (1.0 + R2);
+    a1 = -(4.0 * R2 * Math.cos(fr)) / (1.0 + R2);
     a2 = R2;
   }
 

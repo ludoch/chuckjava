@@ -1,8 +1,8 @@
 package org.chuck.core;
 
 /**
- * A Java implementation of the MT19937 Mersenne Twister RNG.
- * Used for mathematical parity with native ChucK (1.5.0.1+).
+ * A Java implementation of the MT19937 Mersenne Twister RNG. Used for mathematical parity with
+ * native ChucK (1.5.0.1+).
  */
 public class MersenneTwister {
   private static final int N = 624;
