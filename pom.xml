@@ -16,7 +16,6 @@
     <modules>
         <module>chuck-core</module>
         <module>chuck-cli</module>
-        <module>sequencer</module>
         <module>chuck-ide</module>
         <module>chuck-samples</module>
         <module>deluge</module>
@@ -39,16 +38,9 @@
                 <version>${project.version}</version>
             </dependency>
             <dependency>
-                <groupId>org.chuck</groupId>
-                <artifactId>sequencer</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>io.github.ludoch</groupId>
                 <artifactId>rtmidijava</artifactId>
                 <version>1.0.2</version>
-
-
             </dependency>
             <dependency>
                 <groupId>org.antlr</groupId>

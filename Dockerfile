@@ -21,7 +21,6 @@ WORKDIR /build
 COPY pom.xml .
 COPY chuck-core/ chuck-core/
 COPY chuck-cli/ chuck-cli/
-COPY sequencer/ sequencer/
 COPY chuck-ide/ chuck-ide/
 
 # Build and Install everything to local m2 (required for inter-module dependencies)

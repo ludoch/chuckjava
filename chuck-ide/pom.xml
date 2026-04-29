@@ -24,10 +24,6 @@
         </dependency>
         <dependency>
             <groupId>org.chuck</groupId>
-            <artifactId>sequencer</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.chuck</groupId>
             <artifactId>chuck-samples</artifactId>
             <version>${project.version}</version>
         </dependency>

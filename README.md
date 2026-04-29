@@ -29,16 +29,10 @@ You can run ChucK-Java in different modes:
   mvn -pl chuck-ide javafx:run
   ```
 
-- **Standalone Visual Sequencer**:
-  ```bash
-  mvn -pl sequencer javafx:run
-  ```
-
 ## 🎹 Features
 
 - **Native RtMidiJava Support**: Ultra-low latency MIDI drivers via pure Java FFM (Panama).
 - **High-Performance Audio**: Optimized Vector API paths and Project Loom concurrency.
-- **Visual Grid Sequencer**: TR-808 style 16-step drum sequencer.
 - **Deluge Workstation Emulation**: Software emulation of the Synthstrom Deluge workflow.
 
 ## 📚 Documentation
