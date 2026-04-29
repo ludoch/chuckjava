@@ -19,9 +19,38 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 -   Our implementation is inspired by the Synthstrom Deluge hardware.
 -   We have expanded the Java DSL engine to support up to **64 simultaneous tracks** (e.g., 8 kits of 8 sounds each), allowing you to play multiple kits at once.
 
-### 1.4 Auditioning
+### 1.4 Grid Mode (Viewport Configuration)
+
+The grid viewport is configurable via **Settings → Preferences...** → **Grid Mode**. This controls how many rows and columns are visible at once, independent of the underlying clip data.
+
+| Setting | Rows | Columns | Use Case |
+|---------|------|---------|----------|
+| GRID\_8x16  | 8  | 16 | Default. Matches real Deluge hardware (8×16 pads). |
+| GRID\_16x16 | 16 | 16 | More voice rows for larger kits, same column width. |
+| GRID\_24x16 | 24 | 16 | Maximum voice rows (24-step sequencer). |
+| GRID\_16x24 | 16 | 24 | More visible steps per row (adds a horizontal scroll when clip length < 24). |
+
+**How it works:**
+- Changing the Grid Mode resizes the grid cells proportionally to fit the window — more cells = smaller pads, fewer cells = larger pads.
+- The grid always draws `gridMode.rows` voice row slots in the viewport. If the model has more rows (e.g., a 16-sound TR-808 kit), **vertical scroll buttons (▲/▼)** appear in the CLIP view header.
+- The MACROS, SLIDERS, and KEYBOARD rows stay fixed at the bottom regardless of grid mode.
+- **SONG** and **ARRANGEMENT** views also respect the grid mode setting — the viewport shows `gridMode.rows` track slots immediately, no need to load a clip first.
+
+**Per-clip step count:**
+- Each clip has its own length (default 16, range 1–192). Right-click or double-click the `[N]` badge on the grid row to change it.
+- When clip length exceeds `gridMode.columns`, a **horizontal scroll (◀/▶)** appears to pan the visible step window.
+- `gridMode.columns` only affects the viewport, not the underlying clip data.
+
+### 1.5 Auditioning
 -   Before placing notes in the sequence, you can audition (preview) the sound of a given row.
 -   In **Clip Mode**, click the rightmost pad/button of a row to hear the pitch or sound assigned to it.
+
+### 1.6 Velocity View
+-   Active step pads are rendered with **velocity-blended colors**: a step with full velocity (1.0) shows the full track color; lower velocities blend the color toward dark gray (`#333333`).
+-   The cell text in CLIP mode now shows real values: `Ve:<val>` for velocity and `Pr:<val>` for probability, read directly from the engine.
+-   To **set step velocity**, right-click a pad cell to open the **Step Properties** dialog, which includes a Velocity slider (0–100).
+-   The **SLIDERS** row (row 9 in CLIP mode) provides per-column velocity faders — click and drag vertically on any column to adjust that step column's velocity across all rows.
+-   The MIDI track click-path and playhead re-sync also respect the velocity blend, so pad brightness always reflects the current velocity value during playback.
 
 ---
 
