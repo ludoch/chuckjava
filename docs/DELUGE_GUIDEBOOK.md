@@ -18,6 +18,7 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 ### 1.3 Hardware Parity & Limits
 -   Our implementation is inspired by the Synthstrom Deluge hardware.
 -   We have expanded the Java DSL engine to support up to **64 simultaneous tracks** (e.g., 8 kits of 8 sounds each), allowing you to play multiple kits at once.
+-   For a comprehensive per-feature and per-menu mapping against the official firmware, see [`FIRMWARE_FEATURES_MAPPING.md`](FIRMWARE_FEATURES_MAPPING.md).
 
 ### 1.4 Grid Mode (Viewport Configuration)
 
