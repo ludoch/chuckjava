@@ -58,6 +58,13 @@ The grid viewport is configurable via **Settings → Preferences...** → **Grid
 -   **Set Row Velocity...**: Opens a dialog (0–100%) that applies the same velocity to all steps in that row. Useful for adjusting the overall dynamics of a sound without editing each step individually.
 -   These operations target the currently edited clip's sequence data and respect the per-step column count (clip length).
 
+### 1.8 Horizontal Grid Scrolling
+-   When a clip is **longer than the current viewport** (e.g., a 32-step clip in 16-column grid mode), ◀ and ▶ buttons appear in the CLIP header row.
+-   Click ◀ to scroll the visible step window left; click ▶ to scroll right.
+-   The step range label (e.g., "1–16 / 32") shows which steps are currently visible and the total clip length.
+-   The playhead and background step data sync correctly across all rows when the view is scrolled — steps outside the visible window don't show playhead indicators.
+-   This works for both Kit and Synth tracks in CLIP mode.
+
 ---
 
 ## 2. SONG CREATION & LOADING
