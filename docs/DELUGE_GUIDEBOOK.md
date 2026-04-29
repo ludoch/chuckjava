@@ -52,6 +52,12 @@ The grid viewport is configurable via **Settings → Preferences...** → **Grid
 -   The **SLIDERS** row (row 9 in CLIP mode) provides per-column velocity faders — click and drag vertically on any column to adjust that step column's velocity across all rows.
 -   The MIDI track click-path and playhead re-sync also respect the velocity blend, so pad brightness always reflects the current velocity value during playback.
 
+### 1.7 Row-Level Velocity & Probability
+-   **Right-click a row label** (the track name on the left of each row) to open the track context menu.
+-   **Set Row Probability...**: Opens a dialog (0–100%) that applies the same probability value to all steps in that row. This is useful for introducing controlled randomness across an entire drum sound or voice — each step has an independent `probability%` chance of firing when the playhead passes over it.
+-   **Set Row Velocity...**: Opens a dialog (0–100%) that applies the same velocity to all steps in that row. Useful for adjusting the overall dynamics of a sound without editing each step individually.
+-   These operations target the currently edited clip's sequence data and respect the per-step column count (clip length).
+
 ---
 
 ## 2. SONG CREATION & LOADING
