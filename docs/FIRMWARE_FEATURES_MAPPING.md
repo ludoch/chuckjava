@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-04-29 (LiSa/WvOut audio + script loading)
+> Last updated: 2026-04-30 (ARP modes: UP/DOWN/UP_DOWN/RANDOM)
 > Source: [SynthstromAudible/DelugeFirmware/docs](https://github.com/SynthstromAudible/DelugeFirmware/tree/main/docs)
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -11,7 +11,7 @@ This document maps every documented hardware feature and menu from the official 
 
 | Feature | Firmware Doc | Java/ChucK Status | Notes |
 |---------|-------------|-------------------|-------|
-| Arpeggiator | `features/arpeggiator.md` | ❌ Not implemented | 15+ parameters (modes, patterns, randomization, MPE) |
+| Arpeggiator | `features/arpeggiator.md` | ⚠️ Partial | 4 basic modes (UP/DOWN/UP_DOWN/RANDOM) with octaves, rate, gate. Missing: chord sim, note mode, step repeat, rhythm, seq length, randomization, MPE |
 | Automation View | `features/automation_view.md` | ❌ Not implemented | 81 automatable params; per-step/zoom editing |
 | Audio Recording | `features/audio_export.md` | ✅ Implemented | LiSa-based per-track recording, looping playback via audio_shred() |
 | Audio Export | `features/audio_export.md` | ✅ Implemented | WvOut2-based WAV export via Export Audio... menu; offline mastered render |
@@ -115,8 +115,8 @@ The firmware arpeggiator has ~25 configurable parameters across 4 groups. Our st
 
 | Parameter Group | Params | Status |
 |----------------|--------|--------|
-| **Basic (BASI)** | Gate, Sync, Rate | ❌ |
-| **Pattern (PATT)** | Octaves, Octave Mode, Chord Sim, Note Mode, Step Repeat, Rhythm, Seq Length | ❌ |
+| **Basic (BASI)** | Gate, Sync, Rate | ⚠️ Partial | Gate/rate work; sync not implemented |
+| **Pattern (PATT)** | Octaves, Octave Mode, Chord Sim, Note Mode, Step Repeat, Rhythm, Seq Length | ⚠️ Partial | Octaves + 4 octave modes (UP/DOWN/UP_DOWN/RANDOM) implemented; chord sim, note mode, step repeat, rhythm, seq length missing |
 | **Randomizer (RAND)** | Lock, Octave Spread, Gate Spread, Velocity Spread, Ratchet, Chord Poly, Note/Bass/Swap/Glide/Reverse Probability | ❌ |
 | **MPE** | Velocity (via Aftertouch/Y) | ❌ |
 
