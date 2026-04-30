@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-04-29
+> Last updated: 2026-04-29 (LiSa/WvOut audio + script loading)
 > Source: [SynthstromAudible/DelugeFirmware/docs](https://github.com/SynthstromAudible/DelugeFirmware/tree/main/docs)
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -13,7 +13,8 @@ This document maps every documented hardware feature and menu from the official 
 |---------|-------------|-------------------|-------|
 | Arpeggiator | `features/arpeggiator.md` | ❌ Not implemented | 15+ parameters (modes, patterns, randomization, MPE) |
 | Automation View | `features/automation_view.md` | ❌ Not implemented | 81 automatable params; per-step/zoom editing |
-| Audio Export | `features/audio_export.md` | ❌ Not implemented | Batch WAV export, normalization, offline rendering |
+| Audio Recording | `features/audio_export.md` | ✅ Implemented | LiSa-based per-track recording, looping playback via audio_shred() |
+| Audio Export | `features/audio_export.md` | ✅ Implemented | WvOut2-based WAV export via Export Audio... menu; offline mastered render |
 | Chord Keyboard | `features/chord_keyboard.md` | ❌ Not implemented | CORK/CORL layouts, scale-aware chords |
 | DX7 Synth | `features/dx_synth.md` | ❌ Not implemented | .syx compatibility, 6-op FM engine |
 | Looping in Grid View | `features/looping_in_grid_view.md` | ❌ Not implemented | Green mode create+record, LOOP/LAYERING LOOP cmds |
@@ -188,6 +189,9 @@ These features exist only in our software implementation and have no hardware co
 | **MIDI Grid Controller Mode** | Preferences | Map incoming MIDI notes to grid coordinates |
 | **Continuous Automation Drawing** | Bottom panel lane | Draw curves for step parameters |
 | **Visualizer Stack** | Right panel | FFT, oscilloscope, waterfall, stereo phase |
+| **Audio Recording/Playback** | Engine + UI | LiSa per-track audio clip recording + looping playback; rate control |
+| **Master WAV Export** | File menu | WvOut2 spliced into master output chain; records mastered stereo mix to .wav |
+| **Runtime Script Loading** | File menu | Load .ck scripts at runtime via vm.eval(); script access to all UGens + engine globals |
 | **64 simultaneous tracks** | Engine | 8 kits × 8 sounds each |
 
 ---
