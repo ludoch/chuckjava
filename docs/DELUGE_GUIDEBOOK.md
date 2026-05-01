@@ -287,6 +287,9 @@ Contains inner sub accordions categorization grouping setups:
   - **Transpose**: FM transposition values. 
   - **Amount**: visual modular amounts depth level. 
   - **Feedback**: Amplitude modulator live feedback assignments depth levels. 
+  - **Carrier FB**: Carrier self-feedback (carrier1Feedback, carrier2Feedback), 0-100%.
+  - **Modulator1 FB**: Modulator 1 feedback depth.
+  - **Modulator2 Amt/ FB**: Modulator 2 amount and feedback depth.
   - **Destination (on MOD 2 only)**: destination combos logic dropdown (CARS, MOD1). 
 
 #### Category: FILTERS 
@@ -323,6 +326,40 @@ Press active Grid Workspace **`P`** validation onboard key. dynamic Visual step 
 - **Hits ($K$)**: Active sequencing notes active. 
 - **Steps ($N$)**: Sequence duration validation checks duration. 
 - **Offset ($O$)**: Step sequence horizontal timeline shift offset. 
+
+---
+
+### 8.5 Synth Config Dialog — Modulation Tab
+
+Accessed via **Synth → Configure...** in the application menu. The dialog has 4 tabs:
+
+**OSCILLATOR & FILTER (Tab 1)**: Oscillator type/volume/sync/PW/retrig phase per oscillator, LPF/HPF freq+resonance, filter mode (12dB/24dB/SVF), unison count/detune, portamento, master pan/volume, synth mode (subtractive/FM/ringmod), polyphony (poly/mono/legato).
+
+**FM SYNTHESIS (Tab 2)**: FM modulator transpose/amount, carrier feedback, modulator1 feedback, modulator2 amount+feedback, destination routing.
+
+**ENVELOPES (Tab 3)**: ADSR sliders for Envelope 1-4.
+
+**MODULATION (Tab 4)**: Patch cable routing table and mod knob grid.
+
+#### Patch Cables
+- Source options: velocity, envelope1, envelope2, lfo1, lfo2, aftertouch, note, random, sidechain
+- Destination options: volume, pan, lpfFrequency, lpfResonance, oscAVolume, oscBVolume, pitch, noiseVolume, modFxRate, modFxDepth
+- Amount slider per cable (0-100%)
+- Add/Remove buttons for cable rows
+
+#### Mod Knobs
+- 4×4 grid of 16 knob param selectors
+- Options: NONE, volume, pan, reverb, delay, lpfFrequency, lpfResonance, hpfFrequency, pitch, oscAVolume, oscBVolume, noiseVolume, modFxRate, modFxDepth, modFxFeedback
+
+### 8.6 Kit Assembly From Synth Presets
+
+**File → Assemble Kit From Synths...** selects multiple `.XML` synth preset files and generates a single `.KIT` XML where each synth becomes a lane sound.
+
+Flow:
+1. Multi-file chooser for synth preset XMLs (filtered to `.XML`)
+2. Per-lane configuration dialog: mute group, pitch offset (semitones), lane name
+3. Output save dialog for the `.KIT` XML file
+4. The generated kit references each synth preset via `<sample fileName>` — compatible with Deluge hardware rendering
 
 ---
 

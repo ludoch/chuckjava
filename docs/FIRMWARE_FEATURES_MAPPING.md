@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-04-30 (ARP modes: UP/DOWN/UP_DOWN/RANDOM)
+> Last updated: 2026-04-30 (FM feedback params, modulation UI, kit assembly)
 > Source: [SynthstromAudible/DelugeFirmware/docs](https://github.com/SynthstromAudible/DelugeFirmware/tree/main/docs)
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -105,7 +105,21 @@ The firmware has 2 subdirectories (HPF, LPF) plus routing and sound-level config
 | **Sample** | `sample/` (9 files) | ❌ | No sample osc submenu at all |
 | **Unison** | `unison/` (4 files) | ❌ | Unison count/detune only; stereo spread missing |
 | **Index** | `index.md` | ⚠️ Partial | Osc params exist in editor; ~7/19 sub-pages missing |
-| **Index** | `index.md` | ⚠️ Partial | Oscillator params exist in editor; FM matrix limited |
+
+### 2.6 Modulation (`menus/modulation/`)
+
+| Menu Page | Firmware Params | Java/ChucK Status | Details |
+|-----------|----------------|-------------------|---------|
+| Patch Cables | — | ✅ | MODULATION tab with source/destination/amount table, add/remove rows |
+| Mod Knobs | — | ✅ | 4×4 grid of 16 knob param selectors in MODULATION tab |
+| Source options | — | ✅ | velocity, envelope 1-2, lfo 1-2, aftertouch, note, random, sidechain |
+| Destination options | — | ✅ | volume, pan, lpfFrequency, lpfResonance, oscAVolume, oscBVolume, pitch, noiseVolume, modFxRate, modFxDepth |
+
+### 2.7 Kit Assembly
+
+| Feature | Status | Details |
+|---------|--------|---------|
+| Assemble Kit From Synths | ✅ | File → Assemble Kit From Synths... selects N synth XMLs, per-lane mute group/pitch offset, outputs .KIT XML |
 
 ---
 
