@@ -15,6 +15,8 @@ public class MorphingWavetable extends ChuckUGen {
   private double phase = 0.0;
   private float freq = 440.0f;
   private float index = 0.0f;
+  /** FM modulation gain — bypasses the ChuckUGen gain clamp so FM depth can exceed 1.0. */
+  private float modGain = 0.0f;
 
   public MorphingWavetable() {
     this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
@@ -61,6 +63,15 @@ public class MorphingWavetable extends ChuckUGen {
     this.phase = p;
   }
 
+  /** Set FM modulation gain (bypasses ChuckUGen gain clamp for FM depth). */
+  public void modGain(float g) {
+    this.modGain = g;
+  }
+
+  public float modGain() {
+    return modGain;
+  }
+
   @Override
   protected float compute(float input, long systemTime) {
     int numTables = tables.length;
@@ -73,9 +84,13 @@ public class MorphingWavetable extends ChuckUGen {
     int t0 = (int) index;
     int t1 = Math.min(t0 + 1, numTables - 1);
     float tFrac = index - t0;
-    // Advance phase
-
+    // Advance phase + FM modulation from input
+    // Mirrors the real Deluge firmware: carrierPhase += modulatorSample (+ wrapping phase shift)
+    // input is the modulator UGen's output sample (after modulator gain clamped to 1.0).
+    // modGain scales the FM depth independently for usable modulation levels.
     phase += rate;
+    phase += input * modGain;
+
     while (phase >= tableLen) {
       phase -= tableLen;
     }
