@@ -9,15 +9,30 @@ package org.chuck.audio.util;
  *
  * <p>Layout (156 bytes):
  * <ul>
- *   <li>6 operators × 21 bytes = 126 bytes
- *   <li>19 bytes global parameters (pitch EG 5 + algorithm 1 + feedback 1 + osc sync 1 + LFO 6 + pitch mod 1 + amp mod 1 + transpose 1)
- *   <li>NOT in standard DX7 SysEx: The Deluge firmware stores the 10-byte patch name at offset 145
- *       <em>within</em> the 156-byte blob (not as a separate field), followed by 1 byte checksum.
- *   <li>1 byte checksum at offset 155
+ *   <li>6 operators × 21 bytes = 126 bytes</li>
+ *   <li>19 bytes global parameters (pitch EG 5 + algorithm 1 + feedback 1 + osc sync 1 + LFO 6 + pitch mod 1 + amp mod 1 + transpose 1)</li>
+ *   <li>10 bytes patch name at offset 145</li>
+ *   <li>1 byte opSwitch/checksum at offset 155</li>
  * </ul>
  *
- * <p>The transpose byte appears at offset 144, which means the global block is 19 bytes
- * (126-144 inclusive) and the name starts at 145.
+ * <p>Per-operator layout (21 bytes):
+ * <pre>
+ *   [0-3]  egRate      (0-99)  EG rates R1-R4
+ *   [4-7]  egLevel     (0-99)  EG levels L1-L4
+ *   [8]    breakPt     (0-127) Key scaling break point
+ *   [9]    leftDepth   (0-99)  Key scaling left depth
+ *   [10]   rightDepth  (0-99)  Key scaling right depth
+ *   [11]   leftCurve   (0-3)   Key scaling left curve
+ *   [12]   rightCurve  (0-3)   Key scaling right curve
+ *   [13]   rateScale   (0-7)   Rate scaling
+ *   [14]   ampModSens  (0-3)   Amp mod sensitivity
+ *   [15]   velSens     (0-7)   Velocity sensitivity
+ *   [16]   outLevel    (0-99)  Operator output level
+ *   [17]   mode        (0-1)   Fixed freq(1) / ratio(0)
+ *   [18]   coarse      (0-31)  Coarse frequency
+ *   [19]   fine        (0-99)  Fine tuning
+ *   [20]   detune      (0-14)  Detune (7=center)
+ * </pre>
  */
 public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int transpose, String name, byte[] raw) {
 
@@ -27,23 +42,44 @@ public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int tr
   /** Number of EG stages (R1-R4, L1-L4). */
   public static final int NUM_EG_STAGES = 4;
 
-  /** Offset where operator data starts. */
-  private static final int OP_BYTE_OFFSET = 0;
-
   /** Bytes per operator. */
-  private static final int OP_BYTES = 21;
+  public static final int OP_BYTES = 21;
 
   /** Offset of algorithm byte (0-31). */
-  private static final int OFF_ALGORITHM = 134;
+  public static final int OFF_ALGORITHM = 134;
 
   /** Offset of feedback byte (0-7). */
-  private static final int OFF_FEEDBACK = 135;
+  public static final int OFF_FEEDBACK = 135;
+
+  /** Offset of LFO speed (0-99). */
+  public static final int OFF_LFO_SPEED = 137;
+
+  /** Offset of LFO delay (0-99). */
+  public static final int OFF_LFO_DELAY = 138;
+
+  /** Offset of LFO pitch mod depth (0-99). */
+  public static final int OFF_PMOD_DEPTH = 139;
+
+  /** Offset of LFO amp mod depth (0-99). */
+  public static final int OFF_AMOD_DEPTH = 140;
+
+  /** Offset of LFO sync flag. */
+  public static final int OFF_LFO_SYNC = 141;
+
+  /** Offset of LFO waveform. */
+  public static final int OFF_LFO_WAVEFORM = 142;
+
+  /** Offset of pitch mod sensitivity (0-7). */
+  public static final int OFF_PMOD_SENS = 143;
 
   /** Offset of transpose byte (semitones). */
-  private static final int OFF_TRANSPOSE = 144;
+  public static final int OFF_TRANSPOSE = 144;
 
   /** Offset of patch name (10 bytes). */
-  private static final int OFF_NAME = 145;
+  public static final int OFF_NAME = 145;
+
+  /** Offset of opSwitch bitmask (byte 155). Bit 0 = op1 on, bit 5 = op6 on. */
+  public static final int OFF_OP_SWITCH = 155;
 
   /** Total patch size in bytes. */
   public static final int PATCH_SIZE = 156;
@@ -65,7 +101,7 @@ public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int tr
 
     Operator[] ops = new Operator[NUM_OPERATORS];
     for (int i = 0; i < NUM_OPERATORS; i++) {
-      ops[i] = decodeOperator(raw, OP_BYTE_OFFSET + i * OP_BYTES);
+      ops[i] = decodeOperator(raw, i * OP_BYTES);
     }
 
     int algorithm = raw[OFF_ALGORITHM] & 0xFF;
@@ -88,6 +124,22 @@ public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int tr
     return data;
   }
 
+  /**
+   * Returns the opSwitch bitmask (byte 155). Bit 0 = operator 1 active, bit 5 = operator 6 active.
+   */
+  public int opSwitch() {
+    return raw[OFF_OP_SWITCH] & 0xFF;
+  }
+
+  /**
+   * Returns true if the specified operator is active.
+   *
+   * @param op operator index (0-5)
+   */
+  public boolean isOpActive(int op) {
+    return ((raw[OFF_OP_SWITCH] >> op) & 1) != 0;
+  }
+
   // ── Operator decoding ──
 
   private static Operator decodeOperator(byte[] raw, int off) {
@@ -98,18 +150,27 @@ public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int tr
       egLevel[i] = raw[off + i + 4] & 0xFF;
     }
 
-    int detune = raw[off + 8] & 0xFF;         // 0-99 (DX7: 0=0, 1=±1, ... 7=±7, rest unused)
-    int coarseFreq = raw[off + 9] & 0xFF;      // 0-99 → frequency ratio (0=0.5, 1=1, ..., 31=32)
-    int fineFreq = raw[off + 10] & 0xFF;       // 0-99 → fine Hz offset (0=0, 1=1, ..., 99=99)
-    int outputLevel = raw[off + 11] & 0xFF;    // 0-99
-    int keyVelSens = raw[off + 12] & 0xFF;     // 0-99 (velocity sensitivity)
-    int ampModSens = raw[off + 13] & 0xFF;     // 0-99 (amplitude modulation sensitivity)
-    int oscMode = raw[off + 14] & 0xFF;        // 0=ratio, 1=fixed frequency
-    int kcLeft = raw[off + 15] & 0xFF;         // key scaling left (breakpoint curve)
-    int kcRight = raw[off + 16] & 0xFF;        // key scaling right
+    // Corrected field mapping matching the firmware layout:
+    // Offsets match the DX7 SysEx format: key scaling at 8-12, rateScale at 13,
+    // ampModSens at 14, velSens at 15, outLevel at 16, mode at 17, coarse at 18,
+    // fine at 19, detune at 20.
+    int breakPt = raw[off + 8] & 0xFF;        // 0-127
+    int leftDepth = raw[off + 9] & 0xFF;       // 0-99
+    int rightDepth = raw[off + 10] & 0xFF;     // 0-99
+    int leftCurve = raw[off + 11] & 0xFF;      // 0-3
+    int rightCurve = raw[off + 12] & 0xFF;     // 0-3
+    int rateScale = raw[off + 13] & 0xFF;      // 0-7
+    int ampModSens = raw[off + 14] & 0xFF;     // 0-3
+    int velSens = raw[off + 15] & 0xFF;        // 0-7
+    int outLevel = raw[off + 16] & 0xFF;       // 0-99
+    int mode = raw[off + 17] & 0xFF;           // 0=ratio, 1=fixed
+    int coarse = raw[off + 18] & 0xFF;         // 0-31
+    int fine = raw[off + 19] & 0xFF;           // 0-99
+    int detune = raw[off + 20] & 0xFF;         // 0-14
 
-    return new Operator(egRate, egLevel, detune, coarseFreq, fineFreq,
-        outputLevel, keyVelSens, ampModSens, oscMode, kcLeft, kcRight);
+    return new Operator(egRate, egLevel, breakPt, leftDepth, rightDepth,
+        leftCurve, rightCurve, rateScale, ampModSens, velSens,
+        outLevel, mode, coarse, fine, detune);
   }
 
   private static String decodeName(byte[] raw, int off) {
@@ -128,21 +189,25 @@ public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int tr
    * A single DX7 operator (voice element).
    *
    * <p>Each operator is a sine-wave oscillator with its own envelope generator (EG),
-   * frequency controls, and output level. Operators can be configured as ratio-mode
-   * (frequency = note × coarse) or fixed-mode (frequency = coarse × fine, independent of note).
+   * frequency controls, and output level. The field ordering matches the DX7 SysEx
+   * layout (21 bytes per operator).
    */
   public record Operator(
-      int[] egRate,      // [4] EG rates (0-99)
-      int[] egLevel,     // [4] EG levels (0-99)
-      int detune,        // 0-99 (0=no detune)
-      int coarseFreq,    // 0-99 (ratio: 0=0.5, 1=1, ≥1=n; fixed: n = freq in Hz × fine)
-      int fineFreq,      // 0-99 (fine tuning, 0-99 Hz in fixed mode)
-      int outputLevel,   // 0-99
-      int keyVelSens,    // 0-99 (keyboard velocity sensitivity)
-      int ampModSens,    // 0-99 (amplitude modulation sensitivity from LFO)
-      int oscMode,       // 0=ratio (freq tracks note), 1=fixed (freq independent of note)
-      int kcLeft,        // key scaling left breakpoint
-      int kcRight        // key scaling right breakpoint
+      int[] egRate,       // [4] EG rates (0-99)
+      int[] egLevel,      // [4] EG levels (0-99)
+      int breakPt,        // 0-127 Key scaling break point
+      int leftDepth,      // 0-99 Key scaling left depth
+      int rightDepth,     // 0-99 Key scaling right depth
+      int leftCurve,      // 0-3 Key scaling left curve
+      int rightCurve,     // 0-3 Key scaling right curve
+      int rateScale,      // 0-7 Rate scaling
+      int ampModSens,     // 0-3 Amp mod sensitivity
+      int velSens,        // 0-7 Velocity sensitivity
+      int outputLevel,    // 0-99
+      int mode,           // 0=ratio, 1=fixed
+      int coarseFreq,     // 0-31 (coarse frequency)
+      int fineFreq,       // 0-99 (fine tuning)
+      int detune          // 0-14 (7=center)
   ) {
     /**
      * Returns the effective frequency ratio for ratio-mode operators.
@@ -155,7 +220,7 @@ public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int tr
 
     /**
      * Returns the fixed frequency in Hz (for fixed-mode operators).
-     * When oscMode=1, frequency = coarseFreq * fineFreq (if fineFreq>0) or coarseFreq.
+     * When mode=1, frequency = coarseFreq * fineFreq (if fineFreq>0) or coarseFreq.
      */
     public double fixedFrequency() {
       if (fineFreq > 0) return coarseFreq * (double) fineFreq;

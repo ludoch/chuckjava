@@ -2,6 +2,7 @@ package org.chuck.audio.util;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -17,14 +18,14 @@ public class Dx7EngineUnitTest {
    * This should produce clearly audible output.
    */
   static final String SIMPLE_PATCH_HEX =
-    "6363636363503c0000010063000000000000000000" +  // op1
-    "6363636363503c0000010063000000000000000000" +  // op2
-    "6363636363503c0000010063000000000000000000" +  // op3
-    "6363636363503c0000010063000000000000000000" +  // op4
-    "6363636363503c0000010063000000000000000000" +  // op5
-    "6363636363503c0000010063000000000000000000" +  // op6
+    "6363636363503c0000000000000000006300010000" +  // op1
+    "6363636363503c0000000000000000006300010000" +  // op2
+    "6363636363503c0000000000000000006300010000" +  // op3
+    "6363636363503c0000000000000000006300010000" +  // op4
+    "6363636363503c0000000000000000006300010000" +  // op5
+    "6363636363503c0000000000000000006300010000" +  // op6
     "00000000000000000000000000000000000000" +       // globals (19 bytes)
-    "5445535420202020202000";                         // name (10) + checksum (1)
+    "544553542020202020203f";                         // name (10) + opSwitch (1)
 
   /**
    * Variation of SIMPLE_PATCH with algorithm=12 (all 6 parallel carriers).
@@ -33,6 +34,11 @@ public class Dx7EngineUnitTest {
     return SIMPLE_PATCH_HEX.substring(0, 134 * 2)
         + String.format("%02x", algo)
         + SIMPLE_PATCH_HEX.substring(135 * 2);
+  }
+
+  @BeforeAll
+  public static void initTables() {
+    Dx7EngineLookupTables.init(44100.0);
   }
 
   @Test
