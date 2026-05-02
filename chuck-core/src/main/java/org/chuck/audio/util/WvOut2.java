@@ -38,6 +38,11 @@ public class WvOut2 extends StereoUGen implements AutoCloseable {
   }
 
   @Override
+  public void tick(float[] buffer, int offset, int length, long systemTime) {
+    super.tick(buffer, offset, length, systemTime);
+  }
+
+  @Override
   protected void computeStereo(float input, long systemTime) {
     computeStereo(input, input, systemTime);
   }
@@ -107,7 +112,6 @@ public class WvOut2 extends StereoUGen implements AutoCloseable {
 
   private void finalizeWav() throws IOException {
     if (fos == null) return;
-    System.out.println("[WvOut2] Finalizing WAV: " + currentFilename + " samples: " + totalSamples);
 
     fos.flush();
     try {

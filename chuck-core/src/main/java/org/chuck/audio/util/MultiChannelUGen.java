@@ -60,7 +60,19 @@ public abstract class MultiChannelUGen extends ChuckUGen {
       for (int s = 0; s < count; s++) {
         ChuckUGen src = sources[s];
         if (src != null) {
-          if (systemTime == -1 || src.getLastTickTime() < systemTime) {
+          // Only skip re-ticking if:
+          //   (a) src was ticked at exactly this systemTime (same-time cache hit), OR
+          //   (b) src has an active block cache that covers this systemTime
+          // Otherwise force a re-tick to get the correct per-sample value.
+          // The old condition (src.getLastTickTime() < systemTime) was incorrect
+          // because after a block tick, getLastTickTime() == end-of-block, which
+          // is > systemTime for samples within the block, but the block cache
+          // window may have already been reset by a scalar tick.
+          boolean srcAlreadyTicked = (systemTime != -1 && src.getLastTickTime() == systemTime);
+          if (!srcAlreadyTicked && src.isBlockCacheValid(systemTime)) {
+            srcAlreadyTicked = true;
+          }
+          if (!srcAlreadyTicked) {
             src.tick(systemTime);
           }
           for (int i = 0; i < sums.length; i++) {

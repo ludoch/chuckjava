@@ -389,13 +389,19 @@ public abstract class ChuckUGen extends ChuckObject {
     return 0.0f;
   }
 
-  /** New method to support bit-exact multi-channel block caching. */
+  /** Returns the output for channel {@code i} at the given system time,
+   *  using the block cache when available. */
   public float getChannelLastOut(int i, long systemTime) {
     if (systemTime != -1
         && blockLength > 0
         && systemTime >= blockStartTime
         && systemTime < blockStartTime + blockLength) {
-      return getChannelLastOut(i); // For mono, it's already in lastOut
+      // Block cache hit: return the per-sample cached value.
+      int idx = (int) (systemTime - blockStartTime);
+      if (blockCache != null && idx < blockCache.length) {
+        return blockCache[idx];
+      }
+      return getChannelLastOut(i);
     }
     return getChannelLastOut(i);
   }
@@ -517,5 +523,13 @@ public abstract class ChuckUGen extends ChuckObject {
 
   public ChuckUGen getOutputChannel(int i) {
     return (outputChannels != null && i < outputChannels.length) ? outputChannels[i] : this;
+  }
+
+  /** Returns true if the block cache is active and covers the given systemTime. */
+  public boolean isBlockCacheValid(long systemTime) {
+    return systemTime != -1
+        && blockLength > 0
+        && systemTime >= blockStartTime
+        && systemTime < blockStartTime + blockLength;
   }
 }

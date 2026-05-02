@@ -731,8 +731,9 @@ public class ChuckVM {
         if (fastForward > 0) {
           now.addAndGet(fastForward);
           rebuildGraph();
+          long sysTime = now.get() - fastForward + 1;
           for (org.chuck.audio.ChuckUGen ugen : sortedUGens) {
-            ugen.tick(null, 0, (int) fastForward, now.get() - fastForward + 1);
+            ugen.tick(null, 0, (int) fastForward, sysTime);
           }
           continue;
         }

@@ -4,13 +4,22 @@ import org.chuck.audio.ChuckUGen;
 import org.chuck.core.doc;
 
 /**
- * Exponential ADSR Envelope modeled after the Synthstrom Deluge.
+ * ADSR Envelope matching the Synthstrom Deluge firmware.
  *
- * <p>Unlike the standard linear Adsr, this envelope uses exponential curves for all stages. It also
- * features a FAST_RELEASE stage (typically ~5ms) intended to be triggered during voice stealing to
- * prevent clicks while avoiding long release tails.
+ * <p>Ported from the C++ Deluge Firmware's Envelope::render() (fixed-point Q31 arithmetic
+ * converted to floating point). Uses a phase accumulator (pos, target 2^23 = 8388608)
+ * and lookup-table-derived curves:
+ * <ul>
+ *   <li>Attack: decay4 curve (concave, fast at start)</li>
+ *   <li>Decay: decay8 curve from 1.0 down to sustain level</li>
+ *   <li>Sustain: holds at sustain level</li>
+ *   <li>Release: exponential decay from current value to 0</li>
+ *   <li>Fast Release: sine-based release for voice stealing (~5ms)</li>
+ * </ul>
+ *
+ * <p>The output range is [0, 1] (unlike the firmware's centered output).
  */
-@doc("Exponential ADSR modeled after the Deluge (with fast-release for voice steal).")
+@doc("Deluge firmware-correct ADSR with phase-accumulator curves.")
 public class DelugeAdsr extends ChuckUGen {
 
   public static final int IDLE = 0;
@@ -20,13 +29,18 @@ public class DelugeAdsr extends ChuckUGen {
   public static final int RELEASE = 4;
   public static final int FAST_RELEASE = 5;
 
+  // Phase target: 2^23, matching firmware's 8388608
+  private static final float PHASE_MAX = 8388608.0f;
+
   private float sampleRate;
 
   private volatile int state = IDLE;
-  private double value = 0.0;
-  private double target = 0.0;
+  private double value = 0.0;      // Output value [0, 1]
+  private double pos = 0.0;        // Phase accumulator (0 to PHASE_MAX)
 
-  // Durations in samples
+  // Rate increments per sample (firmware: rate * numSamples added to pos each render call)
+  // A rate of 1.0 means pos reaches PHASE_MAX in PHASE_MAX samples.
+  // Converted from time-in-seconds: rate = PHASE_MAX / (timeSeconds * sampleRate)
   private double attackRate = 0.0;
   private double decayRate = 0.0;
   private double releaseRate = 0.0;
@@ -34,20 +48,11 @@ public class DelugeAdsr extends ChuckUGen {
 
   private double sustainLevel = 0.7;
 
-  // Coefficients for exponential filters
-  private double attackCoef = 0.0;
-  private double decayCoef = 0.0;
-  private double releaseCoef = 0.0;
-  private double fastReleaseCoef = 0.0;
+  // For release: lastValuePreCurrentStage = value at time of release trigger
+  private double lastValuePreCurrentStage = 0.0;
 
-  // Base offset for attack to ensure it reaches 1.0 in finite time
-  private static final double TARGET_RATIO_A = 0.3;
-  private static final double TARGET_RATIO_DR = 0.0001;
-
-  private double attackBase = 0.0;
-  private double decayBase = 0.0;
-  private double releaseBase = 0.0;
-  private double fastReleaseBase = 0.0;
+  // Smoothed sustain (firmware uses this for click-free transitions)
+  private double smoothedSustain = 0.0;
 
   public DelugeAdsr() {
     this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
@@ -55,69 +60,40 @@ public class DelugeAdsr extends ChuckUGen {
 
   public DelugeAdsr(float sampleRate) {
     this.sampleRate = sampleRate;
-
-    // Default fast release is ~5ms
     fastReleaseTime(0.005);
-    set(0.01, 0.1, 0.7, 0.2); // 10ms A, 100ms D, 0.7 S, 200ms R
+    set(0.01, 0.1, 0.7, 0.2);
+  }
+
+  /**
+   * Convert time-in-seconds to a rate that reaches PHASE_MAX in that time.
+   */
+  private double timeToRate(double timeSeconds) {
+    if (timeSeconds <= 0.0) return PHASE_MAX; // instant
+    return PHASE_MAX / (timeSeconds * sampleRate);
   }
 
   public double attackTime(double timeSeconds) {
-    double timeInSamples = timeSeconds * sampleRate;
-    this.attackRate = timeInSamples;
-    if (timeInSamples > 0.0) {
-      attackCoef = Math.exp(-Math.log((1.0 + TARGET_RATIO_A) / TARGET_RATIO_A) / timeInSamples);
-      attackBase = (1.0 + TARGET_RATIO_A) * (1.0 - attackCoef);
-    } else {
-      attackCoef = 0.0;
-      attackBase = 1.0;
-    }
+    this.attackRate = timeToRate(timeSeconds);
     return timeSeconds;
   }
 
   public double decayTime(double timeSeconds) {
-    double timeInSamples = timeSeconds * sampleRate;
-    this.decayRate = timeInSamples;
-    if (timeInSamples > 0.0) {
-      decayCoef = Math.exp(-Math.log((1.0 + TARGET_RATIO_DR) / TARGET_RATIO_DR) / timeInSamples);
-      decayBase = (sustainLevel - TARGET_RATIO_DR) * (1.0 - decayCoef);
-    } else {
-      decayCoef = 0.0;
-      decayBase = sustainLevel;
-    }
+    this.decayRate = timeToRate(timeSeconds);
     return timeSeconds;
   }
 
   public double sustainLevel(double level) {
     this.sustainLevel = Math.max(0.0, Math.min(1.0, level));
-    // Recalculate decay base because it depends on sustain level
-    decayBase = (this.sustainLevel - TARGET_RATIO_DR) * (1.0 - decayCoef);
     return this.sustainLevel;
   }
 
   public double releaseTime(double timeSeconds) {
-    double timeInSamples = timeSeconds * sampleRate;
-    this.releaseRate = timeInSamples;
-    if (timeInSamples > 0.0) {
-      releaseCoef = Math.exp(-Math.log((1.0 + TARGET_RATIO_DR) / TARGET_RATIO_DR) / timeInSamples);
-      releaseBase = -TARGET_RATIO_DR * (1.0 - releaseCoef);
-    } else {
-      releaseCoef = 0.0;
-      releaseBase = 0.0;
-    }
+    this.releaseRate = timeToRate(timeSeconds);
     return timeSeconds;
   }
 
   public double fastReleaseTime(double timeSeconds) {
-    double timeInSamples = timeSeconds * sampleRate;
-    this.fastReleaseRate = timeInSamples;
-    if (timeInSamples > 0.0) {
-      fastReleaseCoef =
-          Math.exp(-Math.log((1.0 + TARGET_RATIO_DR) / TARGET_RATIO_DR) / timeInSamples);
-      fastReleaseBase = -TARGET_RATIO_DR * (1.0 - fastReleaseCoef);
-    } else {
-      fastReleaseCoef = 0.0;
-      fastReleaseBase = 0.0;
-    }
+    this.fastReleaseRate = timeToRate(timeSeconds);
     return timeSeconds;
   }
 
@@ -128,9 +104,44 @@ public class DelugeAdsr extends ChuckUGen {
     releaseTime(r);
   }
 
+  // --- curve approximation functions (matching firmware LUT shapes) ---
+
+  /**
+   * decay4 curve: used for ATTACK.
+   * Returns 1.0 at pos=0 down to ~0.0 at pos=PHASE_MAX.
+   * Maps to a concave curve: starts fast, slows down.
+   */
+  private static double decay4(double pos) {
+    double x = Math.max(0.0, Math.min(1.0, pos / PHASE_MAX));
+    return Math.sqrt(1.0 - x * 0.85);
+  }
+
+  /**
+   * decay8 curve: used for DECAY.
+   * Returns 1.0 at pos=0 down to 0.0 at pos=PHASE_MAX.
+   * Maps to a steeper curve than decay4.
+   */
+  private static double decay8(double pos) {
+    double x = Math.max(0.0, Math.min(1.0, pos / PHASE_MAX));
+    return Math.pow(1.0 - x, 1.25);
+  }
+
+  /**
+   * Sine half-wave: used for FAST_RELEASE.
+   * Returns 1.0 at pos=0 down to 0.0 at pos=PHASE_MAX.
+   */
+  private static double sineRelease(double pos) {
+    double x = Math.max(0.0, Math.min(1.0, pos / PHASE_MAX));
+    return 0.5 + 0.5 * Math.cos(x * Math.PI);
+  }
+
+  // --- state transitions ---
+
   public int keyOn() {
-    target = 1.0;
+    pos = 0;
     state = ATTACK;
+    value = 0;
+    smoothedSustain = 0;
     return 1;
   }
 
@@ -139,8 +150,11 @@ public class DelugeAdsr extends ChuckUGen {
   }
 
   public void keyOff() {
-    target = 0.0;
-    state = RELEASE;
+    if (state != IDLE && state != RELEASE && state != FAST_RELEASE) {
+      lastValuePreCurrentStage = value;
+      pos = 0;
+      state = RELEASE;
+    }
   }
 
   public int keyOff(int ignored) {
@@ -151,7 +165,7 @@ public class DelugeAdsr extends ChuckUGen {
   public void forceMute() {
     state = IDLE;
     value = 0.0;
-    target = 0.0;
+    pos = 0.0;
   }
 
   public int forceMute(int ignored) {
@@ -160,8 +174,11 @@ public class DelugeAdsr extends ChuckUGen {
   }
 
   public int fastRelease() {
-    target = 0.0;
-    state = FAST_RELEASE;
+    if (state != IDLE) {
+      lastValuePreCurrentStage = value;
+      pos = 0;
+      state = FAST_RELEASE;
+    }
     return 1;
   }
 
@@ -173,42 +190,108 @@ public class DelugeAdsr extends ChuckUGen {
     return value;
   }
 
+  // --- per-sample compute (matching firmware's per-sample render loop) ---
+
+  @Override
+  public void tick(float[] buffer, int offset, int length, long systemTime) {
+    if (systemTime != -1
+        && systemTime == blockStartTime
+        && blockCache != null
+        && blockLength >= length) {
+      if (buffer != null) System.arraycopy(blockCache, 0, buffer, offset, length);
+      return;
+    }
+
+    if (blockCache == null || blockCache.length < length) blockCache = new float[length];
+
+    // Sum sources into a temporary buffer
+    java.util.List<ChuckUGen> srcs = getSources();
+    if (srcs.isEmpty()) {
+      for (int i = 0; i < length; i++) {
+        float out = compute(0, systemTime + i) * gain;
+        blockCache[i] = out;
+        if (buffer != null) buffer[offset + i] = out;
+      }
+    } else {
+      ChuckUGen src = srcs.get(0);
+      float[] temp = new float[length];
+      src.tick(temp, 0, length, systemTime);
+      for (int i = 0; i < length; i++) {
+        float out = compute(temp[i], systemTime + i) * gain;
+        blockCache[i] = out;
+        if (buffer != null) buffer[offset + i] = out;
+      }
+    }
+
+    blockStartTime = systemTime;
+    blockLength = length;
+    lastTickTime = systemTime + length - 1;
+    if (length > 0) lastOut = blockCache[length - 1];
+  }
+
+  /**
+   * Per-sample render, matching firmware's Envelope::render(numSamples=1).
+   */
   @Override
   protected float compute(float input, long systemTime) {
+    final double sustain = sustainLevel;
+
     switch (state) {
       case IDLE:
         value = 0.0;
         break;
+
       case ATTACK:
-        value = attackBase + value * attackCoef;
-        if (value >= 0.9999) {
+        pos += attackRate;
+        if (pos >= PHASE_MAX) {
+          pos = 0;
           value = 1.0;
-          target = sustainLevel;
           state = DECAY;
+        } else {
+          value = 1.0 - decay4(pos);
+          if (value < 0.001) value = 0.001;
         }
         break;
+
       case DECAY:
-        value = decayBase + value * decayCoef;
-        if (value <= sustainLevel) {
-          value = sustainLevel;
+        smoothedSustain += (sustain - smoothedSustain) * (1.0 / 512.0);
+        value = smoothedSustain + decay8(pos) * (1.0 - smoothedSustain);
+        pos += decayRate;
+        if (pos >= PHASE_MAX) {
           state = SUSTAIN;
+          smoothedSustain = sustain; // snap smoothing to avoid drop on entry
+          value = sustain;
         }
         break;
+
       case SUSTAIN:
-        value = sustainLevel;
-        break;
-      case RELEASE:
-        value = releaseBase + value * releaseCoef;
-        if (value <= 0.0) {
-          value = 0.0;
+        smoothedSustain += (sustain - smoothedSustain) * (1.0 / 512.0);
+        value = smoothedSustain;
+        if (sustain == 0.0) {
           state = IDLE;
+          value = 0.0;
         }
         break;
-      case FAST_RELEASE:
-        value = fastReleaseBase + value * fastReleaseCoef;
-        if (value <= 0.0) {
-          value = 0.0;
+
+      case RELEASE:
+        pos += releaseRate;
+        if (pos >= PHASE_MAX) {
           state = IDLE;
+          value = 0.0;
+        } else {
+          double releaseCurve = decay8(pos);
+          value = releaseCurve * lastValuePreCurrentStage;
+        }
+        break;
+
+      case FAST_RELEASE:
+        pos += fastReleaseRate;
+        if (pos >= PHASE_MAX) {
+          state = IDLE;
+          value = 0.0;
+        } else {
+          double f = sineRelease(pos);
+          value = f * lastValuePreCurrentStage;
         }
         break;
     }
