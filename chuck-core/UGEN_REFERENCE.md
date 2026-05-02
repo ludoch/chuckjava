@@ -2060,3 +2060,106 @@ Class: `org.chuck.audio.analysis.ZeroX`
 ### Parameters
 - `lastInput` (float)
 
+
+## Dx7Engine
+Class: `org.chuck.audio.util.Dx7Engine`
+
+**Description:** 6-operator FM synthesis engine implementing the Yamaha DX7 voice architecture, ported from the Deluge firmware's dexed/msfa implementation. A single ChuckUGen managing 6 phase accumulators with per-operator envelopes, sine lookup, and 32 algorithm matrices.
+
+Relies on `Dx7EngineLookupTables.init()` being called once at VM startup (per sample rate). Patches are loaded as 156-byte blobs created by `Dx7Patch.fromHex(hexString)`.
+
+### Parameters
+- `patch` (byte[156]) — raw patch blob, set via `loadPatch()`
+- `freq` (double) — base frequency (alternative to MIDI note for non-MIDI use)
+- `midiNote` (int, 0-127)
+- `velocity` (int, 0-127)
+
+### Methods
+- `loadPatch(byte[] patchData)` -> void : Load a DX7 patch from 156-byte raw array
+- `loadPatch(Dx7Patch p)` -> void : Load from a decoded Dx7Patch record
+- `setFreq(double freq)` -> void : Set base note frequency (auto-converts to MIDI note)
+- `noteOn(int midiNote, int velocity)` -> void : Trigger note-on with MIDI note and velocity; initializes all 6 operators with correct frequency, envelope, key/velocity scaling per patch
+- `noteOn()` -> void : Legacy note-on using previously set parameters
+- `noteOff()` -> void : Trigger note-off; all 6 operators enter release phase
+- `isActive()` -> boolean : Returns true while any operator is above the gain threshold
+
+### Math Conventions
+- phase: Q32 (wraps naturally on 32-bit overflow)
+- level\_: Q24 log-domain (2^24 = 6dB doubling)
+- Sin output: Q24 (±~1&lt;&lt;24)
+- gain: Q24 linear
+- logfreq: Q24 log2(frequency)
+- lfo\_value: Q24, lfo\_phase: Q32
+
+
+## Dx7EngineLookupTables
+Class: `org.chuck.audio.util.Dx7EngineLookupTables`
+
+Static lookup tables shared across all Dx7Engine instances. Must be initialized via `init(sampleRate)` before any Dx7Engine is created.
+
+### Static Methods
+- `init(double sampleRate)` -> void : Initialize all tables for the given sample rate. Safe to call multiple times (idempotent if same sample rate).
+
+### Lookup Tables (all static, accessed by Dx7Engine internally)
+- `SIN_DELTA[1024]` — sine wave with delta coding for linear interpolation
+- `EXP2_TABLE[1024]` — 2^x lookup (Q24 log → Q24 linear)
+- `FREQLUT[1024]` — log-frequency to phase increment (Q24 → Q32)
+- `TANH_TABLE[1024]` — tanh saturation (for feedback limiting)
+- `ALGORITHMS[192]` — 32 algorithms × 6 operator flag bytes (from dexed fm_core.cpp)
+- `levellut[20]` — envelope level lookup
+- `velocity_data[64]`, `exp_scale_data[33]` — key/velocity scaling
+- `pitchenv_rate[101]`, `pitchenv_tab[99]` — pitch EG tables
+- `lfo_unit` — LFO phase increment per sample
+- `sr_multiplier` — sample rate multiplier for envelope rate scaling
+
+
+## Dx7Patch
+Class: `org.chuck.audio.util.Dx7Patch` (Java record)
+
+Decoded representation of a Yamaha DX7 voice patch (156 bytes). The Deluge firmware stores DX7 patches as hex-encoded strings in the `dx7patch` attribute of `<osc1 type="dx7">`.
+
+### Field Constants
+- `NUM_OPERATORS` = 6
+- `NUM_EG_STAGES` = 4
+- `OP_BYTES` = 21
+- `PATCH_SIZE` = 156
+- `OFF_ALGORITHM` = 134, `OFF_FEEDBACK` = 135, `OFF_LFO_SPEED` = 137, `OFF_LFO_DELAY` = 138, `OFF_PMOD_DEPTH` = 139, `OFF_AMOD_DEPTH` = 140, `OFF_LFO_SYNC` = 141, `OFF_LFO_WAVEFORM` = 142, `OFF_PMOD_SENS` = 143, `OFF_TRANSPOSE` = 144, `OFF_NAME` = 145, `OFF_OP_SWITCH` = 155
+
+### Per-Operator Layout (21 bytes)
+| Offset | Field | Range | Description |
+|--------|-------|-------|-------------|
+| 0-3 | egRate | 0-99 | EG rates R1-R4 |
+| 4-7 | egLevel | 0-99 | EG levels L1-L4 |
+| 8 | breakPt | 0-127 | Key scaling break point |
+| 9 | leftDepth | 0-99 | Key scaling left depth |
+| 10 | rightDepth | 0-99 | Key scaling right depth |
+| 11 | leftCurve | 0-3 | Key scaling left curve |
+| 12 | rightCurve | 0-3 | Key scaling right curve |
+| 13 | rateScale | 0-7 | Rate scaling |
+| 14 | ampModSens | 0-3 | Amp mod sensitivity |
+| 15 | velSens | 0-7 | Velocity sensitivity |
+| 16 | outLevel | 0-99 | Operator output level |
+| 17 | mode | 0-1 | Fixed freq(1) / ratio(0) |
+| 18 | coarse | 0-31 | Coarse frequency |
+| 19 | fine | 0-99 | Fine tuning |
+| 20 | detune | 0-14 | Detune (7=center) |
+
+### Static Methods
+- `fromHex(String hex)` -> Dx7Patch : Parse from 312-char hex string; throws IllegalArgumentException if wrong length or invalid hex
+- `hexToBytes(String hex)` -> byte[] : Convert hex string to raw byte array (156 bytes)
+
+### Instance Methods
+- `opSwitch()` -> int : Bitmask at byte 155; bit 0 = op1 active, bit 5 = op6 active
+- `isOpActive(int op)` -> boolean : Check if operator at index 0-5 is active
+- `raw()` -> byte[] : Return the raw 156-byte patch array (for passing to Dx7Engine.loadPatch)
+- `operators()` -> Operator[] : The 6 decoded operator records
+- `algorithm()` -> int
+- `feedback()` -> int
+- `lfoSpeed()` -> int
+- `lfoDelay()` -> int
+- `lfoSync()` -> int
+- `lfoWaveform()` -> int
+- `pModSens()` -> int
+- `transpose()` -> int
+- `name()` -> String
+
