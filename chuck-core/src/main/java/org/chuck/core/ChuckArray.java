@@ -14,6 +14,25 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
   private final List<Object> objectData = new ArrayList<>();
   private final List<Byte> types = new ArrayList<>(); // 0: int, 1: float, 2: object
 
+  // Zero-copy backing arrays for performance/decoupling
+  private int[] backingInt = null;
+  private float[] backingFloat = null;
+
+  public ChuckArray(int[] backing) {
+    super(ChuckType.ARRAY);
+    this.backingInt = backing;
+    this.elementTypeName = "int";
+    // For ChucK VM compatibility, we still need to size the 'types' list
+    for (int i = 0; i < backing.length; i++) types.add((byte) 0);
+  }
+
+  public ChuckArray(float[] backing) {
+    super(ChuckType.ARRAY);
+    this.backingFloat = backing;
+    this.elementTypeName = "float";
+    for (int i = 0; i < backing.length; i++) types.add((byte) 1);
+  }
+
   @Override
   public java.util.Iterator<Object> iterator() {
     return new java.util.Iterator<Object>() {
@@ -192,18 +211,30 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
   }
 
   public void setInt(int index, long value) {
+    if (backingInt != null) {
+      if (index >= 0 && index < backingInt.length) backingInt[index] = (int) value;
+      return;
+    }
     ensureCapacity(index);
     intData.set(index, value);
     types.set(index, (byte) 0);
   }
 
   public void setFloat(int index, double value) {
+    if (backingFloat != null) {
+      if (index >= 0 && index < backingFloat.length) backingFloat[index] = (float) value;
+      return;
+    }
     ensureCapacity(index);
     floatData.set(index, value);
     types.set(index, (byte) 1);
   }
 
   public double getFloat(int index) {
+    if (backingFloat != null) {
+      if (index < 0) index = backingFloat.length + index;
+      return (index >= 0 && index < backingFloat.length) ? backingFloat[index] : 0.0;
+    }
     if (index < 0) index = types.size() + index;
     if (index < 0 || index >= types.size()) return 0.0;
     byte t = types.get(index);
@@ -213,6 +244,10 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
   }
 
   public long getInt(int index) {
+    if (backingInt != null) {
+      if (index < 0) index = backingInt.length + index;
+      return (index >= 0 && index < backingInt.length) ? backingInt[index] : 0L;
+    }
     if (index < 0) index = types.size() + index;
     if (index < 0 || index >= types.size()) return 0L;
     byte t = types.get(index);

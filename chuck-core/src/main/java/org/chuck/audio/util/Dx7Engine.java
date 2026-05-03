@@ -275,9 +275,6 @@ public class Dx7Engine extends ChuckUGen {
   /** LFO delta per sample (Q32). */
   int lfoDelta;
 
-  /** Diagnostic: count compute() calls. */
-  private int computeCallCount = 0;
-
   /**
    * Creates a Dx7Engine with the given sample rate.
    * Dx7EngineLookupTables.init() must have been called first.
@@ -286,7 +283,6 @@ public class Dx7Engine extends ChuckUGen {
    */
   public Dx7Engine(float sampleRate) {
     this.sampleRate = sampleRate;
-    System.out.println("[Dx7Engine.ctor] CREATED Dx7Engine@" + Integer.toHexString(System.identityHashCode(this)) + " ALL_UGENS size=" + ALL_UGENS.size());
     Dx7EngineLookupTables.init(sampleRate);
     for (int i = 0; i < 6; i++) {
       env[i] = new Env();
@@ -573,16 +569,15 @@ public class Dx7Engine extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
+    return tick();
+  }
+
+  public float tick() {
     if (!active || patch == null) {
       return 0.0f;
     }
 
     int n = 1; // one sample per call
-
-    // DIAGNOSTIC: first 10 calls
-    if (computeCallCount++ < 10) {
-      System.out.println("[Dx7Engine.compute] called, active=" + active + " patch=" + (patch!=null ? "set" : "null") + " noteOn=" + noteOn + " gainOut[0]=" + gainOut[0] + " midiNote=" + midiNote);
-    }
 
     // ── LFO ──
     computeLfo(n);
@@ -680,12 +675,6 @@ public class Dx7Engine extends ChuckUGen {
 
       // Pre-compute gain to check if operator is inaudible
       int gain = Dx7EngineLookupTables.exp2Lookup(levelIn - (14 << 24));
-
-      // Diagnostic for first compute
-      if (computeCallCount < 5) {
-        int prevGain = opGain[op];
-        System.out.println("[Dx7Engine] op=" + op + " levelIn=" + levelIn + " gain=" + gain + " prevGain=" + prevGain + " thresh=" + Dx7EngineLookupTables.kGainLevelThresh + " algo=" + algoIdx + " freq=" + freq);
-      }
 
       // Inaudible-operator optimization: skip sine computation if gain is below threshold.
       // Only check current gain (not prevGain) because on the first sample prevGain=0
