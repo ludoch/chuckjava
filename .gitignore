@@ -31,3 +31,6 @@ hs_err_pid*
 replay_pid*
 test-report.txt
 cp.txt
+
+# Claude/Claudex local settings
+.claude/
