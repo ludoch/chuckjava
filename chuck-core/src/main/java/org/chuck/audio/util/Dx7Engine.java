@@ -266,8 +266,23 @@ public class Dx7Engine extends ChuckUGen {
   /** Current velocity (0-127). */
   int velocity;
 
-  /** Random detune scale factor (from patch random_detune). */
+  /** Random detune scale factor (from patch random_detune, defaults to 0). */
   int randomDetuneScale;
+
+  /** Per-operator random detune values (int16, set during initNote). */
+  final int[] detunePerVoice = new int[6];
+
+  /** Static RNG state matching firmware CONG: jcong = 69069 * jcong + 1234567. */
+  private static int rngState = 380116160;
+
+  /**
+   * Returns a pseudo-random 32-bit value matching the firmware's getNoise() CONG generator.
+   * Uses the same LCG: jcong = 69069 * jcong + 1234567
+   */
+  public static int getNoise() {
+    rngState = 69069 * rngState + 1234567;
+    return rngState;
+  }
 
   /** Whether we're in note-on state. */
   boolean noteOn;
@@ -361,6 +376,21 @@ public class Dx7Engine extends ChuckUGen {
   }
 
   /**
+   * noteOn with velocity only, using the midiNote previously set by setFreq().
+   * This is the primary entry point for the DSL engine, which sets frequency
+   * via setFreq() then triggers with the clip's actual velocity.
+   *
+   * @param velocity MIDI velocity (0-127)
+   */
+  public void noteOn(int velocity) {
+    if (patch == null) return;
+    noteOn = true;
+    active = true;
+    if (velocity <= 0) velocity = 100;
+    initNote(midiNote > 0 ? midiNote : 60, velocity);
+  }
+
+  /**
    * Trigger note-off — all operators enter release phase.
    */
   public void noteOff() {
@@ -408,13 +438,25 @@ public class Dx7Engine extends ChuckUGen {
       int fine = patch[off + 19] & 0xFF;
       int detune = patch[off + 20] & 0xFF;
 
-      basePitch[op] = oscFreq(logFreq, mode, coarse, fine, detune);
+      detunePerVoice[op] = getNoise() >> 16;
+      basePitch[op] = oscFreq(logFreq, mode, coarse, fine, detune, detunePerVoice[op]);
       phase[op] = 0;
       gainOut[op] = 0;
     }
 
     // Pitch envelope
     pitchenv.set(patch, 126);
+
+    // Oscillator sync/unsync (matching firmware init(): patch[136] ? oscSync() : oscUnSync())
+    if ((patch[136] & 0xFF) != 0) {
+      // oscSync: all phases = 0 (already initialized above)
+    } else {
+      // oscUnSync: randomize phases
+      for (int i = 0; i < 6; i++) {
+        gainOut[i] = 0;
+        phase[i] = getNoise();
+      }
+    }
 
     // LFO delay setup
     int a = 99 - (patch[138] & 0xFF); // LFO delay param
@@ -487,14 +529,16 @@ public class Dx7Engine extends ChuckUGen {
    * Compute operator frequency in Q24 log domain.
    * Matches firmware DxVoice::osc_freq().
    */
-  private int oscFreq(int logFreqForDetune, int mode, int coarse, int fine, int detune) {
+  private int oscFreq(int logFreqForDetune, int mode, int coarse, int fine, int detune, int randomDetune) {
     if (mode == 0) {
-      // Ratio mode
-      int logfreq = 0;
+      // Ratio mode: start from the note's base log-frequency, then apply
+      // coarse ratio, fine tune, and detune as additive offsets in the log domain.
+      int logfreq = logFreqForDetune;
 
       // Detune ratio
       double detuneRatio = 0.0209 * Math.exp(-0.396 * ((double)logFreqForDetune / (1 << 24))) / 7;
-      logfreq += (int)(detuneRatio * logFreqForDetune * (detune - 7));
+      int randomScaled = (randomDetune * randomDetuneScale) >> 17;
+      logfreq += (int)(detuneRatio * logFreqForDetune * (detune - 7 + randomScaled));
 
       logfreq += Dx7EngineLookupTables.coarsemul[coarse & 31];
       if (fine != 0) {
@@ -603,7 +647,7 @@ public class Dx7Engine extends ChuckUGen {
     int amdMod = (int)amod1;
 
     // ── EG amp mod ──
-    long amod3 = (127L + 1) << 17; // eg_mod defaults to 127
+    long amod3 = ((patch[144] & 0xFF) + 1L) << 17; // eg_mod from patch
     amdMod = Math.max((int)((1 << 24) - amod3), amdMod);
 
     // Collect operator parameters: phase, freq, level_in, gain_out
@@ -636,13 +680,19 @@ public class Dx7Engine extends ChuckUGen {
 
         int level = env[op].getsample(patch, off, n, 0);
 
-        // Amp mod sensitivity
+        // Amp mod sensitivity (matching firmware dx7note.cpp:365-374)
         int ampmodsens = Dx7EngineLookupTables.ampmodsenstab[patch[off + 14] & 3];
         if (ampmodsens != 0) {
           long sensamp = ((long)amdMod * (long)ampmodsens) >> 24;
-          // Approximate with a simpler calculation: subtract scaled mod from level
-          level -= (int)(sensamp >> 1);
+          // pt = exp(sensamp / 262144 * 0.07 + 12.2)
+          long pt = (long)Math.exp(((double)sensamp) / 262144.0 * 0.07 + 12.2);
+          long ldiff = ((long)level * (pt << 4)) >> 28;
+          level -= (int)ldiff;
+          // level += (ampmodsens >> 16) * voice_ctrls->ampmod; // velmod=0 currently, no-op
         }
+
+        // Velocity sensitivity modulation (firmware: level += patch[off+15] * voice_ctrls->velmod)
+        level += (patch[off + 15] & 0xFF) * 0; // velmod=0 currently, formal no-op
 
         opLevel[op] = level;
       }
@@ -656,11 +706,19 @@ public class Dx7Engine extends ChuckUGen {
     // Bus accumulation: 0=main output, 1=bus1, 2=bus2
     int bus1 = 0;
     int bus2 = 0;
+    // has_contents tracks which buses have active content (firmware fm_core.cpp line 92-93).
+    // Main output (0) always starts with content. Buses 1/2 start empty.
+    boolean[] has_contents = {true, false, false};
 
     int feedback = patch[135] & 0xFF;
     int fbShift = feedback != 0 ? Dx7EngineLookupTables.FEEDBACK_BITDEPTH - feedback : 16;
 
     int mainOutput = 0;
+
+    boolean engineMkI = false;
+    if (fbShift < 16 && (algoIdx == 3 || algoIdx == 5)) {
+      engineMkI = true;
+    }
 
     for (int op = 0; op < 6; op++) {
       int flags = Dx7EngineLookupTables.ALGORITHMS[algoIdx * 6 + op];
@@ -673,6 +731,44 @@ public class Dx7Engine extends ChuckUGen {
       int levelIn = opLevel[op];
       int freq = opFreq[op];
 
+      // ── EngineMkI path for feedback algorithms 3/5 ──
+      // The firmware's EngineMkI handles FB_IN|FB_OUT operators using mkiSin(),
+      // which has a different sine function + ENV_BITDEPTH=14 envelope integration.
+      // For algo 3 (3-op chain: op0→op1→op2) and algo 5 (2-op chain: op0→op1).
+      if (engineMkI && op == 0 && (flags & 0xc0) == 0xc0) {
+        if (algoIdx == 3) {
+          int mkShift = Math.min(fbShift + 2, 16);
+          int y = computeFb3(
+              opPhase[0], opFreq[0], opLevel[0],
+              opPhase[1], opFreq[1], opLevel[1],
+              opPhase[2], opFreq[2], opLevel[2],
+              fbBuf, mkShift);
+          mainOutput = y;
+          has_contents[0] = true;
+          // Advance phases for the two operators we're consuming
+          opPhase[1] += opFreq[1];
+          opPhase[2] += opFreq[2];
+          opGain[0] = Dx7EngineLookupTables.kGainLevelThresh + 1; // mark as active
+          opGain[1] = Dx7EngineLookupTables.kGainLevelThresh + 1;
+          opGain[2] = Dx7EngineLookupTables.kGainLevelThresh + 1;
+          op += 2; // skip ops 1 and 2 — already processed
+          continue;
+        } else if (algoIdx == 5) {
+          int mkShift = Math.min(fbShift + 2, 16);
+          int y = computeFb2(
+              opPhase[0], opFreq[0], opLevel[0],
+              opPhase[1], opFreq[1], opLevel[1],
+              fbBuf, mkShift);
+          mainOutput = y;
+          has_contents[0] = true;
+          opPhase[1] += opFreq[1];
+          opGain[0] = Dx7EngineLookupTables.kGainLevelThresh + 1;
+          opGain[1] = Dx7EngineLookupTables.kGainLevelThresh + 1;
+          op++; // skip op 1
+          continue;
+        }
+      }
+
       // Pre-compute gain to check if operator is inaudible
       int gain = Dx7EngineLookupTables.exp2Lookup(levelIn - (14 << 24));
 
@@ -683,20 +779,33 @@ public class Dx7Engine extends ChuckUGen {
       if (gain < Dx7EngineLookupTables.kGainLevelThresh) {
         opPhase[op] += freq * 1;
         if (!add) {
-          if (ob == 1) bus1 = 0;
-          else if (ob == 2) bus2 = 0;
+          if (ob == 1) { bus1 = 0; has_contents[1] = false; }
+          else if (ob == 2) { bus2 = 0; has_contents[2] = false; }
+        }
+        // Keep feedback buffer updated even when silent
+        if (fbout) {
+          fbBuf[0] = fbBuf[1];
+          fbBuf[1] = 0;
         }
         opGain[op] = gain;
         continue;
       }
 
-      // Modulation input
+      // Firmware line 92-93: if output bus has no content, force add=false
+      // (first operator to write to an empty bus replaces, subsequent ones add)
+      if (!has_contents[ob]) {
+        add = false;
+      }
+
+      // ── Modulation input (bus or feedback) ──
       int mod = 0;
       if (fbin) {
+        // FB_IN operator: add scaled feedback from fbBuf to phase
+        // Matches firmware FmOpKernel::compute_fb(): scaled_fb = (y0 + y1) >> (fbShift + 1)
         mod = (fbBuf[0] + fbBuf[1]) >> (fbShift + 1);
-      } else if (ib == 1) {
+      } else if (ib == 1 && has_contents[1]) {
         mod = bus1;
-      } else if (ib == 2) {
+      } else if (ib == 2 && has_contents[2]) {
         mod = bus2;
       }
 
@@ -704,7 +813,6 @@ public class Dx7Engine extends ChuckUGen {
       int y = Dx7EngineLookupTables.sinLookup(opPhase[op] + mod);
 
       // Gain: Exp2::lookup(levelIn - 14 * (1 << 24))
-      gain = Dx7EngineLookupTables.exp2Lookup(levelIn - (14 << 24));
       int y1 = (int)(((long)y * (long)gain) >> 24);
 
       // Accumulate to output bus — handle all three outbus cases inline
@@ -731,11 +839,14 @@ public class Dx7Engine extends ChuckUGen {
           }
           break;
       }
+      has_contents[ob] = true;
 
       // Store gain for active check
       opGain[op] = gain;
 
-      // Update feedback buffer
+      // Update feedback buffer (only needed for FB_OUT ops not in the block loop above,
+      // i.e. when the block path above already handled it, this won't fire again because
+      // we used 'continue')
       if (fbout) {
         fbBuf[0] = fbBuf[1];
         fbBuf[1] = y1;
@@ -764,6 +875,108 @@ public class Dx7Engine extends ChuckUGen {
 
     // Convert Q24 to float (-1..1 range)
     return mainOutput / (float)(1 << 24);
+  }
+
+  // ── EngineMkI rendering (for feedback algorithms 3 and 5) ──
+
+  /**
+   * Compute_fb2: 2-op feedback chain for algorithm 5 with feedback.
+   * Matches EngineMkI.cpp compute_fb2().
+   *
+   * Process sequence: op0 (with feedback) → op1 → output (main bus).
+   * Both operators output directly to main (no bus accumulation).
+   *
+   * @return mkiSin output for the last operator in the chain
+   */
+  private static int computeFb2(
+      int phase0, int freq0, int levelIn0,
+      int phase1, int freq1, int levelIn1,
+      int[] fbBuf, int fbShift) {
+
+    int gain0 = fbBuf[1] != 0 ? fbBuf[1] : (Dx7EngineLookupTables.ENV_MAX - 1);
+    int y0 = fbBuf[0];
+    int y = fbBuf[1];
+
+    // gain for op1
+    int levelIn1_14 = levelIn1 >> (28 - Dx7EngineLookupTables.ENV_BITDEPTH);
+    int gain1 = levelIn1_14 == 0 ? (Dx7EngineLookupTables.ENV_MAX - 1) : (Dx7EngineLookupTables.ENV_MAX - levelIn1_14);
+
+    // Per-sample (n=1): no dgain interpolation, gain = gain2 directly
+    // op0: level_in used on the mkiSin call
+    int levelIn0_14 = levelIn0 >> (28 - Dx7EngineLookupTables.ENV_BITDEPTH);
+    int gain0_target = Dx7EngineLookupTables.ENV_MAX - levelIn0_14;
+
+    // op 0 with feedback
+    int scaled_fb = (y0 + y) >> (fbShift + 1);
+    y0 = y;
+    y = Dx7EngineLookupTables.mkiSin(phase0 + scaled_fb, gain0_target);
+    phase0 += freq0;
+
+    // op 1 modulated by op0
+    y = Dx7EngineLookupTables.mkiSin(phase1 + y, gain1);
+    phase1 += freq1;
+
+    // Update feedback buffer
+    fbBuf[0] = y0;
+    fbBuf[1] = y;
+
+    return y;
+  }
+
+  /**
+   * Compute_fb3: 3-op feedback chain for algorithm 3 with feedback.
+   * Matches EngineMkI.cpp compute_fb3().
+   *
+   * Process sequence: op0 (with feedback) → op1 → op2 → output (main bus).
+   *
+   * @return mkiSin output for the last operator in the chain
+   */
+  private static int computeFb3(
+      int phase0, int freq0, int levelIn0,
+      int phase1, int freq1, int levelIn1,
+      int phase2, int freq2, int levelIn2,
+      int[] fbBuf, int fbShift) {
+
+    int y0 = fbBuf[0];
+    int y = fbBuf[1];
+
+    // Envelope gain for each operator (per-sample: gain = gain2 directly)
+    // gain = ENV_MAX - (level_in >> (28 - ENV_BITDEPTH))
+    int gain1_val = envToGain(levelIn1);
+    int gain2_val = envToGain(levelIn2);
+    int gain0_target = envToGain(levelIn0);
+
+    // op 0 with feedback
+    int scaled_fb = (y0 + y) >> (fbShift + 1);
+    y0 = y;
+    y = Dx7EngineLookupTables.mkiSin(phase0 + scaled_fb, gain0_target);
+    phase0 += freq0;
+
+    // op 1 modulated by op0
+    y = Dx7EngineLookupTables.mkiSin(phase1 + y, gain1_val);
+    phase1 += freq1;
+
+    // op 2 modulated by op1
+    y = Dx7EngineLookupTables.mkiSin(phase2 + y, gain2_val);
+    phase2 += freq2;
+
+    // Update feedback buffer
+    fbBuf[0] = y0;
+    fbBuf[1] = y;
+
+    return y;
+  }
+
+  /**
+   * Convert Q24 log-domain envelope level to EngineMkI 14-bit gain.
+   * gain = ENV_MAX - (level_in >> (28 - ENV_BITDEPTH))
+   * If the result is 0, returns ENV_MAX - 1 (matching firmware gain_out == 0 check).
+   */
+  private static int envToGain(int levelIn) {
+    int shifted = levelIn >> (28 - Dx7EngineLookupTables.ENV_BITDEPTH);
+    int gain = Dx7EngineLookupTables.ENV_MAX - shifted;
+    if (gain == 0) return Dx7EngineLookupTables.ENV_MAX - 1;
+    return gain;
   }
 
   // ── Helper: set frequency (ChucK-style) ──

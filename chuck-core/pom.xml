@@ -82,7 +82,7 @@
                         <phase>test</phase>
                         <goals><goal>test</goal></goals>
                         <configuration>
-                            <argLine>--enable-preview --add-modules jdk.incubator.vector -Xmx2g -Xms128m</argLine>
+                            <argLine>--enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xmx2g -Xms128m</argLine>
                             <excludes>
                                 <exclude>**/ChucKIntegrationTest.java</exclude>
                             </excludes>

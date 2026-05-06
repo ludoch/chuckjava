@@ -161,6 +161,38 @@ public final class Dx7EngineLookupTables {
     0xc4, 0x04, 0x04, 0x04, 0x04, 0x04  // 31
   };
 
+  // ── EngineMkI constants (EngineMkI.cpp) ──
+
+  /** NEGATIVE_BIT for EngineMkI sinLog tables. */
+  public static final int NEGATIVE_BIT = 0x8000;
+
+  /** ENV_BITDEPTH for EngineMkI envelope integration (14-bit). */
+  public static final int ENV_BITDEPTH = 14;
+
+  /** ENV_MAX = 1 << ENV_BITDEPTH = 16384. */
+  public static final int ENV_MAX = 1 << ENV_BITDEPTH;
+
+  /** Table size for sinLog (10-bit). */
+  public static final int SINLOG_BITDEPTH = 10;
+
+  /** Table size for sinLog (1024 entries). */
+  public static final int SINLOG_TABLESIZE = 1 << SINLOG_BITDEPTH;
+
+  /** Table size for sinExp (10-bit). */
+  public static final int SINEXP_TABLESIZE = 1024;
+
+  /** EngineMkI sine log table (1024 uint16 entries). */
+  public static final int[] sinLogTable = new int[SINLOG_TABLESIZE];
+
+  /** EngineMkI sine exp table (1024 uint16 entries). */
+  public static final int[] sinExpTable = new int[SINEXP_TABLESIZE];
+
+  /**
+   * Gain threshold for EngineMkI (ENV_MAX - 100 = 16284).
+   * FmCore's kGainLevelThresh = 1120 is used for FmCore rendering.
+   */
+  public static final int kLevelThresh = ENV_MAX - 100;
+
   /**
    * Gain threshold below which an operator is considered inaudible.
    * Matches dexed kGainLevelThresh = 1120.
@@ -194,6 +226,7 @@ public final class Dx7EngineLookupTables {
     tanhInit();
     sinInit();
     freqLutInit(sr);
+    engineMkIInit();
     initialized = true;
   }
 
@@ -390,6 +423,75 @@ public final class Dx7EngineLookupTables {
       freq_lut[i] = (int)Math.floor(y + 0.5);
       y *= inc;
     }
+  }
+
+  /**
+   * Initialize EngineMkI sinLog and sinExp tables.
+   * Matches EngineMkI.cpp constructor.
+   */
+  private static void engineMkIInit() {
+    for (int i = 0; i < SINLOG_TABLESIZE; i++) {
+      double x1 = Math.sin(((0.5 + i) / SINLOG_TABLESIZE) * Math.PI / 2.0);
+      sinLogTable[i] = (int)Math.round(-1024 * (Math.log(x1) / Math.log(2)));
+      // clamps: firmware round() outputs uint16, ensure range 0-0xFFFF
+      if (sinLogTable[i] < 0) sinLogTable[i] = 0;
+      if (sinLogTable[i] > 0xFFFF) sinLogTable[i] = 0xFFFF;
+    }
+    for (int i = 0; i < SINEXP_TABLESIZE; i++) {
+      double x1 = (Math.pow(2, (double)i / SINEXP_TABLESIZE) - 1) * 4096;
+      sinExpTable[i] = (int)Math.round(x1);
+      if (sinExpTable[i] < 0) sinExpTable[i] = 0;
+      if (sinExpTable[i] > 0xFFFF) sinExpTable[i] = 0xFFFF;
+    }
+  }
+
+  /**
+   * Fixed-point division: div_n(x, inv_n) = (int32_t)(((int64_t)x * (int64_t)inv_n) >> 30)
+   * where inv_n = (1 << 30) / n.
+   * For per-sample rendering (n=1): inv_n = 1<<30, result = x.
+   */
+  public static int div_n(int x, int inv_n) {
+    return (int)(((long)x * (long)inv_n) >> 30);
+  }
+
+  /**
+   * EngineMkI sinLog lookup. Matches EngineMkI.cpp sinLog().
+   */
+  public static int mkiSinLog(int phi) {
+    final int SINLOG_TABLEFILTER = SINLOG_TABLESIZE - 1;
+    int index = phi & SINLOG_TABLEFILTER;
+    int quadrant = phi & (SINLOG_TABLESIZE * 3);
+    if (quadrant == 0) {
+      return sinLogTable[index];
+    } else if (quadrant == SINLOG_TABLESIZE) {
+      return sinLogTable[index ^ SINLOG_TABLEFILTER];
+    } else if (quadrant == SINLOG_TABLESIZE * 2) {
+      return sinLogTable[index] | NEGATIVE_BIT;
+    } else {
+      return sinLogTable[index ^ SINLOG_TABLEFILTER] | NEGATIVE_BIT;
+    }
+  }
+
+  /**
+   * EngineMkI sine computation. Matches EngineMkI.cpp mkiSin().
+   *
+   * @param phase Q32 phase
+   * @param env   uint16 envelope value (ENV_BITDEPTH=14 bit)
+   * @return Q27 sine value (left-shifted by 13 from a 14-bit result)
+   */
+  public static int mkiSin(int phase, int env) {
+    int expVal = mkiSinLog(phase >> (22 - SINLOG_BITDEPTH)) + env;
+    boolean isSigned = (expVal & NEGATIVE_BIT) != 0;
+    expVal &= ~NEGATIVE_BIT;
+
+    final int SINEXP_FILTER = 0x3FF;
+    int result = 4096 + sinExpTable[(expVal & SINEXP_FILTER) ^ SINEXP_FILTER];
+    result >>= (expVal >> 10);
+
+    if (isSigned)
+      return (-result - 1) << 13;
+    else
+      return result << 13;
   }
 
   private Dx7EngineLookupTables() {}
