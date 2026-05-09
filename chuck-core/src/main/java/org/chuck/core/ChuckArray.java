@@ -235,6 +235,10 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
       if (index < 0) index = backingFloat.length + index;
       return (index >= 0 && index < backingFloat.length) ? backingFloat[index] : 0.0;
     }
+    if (backingInt != null) {
+      if (index < 0) index = backingInt.length + index;
+      return (index >= 0 && index < backingInt.length) ? (double) backingInt[index] : 0.0;
+    }
     if (index < 0) index = types.size() + index;
     if (index < 0 || index >= types.size()) return 0.0;
     byte t = types.get(index);
