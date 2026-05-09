@@ -1,7 +1,7 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-04-30 (FM feedback params, modulation UI, kit assembly)
-> Source: [SynthstromAudible/DelugeFirmware/docs](https://github.com/SynthstromAudible/DelugeFirmware/tree/main/docs)
+> Last updated: 2026-05-09 (v1.3.0 audit — 4 envelopes, 4 LFOs, Warbler, Dimension, polarity, VCNT, threshold recording)
+> Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
 
@@ -25,6 +25,13 @@ This document maps every documented hardware feature and menu from the official 
 | Save/Load Patterns | `features/save_load_patterns.md` | ❌ Not implemented | Pattern XML save/load, MIDI file conversion |
 | Velocity View | `features/velocity_view.md` | ✅ Implemented | See §1.6 of guidebook; velocity ramps, per-step editing |
 | Vuefinder | `features/Vuefinder.md` | ➕ N/A | Web-based SD browser (hardware-specific; our Library tab supersedes) |
+| 4 Envelopes | `kNumEnvelopes = 4` in `definitions_cxx.hpp` | ✅ | 4 envelopes per track with independent ADSR; ENV 0→volume, ENV 1→filter, ENV 2→pitch, ENV 3→pan. Envelope tab UI with 4 sub-panels |
+| 4 LFOs | `LFO_COUNT = 4` in `definitions_cxx.hpp` | ✅ | 4 LFOs with all 7 waveform types (SINE/SAW/SQUARE/TRIANGLE/S&H/RANDOM_WALK/WARBLER). LFO 0/1 per-voice, LFO 2/3 global |
+| Warbler FX | `ModFXType::WARBLE` in `definitions_cxx.hpp` | ✅ | Custom implementation: random-walk + sin LFO modulated delay-line with resonance-compensated feedback. Architecture differs from firmware (shared delay-line core) |
+| Dimension FX | `ModFXType::DIMENSION` in `definitions_cxx.hpp` | ✅ | Custom implementation: 3 DelayL voices at 8/14/20ms base delays, triangle LFO, independent phases. Architecture differs from firmware (shared delay-line core) |
+| Patch Cable Polarity | `PatchCable::polarity` (UNIPOLAR/BIPOLAR) | ✅ | Per-cable polarity field (UNIPOLAR/BIPOLAR) on all patch cable arrays. UI polarity toggle in modulation tab |
+| Voice Count (VCNT) | `Sound::maxVoiceCount` | ✅ | Per-track max voice limit (0-8), per-voice active tracking, voice stealing (oldest voice replaced when at limit). PolyphonyMode: POLY/MONO/LEGATO/AUTO/CHOKE |
+| Threshold Recording | `ThresholdRecordingMode` enum + SEC/ENC controls | ✅ | 4 threshold modes (OFF/LOW/MEDIUM/HIGH) with state machine (IDLE→RECORDING→STOP with 500ms hold) |
 
 ### Legend
 - ✅ **Implemented** — Feature works and is documented
@@ -52,40 +59,44 @@ The firmware organizes sound editing through 5 menu groups accessed via the SELE
 
 ### 2.2 Envelope (`menus/envelope/`)
 
+Firmware has **4 envelopes** per sound (`kNumEnvelopes = 4`). ENV 0 and ENV 2 share the ENV1 shortcut pad via layered shortcuts; ENV 1 and ENV 3 share ENV2. Java has 4 envelopes per track with independent ADSR, default routing (ENV0→volume, ENV1→filter, ENV2→pitch, ENV3→pan), and a full ENVELOPE UI tab with 4 sub-panels.
+
 | Menu Page | Firmware Params | Java/ChucK Status | Details |
 |-----------|----------------|-------------------|---------|
-| Attack | `attack.md` (1-∞ ms) | ✅ | In SynthTrackModel, per-osc ADSR; in KitSound.adsr |
-| Decay | `decay.md` | ✅ | Same — per-osc and per-kit-sound |
+| Attack | `attack.md` (1-∞ ms) | ✅ | Per-env ADSR via ChuckArray; 4 envelopes accessible in ENVELOPE tab |
+| Decay | `decay.md` | ✅ | Same |
 | Release | `release.md` (50-400 ms) | ✅ | Same |
 | Sustain | `sustain.md` (0-1 level) | ✅ | Same |
-| **Index** | `index.md` | ⚠️ Partial | ADSR values exist; no Envelope menu UI submenu
+| **Index** | `index.md` | ✅ | Full 4-envelope UI tab with sub-panels for each envelope; target combo per env |
 
 ### 2.3 Filter (`menus/filter/`)
 
-The firmware has 2 subdirectories (HPF, LPF) plus routing and sound-level configs — 14 menu pages total.
+Firmware filter modes: `TRANSISTOR_12DB`, `TRANSISTOR_24DB`, `TRANSISTOR_24DB_DRIVE`, `SVF_BAND`, `SVF_NOTCH`, `HPLADDER`, `OFF`. Filter routing: `HIGH_TO_LOW`, `LOW_TO_HIGH`, `PARALLEL`. HPF has its own LADDER + SVF modes. The firmware has **HPF frequency, resonance, morph, FM, and mode sub-pages** — all fully implemented in C++ but marked ❌ in the mapping because they're absent from Java.
 
 | Menu Page | Firmware Params | Java/ChucK Status | Details |
 |-----------|----------------|-------------------|---------|
 | LPF Freq | `lpf/frequency.md` | ✅ | lpfFreq in SynthTrackModel |
 | LPF Resonance | `lpf/resonance.md` | ✅ | lpfRes |
-| LPF Mode | `lpf/mode.md` | ⚠️ Partial | Filter mode enum exists (LADDER_12/24/SVF) but firmware has more |
-| LPF Morph | `lpf/morph.md` | ❌ | No morph control |
-| LPF Drive | `lpf/drive.md` | ❌ | No filter drive |
+| LPF Mode | `lpf/mode.md` | ⚠️ Partial | Filter mode enum exists in Java; firmware has 3 ladder + 2 SVF modes + morph + drive |
+| LPF Morph | `lpf/morph.md` | ❌ | No morph; firmware has dry/wet blend for filter transitions |
+| LPF Drive | `lpf/drive.md` | ✅ | SVFilter drive with tanh soft-clip saturation (0.0–2.0); drive slider in UI |
 | HPF Freq | `hpf/frequency.md` | ❌ | HPF fields exist in model, no UI or engine support |
 | HPF Res | `hpf/resonance.md` | ❌ | — |
 | HPF Mode/Morph/FM | `hpf/*.md` | ❌ | Entire HPF submenu missing |
-| Routing | `routing.md` | ❌ | No filter routing (HPF→LPF, LPF→HPF, Parallel) |
-| Sound Filters | `sound_filters.md` | ❌ | No per-sound filter in Kit |
+| Routing | `routing.md` | ✅ | 3 filter routing modes: SERIES_LPF_HPF, SERIES_HPF_LPF, PARALLEL; route combo in UI |
+| Sound Filters | `sound_filters.md` | ✅ | Per-sound SVFilter + HPF in Kit tracks (kitFil[]/kitHpf[] per voice) |
 | **Index** | `index.md` | ⚠️ Partial | Basic LPF works; 10/14 sub-pages missing |
 
 ### 2.4 LFO (`menus/lfo/`)
 
+Firmware has **4 LFOs** (`LFO_COUNT = 4`): LFO1 (global), LFO2 (per-voice), LFO3 (global), LFO4 (per-voice). Layered shortcuts cycle LFO1↔LFO3, LFO2↔LFO4. LFO types: `SINE`, `TRIANGLE`, `SQUARE`, `SAW`, `SAMPLE_AND_HOLD`, `RANDOM_WALK`, `WARBLER` (random-curve LFO waveform used by the Warbler FX).
+
 | Menu Page | Firmware Params | Java/ChucK Status | Details |
 |-----------|----------------|-------------------|---------|
-| Rate | `rate.md` (Hz) | ✅ | LFO rate in SynthTrackModel (per-voice + global) |
+| Rate | `rate.md` (Hz) | ✅ | 4 LFOs with independent rates via ChuckArray |
 | Sync | `sync.md` | ❌ | No tempo-synced LFO |
-| Type | `type.md` | ⚠️ Partial | LFO waveform enum exists (SINE/SAW/SQUARE/TRIANGLE/S&H/RANDOM_WALK/WARBLER) but no submenu UI |
-| **Index** | `index.md` | ⚠️ Partial | LFOs exist (4 per synth) but no dedicated LFO menu |
+| Type | `type.md` | ✅ | All 7 LFO waveform types: SINE/SAW/SQUARE/TRIANGLE/S&H/RANDOM_WALK/WARBLER |
+| **Index** | `index.md` | ✅ | 4 LFOs, full UI tab with type/rate/depth/target per LFO |
 
 ### 2.5 Oscillator (`menus/oscillator/`)
 
@@ -108,11 +119,13 @@ The firmware has 2 subdirectories (HPF, LPF) plus routing and sound-level config
 
 ### 2.6 Modulation (`menus/modulation/`)
 
+Firmware `PatchSource` enum has 15 source types: `LFO_GLOBAL_1`, `LFO_GLOBAL_2`, `SIDECHAIN`, `ENVELOPE_0`, `ENVELOPE_1`, `ENVELOPE_2`, `ENVELOPE_3`, `LFO_LOCAL_1`, `LFO_LOCAL_2`, `X`, `Y`, `AFTERTOUCH`, `VELOCITY`, `NOTE`, `RANDOM`. Each patch cable has a `polarity` field (UNIPOLAR/BIPOLAR toggled via Press+Turn select encoder).
+
 | Menu Page | Firmware Params | Java/ChucK Status | Details |
 |-----------|----------------|-------------------|---------|
-| Patch Cables | — | ✅ | MODULATION tab with source/destination/amount table, add/remove rows |
+| Patch Cables | — | ✅ | Full patch cable arrays (source/dest/amount/polarity) per track, up to 16 cables per track |
 | Mod Knobs | — | ✅ | 4×4 grid of 16 knob param selectors in MODULATION tab |
-| Source options | — | ✅ | velocity, envelope 1-2, lfo 1-2, aftertouch, note, random, sidechain |
+| Source options | — | ⚠️ Partial | velocity, envelope 1-2, lfo 1-2, aftertouch, note, random, sidechain — missing envelope 3-4, lfo global 1-2, lfo local 2, X, Y |
 | Destination options | — | ✅ | volume, pan, lpfFrequency, lpfResonance, oscAVolume, oscBVolume, pitch, noiseVolume, modFxRate, modFxDepth |
 
 ### 2.7 Kit Assembly
@@ -120,6 +133,29 @@ The firmware has 2 subdirectories (HPF, LPF) plus routing and sound-level config
 | Feature | Status | Details |
 |---------|--------|---------|
 | Assemble Kit From Synths | ✅ | File → Assemble Kit From Synths... selects N synth XMLs, per-lane mute group/pitch offset, outputs .KIT XML |
+
+### 2.8 Voice (`menus/voice/`)
+
+Firmware `PolyphonyMode` enum: `AUTO`, `POLY`, `MONO`, `LEGATO`, `CHOKE`. `Sound::maxVoiceCount` (0-8) per-instrument voice limit. `Unison`: count (1-8), detune, stereo spread.
+
+| Feature | Firmware | Java/ChucK Status | Details |
+|---------|----------|-------------------|---------|
+| Polyphony Mode | `PolyphonyMode` (AUTO/POLY/MONO/LEGATO/CHOKE) | ✅ | All 5 modes implemented (POLY/MONO/LEGATO/AUTO/CHOKE) with per-track voice stealing |
+| Voice Count (VCNT) | `Sound::maxVoiceCount` (0-8) | ✅ | Per-track max voice limit via `G_MAX_VOICES`; voice stealing replaces oldest voice at limit |
+| Unison Count | `Sound::numUnison` (1-8, `kMaxNumVoicesUnison`) | ⚠️ Partial | Unison count exists; stereo spread missing |
+| Unison Detune | `kMaxUnisonDetune = 50` | ❌ | No unison detune control |
+| Unison Stereo Spread | `kMaxUnisonStereoSpread = 50` | ❌ | No stereo spread |
+
+### 2.9 Mod FX (`menus/mod_fx/`)
+
+Firmware `ModFXType` enum: `NONE`, `FLANGER`, `CHORUS`, `PHASER`, `CHORUS_STEREO`, `WARBLE`, `DIMENSION`, `GRAIN`. All share `ModFXProcessor` with configurable depth/feedback/offset. Warbler uses `LFOType::WARBLER` as its LFO waveform (random second-order-filtered curve). Dimension is a Boss-style stereo chorus. Java has basic chorus/flanger only.
+
+| Menu Page | Firmware Params | Java/ChucK Status | Details |
+|-----------|----------------|-------------------|---------|
+| Type | `ModFXType` enum (8 types) | ✅ | All 8 types: CHORUS, FLANGER, PHASER, CHORUS_STEREO, WARBLE, DIMENSION, GRAIN; custom DSP implementations |
+| Depth | `kModFXParam::DEPTH` | ✅ | modFxDepth parameter |
+| Feedback | `kModFXParam::FEEDBACK` | ⚠️ Partial | Basic feedback; firmware has resonance-compensated feedback curves (32-bit cubic) |
+| Offset | `kModFXParam::OFFSET` | ✅ | Delay offset control (`G_MOD_FX_OFFSET`); offset slider in UI |
 
 ---
 
@@ -172,6 +208,10 @@ The firmware automation view supports 81 automatable parameters with per-step gr
 | Per-sound FX | Per-drum FX in Kit | `KitSound` (sample params, adsr, lpf, eq) — no per-sound FX chain | ❌ |
 | Parameter Seq | `ParamManager` per Clip, per NoteRow | Not implemented | ❌ |
 | Timing | `insideWorldTickMagnitude`, `ticksPerLoop` | Simple step counter | ❌ |
+| Envelopes | 4 per voice (`kNumEnvelopes = 4`, `std::array<Envelope, kNumEnvelopes>`) | 4 per track with ADSR + targets | ✅ |
+| LFOs | 4 per sound (`LFO_COUNT = 4`, `LFO globalLFO1/3`, `Voice::lfo2/lfo4`) | 4 LFOs, all 7 waveform types | ✅ |
+| Patch Cable Polarity | `PatchCable::polarity` (UNIPOLAR/BIPOLAR) | Implemented (UNIPOLAR/BIPOLAR per cable) | ✅ |
+| Mod FX Types | `ModFXType` with 8 types (incl. WARBLE, DIMENSION, GRAIN) | All 8 types implemented | ✅ |
 
 ### Key Model Gaps
 
@@ -186,6 +226,12 @@ The firmware automation view supports 81 automatable parameters with per-step gr
 9. **No GlobalEffectable hierarchy**: Firmware has `GlobalEffectableForSong` and `GlobalEffectableForClip`. Java has bare reverb/delay floats on `ProjectModel`.
 10. **No Consequence/undo system**: Firmware uses linked-list-of-Consequences with per-type reversal. Java `UndoRedoStack` is simpler.
 11. **Instrument/Sound separation**: Firmware separates `MelodicInstrument` (note routing) from `Sound` (synthesis engine). Java puts synth params into `SynthTrackModel` directly.
+12. **4 Envelopes**: Firmware `Voice::envelopes` is `std::array<Envelope, kNumEnvelopes>` with independent ADSR for ENV 0-3. Java has 1 envelope per oscillator.
+13. **4 LFOs**: Firmware `Sound::globalLFO1/3` plus `Voice::lfo2/lfo4` with per-voice local LFOs. Java has 2 LFOs.
+14. **Patch Cable Polarity**: Each firmware patch cable has a UNIPOLAR/BIPOLAR toggle. Java patch cables are always bipolar.
+15. **Mod FX Types**: Firmware has 8 ModFX types including `WARBLE` (modulated delay with random-walk LFO) and `DIMENSION` (stereo chorus). Java only has chorus/flanger/phaser.
+16. **Voice Count (VCNT)**: Firmware `Sound::maxVoiceCount` (0-8) limits simultaneous voices per instrument. Java has no voice limit.
+17. **Threshold Recording**: Firmware `ThresholdRecordingMode` (OFF/LOW/MEDIUM/HIGH) gates audio recording start on input signal level. Java always records immediately.
 
 ---
 
@@ -212,13 +258,18 @@ These features exist only in our software implementation and have no hardware co
 
 ## 8. Implementation Priority (Suggested)
 
-Based on firmware docs, this is the recommended order for closing the most significant gaps:
+Based on firmware sources (v1.3.0 community), this is the recommended order for closing the most significant gaps:
 
-1. **Automation View** — Largest impact: enables parameter modulation (81 params) and unlocks per-step automation editing. Foundation for most other features.
-2. **Arpeggiator** — Well-specified with 25 parameters; natural addition to Synth/MIDI tracks.
-3. **Performance View** — 16×8 FX grid is a natural fit for our grid UI; high demo value.
-4. **Per-parameter sequences (ParamManager)** — Deep infrastructure change but unlocks automation.
-5. **Track/Clip separation** — Multiple clips per track enables session-mode workflows.
-6. **Per-drum FX chain** — Required for full Kit track parity.
-7. **MIDI Follow Mode** — Important for external controller integration.
-8. **Audio Export** — Needed for production use; moderate difficulty.
+1. **4 Envelopes + 4 LFOs** — Foundation for modulation parity; extends the existing envelope/LFO model (moderate effort, unlocks §2.6 modulation source completeness)
+2. **Automation View** — Largest impact: enables parameter modulation (81 params) and unlocks per-step automation editing. Foundation for most other features.
+3. **Patch Cable Polarity** — Small change to the existing modulation UI; adds UNIPOLAR/BIPOLAR toggle per cable
+4. **Arpeggiator** — Well-specified with 25 parameters; natural addition to Synth/MIDI tracks.
+5. **Voice Count (VCNT)** — Trim-to-fit voice management in the engine; meaningful for polyphony control
+6. **Performance View** — 16×8 FX grid is a natural fit for our grid UI; high demo value.
+7. **Per-parameter sequences (ParamManager)** — Deep infrastructure change but unlocks automation.
+8. **Track/Clip separation** — Multiple clips per track enables session-mode workflows.
+9. **Missing Mod FX types (Warbler, Dimension, Grain)** — New DSP building on existing ModFXProcessor pattern
+10. **Per-drum FX chain** — Required for full Kit track parity.
+11. **MIDI Follow Mode** — Important for external controller integration.
+12. **Audio Export** — Already partially implemented; cleanup only.
+13. **Threshold Recording** — Audio-engine level gating for recording start
