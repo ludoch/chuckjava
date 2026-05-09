@@ -49,6 +49,7 @@
   <xs:element name="type"     type="xs:string"/>
   <xs:element name="name"     type="xs:string"/>
   <xs:element name="presetSlot" type="xs:string"/>
+  <xs:element name="retrigPhase" type="xs:int"/>
 
   <xs:element name="source"      type="xs:string"/>
   <xs:element name="destination" type="xs:string"/>
@@ -325,8 +326,9 @@
   <xs:element name="osc1">
     <xs:complexType>
       <xs:sequence>
-        <xs:element ref="fileName" minOccurs="0" maxOccurs="1"/>
-        <xs:element ref="zone"     minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="fileName"    minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="zone"        minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="retrigPhase" minOccurs="0" maxOccurs="1"/>
       </xs:sequence>
       <xs:attribute name="fileName" type="xs:string"/>
     </xs:complexType>
@@ -335,9 +337,10 @@
   <xs:element name="osc2">
     <xs:complexType>
       <xs:sequence>
-        <xs:element ref="type"     minOccurs="0" maxOccurs="1"/>
-        <xs:element ref="fileName" minOccurs="0" maxOccurs="1"/>
-        <xs:element ref="zone"     minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="type"        minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="fileName"    minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="zone"        minOccurs="0" maxOccurs="1"/>
+        <xs:element ref="retrigPhase" minOccurs="0" maxOccurs="1"/>
       </xs:sequence>
       <xs:attribute name="fileName" type="xs:string"/>
       <xs:attribute name="type"     type="xs:string"/>
