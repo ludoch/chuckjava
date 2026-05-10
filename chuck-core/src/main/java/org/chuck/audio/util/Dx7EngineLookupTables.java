@@ -126,7 +126,7 @@ public final class Dx7EngineLookupTables {
   public static final int OUT_BUS_ONE = 1 << 0;
 
   /** The 32 DX7 algorithms — flat array: [algo0_op0, algo0_op1, ..., algo31_op5]. */
-  static final int[] ALGORITHMS = {
+  public static final int[] ALGORITHMS = {
     0xc1, 0x11, 0x11, 0x14, 0x01, 0x14, // 0
     0x01, 0x11, 0x11, 0x14, 0xc1, 0x14, // 1
     0xc1, 0x11, 0x14, 0x01, 0x11, 0x14, // 2

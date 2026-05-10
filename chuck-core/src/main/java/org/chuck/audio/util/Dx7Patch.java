@@ -124,6 +124,15 @@ public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int tr
     return data;
   }
 
+  /** Convert a byte array to a hex string (upper case, no delimiters). */
+  public static String bytesToHex(byte[] data) {
+    StringBuilder sb = new StringBuilder(data.length * 2);
+    for (byte b : data) {
+      sb.append(String.format("%02X", b & 0xFF));
+    }
+    return sb.toString();
+  }
+
   /**
    * Returns the opSwitch bitmask (byte 155). Bit 0 = operator 1 active, bit 5 = operator 6 active.
    */
