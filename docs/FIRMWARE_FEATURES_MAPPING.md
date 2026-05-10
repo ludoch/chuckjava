@@ -110,7 +110,7 @@ Firmware has **4 LFOs** (`LFO_COUNT = 4`): LFO1 (global), LFO2 (per-voice), LFO3
 | Sync | `sync.md` | ✅ | Hard sync checkbox |
 | Retrigger Phase | `retrigger_phase.md` | ✅ | 0-360° |
 | Feedback | `feedback.md` | ✅ | FM feedback amount |
-| Wave Index | `wave_index.md` | ❌ | No wavetable position |
+| Wave Index | `wave_index.md` | ✅ | Wavetable position (0.0-1.0) per oscillator, model+bridge+engine+UI+XML |
 | File Browser | `file_browser.md` | ✅ | Library tab |
 | **Modulator 1/2** | `modulator/` | ⚠️ Partial | Volume/transpose/destination/feedback exist; retrigger phase missing |
 | **Sample** | `sample/` (9 files) | ❌ | No sample osc submenu at all |
