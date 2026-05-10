@@ -16,7 +16,7 @@ This document maps every documented hardware feature and menu from the official 
 | Audio Recording | `features/audio_export.md` | ✅ Implemented | LiSa-based per-track recording, looping playback via audio_shred() |
 | Audio Export | `features/audio_export.md` | ✅ Implemented | WvOut2-based WAV export via Export Audio... menu; offline mastered render |
 | Chord Keyboard | `features/chord_keyboard.md` | ✅ Implemented | CORK/CORL layouts, scale-aware chords, 6 voicing modes |
-| DX7 Synth | `features/dx_synth.md` | ✅ Implemented | 6-op FM engine (Dx7Engine), .syx import/export (Dx7SyxParser), 32 algorithms, operator editor UI, DX7 tab, XML round-trip. **Note:** envelope shape uses dexed/msfa log-domain envelopes (not standard ADSR); track-level DelugeAdsr bypassed for DX7 tracks — per-operator DX7 envelopes control amplitude directly |
+| DX7 Synth | `features/dx_synth.md` | ✅ Implemented | 6-op FM engine (Dx7Engine), .syx import/export (Dx7SyxParser), 32 algorithms, operator editor UI, DX7 tab, XML round-trip, Vintage/Modern/Auto engine type toggle. **Note:** envelope shape uses dexed/msfa log-domain envelopes (not standard ADSR); track-level DelugeAdsr bypassed for DX7 tracks — per-operator DX7 envelopes control amplitude directly |
 | Looping in Grid View | `features/looping_in_grid_view.md` | ❌ Not implemented | Green mode create+record, LOOP/LAYERING LOOP cmds |
 | MIDI Device Definitions | `features/midi_device_definition_files.md` | ✅ Implemented | MidiDeviceDefinition XML model, loader, preferences, feedback service, UI browser |
 | MIDI Follow Mode | `features/midi_follow_mode.md` | ✅ Implemented | MidiInputRouter, 3 follow channels, feedback light piping, auto-clip-follow |

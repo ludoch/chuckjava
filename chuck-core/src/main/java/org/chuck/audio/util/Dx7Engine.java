@@ -266,6 +266,12 @@ public class Dx7Engine extends ChuckUGen {
   /** Current velocity (0-127). */
   int velocity;
 
+  /**
+   * Engine type override: -1=AUTO (firmware default), 0=MODERN (sinLookup/exp2Lookup, 32-bit),
+   * 1=VINTAGE (mkiSin, ENV_BITDEPTH=14). When -1, auto-detection based on algorithm + feedback applies.
+   */
+  private int forceVintage = -1;
+
   /** Random detune scale factor (from patch random_detune, defaults to 0). */
   int randomDetuneScale;
 
@@ -404,6 +410,10 @@ public class Dx7Engine extends ChuckUGen {
 
   public boolean isActive() {
     return active;
+  }
+
+  public void setForceVintage(int val) {
+    this.forceVintage = val;
   }
 
   // ── Core initialization ──
@@ -716,9 +726,15 @@ public class Dx7Engine extends ChuckUGen {
     int mainOutput = 0;
 
     boolean engineMkI = false;
-    if (fbShift < 16 && (algoIdx == 3 || algoIdx == 5)) {
+    if (forceVintage == 1) {
       engineMkI = true;
+    } else if (forceVintage == -1) {
+      // Auto-detect: firmware activates EngineMkI for algorithms 3 and 5 with feedback
+      if (fbShift < 16 && (algoIdx == 3 || algoIdx == 5)) {
+        engineMkI = true;
+      }
     }
+    // forceVintage == 0: explicitly MODERN, engineMkI stays false
 
     for (int op = 0; op < 6; op++) {
       int flags = Dx7EngineLookupTables.ALGORITHMS[algoIdx * 6 + op];
