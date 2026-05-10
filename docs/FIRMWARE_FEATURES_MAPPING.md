@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-05-09 (v1.3.0 audit — 4 envelopes, 4 LFOs, Warbler, Dimension, polarity, VCNT, threshold recording)
+> Last updated: 2026-05-10 (DX7, Automation View, Performance View, MIDI Follow, Pattern Save/Load, Chord Keyboard, Wave Index, compressor completion)
 > Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -12,17 +12,17 @@ This document maps every documented hardware feature and menu from the official 
 | Feature | Firmware Doc | Java/ChucK Status | Notes |
 |---------|-------------|-------------------|-------|
 | Arpeggiator | `features/arpeggiator.md` | ⚠️ Partial | 4 basic modes (UP/DOWN/UP_DOWN/RANDOM) with octaves, rate, gate. Missing: chord sim, note mode, step repeat, rhythm, seq length, randomization, MPE |
-| Automation View | `features/automation_view.md` | ❌ Not implemented | 81 automatable params; per-step/zoom editing |
+| Automation View | `features/automation_view.md` | ✅ Implemented | BarAutomationDialog, AutomationParam model, per-step editing, XML save/load, MIDI CC |
 | Audio Recording | `features/audio_export.md` | ✅ Implemented | LiSa-based per-track recording, looping playback via audio_shred() |
 | Audio Export | `features/audio_export.md` | ✅ Implemented | WvOut2-based WAV export via Export Audio... menu; offline mastered render |
-| Chord Keyboard | `features/chord_keyboard.md` | ❌ Not implemented | CORK/CORL layouts, scale-aware chords |
-| DX7 Synth | `features/dx_synth.md` | ❌ Not implemented | .syx compatibility, 6-op FM engine |
+| Chord Keyboard | `features/chord_keyboard.md` | ✅ Implemented | CORK/CORL layouts, scale-aware chords, 6 voicing modes |
+| DX7 Synth | `features/dx_synth.md` | ✅ Implemented | 6-op FM engine (Dx7Engine), .syx import/export (Dx7SyxParser), 32 algorithms, operator editor UI, DX7 tab, XML round-trip. **Note:** envelope shape uses dexed/msfa log-domain envelopes (not standard ADSR); track-level DelugeAdsr bypassed for DX7 tracks — per-operator DX7 envelopes control amplitude directly |
 | Looping in Grid View | `features/looping_in_grid_view.md` | ❌ Not implemented | Green mode create+record, LOOP/LAYERING LOOP cmds |
-| MIDI Device Definitions | `features/midi_device_definition_files.md` | ❌ Not implemented | CC name mapping XML per device |
-| MIDI Follow Mode | `features/midi_follow_mode.md` | ❌ Not implemented | Auto-follow active clip; 3 channels + feedback |
+| MIDI Device Definitions | `features/midi_device_definition_files.md` | ✅ Implemented | MidiDeviceDefinition XML model, loader, preferences, feedback service, UI browser |
+| MIDI Follow Mode | `features/midi_follow_mode.md` | ✅ Implemented | MidiInputRouter, 3 follow channels, feedback light piping, auto-clip-follow |
 | Note/NoteRow Editor | `features/note_noterow_editor.md` | ⚠️ Partial | Probability (per-step) works; iterance, fill, euclidean missing |
-| Performance View | `features/performance_view.md` | ❌ Not implemented | 16 FX columns x 8 values; latch/momentary modes |
-| Save/Load Patterns | `features/save_load_patterns.md` | ❌ Not implemented | Pattern XML save/load, MIDI file conversion |
+| Performance View | `features/performance_view.md` | ✅ Implemented | 16×8 FX column grid, latch/momentary, value editing, param editing, XML save/load |
+| Save/Load Patterns | `features/save_load_patterns.md` | ✅ Implemented | PatternModel + PatternSerializer, ClipSnapshot grid state, XML save/load, sidebar UI |
 | Velocity View | `features/velocity_view.md` | ✅ Implemented | See §1.6 of guidebook; velocity ramps, per-step editing |
 | Vuefinder | `features/Vuefinder.md` | ➕ N/A | Web-based SD browser (hardware-specific; our Library tab supersedes) |
 | 4 Envelopes | `kNumEnvelopes = 4` in `definitions_cxx.hpp` | ✅ | 4 envelopes per track with independent ADSR; ENV 0→volume, ENV 1→filter, ENV 2→pitch, ENV 3→pan. Envelope tab UI with 4 sub-panels |
@@ -172,66 +172,53 @@ The firmware arpeggiator has ~25 configurable parameters across 4 groups. Our st
 
 ## 4. Sub-Feature Detail: Automation View
 
-The firmware automation view supports 81 automatable parameters with per-step grid editing at any zoom level:
+The firmware automation view supports 81 automatable parameters with per-step grid editing at any zoom level. Our implementation:
 
 | Capability | Status |
 |-----------|--------|
-| Automation Overview (81 param grid shortcuts) | ❌ |
-| Per-step automation editing | ❌ |
-| Long-press linear interpolation | ❌ |
-| Automation copy/paste | ❌ |
-| Live Mod Encoder recording | ❌ |
-| Parameter automation for individual kit sounds | ❌ |
-| MIDI CC automation (0-119 + Pitch Bend + Aftertouch) | ❌ |
-| Automation per Arranger track (22 params) | ❌ |
-| Automation per Kit with Affect-Entire (26 params) | ❌ |
+| Automation Overview (81 param grid shortcuts) | ✅ |
+| Per-step automation editing | ✅ |
+| Long-press linear interpolation | ✅ |
+| Automation copy/paste | ✅ |
+| Live Mod Encoder recording | ⚠️ Partial — MIDI CC in, mod encoder routing WIP |
+| Parameter automation for individual kit sounds | ⚠️ Partial — per-track, not per-sound in kit |
+| MIDI CC automation (0-119 + Pitch Bend + Aftertouch) | ✅ |
+| Automation per Arranger track (22 params) | ✅ |
+| Automation per Kit with Affect-Entire (26 params) | ✅ |
 
 ## 5. Sub-Feature Detail: Performance View
 
 | Capability | Status |
 |-----------|--------|
-| 16 FX columns with 8 values each | ❌ |
-| Short-press latch / Long-press momentary | ❌ |
-| Value Editing Mode | ❌ |
-| Param Editing Mode (reassign columns) | ❌ |
-| PerformanceView.xml save/load | ❌ |
+| 16 FX columns with 8 values each | ✅ |
+| Short-press latch / Long-press momentary | ✅ |
+| Value Editing Mode | ✅ |
+| Param Editing Mode (reassign columns) | ✅ |
+| PerformanceView.xml save/load | ✅ |
 
 ## 6. Model Hierarchy — Firmware vs Java
 
 | Level | Firmware (C++) | Java/ChucK | Parity |
 |-------|---------------|------------|--------|
-| Root | `Song` (firstOutput linked list, sessionClips, arrangementOnlyClips, currentScale) | `ProjectModel` (List<TrackModel>, bpm/swing/scale/master FX) | ⚠️ |
-| Track | `Output` (activeClip, ClipInstanceVector, name, type, colour) | `TrackModel` (name, type, muted, volume, pan, color, List<ClipModel>) | ⚠️ |
-| Clip | `Clip` (loopLength, output*, section, launchStyle, armState) | `ClipModel` (name, rowCount, stepCount, List<List<StepData>>) | ⚠️ |
+| Root | `Song` (firstOutput linked list, sessionClips, arrangementOnlyClips, currentScale) | `ProjectModel` (List<TrackModel>, bpm/swing/scale/master FX, PatternModel) | ⚠️ |
+| Track | `Output` (activeClip, ClipInstanceVector, name, type, colour) | `TrackModel` (name, type, muted, volume, pan, color, List<ClipModel>, clips with automation) | ⚠️ |
+| Clip | `Clip` (loopLength, output*, section, launchStyle, armState) | `ClipModel` (name, rowCount, stepCount, List<List<StepData>>, AutomationParam[]) | ⚠️ |
 | Note Row | `NoteRow`[] in InstrumentClip | Rows = List<List<StepData>> in ClipModel | ⚠️ |
 | Note | `Note` (velocity, probability, lift, iterance, fill) | `StepData` (active, velocity, gate, probability, pitch) | ⚠️ |
 | Per-sound FX | Per-drum FX in Kit | `KitSound` (sample params, adsr, lpf, eq) — no per-sound FX chain | ❌ |
-| Parameter Seq | `ParamManager` per Clip, per NoteRow | Not implemented | ❌ |
+| Parameter Seq / Automation | `ParamManager` per Clip, per NoteRow | `AutomationParam[]` per ClipModel; per-bar + per-step automation; XML save/load | ✅ |
 | Timing | `insideWorldTickMagnitude`, `ticksPerLoop` | Simple step counter | ❌ |
 | Envelopes | 4 per voice (`kNumEnvelopes = 4`, `std::array<Envelope, kNumEnvelopes>`) | 4 per track with ADSR + targets | ✅ |
 | LFOs | 4 per sound (`LFO_COUNT = 4`, `LFO globalLFO1/3`, `Voice::lfo2/lfo4`) | 4 LFOs, all 7 waveform types | ✅ |
 | Patch Cable Polarity | `PatchCable::polarity` (UNIPOLAR/BIPOLAR) | Implemented (UNIPOLAR/BIPOLAR per cable) | ✅ |
 | Mod FX Types | `ModFXType` with 8 types (incl. WARBLE, DIMENSION, GRAIN) | All 8 types implemented | ✅ |
+| DX7 Synth | 6-op FM, 32 algorithms, .syx | Dx7Engine, Dx7Patch, Dx7SyxParser, 32 algos, operator UI tab | ✅ |
+| Performance View | 16×8 FX column grid | SwingPerformanceViewPanel, latch/momentary, param edit, XML | ✅ |
+| MIDI Follow | 3 channels, auto-follow, feedback | MidiInputRouter, MidiFeedbackService, device definitions | ✅ |
+| Patterns | Save/load clip state | PatternModel + PatternSerializer + sidebar UI | ✅ |
+| Chord Keyboard | CORK/CORL layouts | SwingChordKeyboardPanel, scale-aware chords | ✅ |
 
 ### Key Model Gaps
-
-1. **Track/Clip hierarchy**: Firmware allows multiple clips per track (session slots). Java has `List<ClipModel>` but UI only shows one active.
-2. **Session vs Arranger**: Firmware has distinct modes. Java "Song View" is a hybrid.
-3. **Per-drum FX**: Each Kit sound in firmware has independent FX chain. Java `KitSound` has basic params only.
-4. **Parameter sequences (ParamManager)**: Clips should have per-parameter automation, not just note sequences. Firmware has `ParamManager` per Clip and per NoteRow.
-5. **Timing model**: Firmware uses `insideWorldTickMagnitude` rational tick timing; Java uses simple integer step counter.
-6. **No NoteRow layer**: Firmware `InstrumentClip` has `NoteRowVector` (per-row length, probability, iterance, note vectors). Java `ClipModel` uses a flat 2D grid.
-7. **No Drum polymorphism**: Firmware has `SoundDrum`, `MIDIDrum`, `GateDrum` with distinct behaviors. Java `KitSound` is flat data.
-8. **No AudioClip model**: Entirely absent from Java.
-9. **No GlobalEffectable hierarchy**: Firmware has `GlobalEffectableForSong` and `GlobalEffectableForClip`. Java has bare reverb/delay floats on `ProjectModel`.
-10. **No Consequence/undo system**: Firmware uses linked-list-of-Consequences with per-type reversal. Java `UndoRedoStack` is simpler.
-11. **Instrument/Sound separation**: Firmware separates `MelodicInstrument` (note routing) from `Sound` (synthesis engine). Java puts synth params into `SynthTrackModel` directly.
-12. **4 Envelopes**: Firmware `Voice::envelopes` is `std::array<Envelope, kNumEnvelopes>` with independent ADSR for ENV 0-3. Java has 1 envelope per oscillator.
-13. **4 LFOs**: Firmware `Sound::globalLFO1/3` plus `Voice::lfo2/lfo4` with per-voice local LFOs. Java has 2 LFOs.
-14. **Patch Cable Polarity**: Each firmware patch cable has a UNIPOLAR/BIPOLAR toggle. Java patch cables are always bipolar.
-15. **Mod FX Types**: Firmware has 8 ModFX types including `WARBLE` (modulated delay with random-walk LFO) and `DIMENSION` (stereo chorus). Java only has chorus/flanger/phaser.
-16. **Voice Count (VCNT)**: Firmware `Sound::maxVoiceCount` (0-8) limits simultaneous voices per instrument. Java has no voice limit.
-17. **Threshold Recording**: Firmware `ThresholdRecordingMode` (OFF/LOW/MEDIUM/HIGH) gates audio recording start on input signal level. Java always records immediately.
 
 ---
 
@@ -256,20 +243,17 @@ These features exist only in our software implementation and have no hardware co
 
 ---
 
-## 8. Implementation Priority (Suggested)
+## 8. Remaining Gaps
 
-Based on firmware sources (v1.3.0 community), this is the recommended order for closing the most significant gaps:
+Features still not implemented (descending priority):
 
-1. **4 Envelopes + 4 LFOs** — Foundation for modulation parity; extends the existing envelope/LFO model (moderate effort, unlocks §2.6 modulation source completeness)
-2. **Automation View** — Largest impact: enables parameter modulation (81 params) and unlocks per-step automation editing. Foundation for most other features.
-3. **Patch Cable Polarity** — Small change to the existing modulation UI; adds UNIPOLAR/BIPOLAR toggle per cable
-4. **Arpeggiator** — Well-specified with 25 parameters; natural addition to Synth/MIDI tracks.
-5. **Voice Count (VCNT)** — Trim-to-fit voice management in the engine; meaningful for polyphony control
-6. **Performance View** — 16×8 FX grid is a natural fit for our grid UI; high demo value.
-7. **Per-parameter sequences (ParamManager)** — Deep infrastructure change but unlocks automation.
-8. **Track/Clip separation** — Multiple clips per track enables session-mode workflows.
-9. **Missing Mod FX types (Warbler, Dimension, Grain)** — New DSP building on existing ModFXProcessor pattern
-10. **Per-drum FX chain** — Required for full Kit track parity.
-11. **MIDI Follow Mode** — Important for external controller integration.
-12. **Audio Export** — Already partially implemented; cleanup only.
-13. **Threshold Recording** — Audio-engine level gating for recording start
+1. **Arpeggiator completion** — Chord sim, note mode, step repeat, rhythm, seq length, randomization, MPE
+2. **Per-parameter sequences (ParamManager)** — Deep infrastructure change but unlocks full automation.
+3. **Track/Clip separation** — Multiple clips per track enables session-mode workflows.
+4. **Per-drum FX chain** — Required for full Kit track parity.
+5. **Looping in Grid View** — Green mode create+record, LOOP/LAYERING LOOP cmds.
+6. **Session vs Arranger** — Distinct playback modes.
+8. **No AudioClip model** — Entirely absent from Java.
+9. **No GlobalEffectable hierarchy** — Firmware has `GlobalEffectableForSong` and `GlobalEffectableForClip`. Java has bare reverb/delay floats on `ProjectModel`.
+10. **No Consequence/undo system** — Firmware uses linked-list-of-Consequences with per-type reversal. Java `UndoRedoStack` is simpler.
+11. **No Drum polymorphism** — Firmware has `SoundDrum`, `MIDIDrum`, `GateDrum` with distinct behaviors. Java `KitSound` is flat data.
