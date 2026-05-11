@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-05-11 (FM feedback/amount sliders: mod1Fb, mod2Amt, mod2Fb, carrier2Fb)
+> Last updated: 2026-05-11 (patch cable modFxFeedback + modFxOffset destinations, modFxOffset in knob params)
 > Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
