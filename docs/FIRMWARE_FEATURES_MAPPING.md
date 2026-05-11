@@ -12,7 +12,7 @@ This document maps every documented hardware feature and menu from the official 
 | Feature | Firmware Doc | Java/ChucK Status | Notes |
 |---------|-------------|-------------------|-------|
 | Arpeggiator | `features/arpeggiator.md` | ✅ | All 9 note modes (UP/DOWN/UPDN/RAND/WLK1-3/PLAY/PATT), 5 octave modes (UP/DOWN/UPDN/ALT/RAND), stepRepeat, rhythm patterns with silences, seqLength, noteProbability, chordPolyphony+probability, ratchet, octave/gate/vel spread. MPE missing.
-| Automation View | `features/automation_view.md` | ✅ Implemented | BarAutomationDialog, AutomationParam model, per-step editing, XML save/load, MIDI CC |
+| Automation View | `features/automation_view.md` | ✅ Implemented | BarAutomationDialog, AutomationParam model (26 synth params), per-step editing, XML save/load, MIDI CC |
 | Audio Recording | `features/audio_export.md` | ✅ Implemented | LiSa-based per-track recording, looping playback via audio_shred(); pre-existing WAV file loading via AudioClip.filePath → WavReader → LiSa |
 | Audio Export | `features/audio_export.md` | ✅ Implemented | WvOut2-based WAV export via Export Audio... menu; offline mastered render |
 | Chord Keyboard | `features/chord_keyboard.md` | ✅ Implemented | CORK/CORL layouts, scale-aware chords, 6 voicing modes |
@@ -294,12 +294,13 @@ These are XML attributes/sub-elements that the DelugeFirmware C++ code writes an
 
 Features still not implemented (descending priority):
 
-1. **Per-parameter sequences (ParamManager)** — Deep infrastructure change but unlocks full automation.
+1. **Per-parameter sequences (ParamManager)** — Deep infrastructure change but unlocks full automation. ✅ Note: All 26 SYTH_PARAMS are now exposed in the automation UI tab (SwingSynthConfigDialog + SwingGridPanel both use SYTH_PARAMS instead of legacy 14). The engine already reads all G_STEP_* arrays. The UI gap is closed — what remains is the firmware-style ParamManager as a separate object per param (vs. our flat Map).
 2. **Track/Clip separation** — Multiple clips per track enables session-mode workflows.
 3. **Per-drum FX chain** — Required for full Kit track parity.
 4. **Session vs Arranger** — Distinct playback modes.
 5. ✅ **AudioClip engine integration** — done (loads WAV via WavReader, LiSa.loadSamples() added, loop region from startSamplePos/endSamplePos)
 6. **No GlobalEffectable hierarchy** — Firmware has `GlobalEffectableForSong` and `GlobalEffectableForClip`. Java has bare reverb/delay floats on `ProjectModel`.
+7. ✅ **EQ tab** — Bass/treble shelving EQ UI tab added to SwingSynthConfigDialog (previously only model + bridge arrays existed).
 7. ✅ **Compressor menu** — Attack, blend, ratio, release, sidechain HPF UI tab added to `SwingSynthConfigDialog`.
 8. ✅ **Arpeggiator completion** — All modes, randomization, note probability, chord polyphony, rhythm silences done.
 9. **MPE (MIDI Polyphonic Expression)** — No per-note pitch-bend, per-note release velocity, or 14-bit MIDI resolution. `mpeVelocity` field parsed from XML into `ArpModel` but engine never acts on it. MIDI bridge (`MidiInputRouter`) treats all controller data as standard 7-bit. Blocking: MPE-capable controllers (Roli, Osmose) will feel flat.
