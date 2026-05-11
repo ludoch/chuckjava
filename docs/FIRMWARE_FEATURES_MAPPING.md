@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-05-11 (Per-step filter mode / delay / reverb wired to engine; doc cleanup)
+> Last updated: 2026-05-11 (AudioClip WAV file loading in engine; doc cleanup)
 > Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -13,7 +13,7 @@ This document maps every documented hardware feature and menu from the official 
 |---------|-------------|-------------------|-------|
 | Arpeggiator | `features/arpeggiator.md` | ⚠️ Partial | 4 basic modes (UP/DOWN/UP_DOWN/RANDOM) with octaves, rate, gate. Missing: chord sim, note mode, step repeat, rhythm, seq length, randomization, MPE |
 | Automation View | `features/automation_view.md` | ✅ Implemented | BarAutomationDialog, AutomationParam model, per-step editing, XML save/load, MIDI CC |
-| Audio Recording | `features/audio_export.md` | ✅ Implemented | LiSa-based per-track recording, looping playback via audio_shred() |
+| Audio Recording | `features/audio_export.md` | ✅ Implemented | LiSa-based per-track recording, looping playback via audio_shred(); pre-existing WAV file loading via AudioClip.filePath → WavReader → LiSa |
 | Audio Export | `features/audio_export.md` | ✅ Implemented | WvOut2-based WAV export via Export Audio... menu; offline mastered render |
 | Chord Keyboard | `features/chord_keyboard.md` | ✅ Implemented | CORK/CORL layouts, scale-aware chords, 6 voicing modes |
 | DX7 Synth | `features/dx_synth.md` | ✅ Implemented | 6-op FM engine (Dx7Engine), .syx import/export (Dx7SyxParser), 32 algorithms, operator editor UI, DX7 tab, XML round-trip, Vintage/Modern/Auto engine type toggle. **Note:** envelope shape uses dexed/msfa log-domain envelopes (not standard ADSR); track-level DelugeAdsr bypassed for DX7 tracks — per-operator DX7 envelopes control amplitude directly |
@@ -266,7 +266,7 @@ These features exist only in our software implementation and have no hardware co
 | **MIDI Grid Controller Mode** | Preferences | Map incoming MIDI notes to grid coordinates |
 | **Continuous Automation Drawing** | Bottom panel lane | Draw curves for step parameters |
 | **Visualizer Stack** | Right panel | FFT, oscilloscope, waterfall, stereo phase |
-| **Audio Recording/Playback** | Engine + UI | LiSa per-track audio clip recording + looping playback; rate control |
+| **Audio Recording/Playback** | Engine + UI | LiSa per-track audio clip recording + looping playback; rate control; pre-existing WAV file loading from AudioClip.filePath |
 | **Master WAV Export** | File menu | WvOut2 spliced into master output chain; records mastered stereo mix to .wav |
 | **Runtime Script Loading** | File menu | Load .ck scripts at runtime via vm.eval(); script access to all UGens + engine globals |
 | **64 simultaneous tracks** | Engine | 8 kits × 8 sounds each |
@@ -298,7 +298,7 @@ Features still not implemented (descending priority):
 2. **Track/Clip separation** — Multiple clips per track enables session-mode workflows.
 3. **Per-drum FX chain** — Required for full Kit track parity.
 4. **Session vs Arranger** — Distinct playback modes.
-5. **AudioClip engine integration** — AudioTrackModel + AudioClip model exists, but engine's audio_shred() doesn't play back AudioClip data (no LiSa connection from AudioClip.filePath).
+5. ✅ **AudioClip engine integration** — done (loads WAV via WavReader, LiSa.loadSamples() added, loop region from startSamplePos/endSamplePos)
 6. **No GlobalEffectable hierarchy** — Firmware has `GlobalEffectableForSong` and `GlobalEffectableForClip`. Java has bare reverb/delay floats on `ProjectModel`.
 7. **Compressor menu** — Attack, blend, ratio, release, threshold are individually wired via globals; no unified compressor menu UI.
 8. **Arpeggiator completion** — Chord sim, note mode, step repeat, rhythm, seq length, randomization, MPE (basic modes + ratchet work; these sub-features missing).

@@ -47,6 +47,18 @@ public class LiSa extends ChuckUGen {
     this.feedback = f;
   }
 
+  /**
+   * Load pre-recorded float sample data into the LiSa buffer, replacing any existing content.
+   * Sets the buffer duration to match the data length and resets the record position.
+   */
+  public void loadSamples(float[] data) {
+    if (data == null || data.length == 0) return;
+    this.buffer = new float[data.length];
+    System.arraycopy(data, 0, this.buffer, 0, data.length);
+    this.recPos = 0;
+    this.isRecording = false;
+  }
+
   // --- Voice Management ---
 
   public void play(int v, int state) {
