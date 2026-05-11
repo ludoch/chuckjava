@@ -27,6 +27,9 @@ public class Dyno extends ChuckUGen {
 
   private float externalGain = 1.0f;
 
+  /** Dry/wet blend for parallel compression (0.0 = dry only, 1.0 = fully compressed). */
+  private float dryWet = 1.0f;
+
   private float envelope = 0.0f;
   private float sampleRate = 44100.0f;
 
@@ -67,7 +70,9 @@ public class Dyno extends ChuckUGen {
       }
     }
 
-    float out = input * gainReduction * externalGain;
+    // Parallel compression: blend compressed (with makeup gain) and dry signals
+    float compressed = input * gainReduction * externalGain;
+    float out = compressed * dryWet + input * (1.0f - dryWet);
     // Hard safety clamp for limiter mode: never exceed thresh * 2.0 (headroom)
     if (mode == LIMITER && Math.abs(out) > thresh * 2.0f) {
       out = Math.signum(out) * thresh * 2.0f;
@@ -157,5 +162,13 @@ public class Dyno extends ChuckUGen {
 
   public void duck() {
     this.mode = DUCK;
+  }
+
+  public void dryWet(float v) {
+    this.dryWet = Math.max(0.0f, Math.min(1.0f, v));
+  }
+
+  public float dryWet() {
+    return dryWet;
   }
 }
