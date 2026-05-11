@@ -30,6 +30,10 @@ public class Dyno extends ChuckUGen {
   /** Dry/wet blend for parallel compression (0.0 = dry only, 1.0 = fully compressed). */
   private float dryWet = 1.0f;
 
+  /** Sidechain HPF cutoff (0-1 normalized, 0=OFF). Filters the envelope follower input. */
+  private float sidechainHpf = 0.0f;
+  private float scHpfState = 0.0f;
+
   private float envelope = 0.0f;
   private float sampleRate = 44100.0f;
 
@@ -45,7 +49,16 @@ public class Dyno extends ChuckUGen {
   @Override
   protected float compute(float input, long systemTime) {
     // Simple peak envelope follower
-    float absIn = Math.abs(input);
+    float absIn;
+    if (sidechainHpf > 0.001f) {
+      // One-pole highpass filters the absolute signal before the envelope follower.
+      // Removes low-frequency energy from the sidechain so bass doesn't over-trigger.
+      scHpfState = scHpfState + sidechainHpf * (Math.abs(input) - scHpfState);
+      absIn = Math.abs(input) - scHpfState;
+      if (absIn < 0f) absIn = 0f;
+    } else {
+      absIn = Math.abs(input);
+    }
     float target = absIn;
 
     float coeff;
@@ -170,5 +183,23 @@ public class Dyno extends ChuckUGen {
 
   public float dryWet() {
     return dryWet;
+  }
+
+  /**
+   * Sidechain HPF cutoff (0-1 normalized). 0 = OFF, values > 0 filter the sidechain signal
+   * before the envelope follower. Higher values remove more low-frequency content, making
+   * compression less sensitive to bass-heavy material. Internally:
+   * {@code cutoff_hz = 100 + sidechainHpf^2 * 2000}, mapped to one-pole coefficient.
+   */
+  public void sidechainHpf(float v) {
+    float clamped = Math.max(0.0f, Math.min(1.0f, v));
+    // Map 0-1 to 0 Hz - 2 kHz (square-law for more resolution at low end)
+    float hz = 100f + clamped * clamped * 2000f;
+    // One-pole HPF coefficient: alpha = cutoff / (cutoff + sampleRate)
+    this.sidechainHpf = hz / (hz + sampleRate);
+  }
+
+  public float sidechainHpf() {
+    return sidechainHpf;
   }
 }
