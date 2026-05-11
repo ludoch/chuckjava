@@ -3,6 +3,7 @@ package org.chuck.audio.util;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.chuck.audio.ChuckUGen;
+import org.chuck.audio.util.WavReader.WavData;
 
 /**
  * A Unit Generator for sample playback. Loads a float array of samples and plays them back at a
@@ -63,9 +64,9 @@ public class SndBuf extends ChuckUGen {
     // Try loading as a real file
     try {
       java.io.File file = org.chuck.core.ChuckConfig.resolveFile(path);
-      javax.sound.sampled.AudioInputStream ais = null;
+      WavData wavData = null;
       if (file != null && file.exists()) {
-        ais = javax.sound.sampled.AudioSystem.getAudioInputStream(file);
+        wavData = WavReader.read(file);
       } else {
         // Try resource fallback
         String resourcePath = path.replace("\\", "/");
@@ -73,73 +74,25 @@ public class SndBuf extends ChuckUGen {
 
         java.io.InputStream ris = findResource(resourcePath);
         if (ris != null) {
-          ais =
-              javax.sound.sampled.AudioSystem.getAudioInputStream(
-                  new java.io.BufferedInputStream(ris));
+          wavData = WavReader.read(new java.io.BufferedInputStream(ris));
         }
       }
 
-      if (ais == null) {
+      if (wavData == null) {
         logger.log(Level.SEVERE, "[Audio] SndBuf: File or resource not found: " + path);
         samples = new float[0];
         return;
       }
 
-      javax.sound.sampled.AudioFormat format = ais.getFormat();
-
-      // Convert to PCM_SIGNED 16-bit if needed
-      if (format.getEncoding() != javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED
-          || format.getSampleSizeInBits() != 16) {
-        javax.sound.sampled.AudioFormat targetFormat =
-            new javax.sound.sampled.AudioFormat(
-                javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED,
-                format.getSampleRate(),
-                16,
-                format.getChannels(),
-                format.getChannels() * 2,
-                format.getSampleRate(),
-                false);
-        ais = javax.sound.sampled.AudioSystem.getAudioInputStream(targetFormat, ais);
-        format = targetFormat;
+      // Mix down to mono
+      int n = wavData.frameCount();
+      samples = new float[n];
+      for (int i = 0; i < n; i++) {
+        samples[i] = (wavData.channels[0][i] + wavData.channels[1][i]) * 0.5f;
       }
 
-      int numChannels = format.getChannels();
-      long totalSamples = ais.getFrameLength();
-
-      if (totalSamples <= 0) {
-        // Read manually if frame length is unknown
-        java.util.ArrayList<Float> samplesList = new java.util.ArrayList<>();
-        byte[] buf = new byte[format.getFrameSize()];
-        while (ais.read(buf) != -1) {
-          float sum = 0;
-          for (int c = 0; c < numChannels; c++) {
-            int idx = c * 2;
-            short pcm = (short) ((buf[idx + 1] << 8) | (buf[idx] & 0xFF));
-            sum += pcm / 32768.0f;
-          }
-          samplesList.add(sum / numChannels);
-        }
-        samples = new float[samplesList.size()];
-        for (int i = 0; i < samples.length; i++) samples[i] = samplesList.get(i);
-      } else {
-        if (totalSamples > Integer.MAX_VALUE) totalSamples = Integer.MAX_VALUE;
-        samples = new float[(int) totalSamples];
-        byte[] buf = new byte[format.getFrameSize()];
-        for (int i = 0; i < totalSamples; i++) {
-          int read = ais.read(buf);
-          if (read == -1) break;
-          float sum = 0;
-          for (int c = 0; c < numChannels; c++) {
-            int idx = c * 2;
-            short pcm = (short) ((buf[idx + 1] << 8) | (buf[idx] & 0xFF));
-            sum += pcm / 32768.0f;
-          }
-          samples[i] = sum / numChannels;
-        }
-      }
       logger.log(
           Level.FINE, "[Audio] SndBuf: Loaded " + path + " (" + samples.length + " samples)");
-      ais.close();
     } catch (Exception e) {
       logger.log(
           Level.SEVERE, "[Audio] Error loading WAV file '" + path + "': " + e.getMessage(), e);

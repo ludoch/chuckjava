@@ -1,9 +1,9 @@
 package org.chuck.audio.util;
 
 import java.io.IOException;
-import javax.sound.sampled.UnsupportedAudioFileException;
+import org.chuck.audio.util.WavReader.WavData;
 
-/** SndBuf2: Stereo sample playback. */
+/** SndBuf2: Stereo sample playback. Reads WAV using {@link WavReader} (no javax.sound). */
 public class SndBuf2 extends StereoUGen {
   private float[][] samples; // [channel][sample]
   private double pos = 0.0;
@@ -25,53 +25,11 @@ public class SndBuf2 extends StereoUGen {
         return;
       }
 
-      javax.sound.sampled.AudioInputStream ais =
-          javax.sound.sampled.AudioSystem.getAudioInputStream(file);
-      javax.sound.sampled.AudioFormat format = ais.getFormat();
-
-      // Convert to PCM_SIGNED 16-bit if needed
-      if (format.getEncoding() != javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED
-          || format.getSampleSizeInBits() != 16) {
-        javax.sound.sampled.AudioFormat targetFormat =
-            new javax.sound.sampled.AudioFormat(
-                javax.sound.sampled.AudioFormat.Encoding.PCM_SIGNED,
-                format.getSampleRate(),
-                16,
-                format.getChannels(),
-                format.getChannels() * 2,
-                format.getSampleRate(),
-                false);
-        ais = javax.sound.sampled.AudioSystem.getAudioInputStream(targetFormat, ais);
-        format = targetFormat;
-      }
-
-      int fileChannels = format.getChannels();
-      long totalSamples = ais.getFrameLength();
-      if (totalSamples > Integer.MAX_VALUE) totalSamples = Integer.MAX_VALUE;
-
-      samples = new float[2][(int) totalSamples];
-      byte[] buf = new byte[format.getFrameSize()];
-
-      for (int i = 0; i < totalSamples; i++) {
-        int read = ais.read(buf);
-        if (read == -1) break;
-
-        if (fileChannels >= 2) {
-          // Channel 0
-          short pcm0 = (short) ((buf[1] << 8) | (buf[0] & 0xFF));
-          samples[0][i] = pcm0 / 32768.0f;
-          // Channel 1
-          short pcm1 = (short) ((buf[3] << 8) | (buf[2] & 0xFF));
-          samples[1][i] = pcm1 / 32768.0f;
-        } else {
-          // Mono to stereo
-          short pcm = (short) ((buf[1] << 8) | (buf[0] & 0xFF));
-          samples[0][i] = pcm / 32768.0f;
-          samples[1][i] = samples[0][i];
-        }
-      }
-      ais.close();
-    } catch (IOException | UnsupportedAudioFileException e) {
+      WavData wavData = WavReader.read(file);
+      int n = wavData.frameCount();
+      samples[0] = wavData.channels[0];
+      samples[1] = wavData.channels[1];
+    } catch (IOException e) {
       samples = new float[2][0];
     }
     pos = 0;

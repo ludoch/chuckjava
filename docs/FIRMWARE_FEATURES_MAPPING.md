@@ -127,6 +127,7 @@ Firmware `PatchSource` enum has 15 source types: `LFO_GLOBAL_1`, `LFO_GLOBAL_2`,
 | Patch Cables | — | ✅ | Full patch cable arrays (source/dest/amount/polarity) per track, up to 16 cables per track |
 | Mod Knobs | — | ✅ | 4×4 grid of 16 knob param selectors in MODULATION tab |
 | Source options | — | ⚠️ Partial | velocity, envelope 1-2, lfo 1-2, aftertouch, note, random, sidechain — missing envelope 3-4, lfo global 1-2, lfo local 2, X, Y |
+| MPE (MIDI Polyphonic Expression) | — | ❌ | `mpeVelocity` field parsed from XML into `ArpModel`, but engine has no per-note pitch-bend, per-note release velocity, or 14-bit MIDI resolution. MIDI bridge treats all data as standard 7-bit. See §8.2 item 9. |
 | Destination options | — | ✅ | volume, pan, lpfFrequency, lpfResonance, oscAVolume, oscBVolume, pitch, noiseVolume, modFxRate, modFxDepth |
 
 ### 2.7 Kit Assembly
@@ -190,14 +191,14 @@ All three now read and applied during step processing (SynthShred + KitShred):
 
 ## 3. Sub-Feature Detail: Arpeggiator
 
-The firmware arpeggiator has ~25 configurable parameters across 4 groups. Our status:
+The firmware arpeggiator has ~25 configurable parameters across 4 groups. Our status (updated 2026-05-11: sync/ratchet/randomizer parsers added):
 
 | Parameter Group | Params | Status |
 |----------------|--------|--------|
-| **Basic (BASI)** | Gate, Sync, Rate | ⚠️ Partial | Gate/rate work; sync not implemented |
-| **Pattern (PATT)** | Octaves, Octave Mode, Chord Sim, Note Mode, Step Repeat, Rhythm, Seq Length | ⚠️ Partial | Octaves + 4 octave modes (UP/DOWN/UP_DOWN/RANDOM) implemented; chord sim, note mode, step repeat, rhythm, seq length missing |
-| **Randomizer (RAND)** | Lock, Octave Spread, Gate Spread, Velocity Spread, Ratchet, Chord Poly, Note/Bass/Swap/Glide/Reverse Probability | ❌ |
-| **MPE** | Velocity (via Aftertouch/Y) | ❌ |
+| **Basic (BASI)** | Gate, Sync, Rate | ⚠️ Partial | Gate, rate, and sync work; `lfoSyncRate()` in engine maps sync level → note divisions |
+| **Pattern (PATT)** | Octaves, Octave Mode, Chord Sim, Note Mode, Step Repeat, Rhythm, Seq Length | ⚠️ Partial | Octaves + 4 octave modes (UP/DOWN/UP_DOWN/RANDOM) + ratchet (0-4 sub-divisions, engine + UI slider) work; chord sim, note mode, step repeat, rhythm, seq length missing |
+| **Randomizer (RAND)** | Lock, Octave Spread, Gate Spread, Velocity Spread, Ratchet, Chord Poly, Note/Bass/Swap/Glide/Reverse Probability | ⚠️ Partial | Ratchet amount/probability + all 7 probability params parsed from XML into `ArpModel`, bridge globals registered, engine reads ratchet per-voice. Missing: lock, octave/gate/velocity spread, chord poly engine |
+| **MPE** | Velocity (via Aftertouch/Y) | ❌ | `mpeVelocity` parsed from XML into `ArpModel` field; no engine behavior. See §8.2 item 9. |
 
 ## 4. Sub-Feature Detail: Automation View
 
@@ -300,7 +301,8 @@ Features still not implemented (descending priority):
 5. **AudioClip engine integration** — AudioTrackModel + AudioClip model exists, but engine's audio_shred() doesn't play back AudioClip data (no LiSa connection from AudioClip.filePath).
 6. **No GlobalEffectable hierarchy** — Firmware has `GlobalEffectableForSong` and `GlobalEffectableForClip`. Java has bare reverb/delay floats on `ProjectModel`.
 7. **Compressor menu** — Attack, blend, ratio, release, threshold are individually wired via globals; no unified compressor menu UI.
-8. **Arpeggiator completion** — Chord sim, note mode, step repeat, rhythm, seq length, randomization, MPE (partial — basic modes work)
+8. **Arpeggiator completion** — Chord sim, note mode, step repeat, rhythm, seq length, randomization, MPE (basic modes + ratchet work; these sub-features missing).
+9. **MPE (MIDI Polyphonic Expression)** — No per-note pitch-bend, per-note release velocity, or 14-bit MIDI resolution. `mpeVelocity` field parsed from XML into `ArpModel` but engine never acts on it. MIDI bridge (`MidiInputRouter`) treats all controller data as standard 7-bit. Blocking: MPE-capable controllers (Roli, Osmose) will feel flat.
 
 ### 8.3 Audio Engine Gaps (Active Items)
 
@@ -310,5 +312,32 @@ Features still not implemented (descending priority):
 4. ~~**Compressor threshold wiring** — Done: MasterShred now reads `G_SP_COMPRESSOR_THRESHOLD` as an override (non-zero values replace the knob-derived `1 - 0.8*knob` formula, 0.0 preserves backward compatibility).~~ ✅
 
 
- ## 9. Never depend on javax.sound API Instead we should depend on chuck apis. 
+## 9. javax.sound Dependency Audit & Replacement
+
+**Decision:** Replace javax.sound only where a chuck-core API provides equivalent functionality. Keep javax.sound where no chuck equivalent exists (real MIDI device I/O, audio system playback, core audio engine).
+
+### 9.1 Replaced (Now Using chuck-core APIs)
+
+| Component | What Changed | chuck-core API | Files Changed |
+|-----------|-------------|----------------|---------------|
+| WAV file reading | Replaced `AudioSystem.getAudioInputStream()` + `AudioFormat` parsing | New `WavReader` utility — pure-Java RIFF/PCM parser (8/16/24-bit, mono/stereo) | `chuck-core/.../WavReader.java` (NEW), `SndBuf.java`, `SndBuf2.java`, `AudioAnalyzer.java` |
+| WAV file writing (export) | Replaced `AudioSystem.write()` with manual RIFF header via `ByteBuffer` | 44-byte RIFF header + raw PCM bytes (same pattern as `WvOut2`) | `NativeWavExporter.java` |
+| MIDI file export | Replaced `javax.sound.midi.Sequence`/`Track`/`MidiEvent`/`ShortMessage`/`MidiSystem` | `MidiFileOut` + `MidiMsg` (seconds-based timing, 120 BPM, 480 PPQ) | `NativeMidiExporter.java` |
+| Test WAV loading | 10 test files had duplicated `loadWavAsFloat()`/`readFrames()` methods | Consolidated to `AudioAnalyzer.loadWav()` — single source of truth | 10 test files + `Dx7SingleNoteAnalysis.java` |
+
+### 9.2 Intentionally Kept (No chuck Equivalent)
+
+| Component | javax.sound API Used | Why Kept |
+|-----------|---------------------|----------|
+| `NativeMidiInputRouter` | `javax.sound.midi.MidiDevice`/`Transmitter`/`Receiver` | Real MIDI device I/O — no chuck-core abstraction exists for enumerating/opening physical MIDI ports |
+| `SwingDelugeApp` clip preview | `javax.sound.sampled.Clip` | Quick sample preview in UI file browser — lightweight playback, no chuck engine needed |
+| `ChuckAudio` | `javax.sound.sampled.SourceDataLine`/`AudioFormat`/`AudioSystem` | Core audio engine output — `SourceDataLine` is the JVM's bridge to the OS audio driver; no chuck replacement exists |
+| `ChuckMidi`/`ChuckMidiOut`/`MidiFileIn` | `javax.sound.midi.*` (chuck-core internals) | These are chuck-core's own fallback implementations — replacing them would be circular |
+
+### 9.3 File Counts
+
+- **Files modified:** 15 (2 chuck-core + 12 deluge + 1 test utility)
+- **Files created:** 1 (`WavReader.java`)
+- **javax.sound imports removed:** ~40
+- **javax.sound imports remaining:** ~15 (all intentional — see §9.2)
 
