@@ -52,7 +52,7 @@ The firmware organizes sound editing through 5 menu groups accessed via the SELE
 |-----------|----------------|-------------------|---------|
 | Attack | `attack.md` | ✅ | Per-song attack via G_MASTER_COMP_ATTACK + engine RMSFeedbackCompressor mapping |
 | Blend | `blend.md` | ✅ | Per-song dry/wet blend via G_MASTER_COMP_BLEND + comp.dryWet() |
-| HPF | `hpf.md` | ❌ | No sidechain HPF |
+| HPF | `hpf.md` | ✅ | Per-track sidechain HPF via G_COMP_SIDECHAIN_HPF array + engine Dyno.sidechainHpf() |
 | Ratio | `ratio.md` | ✅ | Per-song ratio via G_MASTER_COMP_RATIO + engine RMSFeedbackCompressor mapping |
 | Release | `release.md` | ✅ | Per-song release via G_MASTER_COMP_RELEASE + engine RMSFeedbackCompressor mapping |
 | Threshold | `threshold.md` | ✅ | Per-song threshold via G_SP_COMPRESSOR_THRESHOLD (song param overrides knob formula when non-zero) |
@@ -300,7 +300,7 @@ Features still not implemented (descending priority):
 4. **Session vs Arranger** — Distinct playback modes.
 5. ✅ **AudioClip engine integration** — done (loads WAV via WavReader, LiSa.loadSamples() added, loop region from startSamplePos/endSamplePos)
 6. **No GlobalEffectable hierarchy** — Firmware has `GlobalEffectableForSong` and `GlobalEffectableForClip`. Java has bare reverb/delay floats on `ProjectModel`.
-7. **Compressor menu** — Attack, blend, ratio, release, threshold are individually wired via globals; no unified compressor menu UI.
+7. ✅ **Compressor menu** — Attack, blend, ratio, release, sidechain HPF UI tab added to `SwingSynthConfigDialog`.
 8. ✅ **Arpeggiator completion** — All modes, randomization, note probability, chord polyphony, rhythm silences done.
 9. **MPE (MIDI Polyphonic Expression)** — No per-note pitch-bend, per-note release velocity, or 14-bit MIDI resolution. `mpeVelocity` field parsed from XML into `ArpModel` but engine never acts on it. MIDI bridge (`MidiInputRouter`) treats all controller data as standard 7-bit. Blocking: MPE-capable controllers (Roli, Osmose) will feel flat.
 10. ~~**KitShred unison** — Bridge globals and UI exist for kit unison; KitShred engine never spawns sub-voices (only SynthShred has unison).~~ ✅ Done.
