@@ -245,6 +245,19 @@ Pressing the **● REC** button enables live recording mode. Incoming notes will
 The application preferences can be accessed via **Settings > Preferences...**.
 ![Preferences Dialog](preferences_dialog_annotated.png)
 
+#### Hardware Character Preferences
+
+The Deluge hardware (v1.3.1+) has a distinct analog character that the clean 32-bit float emulation doesn't naturally reproduce. These preferences enable select hardware behaviors for more authentic audio output:
+
+| Preference | Description | Default |
+|-----------|-------------|---------|
+| **Master Saturation** | Enables tanh-style soft-clipping on the master summing bus, mimicking the hardware's analog saturation when the bus approaches 80%+ of full scale. Uses a Distortion UGen with atan-based overdrive curve. | Off |
+| **Filter Drive (v1.3.1+)** | Boosts SVF filter drive to 1.8 (from the default 1.0), activating the post-filter tanh non-linearity present in firmware v1.3.1+. Applied per-voice for both synth and kit tracks. The `drive` parameter value used is the maximum of the track's programmed filter drive and 1.8. | Off |
+| **14-bit DAC Crunch** | Truncates the 32-bit float output to 14-bit resolution (16384 levels) with TPDF dither, simulating the hardware's 14-bit DAC precision. Subtle at high signal levels, most audible on low-level tails and reverb decay. | Off |
+| **Reverb Model** | Selects the reverb algorithm. **RingsReverb** (index 4) is a physical-modeling reverb based on the Rings resonator — notably different from the standard reverb types. Options: JCRev, FreeVerb, MVerb, ProceduralReverb, RingsReverb. | JCRev |
+
+These preferences push float globals (`g_masterSat`, `g_charFilterDrive`, `g_bitCrunch`) to the ChucK engine each time a song loads. The engine reads them per-tick and applies the corresponding processing. Toggling a preference takes effect on the next song load.
+
 ### Preset Sound Editor
 Clicking the **E** button in Song View or the **🎹 EDIT PRESET** button at the bottom of the Clip View opens the Sound Editor.
 ![Preset Sound Editor](preset_editor_annotated.png)
@@ -502,7 +515,7 @@ The User Interface interacts with the sample-accurate synthesis engine entirely 
 
 Persistent preferences are handled through `org.chuck.deluge.project.PreferencesManager` and configure hardware boundaries on application boot cycles:
 - `midi.input` (String): Descriptors name of incoming physical interface hardware port.
-- `reverb.model` (String): Algorithmic architecture selection switch (`JCRev`, `FreeVerb`, `ProceduralReverb`).
+- `reverb.model` (String): Algorithmic architecture selection switch (`JCRev`, `FreeVerb`, `MVerb`, `ProceduralReverb`, `RingsReverb`).
 - `show.visualizers` (Boolean): GPU acceleration optimization toggles gating FFT analyzer pipeline loops.
 - `preset.linking.policy` (String): Governs composition save files structure (`EMBED` vs `LINK_LIVE` references).
 

@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-05-10 (DX7, Automation View, Performance View, MIDI Follow, Pattern Save/Load, Chord Keyboard, Wave Index, compressor completion)
+> Last updated: 2026-05-11 (Hardware Character Preferences — master saturation, filter drive, 14-bit DAC crunch, Rings reverb)
 > Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -17,6 +17,7 @@ This document maps every documented hardware feature and menu from the official 
 | Audio Export | `features/audio_export.md` | ✅ Implemented | WvOut2-based WAV export via Export Audio... menu; offline mastered render |
 | Chord Keyboard | `features/chord_keyboard.md` | ✅ Implemented | CORK/CORL layouts, scale-aware chords, 6 voicing modes |
 | DX7 Synth | `features/dx_synth.md` | ✅ Implemented | 6-op FM engine (Dx7Engine), .syx import/export (Dx7SyxParser), 32 algorithms, operator editor UI, DX7 tab, XML round-trip, Vintage/Modern/Auto engine type toggle. **Note:** envelope shape uses dexed/msfa log-domain envelopes (not standard ADSR); track-level DelugeAdsr bypassed for DX7 tracks — per-operator DX7 envelopes control amplitude directly |
+| Hardware Character (Master Sat, Filter Drive, 14-bit DAC, Rings Reverb) | — | ✅ Implemented | User preferences for hardware-accurate audio character: tanh master bus saturation, v1.3.1+ filter drive (SVFilter tanh at drive > 1.0), 14-bit DAC truncation with TPDF dither, RingsReverb physical-modeling reverb. Toggled via Settings → Preferences. See §Preferences in guidebook. |
 | Looping in Grid View | `features/looping_in_grid_view.md` | ❌ Not implemented | Green mode create+record, LOOP/LAYERING LOOP cmds |
 | MIDI Device Definitions | `features/midi_device_definition_files.md` | ✅ Implemented | MidiDeviceDefinition XML model, loader, preferences, feedback service, UI browser |
 | MIDI Follow Mode | `features/midi_follow_mode.md` | ✅ Implemented | MidiInputRouter, 3 follow channels, feedback light piping, auto-clip-follow |
