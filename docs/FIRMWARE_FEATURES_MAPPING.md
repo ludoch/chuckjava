@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-05-11 (Unison engine in SynthShred; doc cleanup)
+> Last updated: 2026-05-11 (Unison engine in SynthShred + KitShred; doc cleanup)
 > Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -115,7 +115,7 @@ Firmware has **4 LFOs** (`LFO_COUNT = 4`): LFO1 (global), LFO2 (per-voice), LFO3
 | File Browser | `file_browser.md` | ✅ | Library tab |
 | **Modulator 1/2** | `modulator/` | ⚠️ Partial | Volume/transpose/destination/feedback exist; retrigger phase missing |
 | **Sample** | `sample/` (9 files) | ❌ | No sample osc submenu at all |
-| **Unison** | `unison/` (4 files) | ✅ | SynthShred spawns sub-voice MorphingWavetable instances per slot (up to 8), applies detune (±cents), stereo spread (phase offset). Bridge globals `G_UNISON_NUM/DETUNE/SPREAD` read per-step. Still missing from KitShred. |
+| **Unison** | `unison/` (4 files) | ✅ | SynthShred spawns sub-voice MorphingWavetable instances per slot (up to 8), applies detune (±cents), stereo spread (phase offset). KitShred spawns sub-SndBuf instances with detuned playback rates and per-sub Pan2 stereo spread. Bridge globals `G_UNISON_NUM/DETUNE/SPREAD` / `G_KIT_UNISON_NUM/DETUNE/SPREAD` read per-step. |
 | **Index** | `index.md` | ⚠️ Partial | Osc params exist in editor; ~7/19 sub-pages missing |
 
 ### 2.6 Modulation (`menus/modulation/`)
@@ -168,7 +168,7 @@ These `G_KIT_*` globals are registered in `BridgeContract.java` with UI controls
 | `G_KIT_HPF_MODE` | ✅ Read every tick | ❌ Not applied | Per-track HPF is a Butterworth (no mode/morph); value stored as `G_KIT_HPF_MODE_#` global |
 | `G_KIT_HPF_MORPH` | ✅ Read every tick | ❌ Not applied | Same — Butterworth HPF has no morph parameter |
 | `G_KIT_OSC2_TYPE` | ✅ Read every tick | ❌ Not applied | Kit voices use SndBuf (sample playback), no osc2 type concept |
-| `G_KIT_UNISON_NUM` | ✅ Read every tick | ❌ Not applied | Kit voices are single SndBuf instances; no sub-voice spawning |
+| `G_KIT_UNISON_NUM` | ✅ Read every tick | ✅ Applied | KitShred spawns sub-SndBuf instances with detuned rate and stereo spread per-sub Pan2 |
 | `G_KIT_UNISON_DETUNE` | ✅ Read every tick | ❌ Not applied | Same |
 | `G_KIT_UNISON_SPREAD` | ✅ Read every tick | ❌ Not applied | Same |
 | `G_KIT_WAVE_INDEX` | ✅ Read every tick | ❌ Not applied | Kit voices use SndBuf (not wavetable); value stored as global |
@@ -303,7 +303,7 @@ Features still not implemented (descending priority):
 7. **Compressor menu** — Attack, blend, ratio, release, threshold are individually wired via globals; no unified compressor menu UI.
 8. ✅ **Arpeggiator completion** — All modes, randomization, note probability, chord polyphony, rhythm silences done.
 9. **MPE (MIDI Polyphonic Expression)** — No per-note pitch-bend, per-note release velocity, or 14-bit MIDI resolution. `mpeVelocity` field parsed from XML into `ArpModel` but engine never acts on it. MIDI bridge (`MidiInputRouter`) treats all controller data as standard 7-bit. Blocking: MPE-capable controllers (Roli, Osmose) will feel flat.
-10. **KitShred unison** — Bridge globals and UI exist for kit unison; KitShred engine never spawns sub-voices (only SynthShred has unison).
+10. ~~**KitShred unison** — Bridge globals and UI exist for kit unison; KitShred engine never spawns sub-voices (only SynthShred has unison).~~ ✅ Done.
 
 ### 8.3 Audio Engine Gaps (Active Items)
 
@@ -311,7 +311,7 @@ Features still not implemented (descending priority):
 2. ~~**Enhance RingsReverb** — YIN pitch tracking, mallet excitation, K-S mode toggle all already implemented (RingsReverb.java + bridge globals G_REVERB_EXCITATION/G_REVERB_MODE + engine wiring).~~ ✅
 3. ~~**Compressor master blend** — Done: `G_MASTER_COMP_BLEND` constant, `ProjectModel.compressorBlend` field, engine reads `comp.dryWet()`.~~ ✅
 4. ~~**Compressor threshold wiring** — Done: MasterShred now reads `G_SP_COMPRESSOR_THRESHOLD` as an override (non-zero values replace the knob-derived `1 - 0.8*knob` formula, 0.0 preserves backward compatibility).~~ ✅
-5. ✅ **SynthShred unison engine** — Sub-voice MorphingWavetable spawn, detune, phase-based stereo spread, power-normalized gain. Done. KitShred unison still missing.
+5. ✅ **SynthShred + KitShred unison engine** — SynthShred: sub-voice MorphingWavetable spawn, detune, phase-based stereo spread. KitShred: sub-SndBuf spawn, rate detune, per-sub Pan2 stereo spread. Both use power-normalized gain (<code>1/√N</code>).
 
 
 ## 9. javax.sound Dependency Audit & Replacement
