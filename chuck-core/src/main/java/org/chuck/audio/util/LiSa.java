@@ -65,6 +65,14 @@ public class LiSa extends ChuckUGen {
     if (v >= 0 && v < MAX_VOICES) voices[v].looping = (state != 0);
   }
 
+  public void loopStart(int v, double samples) {
+    if (v >= 0 && v < MAX_VOICES) voices[v].loopStart = Math.max(0.0, samples);
+  }
+
+  public void loopEnd(int v, double samples) {
+    if (v >= 0 && v < MAX_VOICES) voices[v].loopEnd = samples;
+  }
+
   public void bi(int v, int state) {
     if (v >= 0 && v < MAX_VOICES) voices[v].bidirectional = (state != 0);
   }
@@ -138,22 +146,36 @@ public class LiSa extends ChuckUGen {
       // Advance play position
       v.playPos += v.rate * v.dir;
 
-      // Looping / Edge Logic
-      if (v.playPos >= buffer.length) {
+      // Compute effective loop bounds (loopEnd defaults to buffer.length)
+      double effLoopEnd = (v.loopEnd == Double.MAX_VALUE) ? buffer.length : Math.min(v.loopEnd, buffer.length);
+      double effLoopStart = Math.max(0.0, Math.min(v.loopStart, effLoopEnd - 1));
+
+      // Looping / Edge Logic (respects per-voice loopStart/loopEnd sub-region)
+      if (v.playPos >= effLoopEnd) {
         if (v.bidirectional && v.looping) {
-          v.playPos = buffer.length - 1;
+          v.playPos = effLoopEnd - 1;
           v.dir = -1;
         } else if (v.looping) {
-          v.playPos %= buffer.length;
+          double range = effLoopEnd - effLoopStart;
+          if (range > 0) {
+            v.playPos = effLoopStart + ((v.playPos - effLoopStart) % range);
+          } else {
+            v.playPos = effLoopStart;
+          }
         } else {
           v.playing = false;
         }
-      } else if (v.playPos < 0) {
+      } else if (v.playPos < effLoopStart) {
         if (v.bidirectional && v.looping) {
-          v.playPos = 0;
+          v.playPos = effLoopStart;
           v.dir = 1;
         } else if (v.looping) {
-          v.playPos = buffer.length + (v.playPos % buffer.length);
+          double range = effLoopEnd - effLoopStart;
+          if (range > 0) {
+            v.playPos = effLoopEnd - ((effLoopStart - v.playPos) % range);
+          } else {
+            v.playPos = effLoopStart;
+          }
         } else {
           v.playing = false;
         }
@@ -196,5 +218,7 @@ public class LiSa extends ChuckUGen {
     boolean bidirectional = false;
     float gain = 1.0f;
     float pan = 0.0f; // [-1, 1]
+    double loopStart = 0.0;           // start of loop region (samples), 0 = buffer start
+    double loopEnd = Double.MAX_VALUE; // end of loop region (samples), MAX_VALUE = buffer end
   }
 }
