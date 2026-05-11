@@ -168,9 +168,9 @@ These `G_KIT_*` globals are registered in `BridgeContract.java` with UI controls
 | `G_KIT_HPF_MODE` | ✅ Read every tick | ❌ Not applied | Per-track HPF is a Butterworth (no mode/morph); value stored as `G_KIT_HPF_MODE_#` global |
 | `G_KIT_HPF_MORPH` | ✅ Read every tick | ❌ Not applied | Same — Butterworth HPF has no morph parameter |
 | `G_KIT_OSC2_TYPE` | ✅ Read every tick | ❌ Not applied | Kit voices use SndBuf (sample playback), no osc2 type concept |
-| `G_KIT_UNISON_NUM` | ✅ Read every tick | ✅ Applied | KitShred spawns sub-SndBuf instances with detuned rate and stereo spread per-sub Pan2 |
-| `G_KIT_UNISON_DETUNE` | ✅ Read every tick | ❌ Not applied | Same |
-| `G_KIT_UNISON_SPREAD` | ✅ Read every tick | ❌ Not applied | Same |
+| `G_KIT_UNISON_NUM` | ✅ Read every tick | ✅ Applied | KitShred spawns sub-SndBuf instances with detuned rate and per-sub Pan2 stereo spread |
+| `G_KIT_UNISON_DETUNE` | ✅ Read every tick | ✅ Applied | Sub-voice rate detune via 2^(cents*offset/1200) |
+| `G_KIT_UNISON_SPREAD` | ✅ Read every tick | ✅ Applied | Per-sub Pan2 positions spread across stereo field |
 | `G_KIT_WAVE_INDEX` | ✅ Read every tick | ❌ Not applied | Kit voices use SndBuf (not wavetable); value stored as global |
 | `G_KIT_DELAY_RATE` | ✅ Read every tick | ❌ Not applied | Kit delay rate is per-voice FX routing; stored for potential FX bus readers |
 | `G_KIT_DELAY_FB` | ✅ Read every tick | ❌ Not applied | Same |
