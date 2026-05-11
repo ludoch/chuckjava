@@ -21,7 +21,7 @@ This document maps every documented hardware feature and menu from the official 
 | Looping in Grid View | `features/looping_in_grid_view.md` | ✅ Implemented | ClipModel.PlayMode.LOOP with context menu, engine auto-re-queue, green rendering in SONG view |
 | MIDI Device Definitions | `features/midi_device_definition_files.md` | ✅ Implemented | MidiDeviceDefinition XML model, loader, preferences, feedback service, UI browser |
 | MIDI Follow Mode | `features/midi_follow_mode.md` | ✅ Implemented | MidiInputRouter, 3 follow channels, feedback light piping, auto-clip-follow |
-| Note/NoteRow Editor | `features/note_noterow_editor.md` | ⚠️ Partial | Probability (per-step) works; iterance, fill, euclidean missing |
+| Note/NoteRow Editor | `features/note_noterow_editor.md` | ⚠️ Partial | Probability, iterance (0-3), fill (0-100%) implemented; euclidean missing |
 | Performance View | `features/performance_view.md` | ✅ Implemented | 16×8 FX column grid, latch/momentary, value editing, param editing, XML save/load |
 | Save/Load Patterns | `features/save_load_patterns.md` | ✅ Implemented | PatternModel + PatternSerializer, ClipSnapshot grid state, XML save/load, sidebar UI |
 | Velocity View | `features/velocity_view.md` | ✅ Implemented | See §1.6 of guidebook; velocity ramps, per-step editing |
@@ -234,7 +234,7 @@ The firmware automation view supports 81 automatable parameters with per-step gr
 | Track | `Output` (activeClip, ClipInstanceVector, name, type, colour) | `TrackModel` (name, type, muted, volume, pan, color, List<ClipModel>, clips with automation) | ⚠️ |
 | Clip | `Clip` (loopLength, output*, section, launchStyle, armState) | `ClipModel` (name, rowCount, stepCount, List<List<StepData>>, AutomationParam[]) | ⚠️ |
 | Note Row | `NoteRow`[] in InstrumentClip | Rows = List<List<StepData>> in ClipModel | ⚠️ |
-| Note | `Note` (velocity, probability, lift, iterance, fill) | `StepData` (active, velocity, gate, probability, pitch) | ⚠️ |
+| Note | `Note` (velocity, probability, lift, iterance, fill) | `StepData` (active, velocity, gate, probability, pitch, iterance, fill) | ⚠️ |
 | Per-sound FX | Per-drum FX in Kit | `KitSound` (sample params, adsr, lpf, eq) — no per-sound FX chain | ❌ |
 | Parameter Seq / Automation | `ParamManager` per Clip, per NoteRow | `AutomationParam[]` per ClipModel; per-bar + per-step automation; XML save/load | ✅ |
 | Timing | `insideWorldTickMagnitude`, `ticksPerLoop` | Simple step counter | ❌ |
