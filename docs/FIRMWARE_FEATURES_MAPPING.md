@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-05-11 (Unison engine in SynthShred + KitShred; doc cleanup)
+> Last updated: 2026-05-11 (FM feedback/amount sliders: mod1Fb, mod2Amt, mod2Fb, carrier2Fb)
 > Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -305,6 +305,7 @@ Features still not implemented (descending priority):
 8. ✅ **Arpeggiator completion** — All modes, randomization, note probability, chord polyphony, rhythm silences done.
 9. **MPE (MIDI Polyphonic Expression)** — No per-note pitch-bend, per-note release velocity, or 14-bit MIDI resolution. `mpeVelocity` field parsed from XML into `ArpModel` but engine never acts on it. MIDI bridge (`MidiInputRouter`) treats all controller data as standard 7-bit. Blocking: MPE-capable controllers (Roli, Osmose) will feel flat.
 10. ~~**KitShred unison** — Bridge globals and UI exist for kit unison; KitShred engine never spawns sub-voices (only SynthShred has unison).~~ ✅ Done.
+11. ✅ **FM feedback/amount UI sliders** — mod1Fb, mod2Amt, mod2Fb, carrier2Fb sliders added to FM section of main panel (previously only bridge arrays + engine wiring existed).
 
 ### 8.3 Audio Engine Gaps (Active Items)
 
