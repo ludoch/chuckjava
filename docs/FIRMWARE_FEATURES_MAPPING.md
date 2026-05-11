@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-05-11 (AudioClip WAV file loading in engine; doc cleanup)
+> Last updated: 2026-05-11 (Unison engine in SynthShred; doc cleanup)
 > Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -11,7 +11,7 @@ This document maps every documented hardware feature and menu from the official 
 
 | Feature | Firmware Doc | Java/ChucK Status | Notes |
 |---------|-------------|-------------------|-------|
-| Arpeggiator | `features/arpeggiator.md` | ⚠️ Partial | 4 basic modes (UP/DOWN/UP_DOWN/RANDOM) with octaves, rate, gate. Missing: chord sim, note mode, step repeat, rhythm, seq length, randomization, MPE |
+| Arpeggiator | `features/arpeggiator.md` | ✅ | All 9 note modes (UP/DOWN/UPDN/RAND/WLK1-3/PLAY/PATT), 5 octave modes (UP/DOWN/UPDN/ALT/RAND), stepRepeat, rhythm patterns with silences, seqLength, noteProbability, chordPolyphony+probability, ratchet, octave/gate/vel spread. MPE missing.
 | Automation View | `features/automation_view.md` | ✅ Implemented | BarAutomationDialog, AutomationParam model, per-step editing, XML save/load, MIDI CC |
 | Audio Recording | `features/audio_export.md` | ✅ Implemented | LiSa-based per-track recording, looping playback via audio_shred(); pre-existing WAV file loading via AudioClip.filePath → WavReader → LiSa |
 | Audio Export | `features/audio_export.md` | ✅ Implemented | WvOut2-based WAV export via Export Audio... menu; offline mastered render |
@@ -115,7 +115,7 @@ Firmware has **4 LFOs** (`LFO_COUNT = 4`): LFO1 (global), LFO2 (per-voice), LFO3
 | File Browser | `file_browser.md` | ✅ | Library tab |
 | **Modulator 1/2** | `modulator/` | ⚠️ Partial | Volume/transpose/destination/feedback exist; retrigger phase missing |
 | **Sample** | `sample/` (9 files) | ❌ | No sample osc submenu at all |
-| **Unison** | `unison/` (4 files) | ❌ | `G_KIT_UNISON_NUM/DETUNE/SPREAD` bridge globals exist, UI controls wired (combo + sliders), model fields present — engine KitShred never spawns sub-voices or reads these globals |
+| **Unison** | `unison/` (4 files) | ✅ | SynthShred spawns sub-voice MorphingWavetable instances per slot (up to 8), applies detune (±cents), stereo spread (phase offset). Bridge globals `G_UNISON_NUM/DETUNE/SPREAD` read per-step. Still missing from KitShred. |
 | **Index** | `index.md` | ⚠️ Partial | Osc params exist in editor; ~7/19 sub-pages missing |
 
 ### 2.6 Modulation (`menus/modulation/`)
@@ -144,9 +144,9 @@ Firmware `PolyphonyMode` enum: `AUTO`, `POLY`, `MONO`, `LEGATO`, `CHOKE`. `Sound
 |---------|----------|-------------------|---------|
 | Polyphony Mode | `PolyphonyMode` (AUTO/POLY/MONO/LEGATO/CHOKE) | ✅ | All 5 modes implemented (POLY/MONO/LEGATO/AUTO/CHOKE) with per-track voice stealing |
 | Voice Count (VCNT) | `Sound::maxVoiceCount` (0-8) | ✅ | Per-track max voice limit via `G_MAX_VOICES`; voice stealing replaces oldest voice at limit |
-| Unison Count | `Sound::numUnison` (1-8, `kMaxNumVoicesUnison`) | ⚠️ Partial | Model/UI/bridge globals wired (1-8 combo, `G_KIT_UNISON_NUM`), engine never spawns sub-voices — per-track SynthShred `G_UNISON_NUM` works (see note below) |
-| Unison Detune | `kMaxUnisonDetune = 50` | ❌ | `G_KIT_UNISON_DETUNE` bridge global + UI slider registered, engine never reads it — per-track `G_UNISON_DETUNE` works |
-| Unison Stereo Spread | `kMaxUnisonStereoSpread = 50` | ❌ | `G_KIT_UNISON_SPREAD` bridge global + UI slider registered, engine never reads it — per-track `G_UNISON_SPREAD` works |
+| Unison Count | `Sound::numUnison` (1-8, `kMaxNumVoicesUnison`) | ✅ | SynthShred spawns up to 8 sub-voices per slot; power-normalized gain; `G_UNISON_NUM` read per-step from bridge |
+| Unison Detune | `kMaxUnisonDetune = 50` | ✅ | Sub-voice frequency = baseFreq × 2^(detuneCents × offset / 1200); symmetric distribution |
+| Unison Stereo Spread | `kMaxUnisonStereoSpread = 50` | ✅ | Sub-voice phase offset for stereo width; distributed across ±spread range |
 
 ### 2.9 Mod FX (`menus/mod_fx/`)
 
@@ -301,8 +301,9 @@ Features still not implemented (descending priority):
 5. ✅ **AudioClip engine integration** — done (loads WAV via WavReader, LiSa.loadSamples() added, loop region from startSamplePos/endSamplePos)
 6. **No GlobalEffectable hierarchy** — Firmware has `GlobalEffectableForSong` and `GlobalEffectableForClip`. Java has bare reverb/delay floats on `ProjectModel`.
 7. **Compressor menu** — Attack, blend, ratio, release, threshold are individually wired via globals; no unified compressor menu UI.
-8. **Arpeggiator completion** — Chord sim, note mode, step repeat, rhythm, seq length, randomization, MPE (basic modes + ratchet work; these sub-features missing).
+8. ✅ **Arpeggiator completion** — All modes, randomization, note probability, chord polyphony, rhythm silences done.
 9. **MPE (MIDI Polyphonic Expression)** — No per-note pitch-bend, per-note release velocity, or 14-bit MIDI resolution. `mpeVelocity` field parsed from XML into `ArpModel` but engine never acts on it. MIDI bridge (`MidiInputRouter`) treats all controller data as standard 7-bit. Blocking: MPE-capable controllers (Roli, Osmose) will feel flat.
+10. **KitShred unison** — Bridge globals and UI exist for kit unison; KitShred engine never spawns sub-voices (only SynthShred has unison).
 
 ### 8.3 Audio Engine Gaps (Active Items)
 
@@ -310,6 +311,7 @@ Features still not implemented (descending priority):
 2. ~~**Enhance RingsReverb** — YIN pitch tracking, mallet excitation, K-S mode toggle all already implemented (RingsReverb.java + bridge globals G_REVERB_EXCITATION/G_REVERB_MODE + engine wiring).~~ ✅
 3. ~~**Compressor master blend** — Done: `G_MASTER_COMP_BLEND` constant, `ProjectModel.compressorBlend` field, engine reads `comp.dryWet()`.~~ ✅
 4. ~~**Compressor threshold wiring** — Done: MasterShred now reads `G_SP_COMPRESSOR_THRESHOLD` as an override (non-zero values replace the knob-derived `1 - 0.8*knob` formula, 0.0 preserves backward compatibility).~~ ✅
+5. ✅ **SynthShred unison engine** — Sub-voice MorphingWavetable spawn, detune, phase-based stereo spread, power-normalized gain. Done. KitShred unison still missing.
 
 
 ## 9. javax.sound Dependency Audit & Replacement
