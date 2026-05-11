@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-05-11 (Compressor master blend, always-on summing tanh, RingsReverb excitation/K-S mode)
+> Last updated: 2026-05-11 (XML parsing gap audit: 8 concrete gaps found, doc restructured)
 > Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -278,14 +278,39 @@ These features exist only in our software implementation and have no hardware co
 
 ## 8. Remaining Gaps
 
+### 8.1 XML Parsing Gaps (Concrete, Fixable in `DelugeXmlParser.java`)
+
+These are XML attributes/sub-elements that the DelugeFirmware C++ code writes and reads but our Java parser silently ignores. All verified against firmware source (`../DelugeFirmware`).
+
+| # | Gap | Status | Java Impact | Priority |
+|---|-----|--------|-------------|----------|
+| 1 | **`<stutter>` element** — `quantized`, `reverse`, `pingPong` sub-attributes | ✅ Fixed | Stutter config now parsed in `populateSynth()` and `parseSoundDrum()` | HIGH |
+| 2 | **`oscillatorSync` attribute on `<osc2>`** | ✅ Fixed | OscillatorSync field on `SynthTrackModel`, parsed in `populateSynth()` | HIGH |
+| 3 | **Osc2 missing sample-playback attrs** — `loopMode`, `reversed`, `timeStretchEnable`, `timeStretchAmount`, `linearInterpolation` on `<osc2>` | ✅ Fixed | Model fields + parser on both `SynthTrackModel` and `SoundDrum` | MEDIUM |
+| 4 | **`linearInterpolation` attribute on sample osc** | ✅ Fixed | `osc1LinearInterpolation` field + getter/setter on `SynthTrackModel`, parsed in osc1 block | MEDIUM |
+| 5 | **`dx7randomdetune` + `dx7enginemode` attributes on DX7 osc block** | ✅ Fixed | `dx7RandomDetune` field + `engineType` (maps to dx7enginemode) parsed from osc1 attrs | MEDIUM |
+| 6 | **`startLoopPos`/`endLoopPos` in `<zone>`** | ✅ Fixed | Parsed in `parseZoneFromOsc()` (osc1 zones) and osc2 zone block in `parseSoundDrum()` | MEDIUM |
+| 7 | **Arp randomization params** — 10 probability params + chordPolyphony | ✅ Fixed | Fields added to `ArpModel` record, parsed as attributes on `<arpeggiator>` element | MEDIUM |
+| 8 | **`sidechainCompressorVolume`** — written alongside `sidechainCompressorShape` | ✅ Fixed | Parsed at song level (`ProjectModel`), audio clip level (`AudioTrackModel.AudioClip`), kit level (`ClipModel.kitParams`) | MEDIUM |
+
+### 8.2 Architectural Gaps (Large Features)
+
 Features still not implemented (descending priority):
 
-1. **Arpeggiator completion** — Chord sim, note mode, step repeat, rhythm, seq length, randomization, MPE
-2. **Per-parameter sequences (ParamManager)** — Deep infrastructure change but unlocks full automation.
-3. **Track/Clip separation** — Multiple clips per track enables session-mode workflows.
-4. **Per-drum FX chain** — Required for full Kit track parity.
-5. **Session vs Arranger** — Distinct playback modes.
-6. **No AudioClip model** — Entirely absent from Java.
-7. **No GlobalEffectable hierarchy** — Firmware has `GlobalEffectableForSong` and `GlobalEffectableForClip`. Java has bare reverb/delay floats on `ProjectModel`.
-8. **Compressor menu** — Attack, blend, ratio, release, threshold are individually wired via globals; no unified compressor menu UI.
-9. **Unwired kit-sound bridge globals** — 11 per-kit globals (`G_KIT_HPF_MODE`, `G_KIT_UNISON_NUM`, etc.) registered in BridgeContract + some with UI, but engine's KitShred never reads them. See §2.10.
+1. **Per-parameter sequences (ParamManager)** — Deep infrastructure change but unlocks full automation.
+2. **Track/Clip separation** — Multiple clips per track enables session-mode workflows.
+3. **Per-drum FX chain** — Required for full Kit track parity.
+4. **Session vs Arranger** — Distinct playback modes.
+5. **No AudioClip model** — Entirely absent from Java.
+6. **No GlobalEffectable hierarchy** — Firmware has `GlobalEffectableForSong` and `GlobalEffectableForClip`. Java has bare reverb/delay floats on `ProjectModel`.
+7. **Compressor menu** — Attack, blend, ratio, release, threshold are individually wired via globals; no unified compressor menu UI.
+8. **Unwired kit-sound bridge globals** — 11 per-kit globals (`G_KIT_HPF_MODE`, `G_KIT_UNISON_NUM`, etc.) registered in BridgeContract + some with UI, but engine's KitShred never reads them. See §2.10.
+9. **Arpeggiator completion** — Chord sim, note mode, step repeat, rhythm, seq length, randomization, MPE (partial — basic modes work)
+
+### 8.3 Audio Engine Gaps (Plan from prior session)
+
+From the plan file (`fizzy-sleeping-penguin.md`):
+
+1. **Always-on summing tanh saturation** — Add lightweight `Math.tanh()` stage to master chain in `DelugeEngineDSL.java` (always active, no UI).
+2. **Enhance RingsReverb** — Add YIN pitch tracking, mallet excitation, K-S mode toggle.
+3. **Compressor master blend** — Add `G_MASTER_COMP_BLEND` global, `ProjectModel.compressorBlend` field, wire in engine.
