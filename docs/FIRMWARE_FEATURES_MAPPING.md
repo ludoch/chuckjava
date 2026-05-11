@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-05-11 (Hardware Character Preferences — master saturation, filter drive, 14-bit DAC crunch, Rings reverb)
+> Last updated: 2026-05-11 (Compressor master blend, always-on summing tanh, RingsReverb excitation/K-S mode)
 > Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -18,7 +18,7 @@ This document maps every documented hardware feature and menu from the official 
 | Chord Keyboard | `features/chord_keyboard.md` | ✅ Implemented | CORK/CORL layouts, scale-aware chords, 6 voicing modes |
 | DX7 Synth | `features/dx_synth.md` | ✅ Implemented | 6-op FM engine (Dx7Engine), .syx import/export (Dx7SyxParser), 32 algorithms, operator editor UI, DX7 tab, XML round-trip, Vintage/Modern/Auto engine type toggle. **Note:** envelope shape uses dexed/msfa log-domain envelopes (not standard ADSR); track-level DelugeAdsr bypassed for DX7 tracks — per-operator DX7 envelopes control amplitude directly |
 | Hardware Character (Master Sat, Filter Drive, 14-bit DAC, Rings Reverb) | — | ✅ Implemented | User preferences for hardware-accurate audio character: tanh master bus saturation, v1.3.1+ filter drive (SVFilter tanh at drive > 1.0), 14-bit DAC truncation with TPDF dither, RingsReverb physical-modeling reverb. Toggled via Settings → Preferences. See §Preferences in guidebook. |
-| Looping in Grid View | `features/looping_in_grid_view.md` | ❌ Not implemented | Green mode create+record, LOOP/LAYERING LOOP cmds |
+| Looping in Grid View | `features/looping_in_grid_view.md` | ✅ Implemented | ClipModel.PlayMode.LOOP with context menu, engine auto-re-queue, green rendering in SONG view |
 | MIDI Device Definitions | `features/midi_device_definition_files.md` | ✅ Implemented | MidiDeviceDefinition XML model, loader, preferences, feedback service, UI browser |
 | MIDI Follow Mode | `features/midi_follow_mode.md` | ✅ Implemented | MidiInputRouter, 3 follow channels, feedback light piping, auto-clip-follow |
 | Note/NoteRow Editor | `features/note_noterow_editor.md` | ⚠️ Partial | Probability (per-step) works; iterance, fill, euclidean missing |
@@ -50,8 +50,8 @@ The firmware organizes sound editing through 5 menu groups accessed via the SELE
 
 | Menu Page | Firmware Params | Java/ChucK Status | Details |
 |-----------|----------------|-------------------|---------|
-| Attack | `attack.md` | ⚠️ Partial | Compressor exists (sidechain ducking); attack parameter not exposed |
-| Blend | `blend.md` | ❌ | No dry/wet blend |
+| Attack | `attack.md` | ✅ | Per-song attack via G_MASTER_COMP_ATTACK + engine mapping |
+| Blend | `blend.md` | ✅ | Per-song dry/wet blend via G_MASTER_COMP_BLEND + comp.dryWet() |
 | HPF | `hpf.md` | ❌ | No sidechain HPF |
 | Ratio | `ratio.md` | ⚠️ Partial | Compression ratio not configurable |
 | Release | `release.md` | ⚠️ Partial | 120ms recovery hardcoded (see guidebook §3) |
@@ -81,9 +81,9 @@ Firmware filter modes: `TRANSISTOR_12DB`, `TRANSISTOR_24DB`, `TRANSISTOR_24DB_DR
 | LPF Mode | `lpf/mode.md` | ⚠️ Partial | Filter mode enum exists in Java; firmware has 3 ladder + 2 SVF modes + morph + drive |
 | LPF Morph | `lpf/morph.md` | ❌ | No morph; firmware has dry/wet blend for filter transitions |
 | LPF Drive | `lpf/drive.md` | ✅ | SVFilter drive with tanh soft-clip saturation (0.0–2.0); drive slider in UI |
-| HPF Freq | `hpf/frequency.md` | ❌ | HPF fields exist in model, no UI or engine support |
-| HPF Res | `hpf/resonance.md` | ❌ | — |
-| HPF Mode/Morph/FM | `hpf/*.md` | ❌ | Entire HPF submenu missing |
+| HPF Freq | `hpf/frequency.md` | ❌ | HPF freq fields in model + UI slider + bridge global, but engine KitShred never reads `G_KIT_HPF_FREQ` — only writes back modulated values |
+| HPF Res | `hpf/resonance.md` | ❌ | Same pattern: engine writes `G_KIT_HPF_RES` back but never reads initial value |
+| HPF Mode/Morph/FM | `hpf/*.md` | ❌ | `G_KIT_HPF_MODE` + `G_KIT_HPF_MORPH` bridge globals registered, UI combo/slider wired, engine never reads them |
 | Routing | `routing.md` | ✅ | 3 filter routing modes: SERIES_LPF_HPF, SERIES_HPF_LPF, PARALLEL; route combo in UI |
 | Sound Filters | `sound_filters.md` | ✅ | Per-sound SVFilter + HPF in Kit tracks (kitFil[]/kitHpf[] per voice) |
 | **Index** | `index.md` | ⚠️ Partial | Basic LPF works; 10/14 sub-pages missing |
@@ -115,7 +115,7 @@ Firmware has **4 LFOs** (`LFO_COUNT = 4`): LFO1 (global), LFO2 (per-voice), LFO3
 | File Browser | `file_browser.md` | ✅ | Library tab |
 | **Modulator 1/2** | `modulator/` | ⚠️ Partial | Volume/transpose/destination/feedback exist; retrigger phase missing |
 | **Sample** | `sample/` (9 files) | ❌ | No sample osc submenu at all |
-| **Unison** | `unison/` (4 files) | ❌ | Unison count/detune only; stereo spread missing |
+| **Unison** | `unison/` (4 files) | ❌ | `G_KIT_UNISON_NUM/DETUNE/SPREAD` bridge globals exist, UI controls wired (combo + sliders), model fields present — engine KitShred never spawns sub-voices or reads these globals |
 | **Index** | `index.md` | ⚠️ Partial | Osc params exist in editor; ~7/19 sub-pages missing |
 
 ### 2.6 Modulation (`menus/modulation/`)
@@ -143,9 +143,9 @@ Firmware `PolyphonyMode` enum: `AUTO`, `POLY`, `MONO`, `LEGATO`, `CHOKE`. `Sound
 |---------|----------|-------------------|---------|
 | Polyphony Mode | `PolyphonyMode` (AUTO/POLY/MONO/LEGATO/CHOKE) | ✅ | All 5 modes implemented (POLY/MONO/LEGATO/AUTO/CHOKE) with per-track voice stealing |
 | Voice Count (VCNT) | `Sound::maxVoiceCount` (0-8) | ✅ | Per-track max voice limit via `G_MAX_VOICES`; voice stealing replaces oldest voice at limit |
-| Unison Count | `Sound::numUnison` (1-8, `kMaxNumVoicesUnison`) | ⚠️ Partial | Unison count exists; stereo spread missing |
-| Unison Detune | `kMaxUnisonDetune = 50` | ❌ | No unison detune control |
-| Unison Stereo Spread | `kMaxUnisonStereoSpread = 50` | ❌ | No stereo spread |
+| Unison Count | `Sound::numUnison` (1-8, `kMaxNumVoicesUnison`) | ⚠️ Partial | Model/UI/bridge globals wired (1-8 combo, `G_KIT_UNISON_NUM`), engine never spawns sub-voices — per-track SynthShred `G_UNISON_NUM` works (see note below) |
+| Unison Detune | `kMaxUnisonDetune = 50` | ❌ | `G_KIT_UNISON_DETUNE` bridge global + UI slider registered, engine never reads it — per-track `G_UNISON_DETUNE` works |
+| Unison Stereo Spread | `kMaxUnisonStereoSpread = 50` | ❌ | `G_KIT_UNISON_SPREAD` bridge global + UI slider registered, engine never reads it — per-track `G_UNISON_SPREAD` works |
 
 ### 2.9 Mod FX (`menus/mod_fx/`)
 
@@ -157,6 +157,38 @@ Firmware `ModFXType` enum: `NONE`, `FLANGER`, `CHORUS`, `PHASER`, `CHORUS_STEREO
 | Depth | `kModFXParam::DEPTH` | ✅ | modFxDepth parameter |
 | Feedback | `kModFXParam::FEEDBACK` | ⚠️ Partial | Basic feedback; firmware has resonance-compensated feedback curves (32-bit cubic) |
 | Offset | `kModFXParam::OFFSET` | ✅ | Delay offset control (`G_MOD_FX_OFFSET`); offset slider in UI |
+
+### 2.10 Unwired Bridge Globals (Engine Never Reads)
+
+These globals are registered in `BridgeContract.java` and some have UI controls, but the engine (`DelugeEngineDSL.java`) never reads them. They represent half-finished feature wiring — the bridge contract and UI layer are ready, but the audio engine side was never completed.
+
+#### Per-Kit-Sound Globals
+
+The per-track (synth) equivalents work correctly in `SynthShred`. The `G_KIT_*` variants are wired at the bridge/UI level but the engine's `KitShred` loop never reads them.
+
+| Bridge Global | Bridge Status | UI Status | Engine Status |
+|--------------|--------------|-----------|---------------|
+| `G_KIT_HPF_MODE` | Registered (Float) | UI dropdown | Never read in KitShred |
+| `G_KIT_HPF_MORPH` | Registered (Float) | HPF morph slider | Never read in KitShred |
+| `G_KIT_OSC2_TYPE` | Registered (Float) | UI dropdown | Never read in KitShred |
+| `G_KIT_UNISON_NUM` | Registered (Float) | 1-8 combo box | Never read in KitShred |
+| `G_KIT_UNISON_DETUNE` | Registered (Float) | Detune slider (0-50) | Never read in KitShred |
+| `G_KIT_UNISON_SPREAD` | Registered (Float) | Spread slider (0-50) | Never read in KitShred |
+| `G_KIT_WAVE_INDEX` | Registered (Float) | Wavetable position slider | Never read in KitShred |
+| `G_KIT_DELAY_RATE` | Registered (Float) | Delay rate slider | Never read in KitShred |
+| `G_KIT_DELAY_FB` | Registered (Float) | Delay feedback slider | Never read in KitShred |
+| `G_KIT_MAX_VOICES` | Registered (Float) | Max voices dropdown | Never read in KitShred |
+| `G_KIT_POLYPHONY` | Registered (Float) | Polyphony mode combo | Never read in KitShred |
+
+#### Per-Step Automation Globals
+
+Written by the step editor UI but never read by the engine during step processing:
+
+| Bridge Global | Bridge Status | UI Status | Engine Status |
+|--------------|--------------|-----------|---------------|
+| `G_STEP_FILTER_MODE` | Registered (Float) | Step editor toggle | Never read in step processing |
+| `G_STEP_DELAY` | Registered (Float) | Step delay amount | Never read in step send gain |
+| `G_STEP_REVERB` | Registered (Float) | Step reverb amount | Never read in step send gain |
 
 ---
 
@@ -252,9 +284,8 @@ Features still not implemented (descending priority):
 2. **Per-parameter sequences (ParamManager)** — Deep infrastructure change but unlocks full automation.
 3. **Track/Clip separation** — Multiple clips per track enables session-mode workflows.
 4. **Per-drum FX chain** — Required for full Kit track parity.
-5. **Looping in Grid View** — Green mode create+record, LOOP/LAYERING LOOP cmds.
-6. **Session vs Arranger** — Distinct playback modes.
-8. **No AudioClip model** — Entirely absent from Java.
-9. **No GlobalEffectable hierarchy** — Firmware has `GlobalEffectableForSong` and `GlobalEffectableForClip`. Java has bare reverb/delay floats on `ProjectModel`.
-10. **No Consequence/undo system** — Firmware uses linked-list-of-Consequences with per-type reversal. Java `UndoRedoStack` is simpler.
-11. **No Drum polymorphism** — Firmware has `SoundDrum`, `MIDIDrum`, `GateDrum` with distinct behaviors. Java `KitSound` is flat data.
+5. **Session vs Arranger** — Distinct playback modes.
+6. **No AudioClip model** — Entirely absent from Java.
+7. **No GlobalEffectable hierarchy** — Firmware has `GlobalEffectableForSong` and `GlobalEffectableForClip`. Java has bare reverb/delay floats on `ProjectModel`.
+8. **Compressor menu** — Attack, blend, ratio, release, threshold are individually wired via globals; no unified compressor menu UI.
+9. **Unwired kit-sound bridge globals** — 11 per-kit globals (`G_KIT_HPF_MODE`, `G_KIT_UNISON_NUM`, etc.) registered in BridgeContract + some with UI, but engine's KitShred never reads them. See §2.10.

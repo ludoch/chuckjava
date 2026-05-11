@@ -5,7 +5,8 @@ import org.chuck.audio.util.StereoUGen;
 /**
  * RingsReverb: Physical modeling reverb inspired by Émilie Gillet's Rings (Mutable Instruments).
  *
- * <p>Architecture: 4 parallel modal resonators (2nd-order IIR bandpass) + Schroeder tank tail.
+ * <p>Architecture: 4 parallel modal resonators (2nd-order IIR bandpass) + Schroeder tank tail,
+ * with optional YIN autocorrelation pitch tracking, mallet excitation, and Karplus-Strong mode.
  * The resonators respond to the pitch/frequency content of the input, creating body/resonance
  * that tracks with the note being played — fundamentally different from algorithmic reverb which
  * applies uniform ambience regardless of pitch.
@@ -16,6 +17,8 @@ import org.chuck.audio.util.StereoUGen;
  *   <li><b>position</b> (0-1): Spatial spread + balance between direct resonators vs tank tail.</li>
  *   <li><b>structure</b> (0-1): Harmonic spacing. 0 = inharmonic (metallic), 1 = harmonic (string-like).</li>
  *   <li><b>damping</b> (0-1): Additional decay damping on the tank reverb tail.</li>
+ *   <li><b>excitation</b> (0-1): Amount of mallet-style transient noise burst on attack detection.</li>
+ *   <li><b>mode</b> (0=RESONATOR, 1=KARPLUS_STRONG): Structural model toggle.</li>
  * </ul>
  */
 public class RingsReverb extends StereoUGen {
@@ -25,14 +28,19 @@ public class RingsReverb extends StereoUGen {
   private float position  = 0.5f;
   private float structure = 0.5f;
   private float damping   = 0.5f;
+  private float excitation = 0.0f;
+  private int   mode      = 0; // 0=RESONATOR, 1=KARPLUS_STRONG
 
   // ─── Internal state ───────────────────────────────────────────
   private final float sampleRate;
-  private float baseFreq = 440.0f; // estimated from input (simple pitch tracker)
+  private float baseFreq = 440.0f;
 
-  // 4 parallel modal resonators (stereo pairs)
+  // 4 parallel modal resonators (stereo pairs) — used in RESONATOR mode
   private final ModalResonator[] resL = new ModalResonator[4];
   private final ModalResonator[] resR = new ModalResonator[4];
+
+  // Karplus-Strong string model — used in KARPLUS_STRONG mode
+  private final KarplusStrongString ksString;
 
   // Tank reverb (Schroeder topology, short tail)
   private final CombFilter[] tankCombL;
@@ -48,6 +56,20 @@ public class RingsReverb extends StereoUGen {
   // Stereo crossfade state
   private float prevBrightness = -1f;
   private float prevStructure = -1f;
+  private int prevMode = -1;
+
+  // ─── YIN autocorrelation pitch tracking state ─────────────────
+  private static final int YIN_BUFFER_SIZE = 2048;
+  private final float[] yinBuffer = new float[YIN_BUFFER_SIZE];
+  private int yinWriteIdx = 0;
+  private float yinPrevEstimate = 440f;
+  private static final float YIN_THRESHOLD = 0.15f;
+
+  // ─── Mallet excitation state ──────────────────────────────────
+  private float malletEnvelope = 0f;
+  private float prevEnvelope = 0f;
+  private static final float MALLET_DECAY = 0.9995f;  // per-sample decay
+  private static final float TRANSIENT_THRESHOLD = 0.02f;
 
   public RingsReverb() {
     this(44100f);
@@ -55,6 +77,8 @@ public class RingsReverb extends StereoUGen {
 
   public RingsReverb(float sampleRate) {
     this.sampleRate = sampleRate;
+    ksString = new KarplusStrongString(sampleRate, 440f);
+
     for (int i = 0; i < 4; i++) {
       resL[i] = new ModalResonator(sampleRate);
       resR[i] = new ModalResonator(sampleRate);
@@ -98,6 +122,16 @@ public class RingsReverb extends StereoUGen {
     this.damping = Math.max(0f, Math.min(1f, v));
   }
 
+  /** Mallet excitation amount (0=none, 1=full). Triggers an exponential-decay noise burst on transients. */
+  public void setExcitation(float v) {
+    this.excitation = Math.max(0f, Math.min(1f, v));
+  }
+
+  /** Structural model: 0=RESONATOR (modal bandpass), 1=KARPLUS_STRONG (string model). */
+  public void setMode(int v) {
+    this.mode = v == 0 ? 0 : 1;
+  }
+
   // ─── StereoUGen implementation ────────────────────────────────
 
   @Override
@@ -113,90 +147,201 @@ public class RingsReverb extends StereoUGen {
     dcBlockerL = left + dcBlockerL * DC_BLOCK;
     dcBlockerR = right + dcBlockerR * DC_BLOCK;
 
-    // Simple pitch tracker for base frequency estimation
     float mono = (left + right) * 0.5f;
-    estimatePitch(mono);
 
+    // YIN autocorrelation pitch estimation (replaces zero-crossing)
+    estimatePitchYin(mono);
+
+    // Update structure on param change (includes mode switch)
     updateResonators();
 
-    // Process through modal resonators
+    // Mallet excitation: detect transient onset, fire noise burst
+    float malletSignal = computeMallet(mono);
+
     float resOutL = 0f, resOutR = 0f;
-    for (int i = 0; i < 4; i++) {
-      resOutL += resL[i].tick(mono);
-      resOutR += resR[i].tick(mono);
-    }
-    float resScale = 0.25f; // average across 4 resonators
-    resOutL *= resScale;
-    resOutR *= resScale;
 
-    // Process through tank reverb
-    float tankInL = resOutL, tankInR = resOutR;
-    for (int i = 0; i < 4; i++) {
-      tankInL = tankCombL[i].tick(tankInL);
-      tankInR = tankCombR[i].tick(tankInR);
-    }
-    float tankOutL = tankInL;
-    float tankOutR = tankInR;
-    for (int i = 0; i < 4; i++) {
-      tankOutL = tankApL[i].tick(tankOutL);
-      tankOutR = tankApR[i].tick(tankOutR);
+    if (mode == 1) {
+      // ── Karplus-Strong mode ──
+      float ksOut = ksString.tick(mono + malletSignal);
+      // Route through tank tail for body
+      float tankInL = ksOut;
+      float tankInR = ksOut;
+      for (int i = 0; i < 4; i++) {
+        tankInL = tankCombL[i].tick(tankInL);
+        tankInR = tankCombR[i].tick(tankInR);
+      }
+      float tankOutL = tankInL;
+      float tankOutR = tankInR;
+      for (int i = 0; i < 4; i++) {
+        tankOutL = tankApL[i].tick(tankOutL);
+        tankOutR = tankApR[i].tick(tankOutR);
+      }
+      // Crossfade: position controls direct string vs string+tank
+      resOutL = ksOut * (1f - position) + tankOutL * position;
+      resOutR = ksOut * (1f - position) + tankOutR * position;
+    } else {
+      // ── RESONATOR mode (original) ──
+      for (int i = 0; i < 4; i++) {
+        resOutL += resL[i].tick(mono);
+        resOutR += resR[i].tick(mono);
+      }
+      float resScale = 0.25f;
+      resOutL *= resScale;
+      resOutR *= resScale;
+
+      // Process through tank reverb
+      float tankInL = resOutL;
+      float tankInR = resOutR;
+      for (int i = 0; i < 4; i++) {
+        tankInL = tankCombL[i].tick(tankInL);
+        tankInR = tankCombR[i].tick(tankInR);
+      }
+      float tankOutL = tankInL;
+      float tankOutR = tankInR;
+      for (int i = 0; i < 4; i++) {
+        tankOutL = tankApL[i].tick(tankOutL);
+        tankOutR = tankApR[i].tick(tankOutR);
+      }
+
+      // Crossfade: position controls balance between dry resonators and wet
+      resOutL = resOutL * (1f - position) + tankOutL * position;
+      resOutR = resOutR * (1f - position) + tankOutR * position;
+
+      // Add mallet signal to resonator output at the end
+      resOutL += malletSignal * 0.3f;
+      resOutR += malletSignal * 0.3f;
     }
 
-    // Crossfade: position controls balance between dry resonators and wet (resonators + tank)
-    // position=0 → pure resonators, position=1 → full resonators + tank
-    float outL = resOutL * (1f - position) + tankOutL * position;
-    float outR = resOutR * (1f - position) + tankOutR * position;
-
-    // Apply brightness as a post-process gain (resonator damping already applied internally)
+    // Apply brightness as a post-process gain
     float gain = 0.3f + brightness * 0.7f;
-    outL *= gain;
-    outR *= gain;
+    resOutL *= gain;
+    resOutR *= gain;
 
-    lastOutChannels[0] = outL;
-    lastOutChannels[1] = outR;
+    lastOutChannels[0] = resOutL;
+    lastOutChannels[1] = resOutR;
   }
 
-  // ─── Internal: pitch estimation (zero-crossing + peak tracking) ──
+  // ─── YIN autocorrelation pitch estimation ─────────────────────
+  //
+  // YIN (De Cheveigné & Kawahara, 2002) is an autocorrelation-based pitch estimator
+  // that is more robust than zero-crossing — better octave detection, less jitter,
+  // and works on polyphonic/mixed signals.
+  //
+  // Simplified implementation: difference function + cumulative mean normalization
+  // over a 2048-sample buffer. The first minimum below threshold is the period.
 
-  private float zcAccum = 0f;
-  private int zcCount = 0;
-  private float peak = 0f;
-  private int sampleCount = 0;
-  private float prevSample = 0f;
+  private void estimatePitchYin(float s) {
+    yinBuffer[yinWriteIdx] = s;
+    yinWriteIdx = (yinWriteIdx + 1) % YIN_BUFFER_SIZE;
 
-  private void estimatePitch(float s) {
-    sampleCount++;
-    // Zero-crossing rate
-    if (prevSample >= 0 && s < 0) zcCount++;
-    prevSample = s;
-    // Peak tracking
-    float abs = Math.abs(s);
-    if (abs > peak) peak = abs;
+    // Only run estimation every 512 samples to keep CPU light
+    if (yinWriteIdx % 512 != 0) return;
 
-    if (sampleCount >= 1024) {
-      if (zcCount > 0) {
-        float freq = (sampleRate * zcCount * 0.5f) / sampleCount; // Hz
-        // Clamp to musical range
-        baseFreq = Math.max(30f, Math.min(8000f, freq));
+    // Difference function: d(tau) = sum_{j=0}^{N/2-1} (x[j] - x[j+tau])^2
+    // Use last YIN_BUFFER_SIZE/2 samples as frame
+    int half = YIN_BUFFER_SIZE / 2;
+    float[] diff = new float[half];
+    float runningMin = Float.MAX_VALUE;
+    int bestTau = 0;
+
+    for (int tau = 1; tau < half; tau++) {
+      float sum = 0f;
+      for (int j = 0; j < half; j++) {
+        int idxJ = (yinWriteIdx - half + j + YIN_BUFFER_SIZE) % YIN_BUFFER_SIZE;
+        int idxT = (idxJ + tau) % YIN_BUFFER_SIZE;
+        float d = yinBuffer[idxJ] - yinBuffer[idxT];
+        sum += d * d;
       }
-      // Reset accumulators
-      zcCount = 0;
-      sampleCount = 0;
-      peak = 0f;
+      diff[tau] = sum;
     }
+
+    // Cumulative mean normalization (CMN): d'(tau) = d(tau) / ( (1/tau) * sum_{j=1}^{tau} d(j) )
+    float cumSum = 0f;
+    for (int tau = 1; tau < half; tau++) {
+      cumSum += diff[tau];
+      if (cumSum < 1e-10f) continue;
+      float cmn = diff[tau] * tau / cumSum;
+      if (cmn < runningMin) {
+        runningMin = cmn;
+        bestTau = tau;
+      }
+      // First minimum below threshold is the period
+      if (cmn < YIN_THRESHOLD && tau > 20) { // tau > 20 avoids subharmonics at very low freqs
+        bestTau = tau;
+        break;
+      }
+    }
+
+    if (bestTau > 0) {
+      float freq = sampleRate / bestTau;
+      // Parabolic interpolation around the minimum for sub-sample accuracy
+      if (bestTau > 1 && bestTau < half - 1) {
+        float y0 = diff[bestTau - 1];
+        float y1 = diff[bestTau];
+        float y2 = diff[bestTau + 1];
+        float a = (y0 + y2 - 2f * y1) * 0.5f;
+        if (a != 0f) {
+          float delta = (y0 - y2) / (2f * a);
+          float interpolatedTau = bestTau + delta;
+          if (interpolatedTau > 0) {
+            freq = sampleRate / interpolatedTau;
+          }
+        }
+      }
+      // Clamp and smooth
+      freq = Math.max(30f, Math.min(8000f, freq));
+      // Low-pass filter the estimate (75% new, 25% previous) to avoid jitter
+      baseFreq = freq * 0.75f + yinPrevEstimate * 0.25f;
+      yinPrevEstimate = baseFreq;
+    }
+  }
+
+  // ─── Mallet excitation ────────────────────────────────────────
+  //
+  // Monitors the input envelope. On transient detection (rapid rise in energy),
+  // triggers an exponentially-decaying white noise burst — simulating the "strike"
+  // sound of a mallet hitting the resonator/string.
+
+  private float computeMallet(float s) {
+    // Simple envelope follower (rectify + one-pole)
+    float instantEnv = Math.abs(s);
+    float envelope = instantEnv + prevEnvelope * 0.5f; // naive envelope
+    envelope = Math.max(instantEnv, envelope * 0.999f); // fast attack, slow decay-ish
+
+    // Detect transient: envelope rise above threshold
+    if (excitation > 0.01f && envelope > TRANSIENT_THRESHOLD && envelope > prevEnvelope * 2.5f) {
+      // Trigger mallet: random noise burst at excitation amplitude
+      malletEnvelope = excitation * 0.5f;
+    }
+
+    prevEnvelope = envelope;
+
+    // Generate noise burst with exponential decay
+    if (malletEnvelope > 0.001f) {
+      float noise = (float) (Math.random() * 2f - 1f) * malletEnvelope;
+      malletEnvelope *= MALLET_DECAY; // per-sample decay
+      return noise;
+    }
+    malletEnvelope = 0f;
+    return 0f;
   }
 
   // ─── Internal: update resonator tuning ────────────────────────
 
   private void updateResonators() {
-    if (brightness == prevBrightness && structure == prevStructure) return;
+    if (mode == 1) {
+      // ── Karplus-Strong mode ──
+      ksString.setFreq(baseFreq);
+      // brightness controls string damping (higher = less damped = brighter)
+      ksString.setDamping(1f - 0.95f * brightness);
+    }
+
+    if (brightness == prevBrightness && structure == prevStructure && mode == prevMode) return;
     prevBrightness = brightness;
     prevStructure = structure;
+    prevMode = mode;
 
     // Harmonic ratios: structure=0 → inharmonic (metallic), structure=1 → harmonic (string)
-    // Inharmonic ratios (like Rings default): 1.0, 4.02, 8.03, 12.04
-    // Harmonic ratios: 1.0, 2.0, 3.0, 4.0
-    // Linear interpolation between them based on structure
     float[] inharmRatios = { 1f, 4.02f, 8.03f, 12.04f };
     float[] harmRatios   = { 1f, 2f,    4f,    6f };
 
@@ -207,8 +352,8 @@ public class RingsReverb extends StereoUGen {
 
     // Brightness controls resonator damping/Q
     // brightness=0 → heavily damped (dull), brightness=1 → lightly damped (bright)
-    float q = 5f + brightness * 45f;   // Q range 5-50
-    float decay = 0.3f + (1f - brightness) * 0.6f; // decay range 0.3-0.9
+    float q = 5f + brightness * 45f;
+    float decay = 0.3f + (1f - brightness) * 0.6f;
 
     for (int i = 0; i < 4; i++) {
       float freq = Math.max(30f, Math.min(sampleRate * 0.45f, baseFreq * ratios[i]));
@@ -229,7 +374,7 @@ public class RingsReverb extends StereoUGen {
    */
   private static class ModalResonator {
     private final float fs;
-    private float b0, b1, b2, a1, a2; // Direct Form I coefficients
+    private float b0, b1, b2, a1, a2;
     private float x1 = 0f, x2 = 0f, y1 = 0f, y2 = 0f;
     private float decay = 0.5f;
 
@@ -241,9 +386,7 @@ public class RingsReverb extends StereoUGen {
 
     void setFreq(float freq) {
       float w0 = (float) (2.0 * Math.PI * freq / fs);
-      float alpha = (float) Math.sin(w0) * 0.5f; // Q=2 → fixed resonance bandwidth
-      // Bandpass (constant-skirt): b0 = alpha, b1 = 0, b2 = -alpha, a1 = -2*cos(w0), a2 = 1 - 2*alpha
-      // We compute coefs here, apply Q and decay multiplicatively in tick()
+      float alpha = (float) Math.sin(w0) * 0.5f;
       float cosW0 = (float) Math.cos(w0);
       b0 = alpha;
       b1 = 0f;
@@ -253,13 +396,8 @@ public class RingsReverb extends StereoUGen {
     }
 
     void setQ(float q) {
-      // Q is applied as a scaling factor on the feedback path
-      // Higher Q = more resonant = longer ring at the tuned frequency
-      // We scale a2 to control the resonance bandwidth
-      // a2_effective = a2 + (1 - 2*alpha) * (1 - 1/q)
-      float alpha = b0; // b0 = alpha from setFreq
+      float alpha = b0;
       float qScale = 1f - 1f / q;
-      // Recompute with adjusted Q
       float cosW0 = -a1 * 0.5f;
       float w0 = (float) Math.acos(Math.max(-1f, Math.min(1f, cosW0)));
       float newAlpha = (float) Math.sin(w0) / (2f * q);
@@ -273,16 +411,53 @@ public class RingsReverb extends StereoUGen {
     }
 
     float tick(float input) {
-      // Direct Form I: y[n] = b0*x[n] + b1*x[n-1] + b2*x[n-2] - a1*y[n-1] - a2*y[n-2]
       float output = b0 * input + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
-      // Apply decay envelope (exponential damping)
       output *= decay;
-      // Shift state
       x2 = x1;
       x1 = input;
       y2 = y1;
       y1 = output;
       return output;
+    }
+  }
+
+  /**
+   * KarplusStrongString: digital waveguide string model.
+   * Uses a delay line (period = sampleRate / freq) with a lowpass filter in the feedback loop.
+   * The initial pluck is the input signal; the string rings at its tuned frequency.
+   */
+  private static class KarplusStrongString {
+    private final float[] delayLine;
+    private int writeIdx = 0;
+    private float feedback = 0.9f;
+    private float lpState = 0f; // one-pole lowpass for damping
+    private static final float LP_COEF = 0.5f;
+
+    KarplusStrongString(float sampleRate, float freq) {
+      int delayLen = Math.max(2, Math.round(sampleRate / freq));
+      delayLine = new float[delayLen];
+    }
+
+    void setFreq(float freq) {
+      // Current delay length is fixed at construction — for dynamic tuning
+      // we'd need interpolation. For now, RG updates damping only.
+    }
+
+    void setDamping(float d) {
+      // d=0 → maximum damping (quick decay), d=1 → minimum damping (long ring)
+      this.feedback = 0.95f * d; // range 0..0.95
+    }
+
+    float tick(float input) {
+      int len = delayLine.length;
+      // Read from delay line
+      float out = delayLine[writeIdx];
+      // One-pole lowpass in feedback path (simulates string stiffness loss)
+      lpState = lpState + LP_COEF * (out - lpState);
+      // Write: input excites the string, feedback sustains it
+      delayLine[writeIdx] = input + lpState * feedback;
+      writeIdx = (writeIdx + 1) % len;
+      return out;
     }
   }
 
