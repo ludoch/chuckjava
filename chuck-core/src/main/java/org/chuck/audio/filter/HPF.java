@@ -6,28 +6,34 @@ import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 
 /**
- * Second-order Butterworth high-pass filter. Controls: freq (cutoff Hz), Q (resonance, default
- * 0.707).
+ * High-pass filter with ZDF (Zero-Delay Feedback) SVF topology.
+ *
+ * Controls: freq (cutoff Hz), Q (resonance), morph (0.0=LP → 0.5=BP → 1.0=HP), notchMode,
+ * drive (1.0=linear, >1.0=tanh saturation).
+ *
+ * Default morph=1.0 preserves HPF behavior for existing callers. The ZDF SVF naturally computes
+ * LP, BP, and HP outputs simultaneously, enabling continuous morphing between filter types.
  */
 public class HPF extends ChuckUGen {
   private double cutoff;
   private double q;
+  private double morph = 1.0; // 0=LP, 0.5=BP, 1.0=HP (default HPF)
+  private boolean notchMode = false;
+  private float drive = 1.0f;
   private final float sampleRate;
 
-  private double b0, b1, b2;
-  private double a1, a2;
-  private double x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  // ZDF integrator state
+  private double ic1eq = 0.0;
+  private double ic2eq = 0.0;
 
   public HPF(float sampleRate) {
     this.sampleRate = sampleRate;
     this.cutoff = 1000.0;
     this.q = 0.707;
-    updateCoeffs();
   }
 
   public double freq(double f) {
     cutoff = f;
-    updateCoeffs();
     return f;
   }
 
@@ -37,7 +43,6 @@ public class HPF extends ChuckUGen {
 
   public double Q(double qv) {
     q = qv;
-    updateCoeffs();
     return qv;
   }
 
@@ -45,16 +50,34 @@ public class HPF extends ChuckUGen {
     return q;
   }
 
-  private void updateCoeffs() {
-    double w0 = 2.0 * Math.PI * cutoff / sampleRate;
-    double cosW0 = Math.cos(w0);
-    double alpha = Math.sin(w0) / (2.0 * q);
-    double norm = 1.0 / (1.0 + alpha);
-    b0 = (1.0 + cosW0) / 2.0 * norm;
-    b1 = -(1.0 + cosW0) * norm;
-    b2 = (1.0 + cosW0) / 2.0 * norm;
-    a1 = -2.0 * cosW0 * norm;
-    a2 = (1.0 - alpha) * norm;
+  public double morph(double m) {
+    this.morph = Math.max(0.0, Math.min(1.0, m));
+    return this.morph;
+  }
+
+  public double morph() {
+    return morph;
+  }
+
+  public void notchMode(boolean b) {
+    this.notchMode = b;
+  }
+
+  public boolean notchMode() {
+    return notchMode;
+  }
+
+  public void drive(float d) {
+    this.drive = Math.max(0.0f, Math.min(2.0f, d));
+  }
+
+  public float drive() {
+    return drive;
+  }
+
+  public void reset() {
+    ic1eq = 0.0;
+    ic2eq = 0.0;
   }
 
   @Override
@@ -88,23 +111,50 @@ public class HPF extends ChuckUGen {
       if (buffer != null) System.arraycopy(buffer, offset, inputSum, 0, length);
     }
 
-    // 2. Apply filter (recursive, scalar)
+    // 2. ZDF SVF processing
+    double m = this.morph;
+    double cLow = m <= 0.5 ? 1.0 - 2.0 * m : 0.0;
+    double cBand = m <= 0.5 ? 2.0 * m : 1.0 - 2.0 * (m - 0.5);
+    double cHigh = m <= 0.5 ? 0.0 : 2.0 * (m - 0.5);
+
+    double safeCutoff = Math.max(10.0, Math.min(sampleRate * 0.49, cutoff));
+    double g = Math.tan(Math.PI * safeCutoff / (sampleRate * 2.0));
+    double R = 1.0 / (2.0 * Math.max(0.1, q));
+    double denom = 1.0 / (1.0 + 2.0 * R * g + g * g);
+
     for (int i = 0; i < length; i++) {
-      double x0 = inputSum[i];
-      double y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
-      x2 = x1;
-      x1 = x0;
-      y2 = y1;
-      y1 = y0;
-      if (Math.abs(y1) < 1.0e-15) y1 = 0.0;
-      if (Math.abs(y2) < 1.0e-15) y2 = 0.0;
+      double in = inputSum[i] * drive;
+      double out = 0.0;
 
-      float out = (float) y0;
-      if (out > 2.0f) out = 2.0f;
-      if (out < -2.0f) out = -2.0f;
+      // Double sampling loop (linear when drive <= 1.0)
+      boolean saturate = drive > 1.0f;
+      for (int step = 0; step < 2; step++) {
+        double hp = (in - 2.0 * R * ic1eq - g * ic1eq - ic2eq) * denom;
+        double bp = ic1eq + g * hp;
+        if (saturate) bp = Math.tanh(bp);
+        double lp = ic2eq + g * bp;
 
-      blockCache[i] = out;
-      if (buffer != null) buffer[offset + i] = out;
+        ic1eq = 2.0 * bp - ic1eq;
+        ic2eq = 2.0 * lp - ic2eq;
+        if (Math.abs(ic1eq) < 1.0e-15) ic1eq = 0.0;
+        if (Math.abs(ic2eq) < 1.0e-15) ic2eq = 0.0;
+
+        if (step == 1) {
+          if (notchMode) {
+            out = lp + hp;
+          } else {
+            out = cLow * lp + cBand * bp + cHigh * hp;
+          }
+        }
+      }
+
+      if (Math.abs(out) < 1.0e-15) out = 0.0;
+      if (saturate) out = Math.tanh(out * 2.0) / 2.0;
+      if (out > 2.0) out = 2.0;
+      if (out < -2.0) out = -2.0;
+
+      blockCache[i] = (float) out * gain;
+      if (buffer != null) buffer[offset + i] = blockCache[i];
     }
 
     blockStartTime = systemTime;
@@ -115,18 +165,37 @@ public class HPF extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
-    double x0 = input;
-    double y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
-    x2 = x1;
-    x1 = x0;
-    y2 = y1;
-    y1 = y0;
-    if (Math.abs(y1) < 1.0e-15) y1 = 0.0;
-    if (Math.abs(y2) < 1.0e-15) y2 = 0.0;
+    double m = this.morph;
+    double cLow = m <= 0.5 ? 1.0 - 2.0 * m : 0.0;
+    double cBand = m <= 0.5 ? 2.0 * m : 1.0 - 2.0 * (m - 0.5);
+    double cHigh = m <= 0.5 ? 0.0 : 2.0 * (m - 0.5);
 
-    float out = (float) y0;
-    if (out > 2.0f) out = 2.0f;
-    if (out < -2.0f) out = -2.0f;
-    return out;
+    double safeCutoff = Math.max(10.0, Math.min(sampleRate * 0.49, cutoff));
+    double g = Math.tan(Math.PI * safeCutoff / (sampleRate * 2.0));
+    double R = 1.0 / (2.0 * Math.max(0.1, q));
+    double denom = 1.0 / (1.0 + 2.0 * R * g + g * g);
+
+    double in = input * drive;
+    double out = 0.0;
+    boolean saturate = drive > 1.0f;
+    for (int step = 0; step < 2; step++) {
+      double hp = (in - 2.0 * R * ic1eq - g * ic1eq - ic2eq) * denom;
+      double bp = ic1eq + g * hp;
+      if (saturate) bp = Math.tanh(bp);
+      double lp = ic2eq + g * bp;
+
+      ic1eq = 2.0 * bp - ic1eq;
+      ic2eq = 2.0 * lp - ic2eq;
+
+      if (step == 1) {
+        if (notchMode) {
+          out = lp + hp;
+        } else {
+          out = cLow * lp + cBand * bp + cHigh * hp;
+        }
+      }
+    }
+    if (saturate) out = Math.tanh(out * 2.0) / 2.0;
+    return (float) out;
   }
 }

@@ -72,7 +72,7 @@ Firmware has **4 envelopes** per sound (`kNumEnvelopes = 4`). ENV 0 and ENV 2 sh
 
 ### 2.3 Filter (`menus/filter/`)
 
-Firmware filter modes: `TRANSISTOR_12DB`, `TRANSISTOR_24DB`, `TRANSISTOR_24DB_DRIVE`, `SVF_BAND`, `SVF_NOTCH`, `HPLADDER`, `OFF`. Filter routing: `HIGH_TO_LOW`, `LOW_TO_HIGH`, `PARALLEL`. HPF has its own LADDER + SVF modes. The firmware has **HPF frequency, resonance, morph, FM, and mode sub-pages** — all fully implemented in C++ but marked ❌ in the mapping because they're absent from Java.
+Firmware filter modes: `TRANSISTOR_12DB`, `TRANSISTOR_24DB`, `TRANSISTOR_24DB_DRIVE`, `SVF_BAND`, `SVF_NOTCH`, `HPLADDER`, `OFF`. Filter routing: `HIGH_TO_LOW`, `LOW_TO_HIGH`, `PARALLEL`. HPF has its own LADDER + SVF modes. The firmware has **HPF frequency, resonance, morph, FM, and mode sub-pages** — HPF UGen rewritten to ZDF SVF with morph/notch/drive support (frequency + resonance fully mapped; morph/mode wired with hardcoded defaults in SynthShred pending Heisenbug fix).
 
 | Menu Page | Firmware Params | Java/ChucK Status | Details |
 |-----------|----------------|-------------------|---------|
@@ -83,7 +83,7 @@ Firmware filter modes: `TRANSISTOR_12DB`, `TRANSISTOR_24DB`, `TRANSISTOR_24DB_DR
 | LPF Drive | `lpf/drive.md` | ✅ | SVFilter drive with tanh soft-clip saturation (0.0–2.0); drive slider in UI |
 | HPF Freq | `hpf/frequency.md` | ✅ | KitShred applies `G_KIT_HPF_FREQ` to per-voice Butterworth HPF every tick (line 1346); per-synth HPF via `G_SP_HPF_FREQ` in MasterShred (line 482); model + UI slider + bridge global |
 | HPF Res | `hpf/resonance.md` | ✅ | KitShred applies `G_KIT_HPF_RES` to per-voice HPF Q every tick (line 1347) |
-| HPF Mode/Morph/FM | `hpf/*.md` | ❌ | `G_KIT_HPF_MODE` + `G_KIT_HPF_MORPH` bridge globals registered and forwarded as per-track globals, but Butterworth HPF UGen has no mode/morph support |
+| HPF Mode/Morph/FM | `hpf/*.md` | ⚠️ Partial | HPF UGen rewritten ZDF SVF (morph, notch, drive); SynthShred applies default HP morph(1.0)/notchMode(false). Kit HPF and FM mod not yet wired from bridge arrays (Heisenbug: array-read value causes test failures) |
 | Routing | `routing.md` | ✅ | 3 filter routing modes: SERIES_LPF_HPF, SERIES_HPF_LPF, PARALLEL; route combo in UI |
 | Sound Filters | `sound_filters.md` | ✅ | Per-sound SVFilter + HPF in Kit tracks (kitFil[]/kitHpf[] per voice) |
 | **Index** | `index.md` | ⚠️ Partial | Basic LPF/HPF works; 10/14 sub-pages missing |
@@ -165,8 +165,8 @@ These `G_KIT_*` globals are registered in `BridgeContract.java` with UI controls
 
 | Bridge Global | Engine Reads? | Applied? | Notes |
 |--------------|--------------|----------|-------|
-| `G_KIT_HPF_MODE` | ✅ Read every tick | ❌ Not applied | Per-track HPF is a Butterworth (no mode/morph); value stored as `G_KIT_HPF_MODE_#` global |
-| `G_KIT_HPF_MORPH` | ✅ Read every tick | ❌ Not applied | Same — Butterworth HPF has no morph parameter |
+| `G_KIT_HPF_MODE` | ✅ Read every tick | ⚠️ Partial | HPF UGen now ZDF SVF with notchMode support; SynthShred applies hardcoded false (bridge array read caused Heisenbug). Kit HPF not yet wired. |
+| `G_KIT_HPF_MORPH` | ✅ Read every tick | ⚠️ Partial | HPF UGen now ZDF SVF with continuous morph; SynthShred applies hardcoded 1.0 (bridge array read caused Heisenbug). Kit HPF not yet wired. |
 | `G_KIT_OSC2_TYPE` | ✅ Read every tick | ❌ Not applied | Kit voices use SndBuf (sample playback), no osc2 type concept |
 | `G_KIT_UNISON_NUM` | ✅ Read every tick | ✅ Applied | KitShred spawns sub-SndBuf instances with detuned rate and per-sub Pan2 stereo spread |
 | `G_KIT_UNISON_DETUNE` | ✅ Read every tick | ✅ Applied | Sub-voice rate detune via 2^(cents*offset/1200) |
