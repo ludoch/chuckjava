@@ -32,8 +32,8 @@ replay_pid*
 test-report.txt
 cp.txt
 
-# Compiled class files
-org/
+# Compiled class files (root directory only)
+/org/
 
 # Claude/Claudex local settings
 .claude/

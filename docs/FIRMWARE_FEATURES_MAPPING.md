@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-05-11 (LPF morph for kit sounds — Drum.lpfMorph, G_KIT_LPF_MORPH bridge array, KitShred engine read, SwingKitConfigDialog slider)
+> Last updated: 2026-05-11 (Euclidean rhythm dialog — EuclideanRhythmDialog.java, even-distribution algorithm, circular wheel preview)
 > Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -21,7 +21,7 @@ This document maps every documented hardware feature and menu from the official 
 | Looping in Grid View | `features/looping_in_grid_view.md` | ✅ Implemented | ClipModel.PlayMode.LOOP with context menu, engine auto-re-queue, green rendering in SONG view |
 | MIDI Device Definitions | `features/midi_device_definition_files.md` | ✅ Implemented | MidiDeviceDefinition XML model, loader, preferences, feedback service, UI browser |
 | MIDI Follow Mode | `features/midi_follow_mode.md` | ✅ Implemented | MidiInputRouter, 3 follow channels, feedback light piping, auto-clip-follow |
-| Note/NoteRow Editor | `features/note_noterow_editor.md` | ⚠️ Partial | Probability, iterance (0-3), fill (0-100%) implemented; euclidean missing |
+| Note/NoteRow Editor | `features/note_noterow_editor.md` | ✅ | Probability, iterance (0-3), fill (0-100%), Euclidean rhythm generation via dialog (EuclideanRhythmDialog) |
 | Performance View | `features/performance_view.md` | ✅ Implemented | 16×8 FX column grid, latch/momentary, value editing, param editing, XML save/load |
 | Save/Load Patterns | `features/save_load_patterns.md` | ✅ Implemented | PatternModel + PatternSerializer, ClipSnapshot grid state, XML save/load, sidebar UI |
 | Velocity View | `features/velocity_view.md` | ✅ Implemented | See §1.6 of guidebook; velocity ramps, per-step editing |
