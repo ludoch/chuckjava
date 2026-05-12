@@ -1,5 +1,6 @@
 package org.chuck.audio.util;
 
+import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.chuck.audio.ChuckUGen;
@@ -64,41 +65,78 @@ public class SndBuf extends ChuckUGen {
     // Try loading as a real file
     try {
       java.io.File file = org.chuck.core.ChuckConfig.resolveFile(path);
-      WavData wavData = null;
       if (file != null && file.exists()) {
-        wavData = WavReader.read(file);
-      } else {
-        // Try resource fallback
-        String resourcePath = path.replace("\\", "/");
-        if (!resourcePath.startsWith("/")) resourcePath = "/" + resourcePath;
-
-        java.io.InputStream ris = findResource(resourcePath);
-        if (ris != null) {
-          wavData = WavReader.read(new java.io.BufferedInputStream(ris));
-        }
-      }
-
-      if (wavData == null) {
-        logger.log(Level.SEVERE, "[Audio] SndBuf: File or resource not found: " + path);
+        if (tryLoadWav(file)) return;
+        if (tryLoadAiff(file)) return;
+        logger.log(Level.SEVERE, "[Audio] SndBuf: Unsupported format: " + path);
         samples = new float[0];
         return;
       }
 
-      // Mix down to mono
-      int n = wavData.frameCount();
-      samples = new float[n];
-      for (int i = 0; i < n; i++) {
-        samples[i] = (wavData.channels[0][i] + wavData.channels[1][i]) * 0.5f;
+      // Try resource fallback
+      String resourcePath = path.replace("\\", "/");
+      if (!resourcePath.startsWith("/")) resourcePath = "/" + resourcePath;
+
+      java.io.InputStream ris = findResource(resourcePath);
+      if (ris != null) {
+        if (tryLoadWavStream(ris)) return;
       }
 
-      logger.log(
-          Level.FINE, "[Audio] SndBuf: Loaded " + path + " (" + samples.length + " samples)");
+      logger.log(Level.SEVERE, "[Audio] SndBuf: File or resource not found: " + path);
+      samples = new float[0];
     } catch (Exception e) {
       logger.log(
-          Level.SEVERE, "[Audio] Error loading WAV file '" + path + "': " + e.getMessage(), e);
+          Level.SEVERE, "[Audio] Error loading file '" + path + "': " + e.getMessage(), e);
       samples = new float[0];
     }
     pos = 0;
+  }
+
+  /** Try to load a WAV file. Returns true if successful. */
+  private boolean tryLoadWav(java.io.File file) throws IOException {
+    try {
+      WavData wavData = WavReader.read(file);
+      setSamplesFromWav(wavData, file.getPath());
+      return true;
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  private boolean tryLoadWavStream(java.io.InputStream stream) throws IOException {
+    try {
+      WavData wavData = WavReader.read(new java.io.BufferedInputStream(stream));
+      setSamplesFromWav(wavData, "(stream)");
+      return true;
+    } catch (IOException e) {
+      return false;
+    }
+  }
+
+  private void setSamplesFromWav(WavData wavData, String source) {
+    int n = wavData.frameCount();
+    samples = new float[n];
+    for (int i = 0; i < n; i++) {
+      samples[i] = (wavData.channels[0][i] + wavData.channels[1][i]) * 0.5f;
+    }
+    logger.log(Level.FINE, "[Audio] SndBuf: Loaded WAV " + source + " (" + samples.length + " samples)");
+  }
+
+  /** Try to load an AIFF/AIFF-C file. Returns true if successful. */
+  private boolean tryLoadAiff(java.io.File file) throws IOException {
+    try {
+      AiffReader.AiffData aiffData = AiffReader.read(file);
+      int n = aiffData.frameCount();
+      samples = new float[n];
+      for (int i = 0; i < n; i++) {
+        samples[i] = (aiffData.channels[0][i] + aiffData.channels[1][i]) * 0.5f;
+      }
+      logger.log(Level.FINE, "[Audio] SndBuf: Loaded AIFF " + file.getPath() + " (" + samples.length + " samples)");
+      return true;
+    } catch (IOException e) {
+      logger.log(Level.FINE, "[Audio] SndBuf: AIFF read failed for " + file.getPath() + ": " + e.getMessage());
+      return false;
+    }
   }
 
   private java.io.InputStream findResource(String path) {

@@ -13,8 +13,9 @@ import java.nio.ByteOrder;
 /**
  * Utility to read WAV (RIFF) files using pure java.io — no {@code javax.sound} dependency.
  *
- * <p>Reads 8-bit/16-bit/24-bit PCM mono/stereo WAV files and converts to normalized float arrays
- * ({@code float[][]} where index 0 = left, index 1 = right, mono duplicates to both channels).
+ * <p>Reads 8/16/24-bit PCM and 32-bit IEEE float mono/stereo WAV files and converts to normalized
+ * float arrays ({@code float[][]} where index 0 = left, index 1 = right, mono duplicates to both
+ * channels).
  */
 public class WavReader {
 
@@ -93,6 +94,7 @@ public class WavReader {
     int numChannels = -1;
     int sampleRate = -1;
     int bitsPerSample = -1;
+    int formatTag = -1;
     byte[] pcmData = null;
 
     // Scan chunks
@@ -107,9 +109,9 @@ public class WavReader {
         if (chunkSize < 16) {
           throw new IOException("Format chunk too small: " + chunkSize);
         }
-        int formatTag = bb.getShort() & 0xFFFF;
-        if (formatTag != 1 && formatTag != 0xFFFE) { // PCM or extensible
-          throw new IOException("Unsupported WAV format: " + formatTag + " (only PCM supported)");
+        formatTag = bb.getShort() & 0xFFFF;
+        if (formatTag != 1 && formatTag != 3 && formatTag != 0xFFFE) { // PCM, IEEE float, or extensible
+          throw new IOException("Unsupported WAV format: " + formatTag + " (only PCM/IEEE float supported)");
         }
         numChannels = bb.getShort() & 0xFFFF;
         sampleRate = bb.getInt();
@@ -140,12 +142,18 @@ public class WavReader {
 
     float[][] channels = new float[2][frameCount];
 
+    boolean isFloat = (formatTag == 3);
+
     for (int f = 0; f < frameCount; f++) {
       int frameOffset = f * bytesPerFrame;
 
       for (int c = 0; c < Math.min(numChannels, 2); c++) {
         int sampleOffset = frameOffset + c * bytesPerSample;
-        channels[c][f] = readPcmSample(pcmData, sampleOffset, bytesPerSample, bitsPerSample);
+        if (isFloat) {
+          channels[c][f] = readFloatSample(pcmData, sampleOffset);
+        } else {
+          channels[c][f] = readPcmSample(pcmData, sampleOffset, bytesPerSample, bitsPerSample);
+        }
       }
 
       // If mono, duplicate to both channels
@@ -176,6 +184,18 @@ public class WavReader {
     raw = (raw << signExtend) >> signExtend;
 
     return raw / (float) (1 << (bitsPerSample - 1));
+  }
+
+  /**
+   * Read a single 32-bit IEEE float sample from a byte array at the given offset.
+   * The float value is already in [-1, 1] range per WAV specification.
+   */
+  private static float readFloatSample(byte[] data, int offset) {
+    int bits = (data[offset + 3] & 0xFF) << 24
+             | (data[offset + 2] & 0xFF) << 16
+             | (data[offset + 1] & 0xFF) << 8
+             | (data[offset] & 0xFF);
+    return Float.intBitsToFloat(bits);
   }
 
   /**
