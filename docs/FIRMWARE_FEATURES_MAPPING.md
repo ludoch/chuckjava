@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-05-11 (patch cable modFxFeedback + modFxOffset destinations, modFxOffset in knob params)
+> Last updated: 2026-05-11 (HPF FM ported to kit sounds, env-to-DSP modulation in KitShred + SynthShred refactored)
 > Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -83,7 +83,7 @@ Firmware filter modes: `TRANSISTOR_12DB`, `TRANSISTOR_24DB`, `TRANSISTOR_24DB_DR
 | LPF Drive | `lpf/drive.md` | ✅ | SVFilter drive with tanh soft-clip saturation (0.0–2.0); drive slider in UI |
 | HPF Freq | `hpf/frequency.md` | ✅ | KitShred applies `G_KIT_HPF_FREQ` to per-voice Butterworth HPF every tick (line 1346); per-synth HPF via `G_SP_HPF_FREQ` in MasterShred (line 482); model + UI slider + bridge global |
 | HPF Res | `hpf/resonance.md` | ✅ | KitShred applies `G_KIT_HPF_RES` to per-voice HPF Q every tick (line 1347) |
-| HPF Mode/Morph/FM | `hpf/*.md` | ⚠️ Partial | HPF UGen rewritten ZDF SVF (morph, notch, drive); SynthShred applies default HP morph(1.0)/notchMode(false). Kit HPF and FM mod not yet wired from bridge arrays (Heisenbug: array-read value causes test failures) |
+| HPF Mode/Morph/FM | `hpf/*.md` | ⚠️ Partial | HPF UGen rewritten ZDF SVF (morph, notch, drive). Kit HPF morph/mode/FM wired from bridge arrays; env-to-HPF FM modulation added (kEnvToF via env[1] × env2 filter depth). SynthShred applies full totalModF (lfoF + pcModF + envToF) with HPF FM modulation. |
 | Routing | `routing.md` | ✅ | 3 filter routing modes: SERIES_LPF_HPF, SERIES_HPF_LPF, PARALLEL; route combo in UI |
 | Sound Filters | `sound_filters.md` | ✅ | Per-sound SVFilter + HPF in Kit tracks (kitFil[]/kitHpf[] per voice) |
 | **Index** | `index.md` | ⚠️ Partial | Basic LPF/HPF works; 10/14 sub-pages missing |
@@ -165,8 +165,9 @@ These `G_KIT_*` globals are registered in `BridgeContract.java` with UI controls
 
 | Bridge Global | Engine Reads? | Applied? | Notes |
 |--------------|--------------|----------|-------|
-| `G_KIT_HPF_MODE` | ✅ Read every tick | ⚠️ Partial | HPF UGen now ZDF SVF with notchMode support; SynthShred applies hardcoded false (bridge array read caused Heisenbug). Kit HPF not yet wired. |
-| `G_KIT_HPF_MORPH` | ✅ Read every tick | ⚠️ Partial | HPF UGen now ZDF SVF with continuous morph; SynthShred applies hardcoded 1.0 (bridge array read caused Heisenbug). Kit HPF not yet wired. |
+| `G_KIT_HPF_MODE` | ✅ Read every tick | ✅ Applied | Kit HPF notchMode via vm.setGlobalFloat per-track + kitHpfArr[r].notchMode() in step trigger loop |
+| `G_KIT_HPF_MORPH` | ✅ Read every tick | ✅ Applied | Kit HPF continuous morph via kitHpfArr[r].morph() in step trigger loop |
+| `G_KIT_HPF_FM` | ✅ Read every tick | ✅ Applied | HPF FM modulation: env[1] × env2 filter depth × hpfFm amount × 5000 added to HPF cutoff |
 | `G_KIT_OSC2_TYPE` | ✅ Read every tick | ❌ Not applied | Kit voices use SndBuf (sample playback), no osc2 type concept |
 | `G_KIT_UNISON_NUM` | ✅ Read every tick | ✅ Applied | KitShred spawns sub-SndBuf instances with detuned rate and per-sub Pan2 stereo spread |
 | `G_KIT_UNISON_DETUNE` | ✅ Read every tick | ✅ Applied | Sub-voice rate detune via 2^(cents*offset/1200) |
