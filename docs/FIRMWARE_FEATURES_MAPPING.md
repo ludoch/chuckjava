@@ -1,6 +1,6 @@
 # Deluge Firmware Features & Menus — Java Implementation Status
 
-> Last updated: 2026-05-11 (HPF FM ported to kit sounds, env-to-DSP modulation in KitShred + SynthShred refactored)
+> Last updated: 2026-05-11 (LPF morph for kit sounds — Drum.lpfMorph, G_KIT_LPF_MORPH bridge array, KitShred engine read, SwingKitConfigDialog slider)
 > Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java/ChucK implementation. Use it to track parity and prioritize future work.
@@ -79,7 +79,7 @@ Firmware filter modes: `TRANSISTOR_12DB`, `TRANSISTOR_24DB`, `TRANSISTOR_24DB_DR
 | LPF Freq | `lpf/frequency.md` | ✅ | lpfFreq in SynthTrackModel |
 | LPF Resonance | `lpf/resonance.md` | ✅ | lpfRes |
 | LPF Mode | `lpf/mode.md` | ⚠️ Partial | Filter mode enum exists in Java; firmware has 3 ladder + 2 SVF modes + morph + drive |
-| LPF Morph | `lpf/morph.md` | ❌ | No morph; firmware has dry/wet blend for filter transitions |
+| LPF Morph | `lpf/morph.md` | ✅ | SVFilter morph (0=fully LP, 50=fully HP). SynthShred applies via G_FILTER_MORPH; KitShred now reads G_KIT_LPF_MORPH per-sound bridge array, with SwingKitConfigDialog slider (0-50 range) |
 | LPF Drive | `lpf/drive.md` | ✅ | SVFilter drive with tanh soft-clip saturation (0.0–2.0); drive slider in UI |
 | HPF Freq | `hpf/frequency.md` | ✅ | KitShred applies `G_KIT_HPF_FREQ` to per-voice Butterworth HPF every tick (line 1346); per-synth HPF via `G_SP_HPF_FREQ` in MasterShred (line 482); model + UI slider + bridge global |
 | HPF Res | `hpf/resonance.md` | ✅ | KitShred applies `G_KIT_HPF_RES` to per-voice HPF Q every tick (line 1347) |
