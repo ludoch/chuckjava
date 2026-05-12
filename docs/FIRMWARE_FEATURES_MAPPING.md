@@ -236,7 +236,7 @@ The firmware automation view supports 81 automatable parameters with per-step gr
 | Clip | `Clip` (loopLength, output*, section, launchStyle, armState) | `ClipModel` (name, rowCount, stepCount, List<List<StepData>>, AutomationParam[]) | ⚠️ |
 | Note Row | `NoteRow`[] in InstrumentClip | Rows = List<List<StepData>> in ClipModel | ⚠️ |
 | Note | `Note` (velocity, probability, lift, iterance, fill) | `StepData` (active, velocity, gate, probability, pitch, iterance, fill) | ⚠️ |
-| Per-sound FX | Per-drum FX in Kit | `KitSound` (sample params, adsr, lpf, eq) — no per-sound FX chain | ❌ |
+| Per-sound FX | Per-drum FX in Kit | `KitSound` (sample params, adsr, lpf, eq, delay, reverb, compressor, sidechain) | ✅ |
 | Parameter Seq / Automation | `ParamManager` per Clip, per NoteRow | `AutomationParam[]` per ClipModel; per-bar + per-step automation; XML save/load | ✅ |
 | Timing | `insideWorldTickMagnitude`, `ticksPerLoop` | Simple step counter | ❌ |
 | Envelopes | 4 per voice (`kNumEnvelopes = 4`, `std::array<Envelope, kNumEnvelopes>`) | 4 per track with ADSR + targets | ✅ |
