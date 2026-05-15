@@ -119,6 +119,7 @@ public class SndBuf extends ChuckUGen {
     for (int i = 0; i < n; i++) {
       samples[i] = (wavData.channels[0][i] + wavData.channels[1][i]) * 0.5f;
     }
+    pos = 0;
     logger.log(Level.FINE, "[Audio] SndBuf: Loaded WAV " + source + " (" + samples.length + " samples)");
   }
 
@@ -131,6 +132,7 @@ public class SndBuf extends ChuckUGen {
       for (int i = 0; i < n; i++) {
         samples[i] = (aiffData.channels[0][i] + aiffData.channels[1][i]) * 0.5f;
       }
+      pos = 0;
       logger.log(Level.FINE, "[Audio] SndBuf: Loaded AIFF " + file.getPath() + " (" + samples.length + " samples)");
       return true;
     } catch (IOException e) {
