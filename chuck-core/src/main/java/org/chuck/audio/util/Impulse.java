@@ -10,6 +10,19 @@ public class Impulse extends ChuckUGen {
     this.nextValue = val;
   }
 
+  public double next(double val) {
+    setNext((float) val);
+    return val;
+  }
+
+  public double next() {
+    return nextValue;
+  }
+
+  public double getNext() {
+    return nextValue;
+  }
+
   @Override
   protected float compute(float input, long systemTime) {
     float out = nextValue;

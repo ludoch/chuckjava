@@ -148,6 +148,15 @@ public class ChuckDSL {
     return ChuckShred.CURRENT_SHRED.get();
   }
 
+  public static int spork(Runnable task) {
+    return ChuckVM.CURRENT_VM.get().spork(task);
+  }
+
+  // Logical helpers for ChucK parity
+  public static long logicalAnd(long a, long b) { return (a != 0 && b != 0) ? 1L : 0L; }
+  public static long logicalOr(long a, long b) { return (a != 0 || b != 0) ? 1L : 0L; }
+  public static long logicalNot(long a) { return (a == 0) ? 1L : 0L; }
+
   // String helpers for ChucK parity
   public static String setCharAt(String s, int pos, int c) {
     char[] chars = s.toCharArray();

@@ -5,17 +5,17 @@ import org.chuck.core.ChuckShred;
 import org.chuck.core.ChuckType;
 import org.chuck.core.ChuckVM;
 
-/** ChuGen: Custom Unit Generator. Allows defining a UGen's tick() logic in ChucK code. */
-public class ChuGen extends ChuckUGen {
+/** Chugen: Custom Unit Generator. Allows defining a UGen's tick() logic in ChucK code. */
+public class Chugen extends ChuckUGen {
   private ChuckCode tickCode;
   private ChuckShred shred;
   private ChuckVM vm;
 
-  public ChuGen() {
-    this(new ChuckType("ChuGen", ChuckType.OBJECT, 0, 0));
+  public Chugen() {
+    this(new ChuckType("Chugen", ChuckType.OBJECT, 0, 0));
   }
 
-  public ChuGen(ChuckType type) {
+  public Chugen(ChuckType type) {
     super(type);
   }
 

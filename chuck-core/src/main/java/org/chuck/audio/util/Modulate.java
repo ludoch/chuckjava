@@ -9,6 +9,10 @@ public class Modulate extends ChuckUGen {
   private float vibratoRate = 6.0f;
   private float vibratoGain = 0.0f;
 
+  public Modulate() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public Modulate(float sampleRate) {
     super();
     vibrato = new SinOsc(sampleRate);

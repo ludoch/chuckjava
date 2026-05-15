@@ -20,7 +20,7 @@ public class PitShift extends ChuckUGen {
   }
 
   public PitShift() {
-    this(44100.0f);
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
   }
 
   @Override

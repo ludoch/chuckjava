@@ -23,14 +23,53 @@ public class OneZero extends ChuckUGen {
     this.b0 = b0;
   }
 
+  public float getB0() {
+    return b0;
+  }
+
+  public double b0() {
+    return getB0();
+  }
+
+  public double b0(double value) {
+    setB0((float) value);
+    return value;
+  }
+
   public void setB1(float b1) {
     this.b1 = b1;
+  }
+
+  public float getB1() {
+    return b1;
+  }
+
+  public double b1() {
+    return getB1();
+  }
+
+  public double b1(double value) {
+    setB1((float) value);
+    return value;
   }
 
   public void setZero(float zero) {
     if (zero > 0.0f) b0 = 1.0f / (1.0f + zero);
     else b0 = 1.0f / (1.0f - zero);
     b1 = -zero * b0;
+  }
+
+  public double zero(double z) {
+    setZero((float) z);
+    return z;
+  }
+
+  public double zero() {
+    return -b1 / b0;
+  }
+
+  public float getZero() {
+    return -b1 / b0;
   }
 
   @Override

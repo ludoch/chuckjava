@@ -8,6 +8,10 @@ public class NRev extends StereoUGen {
   private final AllPass[] allpass = new AllPass[8];
   private float mix = 0.5f;
 
+  public NRev() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public NRev(float sampleRate) {
     super();
     allpass[0] = new AllPass(143, false);

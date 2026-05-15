@@ -65,6 +65,11 @@ public class DelayA extends ChuckUGen {
     return delay;
   }
 
+  public double delay(double samples) {
+    setDelay(samples);
+    return samples;
+  }
+
   public double getDelay() {
     return delay;
   }

@@ -48,6 +48,8 @@ public sealed interface ChuckAST {
     PERCENT_CHUCK,
     POSTFIX_PLUS_PLUS,
     POSTFIX_MINUS_MINUS,
+    PLUS_PLUS,
+    MINUS_MINUS,
     ASSIGN,
     SPORK,
     NEW,
@@ -82,7 +84,8 @@ public sealed interface ChuckAST {
 
   record LogicalExp(Exp lhs, String op, Exp rhs, String doc, int line, int column) implements Exp {}
 
-  record UnaryExp(Operator op, Exp exp, String doc, int line, int column) implements Exp {}
+  record UnaryExp(Operator op, Exp exp, boolean isPostfix, String doc, int line, int column)
+      implements Exp {}
 
   record CallExp(Exp base, List<Exp> args, String doc, int line, int column) implements Exp {}
 
@@ -99,7 +102,17 @@ public sealed interface ChuckAST {
   record ArrayAccessExp(Exp base, List<Exp> indices, String doc, int line, int column)
       implements Exp {}
 
+  record CastExp(Exp value, String targetType, String doc, int line, int column) implements Exp {}
+
   record SporkExp(CallExp call, String doc, int line, int column) implements Exp {}
+
+  record TernaryExp(
+      Exp condition, Exp thenExp, Exp elseExp, String doc, int line, int column) implements Exp {}
+
+  record TypeofExp(Exp expr, String doc, int line, int column) implements Exp {}
+
+  record InstanceofExp(Exp expr, String typeName, String doc, int line, int column)
+      implements Exp {}
 
   record DeclExp(
       String type,
@@ -116,45 +129,8 @@ public sealed interface ChuckAST {
       int column)
       implements Exp {}
 
-  record TernaryExp(Exp condition, Exp thenExp, Exp elseExp, String doc, int line, int column)
-      implements Exp {}
-
-  record CastExp(Exp value, String targetType, String doc, int line, int column) implements Exp {}
-
-  /** typeof(expr) — returns the runtime type name of expr as a string */
-  record TypeofExp(Exp expr, String doc, int line, int column) implements Exp {}
-
-  /** instanceof(expr, TypeName) — returns 1 if expr is an instance of TypeName, else 0 */
-  record InstanceofExp(Exp expr, String typeName, String doc, int line, int column)
-      implements Exp {}
-
   // --- Statement Nodes ---
 
-  record ImportStmt(String path, String doc, int line, int column) implements Stmt {}
-
-  record ExpStmt(Exp exp, String doc, int line, int column) implements Stmt {}
-
-  record IfStmt(Exp condition, Stmt thenBranch, Stmt elseBranch, String doc, int line, int column)
-      implements Stmt {}
-
-  record WhileStmt(Exp condition, Stmt body, String doc, int line, int column) implements Stmt {}
-
-  record UntilStmt(Exp condition, Stmt body, String doc, int line, int column) implements Stmt {}
-
-  record DoStmt(Stmt body, Exp condition, boolean isUntil, String doc, int line, int column)
-      implements Stmt {}
-
-  record ForStmt(Stmt init, Stmt condition, Exp update, Stmt body, String doc, int line, int column)
-      implements Stmt {}
-
-  record ReturnStmt(Exp exp, String doc, int line, int column) implements Stmt {}
-
-  record ExampleStmt(String name, String doc, int line, int column) implements Stmt {}
-
-  record BlockStmt(List<Stmt> statements, boolean isScoped, String doc, int line, int column)
-      implements Stmt {}
-
-  // Declaration statement: int i; or float f[10];
   record DeclStmt(
       String type,
       String name,
@@ -169,6 +145,8 @@ public sealed interface ChuckAST {
       int line,
       int column)
       implements Stmt {}
+
+  record ExpStmt(Exp exp, String doc, int line, int column) implements Stmt {}
 
   record FuncDefStmt(
       String returnType,
@@ -195,7 +173,29 @@ public sealed interface ChuckAST {
       int column)
       implements Stmt {}
 
+  record ImportStmt(String path, String doc, int line, int column) implements Stmt {}
+
+  record ExampleStmt(String name, String doc, int line, int column) implements Stmt {}
+
+  record BlockStmt(List<Stmt> statements, boolean isScoped, String doc, int line, int column)
+      implements Stmt {}
+
+  record IfStmt(Exp condition, Stmt thenBranch, Stmt elseBranch, String doc, int line, int column)
+      implements Stmt {}
+
+  record WhileStmt(Exp condition, Stmt body, String doc, int line, int column) implements Stmt {}
+
+  record UntilStmt(Exp condition, Stmt body, String doc, int line, int column) implements Stmt {}
+
+  record ForStmt(Stmt init, Stmt condition, Exp update, Stmt body, String doc, int line, int column)
+      implements Stmt {}
+
   record RepeatStmt(Exp count, Stmt body, String doc, int line, int column) implements Stmt {}
+
+  record DoStmt(Stmt body, Exp condition, boolean isUntil, String doc, int line, int column)
+      implements Stmt {}
+
+  record ReturnStmt(Exp exp, String doc, int line, int column) implements Stmt {}
 
   record LoopStmt(Stmt body, String doc, int line, int column) implements Stmt {}
 

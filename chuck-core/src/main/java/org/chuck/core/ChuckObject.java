@@ -82,6 +82,11 @@ public class ChuckObject {
     }
   }
 
+  public void help() {
+    System.out.println("Type: " + type.getName());
+    // In a real ChucK, this would list all members and methods.
+  }
+
   public Object getRef(int index) {
     return (index < refs.length) ? refs[index] : null;
   }

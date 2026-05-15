@@ -26,8 +26,7 @@ public class BRF extends ChuckUGen {
   }
 
   public double freq(double f) {
-    cutoff = f;
-    updateCoeffs();
+    setFreq(f);
     return f;
   }
 
@@ -35,13 +34,30 @@ public class BRF extends ChuckUGen {
     return cutoff;
   }
 
-  public double Q(double qv) {
-    q = qv;
+  public void setFreq(double f) {
+    cutoff = f;
     updateCoeffs();
+  }
+
+  public double getFreq() {
+    return cutoff;
+  }
+
+  public double Q(double qv) {
+    setQ(qv);
     return qv;
   }
 
   public double Q() {
+    return q;
+  }
+
+  public void setQ(double qv) {
+    q = qv;
+    updateCoeffs();
+  }
+
+  public double getQ() {
     return q;
   }
 

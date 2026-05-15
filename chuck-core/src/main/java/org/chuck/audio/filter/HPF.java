@@ -33,7 +33,7 @@ public class HPF extends ChuckUGen {
   }
 
   public double freq(double f) {
-    cutoff = f;
+    setFreq(f);
     return f;
   }
 
@@ -41,12 +41,28 @@ public class HPF extends ChuckUGen {
     return cutoff;
   }
 
+  public void setFreq(double f) {
+    cutoff = f;
+  }
+
+  public double getFreq() {
+    return cutoff;
+  }
+
   public double Q(double qv) {
-    q = qv;
+    setQ(qv);
     return qv;
   }
 
   public double Q() {
+    return q;
+  }
+
+  public void setQ(double qv) {
+    q = qv;
+  }
+
+  public double getQ() {
     return q;
   }
 

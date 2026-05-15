@@ -7,6 +7,10 @@ package org.chuck.audio.filter;
 public class FilterStk extends FilterBasic {
   protected double gain = 1.0;
 
+  public FilterStk() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public FilterStk(float sampleRate) {
     super(sampleRate);
   }

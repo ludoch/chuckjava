@@ -70,12 +70,48 @@ public class TwoZero extends ChuckUGen {
     b0 = v;
   }
 
+  public double getB0() {
+    return b0;
+  }
+
+  public double b0() {
+    return getB0();
+  }
+
+  public void b0(double v) {
+    setB0(v);
+  }
+
   public void setB1(double v) {
     b1 = v;
   }
 
+  public double getB1() {
+    return b1;
+  }
+
+  public double b1() {
+    return getB1();
+  }
+
+  public void b1(double v) {
+    setB1(v);
+  }
+
   public void setB2(double v) {
     b2 = v;
+  }
+
+  public double getB2() {
+    return b2;
+  }
+
+  public double b2() {
+    return getB2();
+  }
+
+  public void b2(double v) {
+    setB2(v);
   }
 
   @Override

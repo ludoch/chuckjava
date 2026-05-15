@@ -24,6 +24,10 @@ public class BiQuad extends ChuckUGen {
 
   private final float sampleRate;
 
+  public BiQuad() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public BiQuad(float sampleRate) {
     this(sampleRate, true);
   }

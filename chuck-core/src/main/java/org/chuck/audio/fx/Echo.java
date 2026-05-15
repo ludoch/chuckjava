@@ -16,11 +16,11 @@ public class Echo extends StereoUGen {
   private final float sampleRate;
 
   public Echo() {
-    this(44100, 44100.0f);
+    this(44100, org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
   }
 
   public Echo(int maxDelaySamples) {
-    this(maxDelaySamples, 44100.0f);
+    this(maxDelaySamples, org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
   }
 
   public Echo(int maxDelaySamples, float sampleRate) {

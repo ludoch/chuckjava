@@ -3,13 +3,13 @@ package org.chuck.core;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import org.chuck.audio.ChuGen;
+import org.chuck.audio.Chugen;
 
 /**
- * Runtime instance of a user-defined ChucK class. Extends ChuGen so all user objects can be Unit
+ * Runtime instance of a user-defined ChucK class. Extends Chugen so all user objects can be Unit
  * Generators.
  */
-public class UserObject extends ChuGen {
+public class UserObject extends Chugen {
   public final String className;
 
   /** Non-null if this class (or an ancestor) extends the built-in Event type. */

@@ -50,26 +50,43 @@ public class ExpressionEmitter {
         if (code != null) code.addInstruction(new PushInstrs.PushMe());
       }
       case ChuckAST.UnaryExp e -> {
-        if (e.op() == ChuckAST.Operator.S_OR) {
-          String innerType = parent.getVarType(e.exp());
-          if (innerType != null && parent.getUserClassRegistry().containsKey(innerType)) {
-            ChuckCode opCode = parent.getFunctions().get("__pub_op__!:1");
-            if (opCode == null) {
-              opCode = parent.getFunctions().get("__op__!:1");
-            }
-            if (opCode != null) {
-              this.emitExpression(e.exp(), code);
-              if (code != null) code.addInstruction(new CallFunc(opCode, 1));
-              return;
-            }
-          }
-        }
         this.emitExpression(e.exp(), code);
         if (code != null) {
           switch (e.op()) {
             case MINUS -> code.addInstruction(new ArithmeticInstrs.NegateAny());
-            case S_OR, LOGICAL_NOT -> code.addInstruction(new LogicInstrs.LogicalNot());
-            case PLUS -> {}
+            case LOGICAL_NOT -> code.addInstruction(new LogicInstrs.LogicalNot());
+            case PLUS_PLUS -> {
+              // prefix ++
+              code.addInstruction(new StackInstrs.Dup());
+              code.addInstruction(new PushInstrs.PushInt(1));
+              code.addInstruction(new ArithmeticInstrs.AddAny());
+              parent.emitChuckTarget(e.exp(), code, ChuckAST.Operator.CHUCK);
+            }
+            case MINUS_MINUS -> {
+              // prefix --
+              code.addInstruction(new StackInstrs.Dup());
+              code.addInstruction(new PushInstrs.PushInt(1));
+              code.addInstruction(new ArithmeticInstrs.MinusAny());
+              parent.emitChuckTarget(e.exp(), code, ChuckAST.Operator.CHUCK);
+            }
+            case POSTFIX_PLUS_PLUS -> {
+                // postfix ++ (handled as non-statement expression: pushes original value)
+                code.addInstruction(new StackInstrs.Dup());
+                code.addInstruction(new StackInstrs.Dup());
+                code.addInstruction(new PushInstrs.PushInt(1));
+                code.addInstruction(new ArithmeticInstrs.AddAny());
+                parent.emitChuckTarget(e.exp(), code, ChuckAST.Operator.CHUCK);
+                code.addInstruction(new StackInstrs.Pop());
+            }
+            case POSTFIX_MINUS_MINUS -> {
+                // postfix --
+                code.addInstruction(new StackInstrs.Dup());
+                code.addInstruction(new StackInstrs.Dup());
+                code.addInstruction(new PushInstrs.PushInt(1));
+                code.addInstruction(new ArithmeticInstrs.MinusAny());
+                parent.emitChuckTarget(e.exp(), code, ChuckAST.Operator.CHUCK);
+                code.addInstruction(new StackInstrs.Pop());
+            }
             default -> {}
           }
         }

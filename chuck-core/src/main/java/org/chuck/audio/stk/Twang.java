@@ -7,6 +7,7 @@ import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.filter.OneZero;
 import org.chuck.audio.fx.DelayL;
 import org.chuck.core.doc;
+import org.chuck.core.ChuckVM;
 
 /**
  * Twang: Enhanced plucked-string physical model. Based on STK Twang class. Includes a comb filter
@@ -21,9 +22,22 @@ public class Twang extends ChuckUGen {
   private double freq = 440.0;
   private double loopGain = 0.995;
   private double pluckPosition = 0.5;
+  private float lastInput = 0.0f;
+
+  public Twang() {
+    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
 
   public Twang(float sampleRate) {
     this(sampleRate, true);
+  }
+
+  public void noteOn(float velocity) {
+    lastInput = velocity;
+  }
+
+  public void noteOff(float velocity) {
+    lastInput = 0.0f;
   }
 
   public Twang(float sampleRate, boolean autoRegister) {
@@ -121,6 +135,10 @@ public class Twang extends ChuckUGen {
 
   @Override
   protected float compute(float input, long systemTime) {
+    // Incorporate lastInput (velocity) as impulse excitation
+    float excitation = input + lastInput;
+    lastInput *= 0.0f; // Consume impulse
+
     // Waveguide loop
     float feedback = loopFilter.tick(delayLine.last(), systemTime);
 
@@ -128,7 +146,7 @@ public class Twang extends ChuckUGen {
     double effectiveLoopGain = loopGain + (freq * 0.000005);
     if (effectiveLoopGain > 0.999) effectiveLoopGain = 0.999;
 
-    float val = input + (float) (feedback * effectiveLoopGain);
+    float val = excitation + (float) (feedback * effectiveLoopGain);
 
     // Soft clamp internal state
     if (val > 5.0f) val = 5.0f;

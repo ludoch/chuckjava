@@ -385,7 +385,7 @@ public class ChuckVM {
         } else if (obj instanceof ChuckObject co) {
           String typeName = co.getType().getName();
           if (obj instanceof org.chuck.audio.ChuckUGen
-              && (typeName.equals("UGen") || typeName.equals("Osc") || typeName.equals("ChuGen"))) {
+              && (typeName.equals("UGen") || typeName.equals("Osc") || typeName.equals("Chugen"))) {
             typeName = obj.getClass().getSimpleName();
             if (typeName.endsWith("UGen") && !typeName.equals("UGen")) {
               typeName = typeName.substring(0, typeName.length() - 4);

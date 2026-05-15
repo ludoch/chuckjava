@@ -88,12 +88,48 @@ public class TwoPole extends ChuckUGen {
     b0 = v;
   }
 
+  public double getB0() {
+    return b0;
+  }
+
+  public double b0() {
+    return getB0();
+  }
+
+  public void b0(double v) {
+    setB0(v);
+  }
+
   public void setA1(double v) {
     a1 = v;
   }
 
+  public double getA1() {
+    return a1;
+  }
+
+  public double a1() {
+    return getA1();
+  }
+
+  public void a1(double v) {
+    setA1(v);
+  }
+
   public void setA2(double v) {
     a2 = v;
+  }
+
+  public double getA2() {
+    return a2;
+  }
+
+  public double a2() {
+    return getA2();
+  }
+
+  public void a2(double v) {
+    setA2(v);
   }
 
   @Override

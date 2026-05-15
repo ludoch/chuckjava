@@ -40,13 +40,21 @@ public class OnePole extends ChuckUGen {
     return f;
   }
 
-  public float pole(float p) {
-    setPole(p);
+  public double pole(double p) {
+    setPole((float) p);
     return p;
   }
 
-  public float pole() {
+  public double pole() {
     return -a1;
+  }
+
+  public double getPole() {
+    return -a1;
+  }
+
+  public void setPole(double pole) {
+    setPole((float) pole);
   }
 
   public void setPole(float pole) {

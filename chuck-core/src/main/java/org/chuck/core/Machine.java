@@ -107,6 +107,11 @@ public class Machine {
     return new ChuckArray("int", ids);
   }
 
+  public static void help() {
+    System.out.println("Machine commands:");
+    System.out.println("Machine.add(\"path.ck\") - add a shred");
+  }
+
   public static int intsize() {
     return 64;
   }

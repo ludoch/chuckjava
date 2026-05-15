@@ -11,6 +11,10 @@ public class Chorus extends ChuckUGen {
   private float baseDelaySamples;
   private float mix = 0.5f;
 
+  public Chorus() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public Chorus(float sampleRate) {
     // Base delay of 30ms is common for chorus
     this.baseDelaySamples = 0.030f * sampleRate;

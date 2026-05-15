@@ -423,12 +423,10 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         ctx.getChild(1).getText().equals("++")
             ? ChuckAST.Operator.POSTFIX_PLUS_PLUS
             : ChuckAST.Operator.POSTFIX_MINUS_MINUS;
-    ChuckAST.Exp exp = (ChuckAST.Exp) visit(ctx.expression());
-    return new ChuckAST.BinaryExp(
-        new ChuckAST.IntExp(
-            1, "", ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine()),
+    return new ChuckAST.UnaryExp(
         op,
-        exp,
+        (ChuckAST.Exp) visit(ctx.expression()),
+        true,
         currentDoc,
         ctx.getStart().getLine(),
         ctx.getStart().getCharPositionInLine());
@@ -556,8 +554,8 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
         switch (opStr) {
           case "-" -> ChuckAST.Operator.MINUS;
           case "!" -> ChuckAST.Operator.LOGICAL_NOT;
-          case "++" -> ChuckAST.Operator.PLUS;
-          case "--" -> ChuckAST.Operator.MINUS;
+          case "++" -> ChuckAST.Operator.PLUS_PLUS;
+          case "--" -> ChuckAST.Operator.MINUS_MINUS;
           default -> ChuckAST.Operator.NONE;
         };
     ChuckAST.Exp subExp = (ChuckAST.Exp) visit(ctx.expression());
@@ -566,7 +564,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
           callExp, currentDoc, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
     return new ChuckAST.UnaryExp(
-        op, subExp, currentDoc, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        op, subExp, false, currentDoc, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
   }
 
   @Override

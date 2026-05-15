@@ -29,9 +29,17 @@ public class LPF extends ChuckUGen {
     return f;
   }
 
+  public double freq() {
+    return freq;
+  }
+
   public double Q(double q) {
     set(freq, q);
     return q;
+  }
+
+  public double Q() {
+    return Q;
   }
 
   public void setCutoff(float f) {

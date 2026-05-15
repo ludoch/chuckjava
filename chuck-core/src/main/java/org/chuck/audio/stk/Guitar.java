@@ -22,6 +22,10 @@ public class Guitar extends ChuckUGen {
   private final float[] pluckGains;
   private final float sampleRate;
 
+  public Guitar() {
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate());
+  }
+
   public Guitar(float sampleRate) {
     this.sampleRate = sampleRate;
     this.strings = new Twang[6];
@@ -45,6 +49,22 @@ public class Guitar extends ChuckUGen {
     this.couplingFilter.setPole(0.9f);
 
     this.numOutputs = 2; // Stereo coupling out
+  }
+
+  @doc("Pluck all strings with given velocity.")
+  public void noteOn(float velocity) {
+    for (int i = 0; i < 6; i++) {
+      pluckGains[i] = velocity;
+    }
+    filePointer = 0;
+    stringState = 2;
+  }
+
+  @doc("Damp all strings.")
+  public void noteOff(float velocity) {
+    for (int i = 0; i < 6; i++) {
+      strings[i].loopGain(0.8); // Fast decay
+    }
   }
 
   @doc("Pluck a string (0-5) with given frequency and amplitude.")

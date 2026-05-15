@@ -174,6 +174,10 @@ public class ChuckShred implements Shred, Comparable<ChuckShred> {
     return isRunning;
   }
 
+  public void yield() {
+    this.yield(0);
+  }
+
   public void yield(long samples) {
     suspendOnTime(samples);
   }

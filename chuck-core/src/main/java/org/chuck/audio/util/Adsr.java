@@ -114,16 +114,56 @@ public class Adsr extends ChuckUGen {
     return attackTime * sampleRate;
   }
 
+  public double attackTime(double samples) {
+    this.attackTime = (float) (samples / sampleRate);
+    updateIncrements();
+    return samples;
+  }
+
+  public void setAttackTime(double samples) {
+    attackTime(samples);
+  }
+
   public double decayTime() {
     return decayTime * sampleRate;
+  }
+
+  public double decayTime(double samples) {
+    this.decayTime = (float) (samples / sampleRate);
+    updateIncrements();
+    return samples;
+  }
+
+  public void setDecayTime(double samples) {
+    decayTime(samples);
   }
 
   public double sustainLevel() {
     return sustainLevel;
   }
 
+  public double sustainLevel(double level) {
+    this.sustainLevel = (float) level;
+    updateIncrements();
+    return level;
+  }
+
+  public void setSustainLevel(double level) {
+    sustainLevel(level);
+  }
+
   public double releaseTime() {
     return releaseTime * sampleRate;
+  }
+
+  public double releaseTime(double samples) {
+    this.releaseTime = (float) (samples / sampleRate);
+    updateIncrements();
+    return samples;
+  }
+
+  public void setReleaseTime(double samples) {
+    releaseTime(samples);
   }
 
   public double getAttackTime() {
