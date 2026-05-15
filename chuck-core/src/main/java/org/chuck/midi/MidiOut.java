@@ -1,7 +1,5 @@
 package org.chuck.midi;
 
-import java.util.List;
-import javax.sound.midi.*;
 import org.chuck.core.ChuckObject;
 import org.chuck.core.ChuckType;
 import org.rtmidijava.RtMidi;
@@ -9,14 +7,12 @@ import org.rtmidijava.RtMidiFactory;
 
 /** MidiOut: Support for sending MIDI messages. Uses native RtMidiJava for low latency. */
 public class MidiOut extends ChuckObject {
-  private ChuckMidiOut javaDriver;
   private ChuckMidiOutNative nativeDriver;
   private String openedName = "unopened";
 
   public MidiOut() {
     super(ChuckType.OBJECT);
     nativeDriver = new ChuckMidiOutNative();
-    javaDriver = new ChuckMidiOut();
   }
 
   public int open(int port) {
@@ -67,9 +63,7 @@ public class MidiOut extends ChuckObject {
       out.closePort();
       return names;
     } catch (Throwable t) {
-      // Fallback: list JavaSound devices
-      List<String> javaPorts = ChuckMidiOut.listOutputDevices();
-      return javaPorts.toArray(new String[0]);
+      return new String[0];
     }
   }
 
@@ -157,7 +151,6 @@ public class MidiOut extends ChuckObject {
 
   public void close() {
     nativeDriver.close();
-    javaDriver.close();
   }
 
   public boolean isNative() {

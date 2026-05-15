@@ -1,6 +1,5 @@
 package org.chuck.midi;
 
-import java.util.List;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import org.chuck.core.ChuckEvent;
 import org.chuck.core.ChuckVM;
@@ -10,7 +9,6 @@ import org.rtmidijava.RtMidiFactory;
 /** The ChucK MidiIn object. Support native RtMidi via ChuckMidiNative. */
 public class MidiIn extends ChuckEvent implements AutoCloseable {
   private final ChuckMidiNative driver;
-  private final ChuckMidi javaDriver;
   private final ConcurrentLinkedDeque<MidiMsg> queue = new ConcurrentLinkedDeque<>();
   private String openedName = "unopened";
 
@@ -23,7 +21,6 @@ public class MidiIn extends ChuckEvent implements AutoCloseable {
 
   public MidiIn(ChuckVM vm) {
     this.driver = new ChuckMidiNative(vm, this, this.queue);
-    this.javaDriver = new ChuckMidi(vm, this);
 
     // Auto-apply preferences from IDE
     java.util.prefs.Preferences prefs =
@@ -96,9 +93,7 @@ public class MidiIn extends ChuckEvent implements AutoCloseable {
       in.closePort();
       return names;
     } catch (Throwable t) {
-      // Fallback to JavaSound
-      List<String> javaPorts = ChuckMidi.listInputDevices();
-      return javaPorts.toArray(new String[0]);
+      return new String[0];
     }
   }
 
@@ -125,7 +120,6 @@ public class MidiIn extends ChuckEvent implements AutoCloseable {
 
   public void close() {
     driver.close();
-    javaDriver.close();
   }
 
   public boolean isNative() {

@@ -2381,15 +2381,6 @@
     "allDeclaredConstructors": true
   },
   {
-    "name": "org.chuck.midi.ChuckMidi",
-    "allPublicMethods": true,
-    "allDeclaredMethods": true,
-    "allPublicFields": true,
-    "allDeclaredFields": true,
-    "allPublicConstructors": true,
-    "allDeclaredConstructors": true
-  },
-  {
     "name": "org.chuck.midi.ChuckMidiNative",
     "allPublicMethods": true,
     "allDeclaredMethods": true,
