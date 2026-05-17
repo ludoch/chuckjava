@@ -67,17 +67,14 @@ public class FFT extends UAna {
     return n;
   }
 
-  /** ChucK API: {@code fft.cval(n)} — returns complex bin n as a {@code complex} ChuckArray. */
-  public ChuckArray cval(long n) {
+  /** ChucK API: {@code fft.cval(n)} — returns complex bin n. */
+  public Complex cval(long n) {
     List<Complex> cv = lastBlob.getCvals();
     int idx = (int) n;
-    ChuckArray res = new ChuckArray("complex", new double[] {0.0, 0.0});
     if (idx >= 0 && idx < cv.size()) {
-      Complex c = cv.get(idx);
-      res.setFloat(0, c.re());
-      res.setFloat(1, c.im());
+      return cv.get(idx);
     }
-    return res;
+    return new Complex(0.0f, 0.0f);
   }
 
   /**

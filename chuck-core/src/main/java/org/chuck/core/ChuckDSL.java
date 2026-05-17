@@ -42,6 +42,15 @@ public class ChuckDSL {
     }
   }
 
+  /** Advances time by samples. Equivalent to: samples => now; */
+  public static void advance(long samples) {
+    ChuckShred current = ChuckShred.CURRENT_SHRED.get();
+    ChuckVM vm = ChuckVM.CURRENT_VM.get();
+    if (current != null && vm != null) {
+      current.suspendOnTime(samples);
+    }
+  }
+
   /** Waits for an event. Equivalent to: event => now; */
   public static boolean advance(ChuckEvent event) {
     ChuckShred current = ChuckShred.CURRENT_SHRED.get();
@@ -248,10 +257,17 @@ public class ChuckDSL {
       else System.out.print(o);
       return this;
     }
+
+    public void flush() {
+      if (isErr) System.err.flush();
+      else System.out.flush();
+    }
   }
 
   public static final ChuckIO chout = new ChuckIO(false);
   public static final ChuckIO cherr = new ChuckIO(true);
+
+  public static final double pi = Math.PI;
 
   public static class ChIO {
     public static String newline() {

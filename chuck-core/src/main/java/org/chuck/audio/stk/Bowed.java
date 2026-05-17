@@ -38,27 +38,47 @@ public class Bowed extends ChuckUGen {
     setFreq(220.0);
   }
 
-  public void setFreq(double f) {
+  public double setFreq(double f) {
     this.freq = f;
     double totalDelay = sampleRate / f;
     neckDelay.setDelay(totalDelay * 0.75); // Nut to bow
     bridgeDelay.setDelay(totalDelay * 0.25); // Bow to bridge
+    return f;
   }
 
-  public void bowPressure(float p) {
-    this.bowPressure = p;
+  public double freq(double f) {
+      setFreq(f);
+      return f;
   }
 
-  public void bowVelocity(float v) {
-    this.bowVelocity = v;
+  public double bowPressure(double p) {
+    this.bowPressure = (float) p;
+    return p;
   }
 
-  public void vibratoFreq(float f) {
-    this.vibratoFreq = f;
+  public double bowVelocity(double v) {
+    this.bowVelocity = (float) v;
+    return v;
   }
 
-  public void vibratoGain(float g) {
-    this.vibratoGain = g;
+  public double vibratoFreq(double f) {
+    this.vibratoFreq = (float) f;
+    return f;
+  }
+
+  public double vibratoGain(double g) {
+    this.vibratoGain = (float) g;
+    return g;
+  }
+  
+  public double startBowing(double v) {
+      noteOn((float)v);
+      return v;
+  }
+  
+  public double stopBowing(double v) {
+      noteOff((float)v);
+      return v;
   }
 
   public void noteOn(float velocity) {

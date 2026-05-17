@@ -17,6 +17,10 @@ public class SndBuf2 extends StereoUGen {
     this.samples = new float[2][0];
   }
 
+  public SndBuf2() {
+    this(44100.0f);
+  }
+
   public void setRead(String path) {
     try {
       java.io.File file = new java.io.File(path);

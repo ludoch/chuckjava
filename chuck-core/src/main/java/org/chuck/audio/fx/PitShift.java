@@ -52,8 +52,9 @@ public class PitShift extends ChuckUGen {
     return (float) (out1 * w1 + out2 * w2);
   }
 
-  public void shift(double s) {
+  public double shift(double s) {
     this.shift = s;
+    return s;
   }
 
   public double shift() {

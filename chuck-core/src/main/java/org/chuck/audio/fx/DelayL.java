@@ -11,6 +11,10 @@ public class DelayL extends ChuckUGen {
   @SuppressWarnings("unused")
   private final float sampleRate;
 
+  public DelayL() {
+    this(44100);
+  }
+
   public DelayL(int maxDelaySamples) {
     this(maxDelaySamples, 44100.0f, true);
   }

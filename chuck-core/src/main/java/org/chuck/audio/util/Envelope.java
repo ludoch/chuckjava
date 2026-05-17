@@ -48,6 +48,22 @@ public class Envelope extends ChuckUGen {
     }
   }
 
+  public org.chuck.core.ChuckDuration ramp(org.chuck.core.ChuckDuration d, double t) {
+      setDuration((long)d.samples());
+      setTarget((float)t);
+      return d;
+  }
+
+  public double target(double t) {
+      setTarget((float)t);
+      return t;
+  }
+
+  public org.chuck.core.ChuckDuration duration(org.chuck.core.ChuckDuration d) {
+      setDuration((long)d.samples());
+      return d;
+  }
+
   public void setValue(float value) {
     this.value = value;
     this.target = value;

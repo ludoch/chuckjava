@@ -103,6 +103,10 @@ public class TranslateAndCompileAllTest {
           successCount++;
         } else {
           failures.add(ckFile.toString() + " (Compilation Failed)");
+          if (fileName.contains("array_zero")) {
+            System.err.println("Generated code for " + fileName + ":");
+            System.err.println(javaCode);
+          }
           if (failures.size() < 5) {
             System.err.println("Generated code for " + fileName + ":");
             System.err.println(javaCode);

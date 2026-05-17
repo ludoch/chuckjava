@@ -40,8 +40,9 @@ public class NRev extends StereoUGen {
     allpass[7].delay(3539);
   }
 
-  public void mix(float m) {
+  public float mix(float m) {
     this.mix = m;
+    return m;
   }
 
   public float mix() {

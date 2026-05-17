@@ -212,7 +212,7 @@ public abstract class ChuckUGen extends ChuckObject {
     return target;
   }
 
-  public void unchuck(ChuckUGen target) {
+  public ChuckUGen unchuck(ChuckUGen target) {
     if (target != null) {
       target.removeSource(this);
       ugenLock.lock();
@@ -222,6 +222,17 @@ public abstract class ChuckUGen extends ChuckObject {
         ugenLock.unlock();
       }
     }
+    return this;
+  }
+
+  /** ChucK-style: ugen.left returns the left channel proxy */
+  public ChuckUGen left() {
+    return getOutputChannel(0);
+  }
+
+  /** ChucK-style: ugen.right returns the right channel proxy */
+  public ChuckUGen right() {
+    return getOutputChannel(1);
   }
 
   /** Disconnect from all targets. */
@@ -361,6 +372,10 @@ public abstract class ChuckUGen extends ChuckObject {
   /** ChucK-style gain() getter — called as p.gain() */
   public double gain() {
     return this.gain;
+  }
+
+  public float op(float v) {
+      return v;
   }
 
   public long getLastTickTime() {
@@ -514,6 +529,10 @@ public abstract class ChuckUGen extends ChuckObject {
   }
 
   public int getNumOutputs() {
+    return numOutputs;
+  }
+
+  public int channels() {
     return numOutputs;
   }
 

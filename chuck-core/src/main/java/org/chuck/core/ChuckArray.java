@@ -81,6 +81,10 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
   }
 
   public ChuckArray(String elementTypeName, int size) {
+    this(elementTypeName, (long) size);
+  }
+
+  public ChuckArray(String elementTypeName, long size) {
     super(ChuckType.ARRAY);
     if (elementTypeName != null && elementTypeName.endsWith("[]")) {
       this.elementTypeName = elementTypeName.substring(0, elementTypeName.length() - 2);
@@ -154,6 +158,17 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     }
   }
 
+  public ChuckArray(String tag, Object[] vals) {
+    super(ChuckType.ARRAY);
+    this.elementTypeName = tag;
+    for (Object v : vals) {
+      intData.add(0L);
+      floatData.add(0.0);
+      objectData.add(v);
+      types.add((byte) 2);
+    }
+  }
+
   public ChuckArray(String tag, ChuckArray[] vals) {
     super(ChuckType.ARRAY);
     this.elementTypeName = tag;
@@ -210,24 +225,26 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     }
   }
 
-  public void setInt(int index, long value) {
+  public ChuckArray setInt(int index, long value) {
     if (backingInt != null) {
       if (index >= 0 && index < backingInt.length) backingInt[index] = (int) value;
-      return;
+      return this;
     }
     ensureCapacity(index);
     intData.set(index, value);
     types.set(index, (byte) 0);
+    return this;
   }
 
-  public void setFloat(int index, double value) {
+  public ChuckArray setFloat(int index, double value) {
     if (backingFloat != null) {
       if (index >= 0 && index < backingFloat.length) backingFloat[index] = (float) value;
-      return;
+      return this;
     }
     ensureCapacity(index);
     floatData.set(index, value);
     types.set(index, (byte) 1);
+    return this;
   }
 
   public double getFloat(int index) {
@@ -272,10 +289,11 @@ public class ChuckArray extends ChuckObject implements Iterable<Object> {
     return types.get(index) == 2;
   }
 
-  public void setObject(int index, Object value) {
+  public ChuckArray setObject(int index, Object value) {
     ensureCapacity(index);
     objectData.set(index, value);
     types.set(index, (byte) 2);
+    return this;
   }
 
   public Object getObject(int index) {

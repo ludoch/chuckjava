@@ -34,8 +34,9 @@ public class Echo extends StereoUGen {
   }
 
   @doc("Set the mix between dry and wet signal (0.0 to 1.0).")
-  public void mix(float m) {
+  public float mix(float m) {
     this.mix = m;
+    return m;
   }
 
   public float mix() {
@@ -43,9 +44,10 @@ public class Echo extends StereoUGen {
   }
 
   @doc("Set the delay time in samples.")
-  public void delay(double samples) {
+  public double delay(double samples) {
     delayL.delay(samples);
     delayR.delay(samples);
+    return samples;
   }
 
   public double delay() {
@@ -53,12 +55,13 @@ public class Echo extends StereoUGen {
   }
 
   @doc("Set the feedback gain (alias for .gain).")
-  public void feedback(float f) {
+  public float feedback(float f) {
     this.gain = f;
+    return f;
   }
 
   @doc("Set the maximum delay time (resizes buffer).")
-  public void max(double samples) {
+  public double max(double samples) {
     if (samples > delayL.getDelay()) {
       double currentDelay = delayL.delay();
       this.delayL = new Delay((int) samples, sampleRate, false);
@@ -66,6 +69,7 @@ public class Echo extends StereoUGen {
       this.delayL.delay(currentDelay);
       this.delayR.delay(currentDelay);
     }
+    return samples;
   }
 
   @Override

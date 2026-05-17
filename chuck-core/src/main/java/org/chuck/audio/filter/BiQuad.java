@@ -70,6 +70,18 @@ public class BiQuad extends ChuckUGen {
     return v;
   }
 
+  /** ChucK-style: z.prad(0.99) */
+  public double prad(double r) {
+    setPrad(r);
+    return r;
+  }
+
+  /** ChucK-style: z.eqzs(1) */
+  public double eqzs(double v) {
+    setEqzs(v);
+    return v;
+  }
+
   public double getPrad() {
     return prad;
   }
