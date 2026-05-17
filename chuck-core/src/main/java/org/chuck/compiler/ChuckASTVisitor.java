@@ -297,7 +297,9 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     if (ctx.getChild(childIdx) instanceof ExpressionContext) {
       Object res = visit(ctx.getChild(childIdx));
       ChuckAST.Exp exp =
-          (res instanceof List<?> list) ? (ChuckAST.Exp) list.get(0) : (ChuckAST.Exp) res;
+          (res instanceof List<?> list && !list.isEmpty())
+              ? (ChuckAST.Exp) list.get(0)
+              : (res instanceof ChuckAST.Exp e ? e : null);
       if (exp instanceof ChuckAST.DeclExp de) {
         init =
             new ChuckAST.DeclStmt(
@@ -313,7 +315,7 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
                 de.doc(),
                 de.line(),
                 de.column());
-      } else {
+      } else if (exp != null) {
         init = new ChuckAST.ExpStmt(exp, "", exp.line(), exp.column());
       }
       childIdx++;
@@ -322,14 +324,19 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
     if (ctx.getChild(childIdx) instanceof ExpressionContext) {
       Object res = visit(ctx.getChild(childIdx));
       ChuckAST.Exp exp =
-          (res instanceof List<?> list) ? (ChuckAST.Exp) list.get(0) : (ChuckAST.Exp) res;
-      cond = new ChuckAST.ExpStmt(exp, "", exp.line(), exp.column());
+          (res instanceof List<?> list && !list.isEmpty())
+              ? (ChuckAST.Exp) list.get(0)
+              : (res instanceof ChuckAST.Exp e ? e : null);
+      if (exp != null) cond = new ChuckAST.ExpStmt(exp, "", exp.line(), exp.column());
       childIdx++;
     }
     childIdx++; // skip SEMI
     if (ctx.getChild(childIdx) instanceof ExpressionContext) {
       Object res = visit(ctx.getChild(childIdx));
-      update = (res instanceof List<?> list) ? (ChuckAST.Exp) list.get(0) : (ChuckAST.Exp) res;
+      update =
+          (res instanceof List<?> list && !list.isEmpty())
+              ? (ChuckAST.Exp) list.get(0)
+              : (res instanceof ChuckAST.Exp e ? e : null);
     }
     return new ChuckAST.ForStmt(
         init,
@@ -921,7 +928,9 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
       if (v.CHUCK_OP() != null) {
         Object result = visit(v.expression());
         ChuckAST.Exp rhs =
-            (result instanceof List<?> list) ? (ChuckAST.Exp) list.get(0) : (ChuckAST.Exp) result;
+            (result instanceof List<?> list && !list.isEmpty())
+                ? (ChuckAST.Exp) list.get(0)
+                : (result instanceof ChuckAST.Exp e ? e : null);
         decls.add(
             new ChuckAST.BinaryExp(
                 declExp,

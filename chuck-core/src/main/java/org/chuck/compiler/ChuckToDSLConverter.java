@@ -1016,24 +1016,7 @@ public class ChuckToDSLConverter {
       // Handle connection in declaration: SinOsc s => dac;
       if (ds.callArgs() instanceof ChuckAST.BinaryExp be
           && (be.op() == ChuckAST.Operator.CHUCK || be.op() == ChuckAST.Operator.AT_CHUCK)) {
-        String lhs = visitExp(be.lhs());
-        String rhs = visitExp(be.rhs());
-        String mappedType = mapType(ds.type());
-        if (isPrimitive(mappedType)) {
-          if (isAlreadyField) {
-            return ds.name() + " = (" + mappedType + ")(" + lhs + ");";
-          }
-          sb.append(" = (").append(mappedType).append(")(").append(lhs).append(");");
-          return sb.toString();
-        } else {
-          if (isAlreadyField) {
-            return "_chuckConnect(" + ds.name() + ", " + rhs + ");";
-          }
-          sb.append(" = _new(").append(mappedType).append(".class);");
-          sb.append("\n");
-          sb.append(indent("_chuckConnect(" + ds.name() + ", " + rhs + ");", 0));
-          return sb.toString();
-        }
+        return visitExp(ds.callArgs()) + ";";
       }
 
       if (isAlreadyField) return "";
@@ -1379,7 +1362,9 @@ public class ChuckToDSLConverter {
       if (be.op() == ChuckAST.Operator.PLUS
           || be.op() == ChuckAST.Operator.MINUS
           || be.op() == ChuckAST.Operator.TIMES
-          || be.op() == ChuckAST.Operator.DIVIDE) {
+          || be.op() == ChuckAST.Operator.DIVIDE
+          || be.op() == ChuckAST.Operator.AND
+          || be.op() == ChuckAST.Operator.OR) {
         if (isDur(be.lhs()) || isDur(be.rhs())) {
           if (lhsCode.equals("now()")) lhsCode = "samp(now())";
           if (rhsCode.equals("now()")) rhsCode = "samp(now())";
@@ -1414,6 +1399,8 @@ public class ChuckToDSLConverter {
                 case MINUS -> "minus";
                 case TIMES -> "times";
                 case DIVIDE -> "div";
+                case AND -> "and";
+                case OR -> "or";
                 default -> null;
               };
           if (opName != null) {
@@ -1437,13 +1424,14 @@ public class ChuckToDSLConverter {
           return rhsCode + ".__op__times(" + lhsCode + ")";
         }
 
-        String op = mapOp(be.op());
         if (be.op() == ChuckAST.Operator.AND) {
           return "logicalAnd(" + lhsCode + ", " + rhsCode + ")";
         }
         if (be.op() == ChuckAST.Operator.OR) {
           return "logicalOr(" + lhsCode + ", " + rhsCode + ")";
         }
+
+        String op = mapOp(be.op());
         return "(" + lhsCode + " " + op + " " + rhsCode + ")";
       }
 
@@ -1558,9 +1546,9 @@ public class ChuckToDSLConverter {
         if (be.lhs() instanceof ChuckAST.DeclExp lde) {
           String lType = mapType(lde.type());
           String lName = safeName(lde.name());
+          boolean lAlreadyField = fields.stream().anyMatch(f -> f.name().equals(lde.name()));
           varTypes.put(lName, lType);
           StringBuilder chain = new StringBuilder();
-          boolean lAlreadyField = fields.stream().anyMatch(f -> f.name().equals(lde.name()));
           if (!lAlreadyField) {
             if (isPrimitive(lType)) {
               chain
@@ -1954,7 +1942,13 @@ public class ChuckToDSLConverter {
         String method = "&&".equals(le.op()) ? "eventAnd" : "eventOr";
         return method + "(" + String.join(", ", ops) + ")";
       }
-      return "(" + String.join(" " + le.op() + " ", ops) + ")";
+
+      String method = "&&".equals(le.op()) ? "logicalAnd" : "logicalOr";
+      String res = ops.get(0);
+      for (int i = 1; i < ops.size(); i++) {
+        res = method + "(" + res + ", " + ops.get(i) + ")";
+      }
+      return res;
     } else if (exp instanceof ChuckAST.CallExp ce) {
       if (ce.base() instanceof ChuckAST.DotExp stdDe
           && stdDe.base() instanceof ChuckAST.IdExp stdBase
@@ -2978,6 +2972,8 @@ public class ChuckToDSLConverter {
         return "double";
       }
       if (base.endsWith(".dir")) return "String";
+      if (base.equals("Polar.fromComplex") || base.equals("Polar.from")) return "Polar";
+      if (base.equals("Complex.fromPolar") || base.equals("Complex.from")) return "Complex";
 
       // If it's a duration method, check if it's a ratio (div)
       if (ce.base() instanceof ChuckAST.DotExp de) {
@@ -3249,7 +3245,12 @@ public class ChuckToDSLConverter {
         || type.equals("String")
         || type.equals("ChuckArray")
         || type.equals("ChuckEvent")
-        || type.equals("ChuckEvent[]")) return false;
+        || type.equals("ChuckEvent[]")
+        || type.equals("Complex")
+        || type.equals("Polar")
+        || type.equals("vec2")
+        || type.equals("vec3")
+        || type.equals("vec4")) return false;
     if (userClasses.contains(type)) return false;
     // Assume any TitleCase identifier that isn't a known non-UGen is a UGen/Instrument
     return Character.isUpperCase(type.charAt(0));
