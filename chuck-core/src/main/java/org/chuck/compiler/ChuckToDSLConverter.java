@@ -1054,6 +1054,7 @@ public class ChuckToDSLConverter {
       return "for (int i = 0; i < " + count + "; i++) " + ensureBraces(visitStmt(rs.body()));
     } else if (stmt instanceof ChuckAST.ForEachStmt fes) {
       String iterType = mapType(fes.iterType());
+      if (iterType.endsWith("[]") && !iterType.startsWith("ChuckEvent")) iterType = "ChuckArray";
       String prevType = varTypes.put(fes.iterName(), iterType);
       String body = visitStmt(fes.body());
       if (prevType != null) {
@@ -1061,15 +1062,14 @@ public class ChuckToDSLConverter {
       } else {
         varTypes.remove(fes.iterName());
       }
+      String cast = "Object".equals(iterType) ? "" : "(" + iterType + ") ";
       return "for (Object "
           + fes.iterName()
           + "_obj"
           + " : "
           + visitExp(fes.collection())
           + ") {\n"
-          + indent(
-              iterType + " " + fes.iterName() + " = (" + iterType + ") " + fes.iterName() + "_obj;",
-              1)
+          + indent(iterType + " " + fes.iterName() + " = " + cast + fes.iterName() + "_obj;", 1)
           + "\n"
           + indent(body, 1)
           + "\n"
@@ -1185,8 +1185,12 @@ public class ChuckToDSLConverter {
         // Perform local field collection for this class
         List<ChuckAST.DeclStmt> savedFields = new ArrayList<>(fields);
         Set<String> savedFunctions = new HashSet<>(userFunctions);
+        int savedArrayInitCount = arraysToInit.size();
         fields.clear();
         collectFields(cds.body());
+        if (arraysToInit.size() > savedArrayInitCount) {
+          arraysToInit.subList(savedArrayInitCount, arraysToInit.size()).clear();
+        }
 
         // Also collect local functions
         for (ChuckAST.Stmt s : cds.body()) {
@@ -1198,7 +1202,25 @@ public class ChuckToDSLConverter {
         // Emit class fields
         for (ChuckAST.DeclStmt field : fields) {
           String type = mapType(field.type());
-          sb.append(indent("public " + type + " " + safeName(field.name()) + ";", 1)).append("\n");
+          String declType = type;
+          String init = "";
+          if (field.arraySizes() != null && !field.arraySizes().isEmpty()) {
+            String baseType = type;
+            while (baseType.endsWith("[]")) {
+              baseType = baseType.substring(0, baseType.length() - 2);
+            }
+            String size = visitExp(field.arraySizes().get(0));
+            if (size.equals("-1") || size.startsWith("(-1")) size = "0";
+            if (type.startsWith("ChuckEvent")) {
+              declType = "ChuckEvent[]";
+              init = " = new ChuckEvent[" + size + "]" + "[]".repeat(field.arraySizes().size() - 1);
+            } else {
+              declType = "ChuckArray";
+              init = " = new ChuckArray(\"" + baseType + "\", (int)(" + size + "))";
+            }
+          }
+          sb.append(indent("public " + declType + " " + safeName(field.name()) + init + ";", 1))
+              .append("\n");
         }
 
         // Emit Constructor for initialization code
@@ -1408,6 +1430,12 @@ public class ChuckToDSLConverter {
             if (lType.equals("Complex") || lType.equals("Polar")) {
               return lhsCode + "." + opName + "(" + rhsCode + ")";
             }
+            if (lType.equals("vec2") || lType.equals("vec3") || lType.equals("vec4")) {
+              return lhsCode + ".__op__" + opName + "(" + rhsCode + ")";
+            }
+            if (userFunctions.contains("__op__" + opName)) {
+              return "__op__" + opName + "(" + lhsCode + ", " + rhsCode + ")";
+            }
             return lhsCode + ".__op__" + opName + "(" + rhsCode + ")";
           }
         }
@@ -1425,10 +1453,10 @@ public class ChuckToDSLConverter {
         }
 
         if (be.op() == ChuckAST.Operator.AND) {
-          return "logicalAnd(" + lhsCode + ", " + rhsCode + ")";
+          return "(" + visitBoolExp(be.lhs()) + " && " + visitBoolExp(be.rhs()) + ")";
         }
         if (be.op() == ChuckAST.Operator.OR) {
-          return "logicalOr(" + lhsCode + ", " + rhsCode + ")";
+          return "(" + visitBoolExp(be.lhs()) + " || " + visitBoolExp(be.rhs()) + ")";
         }
 
         String op = mapOp(be.op());
@@ -1729,6 +1757,9 @@ public class ChuckToDSLConverter {
           if ("ChuckMath".equals(baseExpr) && member.equals("isnan")) {
             return "Double.isNaN(" + arg + ")";
           }
+          if ("ChuckMath".equals(baseExpr)) {
+            return "ChuckMath." + member + "(" + arg + ")";
+          }
           if (userClasses.contains(baseExpr)) {
             return baseExpr + "." + member + " = " + arg;
           }
@@ -1943,12 +1974,8 @@ public class ChuckToDSLConverter {
         return method + "(" + String.join(", ", ops) + ")";
       }
 
-      String method = "&&".equals(le.op()) ? "logicalAnd" : "logicalOr";
-      String res = ops.get(0);
-      for (int i = 1; i < ops.size(); i++) {
-        res = method + "(" + res + ", " + ops.get(i) + ")";
-      }
-      return res;
+      String op = "&&".equals(le.op()) ? "&&" : "||";
+      return "(" + visitBoolExp(le.lhs()) + " " + op + " " + visitBoolExp(le.rhs()) + ")";
     } else if (exp instanceof ChuckAST.CallExp ce) {
       if (ce.base() instanceof ChuckAST.DotExp stdDe
           && stdDe.base() instanceof ChuckAST.IdExp stdBase
@@ -2575,9 +2602,29 @@ public class ChuckToDSLConverter {
         if (elemType.equals("String"))
           return "(String)_call(" + baseCode + ", \"getObject\", " + idxCode + ")";
         if (elemType.equals("double") || elemType.equals("float"))
-          return baseCode + ".getFloat(" + idxCode + ")";
+          return "(((Object)"
+              + baseCode
+              + " instanceof ChuckArray) ? ((ChuckArray)((Object)"
+              + baseCode
+              + ")).getFloat("
+              + idxCode
+              + ") : ((double)((double[])((Object)"
+              + baseCode
+              + "))[(int)("
+              + idxCode
+              + ")]))";
         if (elemType.equals("long") || elemType.equals("int"))
-          return baseCode + ".getInt(" + idxCode + ")";
+          return "(((Object)"
+              + baseCode
+              + " instanceof ChuckArray) ? ((ChuckArray)((Object)"
+              + baseCode
+              + ")).getInt("
+              + idxCode
+              + ") : ((long)((long[])((Object)"
+              + baseCode
+              + "))[(int)("
+              + idxCode
+              + ")]))";
 
         // Detect if this is an intermediate array level
         if (baseType.contains("[][]")) {
@@ -2655,14 +2702,21 @@ public class ChuckToDSLConverter {
       if (base.equals("Std") && member.equals("ftom")) return "ftom";
       if (base.equals("Math") && member.startsWith("random")) return "Math." + member;
       if (base.equals("ChuckMath") && member.equals("maybe")) return "maybe";
+      if (base.equals("ChuckMath") && member.equals("INFINITY")) return "Double.POSITIVE_INFINITY";
 
       // Known ChuckArray methods
-      if (baseType.equals("ChuckArray")) {
+      if ("ChuckArray".equals(baseType)
+          || (baseType != null && baseType.endsWith("[]") && !baseType.startsWith("ChuckEvent"))) {
         if (member.equals("size") || member.equals("cap") || member.equals("length"))
           return base + ".size()";
         if (member.equals("popBack") || member.equals("popFront") || member.equals("erase"))
           return base + "." + member;
         if (member.equals("clear") || member.equals("getKeys")) return base + "." + member;
+      }
+
+      if (("Complex".equals(baseType) || "Polar".equals(baseType))
+          && (member.equals("mag") || member.equals("phase"))) {
+        return base + "." + member + "()";
       }
 
       // If it's a user class, assume field access unless we're in a CallExp
@@ -3116,7 +3170,7 @@ public class ChuckToDSLConverter {
           case "time" -> "ChuckDuration";
           case "Event" -> "ChuckEvent";
           case "string" -> "String";
-          case "auto" -> "long"; // Map auto to long (ChucK's default)
+          case "auto" -> "Object"; // Map auto to Object
           case "OscIn" -> "OscIn";
           case "OscOut" -> "OscOut";
           case "OscMsg" -> "OscMsg";
@@ -3129,6 +3183,7 @@ public class ChuckToDSLConverter {
           case "UGen" -> "ChuckUGen";
           case "BPM" -> "BPM";
           case "Foo" -> "Object";
+          case "MandoPlayer" -> "Object";
           case "RollOff" -> "Rolloff";
           case "PitchTrack" -> "Object";
           case "Sigmund" -> "Object";

@@ -103,6 +103,8 @@ public class TranslateAndCompileAllTest {
         Files.writeString(javaFile, javaCode);
         generatedUnits.add(new GeneratedUnit(ckFile, fileName, javaCode, javaFile));
       } catch (Exception e) {
+        System.err.println("Translation error in " + ckFile + ":");
+        e.printStackTrace();
         failures.add(ckFile.toString() + " (Translation Error: " + e.getMessage() + ")");
       }
     }

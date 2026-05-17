@@ -777,14 +777,17 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
 
   @Override
   public List<ChuckAST.Exp> visitExpressionList(ExpressionListContext ctx) {
+    if (ctx == null) return new ArrayList<>();
     return ctx.expression().stream()
         .map(
             e -> {
               Object res = visit(e);
-              return res instanceof ChuckAST.Exp
-                  ? (ChuckAST.Exp) res
-                  : new ChuckAST.IntExp(
-                      0, "", ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+              if (res instanceof ChuckAST.Exp exp) return exp;
+              if (res instanceof List<?> list && !list.isEmpty()) {
+                return (ChuckAST.Exp) list.get(0);
+              }
+              return new ChuckAST.IntExp(
+                  0, "", ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
             })
         .collect(Collectors.toList());
   }

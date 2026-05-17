@@ -157,12 +157,40 @@ public class ChuckDSL {
     return (a != 0 && b != 0) ? 1L : 0L;
   }
 
+  public static long logicalAnd(boolean a, boolean b) {
+    return (a && b) ? 1L : 0L;
+  }
+
+  public static long logicalAnd(long a, boolean b) {
+    return (a != 0 && b) ? 1L : 0L;
+  }
+
+  public static long logicalAnd(boolean a, long b) {
+    return (a && b != 0) ? 1L : 0L;
+  }
+
   public static long logicalOr(long a, long b) {
     return (a != 0 || b != 0) ? 1L : 0L;
   }
 
+  public static long logicalOr(boolean a, boolean b) {
+    return (a || b) ? 1L : 0L;
+  }
+
+  public static long logicalOr(long a, boolean b) {
+    return (a != 0 || b) ? 1L : 0L;
+  }
+
+  public static long logicalOr(boolean a, long b) {
+    return (a || b != 0) ? 1L : 0L;
+  }
+
   public static long logicalNot(long a) {
     return (a == 0) ? 1L : 0L;
+  }
+
+  public static long logicalNot(boolean a) {
+    return a ? 0L : 1L;
   }
 
   // String helpers for ChucK parity
