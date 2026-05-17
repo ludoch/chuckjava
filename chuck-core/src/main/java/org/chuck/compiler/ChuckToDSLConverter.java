@@ -1567,7 +1567,17 @@ public class ChuckToDSLConverter {
           String targetType = mapType(ce.targetType());
           if (targetType.endsWith("[]") && !targetType.startsWith("ChuckEvent"))
             targetType = "ChuckArray";
-          return rhsCode + " = (" + targetType + ")(" + visitExp(ce.value()) + ")";
+          String casted = "(" + targetType + ")(" + visitExp(ce.value()) + ")";
+          if (be.rhs() instanceof ChuckAST.DeclExp de) {
+            String deName = safeName(de.name());
+            boolean isAlreadyField = fields.stream().anyMatch(f -> f.name().equals(de.name()));
+            varTypes.put(deName, targetType);
+            if (isAlreadyField) {
+              return deName + " = " + casted;
+            }
+            return targetType + " " + deName + " = " + casted;
+          }
+          return rhsCode + " = " + casted;
         }
 
         // Handle: UGen u => dac; and UGen u => Gain g;
@@ -2217,17 +2227,19 @@ public class ChuckToDSLConverter {
         }
         if (recType.endsWith("[]")) {
           String elemType = recType.substring(0, recType.length() - 2);
-          String idx = "(int)(" + visitExp(ce.args().get(0)) + ")";
-          if (member.equals("getFloat")) {
+          if (member.equals("getFloat") && !ce.args().isEmpty()) {
+            String idx = "(int)(" + visitExp(ce.args().get(0)) + ")";
             return "((double)(" + baseCode + "[" + idx + "]))";
           }
-          if (member.equals("getInt")) {
+          if (member.equals("getInt") && !ce.args().isEmpty()) {
+            String idx = "(int)(" + visitExp(ce.args().get(0)) + ")";
             return "((long)(" + baseCode + "[" + idx + "]))";
           }
           if (member.equals("size")) {
             return "(long)(" + baseCode + ".length)";
           }
           if (member.equals("setObject") && ce.args().size() == 2) {
+            String idx = "(int)(" + visitExp(ce.args().get(0)) + ")";
             String value = visitExp(ce.args().get(1));
             return "(" + baseCode + "[" + idx + "] = (" + elemType + ")(" + value + "))";
           }
@@ -2458,6 +2470,28 @@ public class ChuckToDSLConverter {
             || member.equals("getFloat")
             || member.equals("getFMTableSusLevel")) {
           return "_callDouble("
+              + baseCode
+              + ", \""
+              + member
+              + "\""
+              + (ce.args().isEmpty()
+                  ? ""
+                  : ", " + ce.args().stream().map(this::visitExp).collect(Collectors.joining(", ")))
+              + ")";
+        }
+        if (member.equals("get") || member.equals("mag") || member.equals("env")) {
+          return "_callDouble("
+              + baseCode
+              + ", \""
+              + member
+              + "\""
+              + (ce.args().isEmpty()
+                  ? ""
+                  : ", " + ce.args().stream().map(this::visitExp).collect(Collectors.joining(", ")))
+              + ")";
+        }
+        if (member.equals("damp") || member.equals("roll") || member.equals("strum")) {
+          return "_call("
               + baseCode
               + ", \""
               + member
