@@ -3,16 +3,17 @@ package org.chuck.audio.util;
 /**
  * Static lookup tables ported from the Deluge firmware's dexed/msfa implementation.
  *
- * <p>All tables are initialized once via {@link #init(double)} and then shared across all
- * Dx7Engine instances. Math conventions match the firmware:
+ * <p>All tables are initialized once via {@link #init(double)} and then shared across all Dx7Engine
+ * instances. Math conventions match the firmware:
+ *
  * <ul>
- *   <li>phase: Q32 (wraps on 32-bit overflow)</li>
- *   <li>logfreq: Q24 log2(frequency)</li>
- *   <li>level_: Q24 log-domain (2^24 = 6dB doubling)</li>
- *   <li>Sin output: Q24 (±~1&lt;&lt;24)</li>
- *   <li>gain: Q24 linear</li>
- *   <li>lfo_value: Q24</li>
- *   <li>pitch_env: Q24/octave</li>
+ *   <li>phase: Q32 (wraps on 32-bit overflow)
+ *   <li>logfreq: Q24 log2(frequency)
+ *   <li>level_: Q24 log-domain (2^24 = 6dB doubling)
+ *   <li>Sin output: Q24 (±~1&lt;&lt;24)
+ *   <li>gain: Q24 linear
+ *   <li>lfo_value: Q24
+ *   <li>pitch_env: Q24/octave
  * </ul>
  */
 public final class Dx7EngineLookupTables {
@@ -40,10 +41,10 @@ public final class Dx7EngineLookupTables {
 
   /** Coarse frequency multipliers (32 entries). */
   static final int[] coarsemul = {
-    -16777216, 0,        16777216, 26591258, 33554432, 38955489, 43368474, 47099600,
-     50331648, 53182516, 55732705, 58039632, 60145690, 62083076, 63876816, 65546747,
-     67108864, 68576247, 69959732, 71268397, 72509921, 73690858, 74816848, 75892776,
-     76922906, 77910978, 78860292, 79773775, 80654032, 81503396, 82323963, 83117622
+    -16777216, 0, 16777216, 26591258, 33554432, 38955489, 43368474, 47099600, 50331648, 53182516,
+    55732705, 58039632, 60145690, 62083076, 63876816, 65546747, 67108864, 68576247, 69959732,
+    71268397, 72509921, 73690858, 74816848, 75892776, 76922906, 77910978, 78860292, 79773775,
+    80654032, 81503396, 82323963, 83117622
   };
 
   /** Amp mod sensitivity table (4 entries). */
@@ -62,12 +63,14 @@ public final class Dx7EngineLookupTables {
 
   /** Exponential scale data (33 entries). */
   static final int[] exp_scale_data = {
-    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 14, 16, 19, 23, 27, 33,
-    39, 47, 56, 66, 80, 94, 110, 126, 142, 158, 174, 190, 206, 222, 238, 250
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 14, 16, 19, 23, 27, 33, 39, 47, 56, 66, 80, 94, 110, 126, 142,
+    158, 174, 190, 206, 222, 238, 250
   };
 
   /** Envelope level LUT (20 entries, for outlevel 0-19). */
-  static final int[] levellut = {0, 5, 9, 13, 17, 20, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 42, 43, 45, 46};
+  static final int[] levellut = {
+    0, 5, 9, 13, 17, 20, 23, 25, 27, 29, 31, 33, 35, 37, 39, 41, 42, 43, 45, 46
+  };
 
   /** Envelope static counts for ACCURATE_ENVELOPE (77 entries at 44.1kHz). */
   static final int[] statics = {
@@ -102,26 +105,32 @@ public final class Dx7EngineLookupTables {
   };
 
   /**
-   * LFO unit constant. Matches firmware: (int32_t)(25190424 / 44100.0 + 0.5)
-   * This is 571.5 in fixed point.
+   * LFO unit constant. Matches firmware: (int32_t)(25190424 / 44100.0 + 0.5) This is 571.5 in fixed
+   * point.
    */
-  static final int lfo_unit = (int)(25190424 / (float)44100 + 0.5f);
+  static final int lfo_unit = (int) (25190424 / (float) 44100 + 0.5f);
 
   // ── FmCore algorithm array (32 algorithms × 6 operators) ──
   // Each byte encodes outbus(1:0), OUT_BUS_ADD(2), inbus(5:4), FB_IN(6), FB_OUT(7)
 
   /** Index into algorithm flags: FB_OUT flag. */
   public static final int FB_OUT = 1 << 7;
+
   /** Index into algorithm flags: FB_IN flag. */
   public static final int FB_IN = 1 << 6;
+
   /** Index into algorithm flags: IN_BUS_TWO. */
   public static final int IN_BUS_TWO = 1 << 5;
+
   /** Index into algorithm flags: IN_BUS_ONE. */
   public static final int IN_BUS_ONE = 1 << 4;
+
   /** Index into algorithm flags: OUT_BUS_ADD. */
   public static final int OUT_BUS_ADD = 1 << 2;
+
   /** Index into algorithm flags: OUT_BUS_TWO. */
   public static final int OUT_BUS_TWO = 1 << 1;
+
   /** Index into algorithm flags: OUT_BUS_ONE. */
   public static final int OUT_BUS_ONE = 1 << 0;
 
@@ -158,7 +167,7 @@ public final class Dx7EngineLookupTables {
     0xc1, 0x14, 0x01, 0x14, 0x04, 0x04, // 28
     0x04, 0xc1, 0x11, 0x14, 0x04, 0x04, // 29
     0xc1, 0x14, 0x04, 0x04, 0x04, 0x04, // 30
-    0xc4, 0x04, 0x04, 0x04, 0x04, 0x04  // 31
+    0xc4, 0x04, 0x04, 0x04, 0x04, 0x04 // 31
   };
 
   // ── EngineMkI constants (EngineMkI.cpp) ──
@@ -188,14 +197,14 @@ public final class Dx7EngineLookupTables {
   public static final int[] sinExpTable = new int[SINEXP_TABLESIZE];
 
   /**
-   * Gain threshold for EngineMkI (ENV_MAX - 100 = 16284).
-   * FmCore's kGainLevelThresh = 1120 is used for FmCore rendering.
+   * Gain threshold for EngineMkI (ENV_MAX - 100 = 16284). FmCore's kGainLevelThresh = 1120 is used
+   * for FmCore rendering.
    */
   public static final int kLevelThresh = ENV_MAX - 100;
 
   /**
-   * Gain threshold below which an operator is considered inaudible.
-   * Matches dexed kGainLevelThresh = 1120.
+   * Gain threshold below which an operator is considered inaudible. Matches dexed kGainLevelThresh
+   * = 1120.
    */
   public static final int kGainLevelThresh = 1120;
 
@@ -207,21 +216,21 @@ public final class Dx7EngineLookupTables {
   private static boolean initialized;
   private static double sampleRate;
   static int sr_multiplier; // Q24 sample rate multiplier for Env
-  static int pitchEnvUnit;  // unit_ for PitchEnv
+  static int pitchEnvUnit; // unit_ for PitchEnv
 
   // ── Initialization ──
 
   /**
-   * Initialize all lookup tables. Must be called once before using any Dx7Engine.
-   * Safe to call multiple times with the same sample rate — reinitializes on rate change.
+   * Initialize all lookup tables. Must be called once before using any Dx7Engine. Safe to call
+   * multiple times with the same sample rate — reinitializes on rate change.
    *
    * @param sr sample rate in Hz (e.g., 44100)
    */
   public static synchronized void init(double sr) {
     if (initialized && sr == sampleRate) return;
     sampleRate = sr;
-    sr_multiplier = (int)((44100.0 / sr) * (1 << 24) + 0.5);
-    pitchEnvUnit = (int)((1 << 24) / (21.3 * sr) + 0.5);
+    sr_multiplier = (int) ((44100.0 / sr) * (1 << 24) + 0.5);
+    pitchEnvUnit = (int) ((1 << 24) / (21.3 * sr) + 0.5);
     exp2Init();
     tanhInit();
     sinInit();
@@ -249,7 +258,7 @@ public final class Dx7EngineLookupTables {
     int phaseInt = (phase >> (SHIFT - 1)) & ((SIN_N_SAMPLES - 1) << 1);
     int dy = sintab[phaseInt];
     int y0 = sintab[phaseInt + 1];
-    return y0 + (int)(((long)dy * (long)lowbits) >> SHIFT);
+    return y0 + (int) (((long) dy * (long) lowbits) >> SHIFT);
   }
 
   // ── Exp2 lookup ──
@@ -266,7 +275,7 @@ public final class Dx7EngineLookupTables {
     int xInt = (x >> (SHIFT - 1)) & ((EXP2_N_SAMPLES - 1) << 1);
     int dy = exp2tab[xInt];
     int y0 = exp2tab[xInt + 1];
-    int y = y0 + (int)(((long)dy * (long)lowbits) >> SHIFT);
+    int y = y0 + (int) (((long) dy * (long) lowbits) >> SHIFT);
     return y >> (6 - (x >> 24));
   }
 
@@ -285,7 +294,7 @@ public final class Dx7EngineLookupTables {
     int y0 = freq_lut[ix];
     int y1 = freq_lut[ix + 1];
     int lowbits = logfreq & ((1 << SAMPLE_SHIFT) - 1);
-    int y = y0 + (int)(((long)(y1 - y0) * (long)lowbits) >> SAMPLE_SHIFT);
+    int y = y0 + (int) (((long) (y1 - y0) * (long) lowbits) >> SAMPLE_SHIFT);
     int hibits = logfreq >> 24;
     return y >> (MAX_LOGFREQ_INT - hibits);
   }
@@ -305,7 +314,7 @@ public final class Dx7EngineLookupTables {
       if (x >= (17 << 23)) {
         return signum ^ (1 << 24);
       }
-      int sx = (int)(((long)-48408812 * (long)x) >> 24);
+      int sx = (int) (((long) -48408812 * (long) x) >> 24);
       return signum ^ ((1 << 24) - 2 * exp2Lookup(sx));
     } else {
       final int SHIFT = 26 - TANH_LG_N_SAMPLES;
@@ -313,17 +322,14 @@ public final class Dx7EngineLookupTables {
       int xInt = (x >> (SHIFT - 1)) & ((TANH_N_SAMPLES - 1) << 1);
       int dy = tanhtab[xInt];
       int y0 = tanhtab[xInt + 1];
-      int y = y0 + (int)(((long)dy * (long)lowbits) >> SHIFT);
+      int y = y0 + (int) (((long) dy * (long) lowbits) >> SHIFT);
       return y ^ signum;
     }
   }
 
   // ── Helper: DX7 note → log-frequency ──
 
-  /**
-   * Convert a MIDI note number to Q24 log-frequency.
-   * Matches firmware dxNoteToFreq().
-   */
+  /** Convert a MIDI note number to Q24 log-frequency. Matches firmware dxNoteToFreq(). */
   public static int dxNoteToFreq(int note) {
     final int base = 50857777; // (1<<24) * (log(440)/log(2) - 69/12)
     final int step = (1 << 24) / 12;
@@ -333,19 +339,19 @@ public final class Dx7EngineLookupTables {
   // ── LFO phase-to-value ──
 
   /**
-   * Convert LFO phase to a modulation value based on waveform.
-   * Matches firmware lfoPhaseToValue().
+   * Convert LFO phase to a modulation value based on waveform. Matches firmware lfoPhaseToValue().
    */
   public static int lfoPhaseToValue(int phase, int waveform) {
     int wf = waveform;
     if (wf == 0) wf = 4; // triangle fallback
     switch (wf) {
-      case 0: { // triangle
-        int x = phase >> 7;
-        x ^= -(phase >> 31);
-        x &= (1 << 24) - 1;
-        return x;
-      }
+      case 0:
+        { // triangle
+          int x = phase >> 7;
+          x ^= -(phase >> 31);
+          x &= (1 << 24) - 1;
+          return x;
+        }
       case 1: // sawtooth down
         return (~phase ^ (1 << 31)) >> 8;
       case 2: // sawtooth up
@@ -365,13 +371,13 @@ public final class Dx7EngineLookupTables {
     double inc = Math.pow(2, 1.0 / EXP2_N_SAMPLES);
     double y = 1 << 30;
     for (int i = 0; i < EXP2_N_SAMPLES; i++) {
-      exp2tab[(i << 1) + 1] = (int)Math.floor(y + 0.5);
+      exp2tab[(i << 1) + 1] = (int) Math.floor(y + 0.5);
       y *= inc;
     }
     for (int i = 0; i < EXP2_N_SAMPLES - 1; i++) {
       exp2tab[i << 1] = exp2tab[(i << 1) + 3] - exp2tab[(i << 1) + 1];
     }
-    exp2tab[(EXP2_N_SAMPLES << 1) - 2] = (int)((1L << 31) - exp2tab[(EXP2_N_SAMPLES << 1) - 1]);
+    exp2tab[(EXP2_N_SAMPLES << 1) - 2] = (int) ((1L << 31) - exp2tab[(EXP2_N_SAMPLES << 1) - 1]);
   }
 
   private static double dtanh(double y) {
@@ -382,7 +388,7 @@ public final class Dx7EngineLookupTables {
     double step = 4.0 / TANH_N_SAMPLES;
     double y = 0;
     for (int i = 0; i < TANH_N_SAMPLES; i++) {
-      tanhtab[(i << 1) + 1] = (int)((1 << 24) * y + 0.5);
+      tanhtab[(i << 1) + 1] = (int) ((1 << 24) * y + 0.5);
       double k1 = dtanh(y);
       double k2 = dtanh(y + 0.5 * step * k1);
       double k3 = dtanh(y + 0.5 * step * k2);
@@ -393,21 +399,21 @@ public final class Dx7EngineLookupTables {
     for (int i = 0; i < TANH_N_SAMPLES - 1; i++) {
       tanhtab[i << 1] = tanhtab[(i << 1) + 3] - tanhtab[(i << 1) + 1];
     }
-    int lasty = (int)((1 << 24) * y + 0.5);
+    int lasty = (int) ((1 << 24) * y + 0.5);
     tanhtab[(TANH_N_SAMPLES << 1) - 2] = lasty - tanhtab[(TANH_N_SAMPLES << 1) - 1];
   }
 
   private static void sinInit() {
     double dphase = 2 * Math.PI / SIN_N_SAMPLES;
-    int c = (int)Math.floor(Math.cos(dphase) * (1 << 30) + 0.5);
-    int s = (int)Math.floor(Math.sin(dphase) * (1 << 30) + 0.5);
+    int c = (int) Math.floor(Math.cos(dphase) * (1 << 30) + 0.5);
+    int s = (int) Math.floor(Math.sin(dphase) * (1 << 30) + 0.5);
     int u = 1 << 30;
     int v = 0;
     for (int i = 0; i < SIN_N_SAMPLES / 2; i++) {
       sintab[(i << 1) + 1] = (v + 32) >> 6;
       sintab[((i + SIN_N_SAMPLES / 2) << 1) + 1] = -((v + 32) >> 6);
-      int t = (int)(((long)u * (long)s + (long)v * (long)c + (1 << 29)) >> 30);
-      u = (int)(((long)u * (long)c - (long)v * (long)s + (1 << 29)) >> 30);
+      int t = (int) (((long) u * (long) s + (long) v * (long) c + (1 << 29)) >> 30);
+      u = (int) (((long) u * (long) c - (long) v * (long) s + (1 << 29)) >> 30);
       v = t;
     }
     for (int i = 0; i < SIN_N_SAMPLES - 1; i++) {
@@ -420,43 +426,37 @@ public final class Dx7EngineLookupTables {
     double y = (1L << (24 + 20)) / sr;
     double inc = Math.pow(2, 1.0 / FREQ_N_SAMPLES);
     for (int i = 0; i < FREQ_N_SAMPLES + 1; i++) {
-      freq_lut[i] = (int)Math.floor(y + 0.5);
+      freq_lut[i] = (int) Math.floor(y + 0.5);
       y *= inc;
     }
   }
 
-  /**
-   * Initialize EngineMkI sinLog and sinExp tables.
-   * Matches EngineMkI.cpp constructor.
-   */
+  /** Initialize EngineMkI sinLog and sinExp tables. Matches EngineMkI.cpp constructor. */
   private static void engineMkIInit() {
     for (int i = 0; i < SINLOG_TABLESIZE; i++) {
       double x1 = Math.sin(((0.5 + i) / SINLOG_TABLESIZE) * Math.PI / 2.0);
-      sinLogTable[i] = (int)Math.round(-1024 * (Math.log(x1) / Math.log(2)));
+      sinLogTable[i] = (int) Math.round(-1024 * (Math.log(x1) / Math.log(2)));
       // clamps: firmware round() outputs uint16, ensure range 0-0xFFFF
       if (sinLogTable[i] < 0) sinLogTable[i] = 0;
       if (sinLogTable[i] > 0xFFFF) sinLogTable[i] = 0xFFFF;
     }
     for (int i = 0; i < SINEXP_TABLESIZE; i++) {
-      double x1 = (Math.pow(2, (double)i / SINEXP_TABLESIZE) - 1) * 4096;
-      sinExpTable[i] = (int)Math.round(x1);
+      double x1 = (Math.pow(2, (double) i / SINEXP_TABLESIZE) - 1) * 4096;
+      sinExpTable[i] = (int) Math.round(x1);
       if (sinExpTable[i] < 0) sinExpTable[i] = 0;
       if (sinExpTable[i] > 0xFFFF) sinExpTable[i] = 0xFFFF;
     }
   }
 
   /**
-   * Fixed-point division: div_n(x, inv_n) = (int32_t)(((int64_t)x * (int64_t)inv_n) >> 30)
-   * where inv_n = (1 << 30) / n.
-   * For per-sample rendering (n=1): inv_n = 1<<30, result = x.
+   * Fixed-point division: div_n(x, inv_n) = (int32_t)(((int64_t)x * (int64_t)inv_n) >> 30) where
+   * inv_n = (1 << 30) / n. For per-sample rendering (n=1): inv_n = 1<<30, result = x.
    */
   public static int div_n(int x, int inv_n) {
-    return (int)(((long)x * (long)inv_n) >> 30);
+    return (int) (((long) x * (long) inv_n) >> 30);
   }
 
-  /**
-   * EngineMkI sinLog lookup. Matches EngineMkI.cpp sinLog().
-   */
+  /** EngineMkI sinLog lookup. Matches EngineMkI.cpp sinLog(). */
   public static int mkiSinLog(int phi) {
     final int SINLOG_TABLEFILTER = SINLOG_TABLESIZE - 1;
     int index = phi & SINLOG_TABLEFILTER;
@@ -476,7 +476,7 @@ public final class Dx7EngineLookupTables {
    * EngineMkI sine computation. Matches EngineMkI.cpp mkiSin().
    *
    * @param phase Q32 phase
-   * @param env   uint16 envelope value (ENV_BITDEPTH=14 bit)
+   * @param env uint16 envelope value (ENV_BITDEPTH=14 bit)
    * @return Q27 sine value (left-shifted by 13 from a 14-bit result)
    */
   public static int mkiSin(int phase, int env) {
@@ -488,10 +488,8 @@ public final class Dx7EngineLookupTables {
     int result = 4096 + sinExpTable[(expVal & SINEXP_FILTER) ^ SINEXP_FILTER];
     result >>= (expVal >> 10);
 
-    if (isSigned)
-      return (-result - 1) << 13;
-    else
-      return result << 13;
+    if (isSigned) return (-result - 1) << 13;
+    else return result << 13;
   }
 
   private Dx7EngineLookupTables() {}

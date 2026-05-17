@@ -7,7 +7,7 @@ import org.chuck.audio.osc.SinOsc;
 public class Flanger extends ChuckUGen {
   private final DelayL delayLine;
   private final SinOsc lfo;
-  private float modDepth = 0.5f;    // 0-1 fraction of max delay
+  private float modDepth = 0.5f; // 0-1 fraction of max delay
   private float baseDelaySamples;
   private float maxDelaySamples;
   private float feedback = 0.0f;
@@ -23,18 +23,27 @@ public class Flanger extends ChuckUGen {
     this.lfo.setFreq(0.25);
   }
 
-  public void setModFreq(double freq) { lfo.setFreq(freq); }
+  public void setModFreq(double freq) {
+    lfo.setFreq(freq);
+  }
 
-  public void setModDepth(float depth) { this.modDepth = depth; }
+  public void setModDepth(float depth) {
+    this.modDepth = depth;
+  }
 
-  public void setFeedback(float fb) { this.feedback = Math.max(-0.95f, Math.min(0.95f, fb)); }
+  public void setFeedback(float fb) {
+    this.feedback = Math.max(-0.95f, Math.min(0.95f, fb));
+  }
 
-  public void setMix(float mix) { this.mix = mix; }
+  public void setMix(float mix) {
+    this.mix = mix;
+  }
 
   @Override
   protected float compute(float input, long systemTime) {
     float lfoOut = lfo.tick(systemTime, systemTime);
-    double currentDelay = baseDelaySamples + (maxDelaySamples - baseDelaySamples) * modDepth * (lfoOut * 0.5f + 0.5f);
+    double currentDelay =
+        baseDelaySamples + (maxDelaySamples - baseDelaySamples) * modDepth * (lfoOut * 0.5f + 0.5f);
     delayLine.setDelay(currentDelay);
 
     float wet = delayLine.tick(input + lastOutput * feedback, systemTime);

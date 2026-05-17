@@ -399,9 +399,13 @@ public class ChuckAudio {
    * Number of output underruns detected since start (late write intervals exceeding one buffer
    * period). Corresponds to {@code RTAUDIO_OUTPUT_UNDERFLOW} status flag.
    */
-  public boolean isOutputLineReady() { return outputLine != null; }
+  public boolean isOutputLineReady() {
+    return outputLine != null;
+  }
 
-  public javax.sound.sampled.SourceDataLine getOutputLine() { return outputLine; }
+  public javax.sound.sampled.SourceDataLine getOutputLine() {
+    return outputLine;
+  }
 
   public long getUnderrunCount() {
     return underrunCount.get();

@@ -4,55 +4,70 @@ import org.chuck.audio.ChuckUGen;
 import org.chuck.core.doc;
 
 /**
- * 6-operator FM synthesis engine implementing the Yamaha DX7 voice architecture,
- * ported from the Deluge firmware's dexed/msfa implementation.
+ * 6-operator FM synthesis engine implementing the Yamaha DX7 voice architecture, ported from the
+ * Deluge firmware's dexed/msfa implementation.
  *
- * <p>This is a single {@link ChuckUGen} that manages 6 internal operators, each with
- * its own phase accumulator, sine lookup, envelope generator (EG), and frequency
- * calculation. The 32 DX7 algorithm matrices determine which operators modulate which,
- * and which operators route to the final output (carriers).
+ * <p>This is a single {@link ChuckUGen} that manages 6 internal operators, each with its own phase
+ * accumulator, sine lookup, envelope generator (EG), and frequency calculation. The 32 DX7
+ * algorithm matrices determine which operators modulate which, and which operators route to the
+ * final output (carriers).
  *
  * <p>Key differences from the firmware's block-based renderer:
+ *
  * <ul>
- *   <li>Per-sample {@link #compute(float, long)} instead of block rendering (n samples)</li>
- *   <li>No gain interpolation across blocks — gain is computed per sample</li>
- *   <li>Log-domain envelope with rate_scaling, proportional-attractive rising curve</li>
- *   <li>Full pitch EG, LFO, key scaling, velocity scaling, opSwitch support</li>
- *   <li>dB-additive output model via Exp2::lookup for log→linear conversion</li>
+ *   <li>Per-sample {@link #compute(float, long)} instead of block rendering (n samples)
+ *   <li>No gain interpolation across blocks — gain is computed per sample
+ *   <li>Log-domain envelope with rate_scaling, proportional-attractive rising curve
+ *   <li>Full pitch EG, LFO, key scaling, velocity scaling, opSwitch support
+ *   <li>dB-additive output model via Exp2::lookup for log→linear conversion
  * </ul>
  *
  * <p>Math conventions (matching the firmware):
+ *
  * <ul>
- *   <li>phase: Q32 (wraps naturally on 32-bit overflow)</li>
- *   <li>level_: Q24 log-domain (2^24 = 6dB doubling)</li>
- *   <li>Sin output: Q24 (±~1&lt;&lt;24)</li>
- *   <li>gain: Q24 linear</li>
- *   <li>logfreq: Q24 log2(frequency)</li>
- *   <li>lfo_value: Q24, lfo_phase: Q32</li>
+ *   <li>phase: Q32 (wraps naturally on 32-bit overflow)
+ *   <li>level_: Q24 log-domain (2^24 = 6dB doubling)
+ *   <li>Sin output: Q24 (±~1&lt;&lt;24)
+ *   <li>gain: Q24 linear
+ *   <li>logfreq: Q24 log2(frequency)
+ *   <li>lfo_value: Q24, lfo_phase: Q32
  * </ul>
  */
 @doc("6-operator FM synthesis engine (Dx7, dexed/msfa-based).")
 public class Dx7Engine extends ChuckUGen {
 
   // ── Algorithm flag field extraction helpers ──
-  private static int outbus(int flags) { return flags & 3; }
-  private static int inbus(int flags) { return (flags >> 4) & 3; }
-  private static boolean fbIn(int flags) { return (flags & Dx7EngineLookupTables.FB_IN) != 0; }
-  private static boolean fbOut(int flags) { return (flags & Dx7EngineLookupTables.FB_OUT) != 0; }
-  private static boolean outBusAdd(int flags) { return (flags & Dx7EngineLookupTables.OUT_BUS_ADD) != 0; }
+  private static int outbus(int flags) {
+    return flags & 3;
+  }
+
+  private static int inbus(int flags) {
+    return (flags >> 4) & 3;
+  }
+
+  private static boolean fbIn(int flags) {
+    return (flags & Dx7EngineLookupTables.FB_IN) != 0;
+  }
+
+  private static boolean fbOut(int flags) {
+    return (flags & Dx7EngineLookupTables.FB_OUT) != 0;
+  }
+
+  private static boolean outBusAdd(int flags) {
+    return (flags & Dx7EngineLookupTables.OUT_BUS_ADD) != 0;
+  }
 
   // ── Env: per-operator log-domain envelope ──
 
   /**
    * Log-domain envelope generator ported from dexed env.h/env.cpp.
    *
-   * <p>Fields match the firmware Env class exactly:
-   * level_ (Q24 log-domain), targetlevel_, ix_ (segment index 0-4),
-   * inc_ (increment per sample), staticcount_ (ACCURATE_ENVELOPE),
-   * outlevel_ (microstep units), rate_scaling_, down_, rising_.
+   * <p>Fields match the firmware Env class exactly: level_ (Q24 log-domain), targetlevel_, ix_
+   * (segment index 0-4), inc_ (increment per sample), staticcount_ (ACCURATE_ENVELOPE), outlevel_
+   * (microstep units), rate_scaling_, down_, rising_.
    */
   static class Env {
-    int level_;          // Q24 log-domain
+    int level_; // Q24 log-domain
     int targetlevel_;
     int ix_;
     int inc_;
@@ -120,7 +135,7 @@ public class Dx7Engine extends ChuckUGen {
       ix_ = newix;
       if (ix_ < 4) {
         // EnvParams layout: rates[0..3] at patch[opOff+0..3], levels[0..3] at patch[opOff+4..7]
-        int rate = patch[opOff + ix_] & 0xFF;         // egRate[ix_]
+        int rate = patch[opOff + ix_] & 0xFF; // egRate[ix_]
         int newlevel = patch[opOff + 4 + ix_] & 0xFF; // egLevel[ix_]
         int actuallevel = scaleoutlevel(newlevel) >> 1;
         actuallevel = (actuallevel << 6) + outlevel_ - 4256;
@@ -145,24 +160,23 @@ public class Dx7Engine extends ChuckUGen {
           if (staticrate < 77 && ix_ == 0 && newlevel == 0) {
             staticcount_ /= 20; // attack scaled faster
           }
-          staticcount_ = (int)(((long)staticcount_ * (long)Dx7EngineLookupTables.sr_multiplier) >> 24);
+          staticcount_ =
+              (int) (((long) staticcount_ * (long) Dx7EngineLookupTables.sr_multiplier) >> 24);
         } else {
           staticcount_ = 0;
         }
 
         inc_ = (4 + (qrate & 3)) << (2 + (qrate >> 2));
-        inc_ = (int)(((long)inc_ * (long)Dx7EngineLookupTables.sr_multiplier) >> 24);
+        inc_ = (int) (((long) inc_ * (long) Dx7EngineLookupTables.sr_multiplier) >> 24);
       }
     }
   }
 
   // ── PitchEnv: pitch envelope generator ──
 
-  /**
-   * Pitch envelope generator ported from dexed pitchenv.h/cpp.
-   */
+  /** Pitch envelope generator ported from dexed pitchenv.h/cpp. */
   static class PitchEnv {
-    int level_;       // Q24/octave
+    int level_; // Q24/octave
     int targetlevel_;
     boolean rising_;
     int ix_;
@@ -201,7 +215,9 @@ public class Dx7Engine extends ChuckUGen {
       }
     }
 
-    boolean isDown() { return down_; }
+    boolean isDown() {
+      return down_;
+    }
 
     private void advance(byte[] patch, int pitchOff, int newix) {
       ix_ = newix;
@@ -209,7 +225,9 @@ public class Dx7Engine extends ChuckUGen {
         int newlevel = patch[pitchOff + ix_] & 0xFF;
         targetlevel_ = Dx7EngineLookupTables.pitchenv_tab[newlevel] << 19;
         rising_ = targetlevel_ > level_;
-        inc_ = Dx7EngineLookupTables.pitchenv_rate[patch[pitchOff + ix_] & 0xFF] * Dx7EngineLookupTables.pitchEnvUnit;
+        inc_ =
+            Dx7EngineLookupTables.pitchenv_rate[patch[pitchOff + ix_] & 0xFF]
+                * Dx7EngineLookupTables.pitchEnvUnit;
       }
     }
   }
@@ -268,7 +286,8 @@ public class Dx7Engine extends ChuckUGen {
 
   /**
    * Engine type override: -1=AUTO (firmware default), 0=MODERN (sinLookup/exp2Lookup, 32-bit),
-   * 1=VINTAGE (mkiSin, ENV_BITDEPTH=14). When -1, auto-detection based on algorithm + feedback applies.
+   * 1=VINTAGE (mkiSin, ENV_BITDEPTH=14). When -1, auto-detection based on algorithm + feedback
+   * applies.
    */
   private int forceVintage = -1;
 
@@ -282,8 +301,8 @@ public class Dx7Engine extends ChuckUGen {
   private static int rngState = 380116160;
 
   /**
-   * Returns a pseudo-random 32-bit value matching the firmware's getNoise() CONG generator.
-   * Uses the same LCG: jcong = 69069 * jcong + 1234567
+   * Returns a pseudo-random 32-bit value matching the firmware's getNoise() CONG generator. Uses
+   * the same LCG: jcong = 69069 * jcong + 1234567
    */
   public static int getNoise() {
     rngState = 69069 * rngState + 1234567;
@@ -297,8 +316,8 @@ public class Dx7Engine extends ChuckUGen {
   int lfoDelta;
 
   /**
-   * Creates a Dx7Engine with the given sample rate.
-   * Dx7EngineLookupTables.init() must have been called first.
+   * Creates a Dx7Engine with the given sample rate. Dx7EngineLookupTables.init() must have been
+   * called first.
    *
    * @param sampleRate sample rate in Hz
    */
@@ -328,17 +347,14 @@ public class Dx7Engine extends ChuckUGen {
     this.patch = patchData;
   }
 
-  /**
-   * Load a DX7 patch from a Dx7Patch record.
-   */
+  /** Load a DX7 patch from a Dx7Patch record. */
   public void loadPatch(Dx7Patch p) {
     this.patch = p.raw();
   }
 
   /**
-   * Set the base note frequency (alternative to noteOn with MIDI note).
-   * Only used when not calling noteOn(midiNote, velocity).
-   * This just stores the value; actual per-operator frequencies are set
+   * Set the base note frequency (alternative to noteOn with MIDI note). Only used when not calling
+   * noteOn(midiNote, velocity). This just stores the value; actual per-operator frequencies are set
    * via noteOn.
    */
   public void setFreq(double freq) {
@@ -346,7 +362,7 @@ public class Dx7Engine extends ChuckUGen {
     // If someone calls setFreq() directly, we approximate by finding
     // the MIDI note closest to this frequency.
     if (freq > 0) {
-      int note = (int)Math.round(69 + 12 * Math.log(freq / 440.0) / Math.log(2));
+      int note = (int) Math.round(69 + 12 * Math.log(freq / 440.0) / Math.log(2));
       if (note < 0) note = 0;
       if (note > 127) note = 127;
       midiNote = note;
@@ -366,9 +382,7 @@ public class Dx7Engine extends ChuckUGen {
     initNote(midiNote, velocity);
   }
 
-  /**
-   * Legacy noteOn() with no args — uses previously set note/velocity or defaults.
-   */
+  /** Legacy noteOn() with no args — uses previously set note/velocity or defaults. */
   public void noteOn() {
     if (patch == null) return;
     noteOn = true;
@@ -382,9 +396,9 @@ public class Dx7Engine extends ChuckUGen {
   }
 
   /**
-   * noteOn with velocity only, using the midiNote previously set by setFreq().
-   * This is the primary entry point for the DSL engine, which sets frequency
-   * via setFreq() then triggers with the clip's actual velocity.
+   * noteOn with velocity only, using the midiNote previously set by setFreq(). This is the primary
+   * entry point for the DSL engine, which sets frequency via setFreq() then triggers with the
+   * clip's actual velocity.
    *
    * @param velocity MIDI velocity (0-127)
    */
@@ -396,9 +410,7 @@ public class Dx7Engine extends ChuckUGen {
     initNote(midiNote > 0 ? midiNote : 60, velocity);
   }
 
-  /**
-   * Trigger note-off — all operators enter release phase.
-   */
+  /** Trigger note-off — all operators enter release phase. */
   public void noteOff() {
     noteOn = false;
     for (int op = 0; op < 6; op++) {
@@ -418,9 +430,7 @@ public class Dx7Engine extends ChuckUGen {
 
   // ── Core initialization ──
 
-  /**
-   * Initialize voice state for a note. Matches firmware DxVoice::init().
-   */
+  /** Initialize voice state for a note. Matches firmware DxVoice::init(). */
   private void initNote(int midinote, int vel) {
     this.midiNote = midinote;
     this.velocity = vel;
@@ -433,8 +443,14 @@ public class Dx7Engine extends ChuckUGen {
       // Output level with key scaling + velocity
       int outlevel = patch[off + 16] & 0xFF;
       outlevel = Env.scaleoutlevel(outlevel);
-      outlevel += scaleLevel(midinote, patch[off + 8] & 0xFF, patch[off + 9] & 0xFF,
-          patch[off + 10] & 0xFF, patch[off + 11] & 0xFF, patch[off + 12] & 0xFF);
+      outlevel +=
+          scaleLevel(
+              midinote,
+              patch[off + 8] & 0xFF,
+              patch[off + 9] & 0xFF,
+              patch[off + 10] & 0xFF,
+              patch[off + 11] & 0xFF,
+              patch[off + 12] & 0xFF);
       if (outlevel > 127) outlevel = 127;
       outlevel = outlevel << 5;
       outlevel += scaleVelocity(vel, patch[off + 15] & 0xFF);
@@ -489,10 +505,7 @@ public class Dx7Engine extends ChuckUGen {
 
   // ── LFO ──
 
-  /**
-   * Update LFO delta based on patch rate parameter.
-   * Matches firmware DxPatch::updateLfo().
-   */
+  /** Update LFO delta based on patch rate parameter. Matches firmware DxPatch::updateLfo(). */
   void updateLfo() {
     if (patch == null) return;
     int rate = patch[137] & 0xFF; // LFO speed 0-99
@@ -501,10 +514,7 @@ public class Dx7Engine extends ChuckUGen {
     lfoDelta = Dx7EngineLookupTables.lfo_unit * sr;
   }
 
-  /**
-   * Advance LFO by n samples.
-   * Matches firmware DxPatch::computeLfo(n).
-   */
+  /** Advance LFO by n samples. Matches firmware DxPatch::computeLfo(n). */
   void computeLfo(int n) {
     if (patch == null) return;
     lfoPhase += n * lfoDelta;
@@ -515,44 +525,39 @@ public class Dx7Engine extends ChuckUGen {
     lfoValue = Dx7EngineLookupTables.lfoPhaseToValue(lfoPhase, waveform);
   }
 
-  /**
-   * LFO delay computation per-sample.
-   * Matches firmware DxVoice::getdelay(n).
-   */
+  /** LFO delay computation per-sample. Matches firmware DxVoice::getdelay(n). */
   int getdelay(int n) {
     int delta = delayState < (1 << 31) ? delayInc : delayInc2;
-    long d = ((long)delayState & 0xFFFFFFFFL) + (long)delta * n;
+    long d = ((long) delayState & 0xFFFFFFFFL) + (long) delta * n;
     if (d > 0xFFFFFFFFL) {
       return 1 << 24;
     }
-    delayState = (int)d;
+    delayState = (int) d;
     if (d < (1L << 31)) {
       return 0;
     } else {
-      return ((int)d >> 7) & ((1 << 24) - 1);
+      return ((int) d >> 7) & ((1 << 24) - 1);
     }
   }
 
   // ── Computed helpers ──
 
-  /**
-   * Compute operator frequency in Q24 log domain.
-   * Matches firmware DxVoice::osc_freq().
-   */
-  private int oscFreq(int logFreqForDetune, int mode, int coarse, int fine, int detune, int randomDetune) {
+  /** Compute operator frequency in Q24 log domain. Matches firmware DxVoice::osc_freq(). */
+  private int oscFreq(
+      int logFreqForDetune, int mode, int coarse, int fine, int detune, int randomDetune) {
     if (mode == 0) {
       // Ratio mode: start from the note's base log-frequency, then apply
       // coarse ratio, fine tune, and detune as additive offsets in the log domain.
       int logfreq = logFreqForDetune;
 
       // Detune ratio
-      double detuneRatio = 0.0209 * Math.exp(-0.396 * ((double)logFreqForDetune / (1 << 24))) / 7;
+      double detuneRatio = 0.0209 * Math.exp(-0.396 * ((double) logFreqForDetune / (1 << 24))) / 7;
       int randomScaled = (randomDetune * randomDetuneScale) >> 17;
-      logfreq += (int)(detuneRatio * logFreqForDetune * (detune - 7 + randomScaled));
+      logfreq += (int) (detuneRatio * logFreqForDetune * (detune - 7 + randomScaled));
 
       logfreq += Dx7EngineLookupTables.coarsemul[coarse & 31];
       if (fine != 0) {
-        logfreq += (int)Math.floor(24204406.323123 * Math.log(1 + 0.01 * fine) + 0.5);
+        logfreq += (int) Math.floor(24204406.323123 * Math.log(1 + 0.01 * fine) + 0.5);
       }
       return logfreq;
     } else {
@@ -565,31 +570,22 @@ public class Dx7Engine extends ChuckUGen {
     }
   }
 
-  /**
-   * Scale velocity to microstep units.
-   * Matches firmware ScaleVelocity().
-   */
+  /** Scale velocity to microstep units. Matches firmware ScaleVelocity(). */
   private int scaleVelocity(int vel, int sensitivity) {
     int clamped = Math.max(0, Math.min(127, vel));
     int velValue = Dx7EngineLookupTables.velocity_data[clamped >> 1] - 239;
     return ((sensitivity * velValue + 7) >> 3) << 4;
   }
 
-  /**
-   * Scale rate based on MIDI note.
-   * Matches firmware ScaleRate().
-   */
+  /** Scale rate based on MIDI note. Matches firmware ScaleRate(). */
   private int scaleRate(int midinote, int sensitivity) {
     int x = Math.min(31, Math.max(0, midinote / 3 - 7));
     return (sensitivity * x) >> 3;
   }
 
-  /**
-   * Key scaling level calculation.
-   * Matches firmware ScaleLevel().
-   */
-  private int scaleLevel(int midinote, int breakPt, int leftDepth, int rightDepth,
-                          int leftCurve, int rightCurve) {
+  /** Key scaling level calculation. Matches firmware ScaleLevel(). */
+  private int scaleLevel(
+      int midinote, int breakPt, int leftDepth, int rightDepth, int leftCurve, int rightCurve) {
     int offset = midinote - breakPt - 17;
     if (offset >= 0) {
       return scaleCurve((offset + 1) / 3, rightDepth, rightCurve);
@@ -598,10 +594,7 @@ public class Dx7Engine extends ChuckUGen {
     }
   }
 
-  /**
-   * Scale curve computation.
-   * Matches firmware ScaleCurve().
-   */
+  /** Scale curve computation. Matches firmware ScaleCurve(). */
   private int scaleCurve(int group, int depth, int curve) {
     int scale;
     if (curve == 0 || curve == 3) {
@@ -641,9 +634,9 @@ public class Dx7Engine extends ChuckUGen {
     // ── Pitch modulation ──
     int pitchmoddepth = (patch[139] & 0xFF) * 165 >> 6;
     int pitchmodsens = Dx7EngineLookupTables.pitchmodsenstab[patch[143] & 7];
-    long pmd = (long)pitchmoddepth * (long)lfoDelay; // Q32
+    long pmd = (long) pitchmoddepth * (long) lfoDelay; // Q32
     int senslfo = pitchmodsens * (lfoVal - (1 << 23));
-    int pmod1 = (int)((pmd * (long)senslfo) >> 39);
+    int pmod1 = (int) ((pmd * (long) senslfo) >> 39);
     if (pmod1 < 0) pmod1 = -pmod1;
     int pmod2 = 0;
     int pitchMod = Math.max(pmod1, pmod2);
@@ -652,13 +645,13 @@ public class Dx7Engine extends ChuckUGen {
     // ── Amp modulation ──
     lfoVal = (1 << 24) - lfoVal;
     int ampmoddepth = (patch[140] & 0xFF) * 165 >> 6;
-    long amod1 = ((long)ampmoddepth * (long)lfoDelay) >> 8; // Q24
-    amod1 = (amod1 * (long)lfoVal) >> 24;
-    int amdMod = (int)amod1;
+    long amod1 = ((long) ampmoddepth * (long) lfoDelay) >> 8; // Q24
+    amod1 = (amod1 * (long) lfoVal) >> 24;
+    int amdMod = (int) amod1;
 
     // ── EG amp mod ──
     long amod3 = ((patch[144] & 0xFF) + 1L) << 17; // eg_mod from patch
-    amdMod = Math.max((int)((1 << 24) - amod3), amdMod);
+    amdMod = Math.max((int) ((1 << 24) - amod3), amdMod);
 
     // Collect operator parameters: phase, freq, level_in, gain_out
     int[] opPhase = new int[6];
@@ -693,11 +686,11 @@ public class Dx7Engine extends ChuckUGen {
         // Amp mod sensitivity (matching firmware dx7note.cpp:365-374)
         int ampmodsens = Dx7EngineLookupTables.ampmodsenstab[patch[off + 14] & 3];
         if (ampmodsens != 0) {
-          long sensamp = ((long)amdMod * (long)ampmodsens) >> 24;
+          long sensamp = ((long) amdMod * (long) ampmodsens) >> 24;
           // pt = exp(sensamp / 262144 * 0.07 + 12.2)
-          long pt = (long)Math.exp(((double)sensamp) / 262144.0 * 0.07 + 12.2);
-          long ldiff = ((long)level * (pt << 4)) >> 28;
-          level -= (int)ldiff;
+          long pt = (long) Math.exp(((double) sensamp) / 262144.0 * 0.07 + 12.2);
+          long ldiff = ((long) level * (pt << 4)) >> 28;
+          level -= (int) ldiff;
           // level += (ampmodsens >> 16) * voice_ctrls->ampmod; // velmod=0 currently, no-op
         }
 
@@ -754,11 +747,19 @@ public class Dx7Engine extends ChuckUGen {
       if (engineMkI && op == 0 && (flags & 0xc0) == 0xc0) {
         if (algoIdx == 3) {
           int mkShift = Math.min(fbShift + 2, 16);
-          int y = computeFb3(
-              opPhase[0], opFreq[0], opLevel[0],
-              opPhase[1], opFreq[1], opLevel[1],
-              opPhase[2], opFreq[2], opLevel[2],
-              fbBuf, mkShift);
+          int y =
+              computeFb3(
+                  opPhase[0],
+                  opFreq[0],
+                  opLevel[0],
+                  opPhase[1],
+                  opFreq[1],
+                  opLevel[1],
+                  opPhase[2],
+                  opFreq[2],
+                  opLevel[2],
+                  fbBuf,
+                  mkShift);
           mainOutput = y;
           has_contents[0] = true;
           // Advance phases for the two operators we're consuming
@@ -771,10 +772,16 @@ public class Dx7Engine extends ChuckUGen {
           continue;
         } else if (algoIdx == 5) {
           int mkShift = Math.min(fbShift + 2, 16);
-          int y = computeFb2(
-              opPhase[0], opFreq[0], opLevel[0],
-              opPhase[1], opFreq[1], opLevel[1],
-              fbBuf, mkShift);
+          int y =
+              computeFb2(
+                  opPhase[0],
+                  opFreq[0],
+                  opLevel[0],
+                  opPhase[1],
+                  opFreq[1],
+                  opLevel[1],
+                  fbBuf,
+                  mkShift);
           mainOutput = y;
           has_contents[0] = true;
           opPhase[1] += opFreq[1];
@@ -795,8 +802,13 @@ public class Dx7Engine extends ChuckUGen {
       if (gain < Dx7EngineLookupTables.kGainLevelThresh) {
         opPhase[op] += freq * 1;
         if (!add) {
-          if (ob == 1) { bus1 = 0; has_contents[1] = false; }
-          else if (ob == 2) { bus2 = 0; has_contents[2] = false; }
+          if (ob == 1) {
+            bus1 = 0;
+            has_contents[1] = false;
+          } else if (ob == 2) {
+            bus2 = 0;
+            has_contents[2] = false;
+          }
         }
         // Keep feedback buffer updated even when silent
         if (fbout) {
@@ -829,7 +841,7 @@ public class Dx7Engine extends ChuckUGen {
       int y = Dx7EngineLookupTables.sinLookup(opPhase[op] + mod);
 
       // Gain: Exp2::lookup(levelIn - 14 * (1 << 24))
-      int y1 = (int)(((long)y * (long)gain) >> 24);
+      int y1 = (int) (((long) y * (long) gain) >> 24);
 
       // Accumulate to output bus — handle all three outbus cases inline
       switch (ob) {
@@ -890,24 +902,29 @@ public class Dx7Engine extends ChuckUGen {
     }
 
     // Convert Q24 to float (-1..1 range)
-    return mainOutput / (float)(1 << 24);
+    return mainOutput / (float) (1 << 24);
   }
 
   // ── EngineMkI rendering (for feedback algorithms 3 and 5) ──
 
   /**
-   * Compute_fb2: 2-op feedback chain for algorithm 5 with feedback.
-   * Matches EngineMkI.cpp compute_fb2().
+   * Compute_fb2: 2-op feedback chain for algorithm 5 with feedback. Matches EngineMkI.cpp
+   * compute_fb2().
    *
-   * Process sequence: op0 (with feedback) → op1 → output (main bus).
-   * Both operators output directly to main (no bus accumulation).
+   * <p>Process sequence: op0 (with feedback) → op1 → output (main bus). Both operators output
+   * directly to main (no bus accumulation).
    *
    * @return mkiSin output for the last operator in the chain
    */
   private static int computeFb2(
-      int phase0, int freq0, int levelIn0,
-      int phase1, int freq1, int levelIn1,
-      int[] fbBuf, int fbShift) {
+      int phase0,
+      int freq0,
+      int levelIn0,
+      int phase1,
+      int freq1,
+      int levelIn1,
+      int[] fbBuf,
+      int fbShift) {
 
     int gain0 = fbBuf[1] != 0 ? fbBuf[1] : (Dx7EngineLookupTables.ENV_MAX - 1);
     int y0 = fbBuf[0];
@@ -915,7 +932,10 @@ public class Dx7Engine extends ChuckUGen {
 
     // gain for op1
     int levelIn1_14 = levelIn1 >> (28 - Dx7EngineLookupTables.ENV_BITDEPTH);
-    int gain1 = levelIn1_14 == 0 ? (Dx7EngineLookupTables.ENV_MAX - 1) : (Dx7EngineLookupTables.ENV_MAX - levelIn1_14);
+    int gain1 =
+        levelIn1_14 == 0
+            ? (Dx7EngineLookupTables.ENV_MAX - 1)
+            : (Dx7EngineLookupTables.ENV_MAX - levelIn1_14);
 
     // Per-sample (n=1): no dgain interpolation, gain = gain2 directly
     // op0: level_in used on the mkiSin call
@@ -940,18 +960,25 @@ public class Dx7Engine extends ChuckUGen {
   }
 
   /**
-   * Compute_fb3: 3-op feedback chain for algorithm 3 with feedback.
-   * Matches EngineMkI.cpp compute_fb3().
+   * Compute_fb3: 3-op feedback chain for algorithm 3 with feedback. Matches EngineMkI.cpp
+   * compute_fb3().
    *
-   * Process sequence: op0 (with feedback) → op1 → op2 → output (main bus).
+   * <p>Process sequence: op0 (with feedback) → op1 → op2 → output (main bus).
    *
    * @return mkiSin output for the last operator in the chain
    */
   private static int computeFb3(
-      int phase0, int freq0, int levelIn0,
-      int phase1, int freq1, int levelIn1,
-      int phase2, int freq2, int levelIn2,
-      int[] fbBuf, int fbShift) {
+      int phase0,
+      int freq0,
+      int levelIn0,
+      int phase1,
+      int freq1,
+      int levelIn1,
+      int phase2,
+      int freq2,
+      int levelIn2,
+      int[] fbBuf,
+      int fbShift) {
 
     int y0 = fbBuf[0];
     int y = fbBuf[1];
@@ -984,9 +1011,9 @@ public class Dx7Engine extends ChuckUGen {
   }
 
   /**
-   * Convert Q24 log-domain envelope level to EngineMkI 14-bit gain.
-   * gain = ENV_MAX - (level_in >> (28 - ENV_BITDEPTH))
-   * If the result is 0, returns ENV_MAX - 1 (matching firmware gain_out == 0 check).
+   * Convert Q24 log-domain envelope level to EngineMkI 14-bit gain. gain = ENV_MAX - (level_in >>
+   * (28 - ENV_BITDEPTH)) If the result is 0, returns ENV_MAX - 1 (matching firmware gain_out == 0
+   * check).
    */
   private static int envToGain(int levelIn) {
     int shifted = levelIn >> (28 - Dx7EngineLookupTables.ENV_BITDEPTH);

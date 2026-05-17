@@ -48,8 +48,8 @@ public class LiSa extends ChuckUGen {
   }
 
   /**
-   * Load pre-recorded float sample data into the LiSa buffer, replacing any existing content.
-   * Sets the buffer duration to match the data length and resets the record position.
+   * Load pre-recorded float sample data into the LiSa buffer, replacing any existing content. Sets
+   * the buffer duration to match the data length and resets the record position.
    */
   public void loadSamples(float[] data) {
     if (data == null || data.length == 0) return;
@@ -159,7 +159,8 @@ public class LiSa extends ChuckUGen {
       v.playPos += v.rate * v.dir;
 
       // Compute effective loop bounds (loopEnd defaults to buffer.length)
-      double effLoopEnd = (v.loopEnd == Double.MAX_VALUE) ? buffer.length : Math.min(v.loopEnd, buffer.length);
+      double effLoopEnd =
+          (v.loopEnd == Double.MAX_VALUE) ? buffer.length : Math.min(v.loopEnd, buffer.length);
       double effLoopStart = Math.max(0.0, Math.min(v.loopStart, effLoopEnd - 1));
 
       // Looping / Edge Logic (respects per-voice loopStart/loopEnd sub-region)
@@ -230,7 +231,7 @@ public class LiSa extends ChuckUGen {
     boolean bidirectional = false;
     float gain = 1.0f;
     float pan = 0.0f; // [-1, 1]
-    double loopStart = 0.0;           // start of loop region (samples), 0 = buffer start
+    double loopStart = 0.0; // start of loop region (samples), 0 = buffer start
     double loopEnd = Double.MAX_VALUE; // end of loop region (samples), MAX_VALUE = buffer end
   }
 }

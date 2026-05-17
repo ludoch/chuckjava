@@ -5,7 +5,7 @@ import org.chuck.audio.ChuckUGen;
 /** A phaser effect using a series of all-pass filters modulated by an internal LFO. */
 public class Phaser extends ChuckUGen {
   private final int stages;
-  private final double[] allpassA;  // Filter coefficients (frequency-related)
+  private final double[] allpassA; // Filter coefficients (frequency-related)
   private final double[] allpassMemory;
   private double lfoPhase = 0.0;
   private double lfoRate = 0.25;
@@ -26,13 +26,21 @@ public class Phaser extends ChuckUGen {
     this.allpassMemory = new double[stages];
   }
 
-  public void setModFreq(double freq) { this.lfoRate = freq; }
+  public void setModFreq(double freq) {
+    this.lfoRate = freq;
+  }
 
-  public void setModDepth(double depth) { this.modDepth = Math.max(0.0, Math.min(1.0, depth)); }
+  public void setModDepth(double depth) {
+    this.modDepth = Math.max(0.0, Math.min(1.0, depth));
+  }
 
-  public void setFeedback(double fb) { this.feedback = Math.max(-0.95, Math.min(0.95, fb)); }
+  public void setFeedback(double fb) {
+    this.feedback = Math.max(-0.95, Math.min(0.95, fb));
+  }
 
-  public void setMix(double mix) { this.mix = mix; }
+  public void setMix(double mix) {
+    this.mix = mix;
+  }
 
   @Override
   protected float compute(float input, long systemTime) {
@@ -43,8 +51,9 @@ public class Phaser extends ChuckUGen {
     double minFreq = 200.0;
     double maxFreq = 4000.0;
     double freq = minFreq * Math.pow(maxFreq / minFreq, lfo * modDepth);
-    double a = (1.0 - Math.sin(2.0 * Math.PI * freq / sampleRate))
-             / (1.0 + Math.sin(2.0 * Math.PI * freq / sampleRate));
+    double a =
+        (1.0 - Math.sin(2.0 * Math.PI * freq / sampleRate))
+            / (1.0 + Math.sin(2.0 * Math.PI * freq / sampleRate));
 
     double x = input + feedback * fbOut;
     for (int i = 0; i < stages; i++) {

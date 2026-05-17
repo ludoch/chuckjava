@@ -85,8 +85,7 @@ public class SndBuf extends ChuckUGen {
       logger.log(Level.SEVERE, "[Audio] SndBuf: File or resource not found: " + path);
       samples = new float[0];
     } catch (Exception e) {
-      logger.log(
-          Level.SEVERE, "[Audio] Error loading file '" + path + "': " + e.getMessage(), e);
+      logger.log(Level.SEVERE, "[Audio] Error loading file '" + path + "': " + e.getMessage(), e);
       samples = new float[0];
     }
     pos = 0;
@@ -120,7 +119,8 @@ public class SndBuf extends ChuckUGen {
       samples[i] = (wavData.channels[0][i] + wavData.channels[1][i]) * 0.5f;
     }
     pos = 0;
-    logger.log(Level.FINE, "[Audio] SndBuf: Loaded WAV " + source + " (" + samples.length + " samples)");
+    logger.log(
+        Level.FINE, "[Audio] SndBuf: Loaded WAV " + source + " (" + samples.length + " samples)");
   }
 
   /** Try to load an AIFF/AIFF-C file. Returns true if successful. */
@@ -133,10 +133,14 @@ public class SndBuf extends ChuckUGen {
         samples[i] = (aiffData.channels[0][i] + aiffData.channels[1][i]) * 0.5f;
       }
       pos = 0;
-      logger.log(Level.FINE, "[Audio] SndBuf: Loaded AIFF " + file.getPath() + " (" + samples.length + " samples)");
+      logger.log(
+          Level.FINE,
+          "[Audio] SndBuf: Loaded AIFF " + file.getPath() + " (" + samples.length + " samples)");
       return true;
     } catch (IOException e) {
-      logger.log(Level.FINE, "[Audio] SndBuf: AIFF read failed for " + file.getPath() + ": " + e.getMessage());
+      logger.log(
+          Level.FINE,
+          "[Audio] SndBuf: AIFF read failed for " + file.getPath() + ": " + e.getMessage());
       return false;
     }
   }

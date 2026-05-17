@@ -3,14 +3,14 @@ package org.chuck.audio.fx;
 import org.chuck.audio.ChuckUGen;
 
 /**
- * GRAIN ModFX: granular effect with grain size and density parameters.
- * Captures input into a ring buffer and overlaps short grains at varying positions.
+ * GRAIN ModFX: granular effect with grain size and density parameters. Captures input into a ring
+ * buffer and overlaps short grains at varying positions.
  */
 public class GrainModFx extends ChuckUGen {
   private final float[] ringBuffer;
   private int writePos = 0;
   private double sampleRate;
-  private double grainSize = 0.05;   // in seconds
+  private double grainSize = 0.05; // in seconds
   private double grainDensity = 0.5; // 0-1
   private double grainFeedback = 0.0;
   private double mix = 0.5;
@@ -34,9 +34,13 @@ public class GrainModFx extends ChuckUGen {
     this.grainSize = 0.005 + depth * 0.195;
   }
 
-  public void setFeedback(double fb) { this.grainFeedback = Math.max(0.0, Math.min(0.9, fb)); }
+  public void setFeedback(double fb) {
+    this.grainFeedback = Math.max(0.0, Math.min(0.9, fb));
+  }
 
-  public void setMix(double mix) { this.mix = mix; }
+  public void setMix(double mix) {
+    this.mix = mix;
+  }
 
   @Override
   protected float compute(float input, long systemTime) {

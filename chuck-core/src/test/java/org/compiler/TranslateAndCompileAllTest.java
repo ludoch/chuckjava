@@ -8,7 +8,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -25,6 +27,8 @@ import org.junit.jupiter.api.Timeout;
  */
 @Timeout(value = 60, unit = TimeUnit.SECONDS)
 public class TranslateAndCompileAllTest {
+
+  private record GeneratedUnit(Path ckFile, String fileName, String javaCode, Path javaFile) {}
 
   @Test
   public void testTranslateAndCompileAll() throws IOException {
@@ -56,12 +60,19 @@ public class TranslateAndCompileAllTest {
     System.out.println("Final Compiler CP: " + classpath);
 
     List<String> failures = new ArrayList<>();
-    int successCount = 0;
+    List<GeneratedUnit> generatedUnits = new ArrayList<>();
 
     for (Path ckFile : ckFiles) {
       String fileName = ckFile.getFileName().toString();
+      String relPath = samplesDir.relativize(ckFile).toString();
       String className =
-          "Generated_" + fileName.replace(".", "_").replace("-", "_").replace("+", "plus");
+          "Generated_"
+              + relPath
+                  .replace('\\', '_')
+                  .replace('/', '_')
+                  .replace(".", "_")
+                  .replace("-", "_")
+                  .replace("+", "plus");
 
       try {
         String source = Files.readString(ckFile);
@@ -87,29 +98,65 @@ public class TranslateAndCompileAllTest {
         var converter = new ChuckToDSLConverter();
         String javaCode = converter.convert(ast, className);
 
-        // 2. Compile
+        // 2. Materialize generated source (compilation happens in iterative passes)
         Path javaFile = tempDir.resolve(className + ".java");
         Files.writeString(javaFile, javaCode);
+        generatedUnits.add(new GeneratedUnit(ckFile, fileName, javaCode, javaFile));
+      } catch (Exception e) {
+        failures.add(ckFile.toString() + " (Translation Error: " + e.getMessage() + ")");
+      }
+    }
 
+    // Compile generated sources in iterative passes so classes can resolve symbols from
+    // other generated classes compiled in earlier passes.
+    String compileClasspath = tempDir + File.pathSeparator + classpath;
+    List<GeneratedUnit> pending = new ArrayList<>(generatedUnits);
+    Map<Path, String> compileFailures = new LinkedHashMap<>();
+    int successCount = 0;
+    int maxPasses = Math.max(3, pending.size());
+    int pass = 0;
+    while (!pending.isEmpty() && pass < maxPasses) {
+      pass++;
+      int compiledThisPass = 0;
+      List<GeneratedUnit> nextPending = new ArrayList<>();
+      compileFailures.clear();
+
+      for (GeneratedUnit unit : pending) {
         List<String> options =
             List.of(
-                "-d", tempDir.toString(), "-cp", classpath, "--enable-preview", "--release", "25");
+                "-d",
+                tempDir.toString(),
+                "-cp",
+                compileClasspath,
+                "--enable-preview",
+                "--release",
+                "25");
 
         var fileManager = compiler.getStandardFileManager(null, null, null);
-        var compilationUnits = fileManager.getJavaFileObjects(javaFile);
+        var compilationUnits = fileManager.getJavaFileObjects(unit.javaFile());
         var task = compiler.getTask(null, fileManager, null, options, null, compilationUnits);
 
         if (task.call()) {
           successCount++;
+          compiledThisPass++;
         } else {
-          failures.add(ckFile.toString() + " (Compilation Failed)");
-          if (failures.size() < 5) {
-            System.err.println("Generated code for " + fileName + ":");
-            System.err.println(javaCode);
-          }
+          nextPending.add(unit);
+          compileFailures.put(unit.ckFile(), unit.fileName());
         }
-      } catch (Exception e) {
-        failures.add(ckFile.toString() + " (Translation Error: " + e.getMessage() + ")");
+        fileManager.close();
+      }
+
+      pending = nextPending;
+      if (compiledThisPass == 0) {
+        break;
+      }
+    }
+
+    for (GeneratedUnit unit : pending) {
+      failures.add(unit.ckFile() + " (Compilation Failed)");
+      if (failures.size() < 5) {
+        System.err.println("Generated code for " + unit.fileName() + ":");
+        System.err.println(unit.javaCode());
       }
     }
 

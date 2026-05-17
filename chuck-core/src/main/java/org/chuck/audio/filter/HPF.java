@@ -8,10 +8,10 @@ import org.chuck.audio.ChuckUGen;
 /**
  * High-pass filter with ZDF (Zero-Delay Feedback) SVF topology.
  *
- * Controls: freq (cutoff Hz), Q (resonance), morph (0.0=LP → 0.5=BP → 1.0=HP), notchMode,
- * drive (1.0=linear, >1.0=tanh saturation).
+ * <p>Controls: freq (cutoff Hz), Q (resonance), morph (0.0=LP → 0.5=BP → 1.0=HP), notchMode, drive
+ * (1.0=linear, >1.0=tanh saturation).
  *
- * Default morph=1.0 preserves HPF behavior for existing callers. The ZDF SVF naturally computes
+ * <p>Default morph=1.0 preserves HPF behavior for existing callers. The ZDF SVF naturally computes
  * LP, BP, and HP outputs simultaneously, enabling continuous morphing between filter types.
  */
 public class HPF extends ChuckUGen {

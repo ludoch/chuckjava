@@ -1,11 +1,12 @@
 package org.chuck.audio.filter;
 
-import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+import org.junit.jupiter.api.Test;
+
 /**
- * Quick diagnostic: run HPF ZDF SVF at morph=1.0, freq=20Hz with a 987Hz tone.
- * Checks whether the output frequency matches the input via autocorrelation.
+ * Quick diagnostic: run HPF ZDF SVF at morph=1.0, freq=20Hz with a 987Hz tone. Checks whether the
+ * output frequency matches the input via autocorrelation.
  */
 public class HPFToneTest {
 
@@ -40,7 +41,7 @@ public class HPFToneTest {
 
     // Autocorrelation
     int minLag = SR / 2000; // ~22 for 987Hz at 44100
-    int maxLag = SR / 400;  // ~110
+    int maxLag = SR / 400; // ~110
     double bestCorr = 0;
     int bestLag = 0;
     for (int lag = minLag; lag <= maxLag; lag++) {
@@ -53,7 +54,10 @@ public class HPFToneTest {
       }
       double norm = Math.sqrt(s1 * s2);
       if (norm > 0) corr /= norm;
-      if (corr > bestCorr) { bestCorr = corr; bestLag = lag; }
+      if (corr > bestCorr) {
+        bestCorr = corr;
+        bestLag = lag;
+      }
     }
     double estFreq = bestLag > 0 ? (double) SR / bestLag : 0;
     double[] candidates = {estFreq, estFreq / 2, estFreq / 3, estFreq / 4, estFreq * 2};
@@ -62,7 +66,10 @@ public class HPFToneTest {
     for (double c : candidates) {
       if (c <= 0) continue;
       double err = Math.abs(c - freq) / freq;
-      if (err < bestCandidateErr) { bestCandidateErr = err; bestCandidate = c; }
+      if (err < bestCandidateErr) {
+        bestCandidateErr = err;
+        bestCandidate = c;
+      }
     }
 
     // Also compute average frequency from zero crossings
@@ -74,8 +81,19 @@ public class HPFToneTest {
 
     System.out.println("HPF ZDF SVF frequency test:");
     System.out.println("  Input freq: " + freq + " Hz");
-    System.out.println("  Autocorr raw: " + String.format("%.2f", estFreq) + " Hz (lag=" + bestLag + " corr=" + String.format("%.4f", bestCorr) + ")");
-    System.out.println("  Best candidate: " + String.format("%.2f", bestCandidate) + " Hz err=" + String.format("%.3f", bestCandidateErr));
+    System.out.println(
+        "  Autocorr raw: "
+            + String.format("%.2f", estFreq)
+            + " Hz (lag="
+            + bestLag
+            + " corr="
+            + String.format("%.4f", bestCorr)
+            + ")");
+    System.out.println(
+        "  Best candidate: "
+            + String.format("%.2f", bestCandidate)
+            + " Hz err="
+            + String.format("%.3f", bestCandidateErr));
     System.out.println("  Zero-cross freq: " + String.format("%.2f", zcFreq) + " Hz");
     System.out.println("  Output peak: " + maxAbs(output));
 

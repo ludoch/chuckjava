@@ -3,19 +3,22 @@ package org.chuck.audio.util;
 /**
  * Decoded representation of a Yamaha DX7 voice patch (156 bytes).
  *
- * <p>The Deluge firmware stores DX7 patches as hex-encoded 156-byte strings in the
- * {@code dx7patch} attribute of {@code <osc1 type="dx7">}. This class parses the hex string
- * into structured operator and global parameter fields matching the real DX7 SysEx format.
+ * <p>The Deluge firmware stores DX7 patches as hex-encoded 156-byte strings in the {@code dx7patch}
+ * attribute of {@code <osc1 type="dx7">}. This class parses the hex string into structured operator
+ * and global parameter fields matching the real DX7 SysEx format.
  *
  * <p>Layout (156 bytes):
+ *
  * <ul>
- *   <li>6 operators × 21 bytes = 126 bytes</li>
- *   <li>19 bytes global parameters (pitch EG 5 + algorithm 1 + feedback 1 + osc sync 1 + LFO 6 + pitch mod 1 + amp mod 1 + transpose 1)</li>
- *   <li>10 bytes patch name at offset 145</li>
- *   <li>1 byte opSwitch/checksum at offset 155</li>
+ *   <li>6 operators × 21 bytes = 126 bytes
+ *   <li>19 bytes global parameters (pitch EG 5 + algorithm 1 + feedback 1 + osc sync 1 + LFO 6 +
+ *       pitch mod 1 + amp mod 1 + transpose 1)
+ *   <li>10 bytes patch name at offset 145
+ *   <li>1 byte opSwitch/checksum at offset 155
  * </ul>
  *
  * <p>Per-operator layout (21 bytes):
+ *
  * <pre>
  *   [0-3]  egRate      (0-99)  EG rates R1-R4
  *   [4-7]  egLevel     (0-99)  EG levels L1-L4
@@ -34,7 +37,8 @@ package org.chuck.audio.util;
  *   [20]   detune      (0-14)  Detune (7=center)
  * </pre>
  */
-public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int transpose, String name, byte[] raw) {
+public record Dx7Patch(
+    Operator[] operators, int algorithm, int feedback, int transpose, String name, byte[] raw) {
 
   /** Number of operators in a DX7 voice. */
   public static final int NUM_OPERATORS = 6;
@@ -94,7 +98,9 @@ public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int tr
   public static Dx7Patch fromHex(String hex) {
     if (hex == null || hex.length() != PATCH_SIZE * 2) {
       throw new IllegalArgumentException(
-          "DX7 patch hex must be " + (PATCH_SIZE * 2) + " chars, got "
+          "DX7 patch hex must be "
+              + (PATCH_SIZE * 2)
+              + " chars, got "
               + (hex == null ? "null" : hex.length()));
     }
     byte[] raw = hexToBytes(hex);
@@ -118,8 +124,9 @@ public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int tr
     int len = hex.length();
     byte[] data = new byte[len / 2];
     for (int i = 0; i < len; i += 2) {
-      data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
-          + Character.digit(hex.charAt(i + 1), 16));
+      data[i / 2] =
+          (byte)
+              ((Character.digit(hex.charAt(i), 16) << 4) + Character.digit(hex.charAt(i + 1), 16));
     }
     return data;
   }
@@ -163,23 +170,36 @@ public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int tr
     // Offsets match the DX7 SysEx format: key scaling at 8-12, rateScale at 13,
     // ampModSens at 14, velSens at 15, outLevel at 16, mode at 17, coarse at 18,
     // fine at 19, detune at 20.
-    int breakPt = raw[off + 8] & 0xFF;        // 0-127
-    int leftDepth = raw[off + 9] & 0xFF;       // 0-99
-    int rightDepth = raw[off + 10] & 0xFF;     // 0-99
-    int leftCurve = raw[off + 11] & 0xFF;      // 0-3
-    int rightCurve = raw[off + 12] & 0xFF;     // 0-3
-    int rateScale = raw[off + 13] & 0xFF;      // 0-7
-    int ampModSens = raw[off + 14] & 0xFF;     // 0-3
-    int velSens = raw[off + 15] & 0xFF;        // 0-7
-    int outLevel = raw[off + 16] & 0xFF;       // 0-99
-    int mode = raw[off + 17] & 0xFF;           // 0=ratio, 1=fixed
-    int coarse = raw[off + 18] & 0xFF;         // 0-31
-    int fine = raw[off + 19] & 0xFF;           // 0-99
-    int detune = raw[off + 20] & 0xFF;         // 0-14
+    int breakPt = raw[off + 8] & 0xFF; // 0-127
+    int leftDepth = raw[off + 9] & 0xFF; // 0-99
+    int rightDepth = raw[off + 10] & 0xFF; // 0-99
+    int leftCurve = raw[off + 11] & 0xFF; // 0-3
+    int rightCurve = raw[off + 12] & 0xFF; // 0-3
+    int rateScale = raw[off + 13] & 0xFF; // 0-7
+    int ampModSens = raw[off + 14] & 0xFF; // 0-3
+    int velSens = raw[off + 15] & 0xFF; // 0-7
+    int outLevel = raw[off + 16] & 0xFF; // 0-99
+    int mode = raw[off + 17] & 0xFF; // 0=ratio, 1=fixed
+    int coarse = raw[off + 18] & 0xFF; // 0-31
+    int fine = raw[off + 19] & 0xFF; // 0-99
+    int detune = raw[off + 20] & 0xFF; // 0-14
 
-    return new Operator(egRate, egLevel, breakPt, leftDepth, rightDepth,
-        leftCurve, rightCurve, rateScale, ampModSens, velSens,
-        outLevel, mode, coarse, fine, detune);
+    return new Operator(
+        egRate,
+        egLevel,
+        breakPt,
+        leftDepth,
+        rightDepth,
+        leftCurve,
+        rightCurve,
+        rateScale,
+        ampModSens,
+        velSens,
+        outLevel,
+        mode,
+        coarse,
+        fine,
+        detune);
   }
 
   private static String decodeName(byte[] raw, int off) {
@@ -197,30 +217,30 @@ public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int tr
   /**
    * A single DX7 operator (voice element).
    *
-   * <p>Each operator is a sine-wave oscillator with its own envelope generator (EG),
-   * frequency controls, and output level. The field ordering matches the DX7 SysEx
-   * layout (21 bytes per operator).
+   * <p>Each operator is a sine-wave oscillator with its own envelope generator (EG), frequency
+   * controls, and output level. The field ordering matches the DX7 SysEx layout (21 bytes per
+   * operator).
    */
   public record Operator(
-      int[] egRate,       // [4] EG rates (0-99)
-      int[] egLevel,      // [4] EG levels (0-99)
-      int breakPt,        // 0-127 Key scaling break point
-      int leftDepth,      // 0-99 Key scaling left depth
-      int rightDepth,     // 0-99 Key scaling right depth
-      int leftCurve,      // 0-3 Key scaling left curve
-      int rightCurve,     // 0-3 Key scaling right curve
-      int rateScale,      // 0-7 Rate scaling
-      int ampModSens,     // 0-3 Amp mod sensitivity
-      int velSens,        // 0-7 Velocity sensitivity
-      int outputLevel,    // 0-99
-      int mode,           // 0=ratio, 1=fixed
-      int coarseFreq,     // 0-31 (coarse frequency)
-      int fineFreq,       // 0-99 (fine tuning)
-      int detune          // 0-14 (7=center)
-  ) {
+      int[] egRate, // [4] EG rates (0-99)
+      int[] egLevel, // [4] EG levels (0-99)
+      int breakPt, // 0-127 Key scaling break point
+      int leftDepth, // 0-99 Key scaling left depth
+      int rightDepth, // 0-99 Key scaling right depth
+      int leftCurve, // 0-3 Key scaling left curve
+      int rightCurve, // 0-3 Key scaling right curve
+      int rateScale, // 0-7 Rate scaling
+      int ampModSens, // 0-3 Amp mod sensitivity
+      int velSens, // 0-7 Velocity sensitivity
+      int outputLevel, // 0-99
+      int mode, // 0=ratio, 1=fixed
+      int coarseFreq, // 0-31 (coarse frequency)
+      int fineFreq, // 0-99 (fine tuning)
+      int detune // 0-14 (7=center)
+      ) {
     /**
-     * Returns the effective frequency ratio for ratio-mode operators.
-     * DX7 convention: 0=0.5, 1=1, 2=2, ..., 31=32
+     * Returns the effective frequency ratio for ratio-mode operators. DX7 convention: 0=0.5, 1=1,
+     * 2=2, ..., 31=32
      */
     public double frequencyRatio() {
       if (coarseFreq == 0) return 0.5;
@@ -228,8 +248,8 @@ public record Dx7Patch(Operator[] operators, int algorithm, int feedback, int tr
     }
 
     /**
-     * Returns the fixed frequency in Hz (for fixed-mode operators).
-     * When mode=1, frequency = coarseFreq * fineFreq (if fineFreq>0) or coarseFreq.
+     * Returns the fixed frequency in Hz (for fixed-mode operators). When mode=1, frequency =
+     * coarseFreq * fineFreq (if fineFreq>0) or coarseFreq.
      */
     public double fixedFrequency() {
       if (fineFreq > 0) return coarseFreq * (double) fineFreq;

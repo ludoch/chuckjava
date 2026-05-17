@@ -108,7 +108,13 @@ public class DacChannel extends ChuckUGen {
       if (src == null) continue;
       float[] temp = new float[length];
       src.tick(temp, 0, length, systemTime);
-      System.err.println("[DacChannel] Source " + s + " tick returned. temp[0]=" + temp[0] + " temp[last]=" + temp[length-1]);
+      System.err.println(
+          "[DacChannel] Source "
+              + s
+              + " tick returned. temp[0]="
+              + temp[0]
+              + " temp[last]="
+              + temp[length - 1]);
       // SIMD Addition: block += temp
       int i = 0;
       int bound = SPECIES.loopBound(length);

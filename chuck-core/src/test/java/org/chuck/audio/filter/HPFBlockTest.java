@@ -1,28 +1,29 @@
 package org.chuck.audio.filter;
 
-import org.chuck.audio.ChuckUGen;
-import org.chuck.core.ChuckDSL;
-import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+import org.chuck.audio.ChuckUGen;
+import org.junit.jupiter.api.Test;
+
 /**
- * Tests HPF ZDF SVF when used with tick() and block-based processing,
- * simulating how the engine uses it in the audio chain.
+ * Tests HPF ZDF SVF when used with tick() and block-based processing, simulating how the engine
+ * uses it in the audio chain.
  */
 public class HPFBlockTest {
 
   static final int SR = 44100;
   static final int BLOCK_SIZE = 256;
 
-  /**
-   * A simple sine oscillator UGen for testing.
-   */
+  /** A simple sine oscillator UGen for testing. */
   static class SineUGen extends ChuckUGen {
     final double freq;
     final float sr;
     double phase = 0;
 
-    SineUGen(float sr, double freq) { this.sr = sr; this.freq = freq; }
+    SineUGen(float sr, double freq) {
+      this.sr = sr;
+      this.freq = freq;
+    }
 
     @Override
     public void tick(float[] buffer, int offset, int length, long systemTime) {
@@ -36,7 +37,9 @@ public class HPFBlockTest {
     }
 
     @Override
-    protected float compute(float input, long systemTime) { return (float) Math.sin(phase++); }
+    protected float compute(float input, long systemTime) {
+      return (float) Math.sin(phase++);
+    }
   }
 
   @Test
@@ -82,7 +85,10 @@ public class HPFBlockTest {
       }
       double norm = Math.sqrt(s1 * s2);
       if (norm > 0) corr /= norm;
-      if (corr > bestCorr) { bestCorr = corr; bestLag = lag; }
+      if (corr > bestCorr) {
+        bestCorr = corr;
+        bestLag = lag;
+      }
     }
     double estFreq = bestLag > 0 ? (double) SR / bestLag : 0;
     double[] candidates = {estFreq, estFreq / 2, estFreq / 3, estFreq / 4, estFreq * 2};
@@ -91,13 +97,27 @@ public class HPFBlockTest {
     for (double c : candidates) {
       if (c <= 0) continue;
       double err = Math.abs(c - freq) / freq;
-      if (err < bestCandidateErr) { bestCandidateErr = err; bestCandidate = c; }
+      if (err < bestCandidateErr) {
+        bestCandidateErr = err;
+        bestCandidate = c;
+      }
     }
 
     System.out.println("HPF ZDF SVF block tick test:");
     System.out.println("  Input freq: " + freq + " Hz");
-    System.out.println("  Autocorr raw: " + String.format("%.2f", estFreq) + " Hz (lag=" + bestLag + " corr=" + String.format("%.4f", bestCorr) + ")");
-    System.out.println("  Best candidate: " + String.format("%.2f", bestCandidate) + " Hz err=" + String.format("%.3f", bestCandidateErr));
+    System.out.println(
+        "  Autocorr raw: "
+            + String.format("%.2f", estFreq)
+            + " Hz (lag="
+            + bestLag
+            + " corr="
+            + String.format("%.4f", bestCorr)
+            + ")");
+    System.out.println(
+        "  Best candidate: "
+            + String.format("%.2f", bestCandidate)
+            + " Hz err="
+            + String.format("%.3f", bestCandidateErr));
 
     assertTrue(bestCandidateErr < 0.15, "Frequency error too high: " + bestCandidateErr);
   }

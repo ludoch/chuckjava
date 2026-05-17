@@ -153,9 +153,17 @@ public class ChuckDSL {
   }
 
   // Logical helpers for ChucK parity
-  public static long logicalAnd(long a, long b) { return (a != 0 && b != 0) ? 1L : 0L; }
-  public static long logicalOr(long a, long b) { return (a != 0 || b != 0) ? 1L : 0L; }
-  public static long logicalNot(long a) { return (a == 0) ? 1L : 0L; }
+  public static long logicalAnd(long a, long b) {
+    return (a != 0 && b != 0) ? 1L : 0L;
+  }
+
+  public static long logicalOr(long a, long b) {
+    return (a != 0 || b != 0) ? 1L : 0L;
+  }
+
+  public static long logicalNot(long a) {
+    return (a == 0) ? 1L : 0L;
+  }
 
   // String helpers for ChucK parity
   public static String setCharAt(String s, int pos, int c) {

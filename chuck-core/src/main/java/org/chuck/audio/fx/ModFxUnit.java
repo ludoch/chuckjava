@@ -3,15 +3,16 @@ package org.chuck.audio.fx;
 import org.chuck.audio.ChuckUGen;
 
 /**
- * Unified ModFX UGen that switches between algorithms: NONE, CHORUS, FLANGER, PHASER,
- * WARBLER, DIMENSION, GRAIN, CHORUS_STEREO.
+ * Unified ModFX UGen that switches between algorithms: NONE, CHORUS, FLANGER, PHASER, WARBLER,
+ * DIMENSION, GRAIN, CHORUS_STEREO.
  *
- * <p>Each track gets one instance. Parameters (rate, depth, feedback, offset) are set
- * per-track, and the algorithm is selected via {@link #setType(int)}.
+ * <p>Each track gets one instance. Parameters (rate, depth, feedback, offset) are set per-track,
+ * and the algorithm is selected via {@link #setType(int)}.
  */
 public class ModFxUnit extends ChuckUGen {
   private final float sampleRate;
-  private int type = 0; // 0=NONE, 1=CHORUS, 2=FLANGER, 3=PHASER, 4=WARBLER, 5=DIMENSION, 6=GRAIN, 7=CHORUS_STEREO
+  private int type =
+      0; // 0=NONE, 1=CHORUS, 2=FLANGER, 3=PHASER, 4=WARBLER, 5=DIMENSION, 6=GRAIN, 7=CHORUS_STEREO
 
   // CHORUS/FLANGER shared resources
   private final DelayL delayLine;
@@ -31,7 +32,7 @@ public class ModFxUnit extends ChuckUGen {
   private double phaserFbOut = 0.0;
 
   // DIMENSION
-  private final double[] dimPhase = new double[]{0.0, 2.0/3.0, 4.0/3.0};
+  private final double[] dimPhase = new double[] {0.0, 2.0 / 3.0, 4.0 / 3.0};
   private static final double[] DIM_DELAYS = {0.008, 0.014, 0.020};
 
   // GRAIN
@@ -57,25 +58,51 @@ public class ModFxUnit extends ChuckUGen {
     this.grainBuffer = new float[ringLen];
   }
 
-  public void setType(int type) { this.type = type; }
-  public void setModFreq(double freq) { this.lfoRate = freq; }
-  public void setModDepth(double depth) { this.delayModDepth = Math.max(0.0, Math.min(1.0, depth)); }
-  public void setFeedback(double fb) { this.feedback = Math.max(-0.95, Math.min(0.95, fb)); }
-  public void setMix(double mix) { this.mix = mix; }
-  public void setOffset(double offset) { this.offset = Math.max(0.0, Math.min(1.0, offset)); }
+  public void setType(int type) {
+    this.type = type;
+  }
+
+  public void setModFreq(double freq) {
+    this.lfoRate = freq;
+  }
+
+  public void setModDepth(double depth) {
+    this.delayModDepth = Math.max(0.0, Math.min(1.0, depth));
+  }
+
+  public void setFeedback(double fb) {
+    this.feedback = Math.max(-0.95, Math.min(0.95, fb));
+  }
+
+  public void setMix(double mix) {
+    this.mix = mix;
+  }
+
+  public void setOffset(double offset) {
+    this.offset = Math.max(0.0, Math.min(1.0, offset));
+  }
 
   @Override
   protected float compute(float input, long systemTime) {
     switch (type) {
-      case 0: return input; // NONE (passthrough)
-      case 1: return computeChorus(input, systemTime);
-      case 2: return computeFlanger(input, systemTime);
-      case 3: return computePhaser(input, systemTime);
-      case 4: return computeWarbler(input, systemTime);
-      case 5: return computeDimension(input, systemTime);
-      case 6: return computeGrain(input, systemTime);
-      case 7: return computeChorusStereo(input, systemTime);
-      default: return input;
+      case 0:
+        return input; // NONE (passthrough)
+      case 1:
+        return computeChorus(input, systemTime);
+      case 2:
+        return computeFlanger(input, systemTime);
+      case 3:
+        return computePhaser(input, systemTime);
+      case 4:
+        return computeWarbler(input, systemTime);
+      case 5:
+        return computeDimension(input, systemTime);
+      case 6:
+        return computeGrain(input, systemTime);
+      case 7:
+        return computeChorusStereo(input, systemTime);
+      default:
+        return input;
     }
   }
 
@@ -85,7 +112,7 @@ public class ModFxUnit extends ChuckUGen {
     double extraDelay = offset * 0.015 * sampleRate;
     double delay = (baseDelaySamples + extraDelay) * (1.0 + delayModDepth * lfo * 0.5);
     delayLine.setDelay(Math.max(2.0, Math.min(maxDelaySamples - 2, delay)));
-    float wet = delayLine.tick(input + (float)(lastWet * feedback * 0.5), systemTime);
+    float wet = delayLine.tick(input + (float) (lastWet * feedback * 0.5), systemTime);
     lastWet = wet;
     return input * (1.0f - (float) mix) + wet * (float) mix;
   }
@@ -98,7 +125,7 @@ public class ModFxUnit extends ChuckUGen {
     double extraOffset = offset * 0.005 * sampleRate;
     double delay = base + extraOffset + (maxD - base) * delayModDepth * (lfo * 0.5 + 0.5);
     delayLine.setDelay(Math.max(2.0, Math.min(maxDelaySamples - 2, delay)));
-    float wet = delayLine.tick(input + (float)(lastWet * feedback), systemTime);
+    float wet = delayLine.tick(input + (float) (lastWet * feedback), systemTime);
     lastWet = wet;
     return input * (1.0f - (float) mix) + wet * (float) mix;
   }
@@ -109,8 +136,9 @@ public class ModFxUnit extends ChuckUGen {
     double minFreq = 200.0;
     double maxFreq = 4000.0;
     double freq = minFreq * Math.pow(maxFreq / minFreq, lfo * delayModDepth);
-    double a = (1.0 - Math.sin(2.0 * Math.PI * freq / sampleRate))
-             / (1.0 + Math.sin(2.0 * Math.PI * freq / sampleRate));
+    double a =
+        (1.0 - Math.sin(2.0 * Math.PI * freq / sampleRate))
+            / (1.0 + Math.sin(2.0 * Math.PI * freq / sampleRate));
 
     double x = input + feedback * phaserFbOut;
     for (int i = 0; i < PHASER_STAGES; i++) {
@@ -134,7 +162,7 @@ public class ModFxUnit extends ChuckUGen {
     double base = 0.015 * sampleRate + extraOffset;
     double mod = combined * delayModDepth * 0.02 * sampleRate;
     delayLine.setDelay(Math.max(2.0, Math.min(maxDelaySamples - 2, base + mod)));
-    float wet = delayLine.tick(input + (float)(lastWet * feedback * 0.707), systemTime);
+    float wet = delayLine.tick(input + (float) (lastWet * feedback * 0.707), systemTime);
     lastWet = wet;
     return input * (1.0f - (float) mix) + wet * (float) mix;
   }
@@ -177,16 +205,16 @@ public class ModFxUnit extends ChuckUGen {
   private float computeChorusStereo(float input, long systemTime) {
     lfoPhase = (lfoPhase + lfoRate / sampleRate) % 1.0;
     double lfoL = Math.sin(lfoPhase * 2.0 * Math.PI);
-    double lfoR = Math.sin((lfoPhase + 1.0/3.0) * 2.0 * Math.PI);
+    double lfoR = Math.sin((lfoPhase + 1.0 / 3.0) * 2.0 * Math.PI);
     double extraOffset = offset * 0.015 * sampleRate;
     double base = 0.025 * sampleRate + extraOffset;
     double delayL = base * (1.0 + delayModDepth * lfoL);
     double delayR = base * (1.0 + delayModDepth * lfoR * 1.3);
     delayLine.setDelay(Math.max(2.0, Math.min(maxDelaySamples - 2, delayL)));
-    float wetL = delayLine.tick(input + (float)(lastWet * feedback * 0.707), systemTime);
+    float wetL = delayLine.tick(input + (float) (lastWet * feedback * 0.707), systemTime);
     delayLine.setDelay(Math.max(2.0, Math.min(maxDelaySamples - 2, delayR)));
-    float wetR = delayLine.tick(input + (float)(lastWet * feedback * 0.707), systemTime);
+    float wetR = delayLine.tick(input + (float) (lastWet * feedback * 0.707), systemTime);
     lastWet = (wetL + wetR) * 0.5f;
-    return input * (1.0f - (float) mix) + (float)(lastWet * mix);
+    return input * (1.0f - (float) mix) + (float) (lastWet * mix);
   }
 }

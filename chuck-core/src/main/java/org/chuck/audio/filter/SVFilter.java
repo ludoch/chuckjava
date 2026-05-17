@@ -59,11 +59,21 @@ public class SVFilter extends ChuckUGen {
     return morph;
   }
 
-  public void notchMode(boolean b) { this.notchMode = b; }
-  public boolean notchMode() { return notchMode; }
+  public void notchMode(boolean b) {
+    this.notchMode = b;
+  }
 
-  public void drive(float d) { this.drive = Math.max(0.0f, Math.min(2.0f, d)); }
-  public float drive() { return drive; }
+  public boolean notchMode() {
+    return notchMode;
+  }
+
+  public void drive(float d) {
+    this.drive = Math.max(0.0f, Math.min(2.0f, d));
+  }
+
+  public float drive() {
+    return drive;
+  }
 
   public void reset() {
     ic1eq = 0.0;

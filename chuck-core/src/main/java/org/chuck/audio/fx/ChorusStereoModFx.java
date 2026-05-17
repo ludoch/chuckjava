@@ -19,7 +19,7 @@ public class ChorusStereoModFx extends ChuckUGen {
 
   public ChorusStereoModFx(float sampleRate) {
     this.baseDelaySamples = 0.025f * sampleRate; // 25ms base
-    this.maxDelaySamples = 0.060f * sampleRate;  // 60ms max
+    this.maxDelaySamples = 0.060f * sampleRate; // 60ms max
     int delayLen = (int) (maxDelaySamples * 2);
     this.delayL = new DelayL(delayLen);
     this.delayR = new DelayL(delayLen);
@@ -35,11 +35,17 @@ public class ChorusStereoModFx extends ChuckUGen {
     lfoR.setFreq(freq);
   }
 
-  public void setModDepth(float depth) { this.modDepth = depth; }
+  public void setModDepth(float depth) {
+    this.modDepth = depth;
+  }
 
-  public void setFeedback(float fb) { this.feedback = Math.max(-0.9f, Math.min(0.9f, fb)); }
+  public void setFeedback(float fb) {
+    this.feedback = Math.max(-0.9f, Math.min(0.9f, fb));
+  }
 
-  public void setMix(float mix) { this.mix = mix; }
+  public void setMix(float mix) {
+    this.mix = mix;
+  }
 
   @Override
   protected float compute(float input, long systemTime) {

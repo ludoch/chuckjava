@@ -32,6 +32,7 @@ public class Dyno extends ChuckUGen {
 
   /** Sidechain HPF cutoff (0-1 normalized, 0=OFF). Filters the envelope follower input. */
   private float sidechainHpf = 0.0f;
+
   private float scHpfState = 0.0f;
 
   private float envelope = 0.0f;
@@ -186,10 +187,10 @@ public class Dyno extends ChuckUGen {
   }
 
   /**
-   * Sidechain HPF cutoff (0-1 normalized). 0 = OFF, values > 0 filter the sidechain signal
-   * before the envelope follower. Higher values remove more low-frequency content, making
-   * compression less sensitive to bass-heavy material. Internally:
-   * {@code cutoff_hz = 100 + sidechainHpf^2 * 2000}, mapped to one-pole coefficient.
+   * Sidechain HPF cutoff (0-1 normalized). 0 = OFF, values > 0 filter the sidechain signal before
+   * the envelope follower. Higher values remove more low-frequency content, making compression less
+   * sensitive to bass-heavy material. Internally: {@code cutoff_hz = 100 + sidechainHpf^2 * 2000},
+   * mapped to one-pole coefficient.
    */
   public void sidechainHpf(float v) {
     float clamped = Math.max(0.0f, Math.min(1.0f, v));

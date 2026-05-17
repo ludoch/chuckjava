@@ -1,7 +1,5 @@
 package org.chuck.audio.util;
 
-import java.io.BufferedInputStream;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -110,8 +108,11 @@ public class WavReader {
           throw new IOException("Format chunk too small: " + chunkSize);
         }
         formatTag = bb.getShort() & 0xFFFF;
-        if (formatTag != 1 && formatTag != 3 && formatTag != 0xFFFE) { // PCM, IEEE float, or extensible
-          throw new IOException("Unsupported WAV format: " + formatTag + " (only PCM/IEEE float supported)");
+        if (formatTag != 1
+            && formatTag != 3
+            && formatTag != 0xFFFE) { // PCM, IEEE float, or extensible
+          throw new IOException(
+              "Unsupported WAV format: " + formatTag + " (only PCM/IEEE float supported)");
         }
         numChannels = bb.getShort() & 0xFFFF;
         sampleRate = bb.getInt();
@@ -168,7 +169,8 @@ public class WavReader {
   /**
    * Read a single PCM sample from a byte array at the given offset and convert to float in [-1, 1].
    */
-  private static float readPcmSample(byte[] data, int offset, int bytesPerSample, int bitsPerSample) {
+  private static float readPcmSample(
+      byte[] data, int offset, int bytesPerSample, int bitsPerSample) {
     if (bitsPerSample == 8) {
       // Unsigned 8-bit
       return (data[offset] & 0xFF) / 128.0f - 1.0f;
@@ -187,14 +189,15 @@ public class WavReader {
   }
 
   /**
-   * Read a single 32-bit IEEE float sample from a byte array at the given offset.
-   * The float value is already in [-1, 1] range per WAV specification.
+   * Read a single 32-bit IEEE float sample from a byte array at the given offset. The float value
+   * is already in [-1, 1] range per WAV specification.
    */
   private static float readFloatSample(byte[] data, int offset) {
-    int bits = (data[offset + 3] & 0xFF) << 24
-             | (data[offset + 2] & 0xFF) << 16
-             | (data[offset + 1] & 0xFF) << 8
-             | (data[offset] & 0xFF);
+    int bits =
+        (data[offset + 3] & 0xFF) << 24
+            | (data[offset + 2] & 0xFF) << 16
+            | (data[offset + 1] & 0xFF) << 8
+            | (data[offset] & 0xFF);
     return Float.intBitsToFloat(bits);
   }
 

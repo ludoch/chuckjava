@@ -5,31 +5,33 @@ import org.chuck.audio.util.StereoUGen;
 /**
  * RingsReverb: Physical modeling reverb inspired by Émilie Gillet's Rings (Mutable Instruments).
  *
- * <p>Architecture: 4 parallel modal resonators (2nd-order IIR bandpass) + Schroeder tank tail,
- * with optional YIN autocorrelation pitch tracking, mallet excitation, and Karplus-Strong mode.
- * The resonators respond to the pitch/frequency content of the input, creating body/resonance
- * that tracks with the note being played — fundamentally different from algorithmic reverb which
- * applies uniform ambience regardless of pitch.
+ * <p>Architecture: 4 parallel modal resonators (2nd-order IIR bandpass) + Schroeder tank tail, with
+ * optional YIN autocorrelation pitch tracking, mallet excitation, and Karplus-Strong mode. The
+ * resonators respond to the pitch/frequency content of the input, creating body/resonance that
+ * tracks with the note being played — fundamentally different from algorithmic reverb which applies
+ * uniform ambience regardless of pitch.
  *
  * <p>Parameters:
+ *
  * <ul>
- *   <li><b>brightness</b> (0-1): Damping/LPF on the resonator structure. Higher = brighter.</li>
- *   <li><b>position</b> (0-1): Spatial spread + balance between direct resonators vs tank tail.</li>
- *   <li><b>structure</b> (0-1): Harmonic spacing. 0 = inharmonic (metallic), 1 = harmonic (string-like).</li>
- *   <li><b>damping</b> (0-1): Additional decay damping on the tank reverb tail.</li>
- *   <li><b>excitation</b> (0-1): Amount of mallet-style transient noise burst on attack detection.</li>
- *   <li><b>mode</b> (0=RESONATOR, 1=KARPLUS_STRONG): Structural model toggle.</li>
+ *   <li><b>brightness</b> (0-1): Damping/LPF on the resonator structure. Higher = brighter.
+ *   <li><b>position</b> (0-1): Spatial spread + balance between direct resonators vs tank tail.
+ *   <li><b>structure</b> (0-1): Harmonic spacing. 0 = inharmonic (metallic), 1 = harmonic
+ *       (string-like).
+ *   <li><b>damping</b> (0-1): Additional decay damping on the tank reverb tail.
+ *   <li><b>excitation</b> (0-1): Amount of mallet-style transient noise burst on attack detection.
+ *   <li><b>mode</b> (0=RESONATOR, 1=KARPLUS_STRONG): Structural model toggle.
  * </ul>
  */
 public class RingsReverb extends StereoUGen {
 
   // ─── Parameters ───────────────────────────────────────────────
   private float brightness = 0.5f;
-  private float position  = 0.5f;
+  private float position = 0.5f;
   private float structure = 0.5f;
-  private float damping   = 0.5f;
+  private float damping = 0.5f;
   private float excitation = 0.0f;
-  private int   mode      = 0; // 0=RESONATOR, 1=KARPLUS_STRONG
+  private int mode = 0; // 0=RESONATOR, 1=KARPLUS_STRONG
 
   // ─── Internal state ───────────────────────────────────────────
   private final float sampleRate;
@@ -68,7 +70,7 @@ public class RingsReverb extends StereoUGen {
   // ─── Mallet excitation state ──────────────────────────────────
   private float malletEnvelope = 0f;
   private float prevEnvelope = 0f;
-  private static final float MALLET_DECAY = 0.9995f;  // per-sample decay
+  private static final float MALLET_DECAY = 0.9995f; // per-sample decay
   private static final float TRANSIENT_THRESHOLD = 0.02f;
 
   public RingsReverb() {
@@ -85,19 +87,19 @@ public class RingsReverb extends StereoUGen {
     }
 
     // Tank reverb: 4 parallel combs + 4 series allpass per channel
-    int[] combTaps = { 480, 600, 700, 800 };
-    int[] apTaps   = { 160, 140, 120, 100 };
+    int[] combTaps = {480, 600, 700, 800};
+    int[] apTaps = {160, 140, 120, 100};
 
     tankCombL = new CombFilter[4];
     tankCombR = new CombFilter[4];
-    tankApL   = new AllPass[4];
-    tankApR   = new AllPass[4];
+    tankApL = new AllPass[4];
+    tankApR = new AllPass[4];
 
     for (int i = 0; i < 4; i++) {
       tankCombL[i] = new CombFilter(combTaps[i], 0.6f);
       tankCombR[i] = new CombFilter(combTaps[i] + 11, 0.6f);
-      tankApL[i]   = new AllPass(apTaps[i], 0.3f);
-      tankApR[i]   = new AllPass(apTaps[i] + 7, 0.3f);
+      tankApL[i] = new AllPass(apTaps[i], 0.3f);
+      tankApR[i] = new AllPass(apTaps[i] + 7, 0.3f);
     }
 
     updateResonators();
@@ -122,7 +124,10 @@ public class RingsReverb extends StereoUGen {
     this.damping = Math.max(0f, Math.min(1f, v));
   }
 
-  /** Mallet excitation amount (0=none, 1=full). Triggers an exponential-decay noise burst on transients. */
+  /**
+   * Mallet excitation amount (0=none, 1=full). Triggers an exponential-decay noise burst on
+   * transients.
+   */
   public void setExcitation(float v) {
     this.excitation = Math.max(0f, Math.min(1f, v));
   }
@@ -142,7 +147,7 @@ public class RingsReverb extends StereoUGen {
   @Override
   protected void computeStereo(float left, float right, long systemTime) {
     // DC blocker
-    left  -= dcBlockerL * DC_BLOCK;
+    left -= dcBlockerL * DC_BLOCK;
     right -= dcBlockerR * DC_BLOCK;
     dcBlockerL = left + dcBlockerL * DC_BLOCK;
     dcBlockerR = right + dcBlockerR * DC_BLOCK;
@@ -342,8 +347,8 @@ public class RingsReverb extends StereoUGen {
     prevMode = mode;
 
     // Harmonic ratios: structure=0 → inharmonic (metallic), structure=1 → harmonic (string)
-    float[] inharmRatios = { 1f, 4.02f, 8.03f, 12.04f };
-    float[] harmRatios   = { 1f, 2f,    4f,    6f };
+    float[] inharmRatios = {1f, 4.02f, 8.03f, 12.04f};
+    float[] harmRatios = {1f, 2f, 4f, 6f};
 
     float[] ratios = new float[4];
     for (int i = 0; i < 4; i++) {
@@ -369,8 +374,8 @@ public class RingsReverb extends StereoUGen {
   // ─── Inner classes ────────────────────────────────────────────
 
   /**
-   * ModalResonator: 2nd-order IIR bandpass with configurable frequency, Q, and decay envelope.
-   * Acts as a struck resonator body — rings at its tuned frequency when excited by input.
+   * ModalResonator: 2nd-order IIR bandpass with configurable frequency, Q, and decay envelope. Acts
+   * as a struck resonator body — rings at its tuned frequency when excited by input.
    */
   private static class ModalResonator {
     private final float fs;
@@ -422,9 +427,9 @@ public class RingsReverb extends StereoUGen {
   }
 
   /**
-   * KarplusStrongString: digital waveguide string model.
-   * Uses a delay line (period = sampleRate / freq) with a lowpass filter in the feedback loop.
-   * The initial pluck is the input signal; the string rings at its tuned frequency.
+   * KarplusStrongString: digital waveguide string model. Uses a delay line (period = sampleRate /
+   * freq) with a lowpass filter in the feedback loop. The initial pluck is the input signal; the
+   * string rings at its tuned frequency.
    */
   private static class KarplusStrongString {
     private final float[] delayLine;

@@ -67,7 +67,7 @@ public class AiffReader {
     int formType = bb.getInt();
     boolean isAifc = (formType == 0x41494643); // "AIFC"
     if (formType != 0x41494646 && formType != 0x41494643) // "AIFF" or "AIFC"
-      throw new IOException("Not an AIFF/AIFC file (got " + Integer.toHexString(formType) + ")");
+    throw new IOException("Not an AIFF/AIFC file (got " + Integer.toHexString(formType) + ")");
 
     int numChannels = -1;
     int sampleRate = -1;
@@ -137,8 +137,8 @@ public class AiffReader {
     for (int f = 0; f < frameCount; f++) {
       int frameOffset = f * bytesPerFrame;
       for (int c = 0; c < Math.min(numChannels, 2); c++) {
-        channels[c][f] = readPcmSample(pcmData, frameOffset + c * bytesPerSample,
-            bytesPerSample, bitsPerSample);
+        channels[c][f] =
+            readPcmSample(pcmData, frameOffset + c * bytesPerSample, bytesPerSample, bitsPerSample);
       }
       if (numChannels == 1) channels[1][f] = channels[0][f];
     }
@@ -190,7 +190,8 @@ public class AiffReader {
     return 44100;
   }
 
-  private static float readPcmSample(byte[] data, int offset, int bytesPerSample, int bitsPerSample) {
+  private static float readPcmSample(
+      byte[] data, int offset, int bytesPerSample, int bitsPerSample) {
     if (bitsPerSample == 8) {
       return (data[offset] & 0xFF) / 128.0f - 1.0f;
     }

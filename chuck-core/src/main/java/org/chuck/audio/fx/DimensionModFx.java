@@ -3,8 +3,8 @@ package org.chuck.audio.fx;
 import org.chuck.audio.ChuckUGen;
 
 /**
- * DIMENSION ModFX: Boss-style stereo chorus with 3 voices and offset delays.
- * Each voice uses a triangle LFO at slightly different phase to create a wide stereo image.
+ * DIMENSION ModFX: Boss-style stereo chorus with 3 voices and offset delays. Each voice uses a
+ * triangle LFO at slightly different phase to create a wide stereo image.
  */
 public class DimensionModFx extends ChuckUGen {
   private final DelayL[] delays;
@@ -22,18 +22,24 @@ public class DimensionModFx extends ChuckUGen {
     this.sampleRate = sampleRate;
     this.maxDelaySamples = (int) (0.050f * sampleRate) + 4;
     this.delays = new DelayL[VOICES];
-    this.phases = new double[]{0.0, 2.0 * Math.PI / 3.0, 4.0 * Math.PI / 3.0};
+    this.phases = new double[] {0.0, 2.0 * Math.PI / 3.0, 4.0 * Math.PI / 3.0};
     for (int i = 0; i < VOICES; i++) {
       delays[i] = new DelayL(maxDelaySamples);
       delays[i].setDelay(VOICE_DELAYS[i] * sampleRate);
     }
   }
 
-  public void setModFreq(double freq) { this.lfoRate = freq; }
+  public void setModFreq(double freq) {
+    this.lfoRate = freq;
+  }
 
-  public void setModDepth(double depth) { this.modDepth = Math.max(0.0, Math.min(1.0, depth)); }
+  public void setModDepth(double depth) {
+    this.modDepth = Math.max(0.0, Math.min(1.0, depth));
+  }
 
-  public void setMix(double mix) { this.mix = mix; }
+  public void setMix(double mix) {
+    this.mix = mix;
+  }
 
   @Override
   protected float compute(float input, long systemTime) {

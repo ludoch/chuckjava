@@ -6,8 +6,8 @@ import jdk.incubator.vector.FloatVector;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.audio.filter.OneZero;
 import org.chuck.audio.fx.DelayL;
-import org.chuck.core.doc;
 import org.chuck.core.ChuckVM;
+import org.chuck.core.doc;
 
 /**
  * Twang: Enhanced plucked-string physical model. Based on STK Twang class. Includes a comb filter

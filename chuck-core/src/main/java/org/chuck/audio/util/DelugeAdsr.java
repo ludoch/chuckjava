@@ -6,15 +6,16 @@ import org.chuck.core.doc;
 /**
  * ADSR Envelope matching the Synthstrom Deluge firmware.
  *
- * <p>Ported from the C++ Deluge Firmware's Envelope::render() (fixed-point Q31 arithmetic
- * converted to floating point). Uses a phase accumulator (pos, target 2^23 = 8388608)
- * and lookup-table-derived curves:
+ * <p>Ported from the C++ Deluge Firmware's Envelope::render() (fixed-point Q31 arithmetic converted
+ * to floating point). Uses a phase accumulator (pos, target 2^23 = 8388608) and
+ * lookup-table-derived curves:
+ *
  * <ul>
- *   <li>Attack: decay4 curve (concave, fast at start)</li>
- *   <li>Decay: decay8 curve from 1.0 down to sustain level</li>
- *   <li>Sustain: holds at sustain level</li>
- *   <li>Release: exponential decay from current value to 0</li>
- *   <li>Fast Release: sine-based release for voice stealing (~5ms)</li>
+ *   <li>Attack: decay4 curve (concave, fast at start)
+ *   <li>Decay: decay8 curve from 1.0 down to sustain level
+ *   <li>Sustain: holds at sustain level
+ *   <li>Release: exponential decay from current value to 0
+ *   <li>Fast Release: sine-based release for voice stealing (~5ms)
  * </ul>
  *
  * <p>The output range is [0, 1] (unlike the firmware's centered output).
@@ -35,8 +36,8 @@ public class DelugeAdsr extends ChuckUGen {
   private float sampleRate;
 
   private volatile int state = IDLE;
-  private double value = 0.0;      // Output value [0, 1]
-  private double pos = 0.0;        // Phase accumulator (0 to PHASE_MAX)
+  private double value = 0.0; // Output value [0, 1]
+  private double pos = 0.0; // Phase accumulator (0 to PHASE_MAX)
 
   // Rate increments per sample (firmware: rate * numSamples added to pos each render call)
   // A rate of 1.0 means pos reaches PHASE_MAX in PHASE_MAX samples.
@@ -64,9 +65,7 @@ public class DelugeAdsr extends ChuckUGen {
     set(0.01, 0.1, 0.7, 0.2);
   }
 
-  /**
-   * Convert time-in-seconds to a rate that reaches PHASE_MAX in that time.
-   */
+  /** Convert time-in-seconds to a rate that reaches PHASE_MAX in that time. */
   private double timeToRate(double timeSeconds) {
     if (timeSeconds <= 0.0) return PHASE_MAX; // instant
     return PHASE_MAX / (timeSeconds * sampleRate);
@@ -107,9 +106,8 @@ public class DelugeAdsr extends ChuckUGen {
   // --- curve approximation functions (matching firmware LUT shapes) ---
 
   /**
-   * decay4 curve: used for ATTACK.
-   * Returns 1.0 at pos=0 down to ~0.0 at pos=PHASE_MAX.
-   * Maps to a concave curve: starts fast, slows down.
+   * decay4 curve: used for ATTACK. Returns 1.0 at pos=0 down to ~0.0 at pos=PHASE_MAX. Maps to a
+   * concave curve: starts fast, slows down.
    */
   private static double decay4(double pos) {
     double x = Math.max(0.0, Math.min(1.0, pos / PHASE_MAX));
@@ -117,19 +115,15 @@ public class DelugeAdsr extends ChuckUGen {
   }
 
   /**
-   * decay8 curve: used for DECAY.
-   * Returns 1.0 at pos=0 down to 0.0 at pos=PHASE_MAX.
-   * Maps to a steeper curve than decay4.
+   * decay8 curve: used for DECAY. Returns 1.0 at pos=0 down to 0.0 at pos=PHASE_MAX. Maps to a
+   * steeper curve than decay4.
    */
   private static double decay8(double pos) {
     double x = Math.max(0.0, Math.min(1.0, pos / PHASE_MAX));
     return Math.pow(1.0 - x, 1.25);
   }
 
-  /**
-   * Sine half-wave: used for FAST_RELEASE.
-   * Returns 1.0 at pos=0 down to 0.0 at pos=PHASE_MAX.
-   */
+  /** Sine half-wave: used for FAST_RELEASE. Returns 1.0 at pos=0 down to 0.0 at pos=PHASE_MAX. */
   private static double sineRelease(double pos) {
     double x = Math.max(0.0, Math.min(1.0, pos / PHASE_MAX));
     return 0.5 + 0.5 * Math.cos(x * Math.PI);
@@ -229,9 +223,7 @@ public class DelugeAdsr extends ChuckUGen {
     if (length > 0) lastOut = blockCache[length - 1];
   }
 
-  /**
-   * Per-sample render, matching firmware's Envelope::render(numSamples=1).
-   */
+  /** Per-sample render, matching firmware's Envelope::render(numSamples=1). */
   @Override
   protected float compute(float input, long systemTime) {
     final double sustain = sustainLevel;

@@ -15,6 +15,7 @@ public class MorphingWavetable extends ChuckUGen {
   private double phase = 0.0;
   private float freq = 440.0f;
   private float index = 0.0f;
+
   /** FM modulation gain — bypasses the ChuckUGen gain clamp so FM depth can exceed 1.0. */
   private float modGain = 0.0f;
 

@@ -5,31 +5,33 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
-/**
- * Standalone unit test for Dx7Engine – same package so it can call compute().
- */
+/** Standalone unit test for Dx7Engine – same package so it can call compute(). */
 public class Dx7EngineUnitTest {
 
   // ── Known-good test patches ──
 
   /**
-   * Simple test patch: all 6 operators identical, outputLevel=99, coarse=1,
-   * algorithm=0 (serial chain), feedback=0.
-   * This should produce clearly audible output.
+   * Simple test patch: all 6 operators identical, outputLevel=99, coarse=1, algorithm=0 (serial
+   * chain), feedback=0. This should produce clearly audible output.
    */
   static final String SIMPLE_PATCH_HEX =
-    "6363636363503c0000000000000000006300010000" +  // op1
-    "6363636363503c0000000000000000006300010000" +  // op2
-    "6363636363503c0000000000000000006300010000" +  // op3
-    "6363636363503c0000000000000000006300010000" +  // op4
-    "6363636363503c0000000000000000006300010000" +  // op5
-    "6363636363503c0000000000000000006300010000" +  // op6
-    "00000000000000000000000000000000000000" +       // globals (19 bytes)
-    "544553542020202020203f";                         // name (10) + opSwitch (1)
+      "6363636363503c0000000000000000006300010000"
+          + // op1
+          "6363636363503c0000000000000000006300010000"
+          + // op2
+          "6363636363503c0000000000000000006300010000"
+          + // op3
+          "6363636363503c0000000000000000006300010000"
+          + // op4
+          "6363636363503c0000000000000000006300010000"
+          + // op5
+          "6363636363503c0000000000000000006300010000"
+          + // op6
+          "00000000000000000000000000000000000000"
+          + // globals (19 bytes)
+          "544553542020202020203f"; // name (10) + opSwitch (1)
 
-  /**
-   * Variation of SIMPLE_PATCH with algorithm=12 (all 6 parallel carriers).
-   */
+  /** Variation of SIMPLE_PATCH with algorithm=12 (all 6 parallel carriers). */
   static String simplePatchAlgo(int algo) {
     return SIMPLE_PATCH_HEX.substring(0, 134 * 2)
         + String.format("%02x", algo)
@@ -63,8 +65,7 @@ public class Dx7EngineUnitTest {
     }
 
     System.out.println("Dx7EngineUnitTest: peak after 1s = " + peak);
-    assertTrue(peak > 0.001f,
-        "Dx7Engine should produce audible output (peak=" + peak + ")");
+    assertTrue(peak > 0.001f, "Dx7Engine should produce audible output (peak=" + peak + ")");
   }
 
   @Test
@@ -85,8 +86,8 @@ public class Dx7EngineUnitTest {
         if (abs > peak) peak = abs;
       }
       System.out.println("algo " + algo + " peak = " + peak);
-      assertTrue(peak > 0.0001f,
-          "Algorithm " + algo + " should produce output (peak=" + peak + ")");
+      assertTrue(
+          peak > 0.0001f, "Algorithm " + algo + " should produce output (peak=" + peak + ")");
     }
   }
 
@@ -118,7 +119,6 @@ public class Dx7EngineUnitTest {
     System.out.println("Peak after note off: " + peakAfter);
 
     // After release (EG rates are 99), sound should fade significantly
-    assertTrue(peakAfter <= peakDuring + 0.01f,
-        "Sound should not get louder after note-off");
+    assertTrue(peakAfter <= peakDuring + 0.01f, "Sound should not get louder after note-off");
   }
 }

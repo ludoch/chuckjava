@@ -389,8 +389,10 @@ public abstract class ChuckUGen extends ChuckObject {
     return 0.0f;
   }
 
-  /** Returns the output for channel {@code i} at the given system time,
-   *  using the block cache when available. */
+  /**
+   * Returns the output for channel {@code i} at the given system time, using the block cache when
+   * available.
+   */
   public float getChannelLastOut(int i, long systemTime) {
     if (systemTime != -1
         && blockLength > 0
