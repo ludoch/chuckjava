@@ -9,10 +9,6 @@ public class BlitSaw extends Osc {
     super(sampleRate);
   }
 
-  public BlitSaw() {
-    this(44100.0f);
-  }
-
   @Override
   protected double computeOsc(double phase) {
     double dt = freq / sampleRate;

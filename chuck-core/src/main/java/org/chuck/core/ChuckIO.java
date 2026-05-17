@@ -107,16 +107,4 @@ public class ChuckIO extends ChuckObject {
   public static String newline() {
     return "\n";
   }
-
-  // Static helper for IO.nl()
-  public static String nl() {
-    return "\n";
-  }
-
-  // Flush the stream
-  public void flush() {
-    if (stream != null) {
-      stream.flush();
-    }
-  }
 }

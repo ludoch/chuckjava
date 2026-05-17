@@ -106,8 +106,8 @@ public sealed interface ChuckAST {
 
   record SporkExp(CallExp call, String doc, int line, int column) implements Exp {}
 
-  record TernaryExp(
-      Exp condition, Exp thenExp, Exp elseExp, String doc, int line, int column) implements Exp {}
+  record TernaryExp(Exp condition, Exp thenExp, Exp elseExp, String doc, int line, int column)
+      implements Exp {}
 
   record TypeofExp(Exp expr, String doc, int line, int column) implements Exp {}
 

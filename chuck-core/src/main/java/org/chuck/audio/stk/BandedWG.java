@@ -36,7 +36,7 @@ public class BandedWG extends ChuckUGen {
     setFreq(110.0);
   }
 
-  public double setFreq(double f) {
+  public void setFreq(double f) {
     freq = f;
     for (int i = 0; i < BANDS; i++) {
       double modeFreq = f * MODE_RATIO[i];
@@ -44,41 +44,6 @@ public class BandedWG extends ChuckUGen {
       delays[i].setDelay(delaySamples);
       decayCoef[i] = Math.exp(-1.0 / (0.3 * sampleRate / modeFreq));
     }
-    return f;
-  }
-  
-  public double freq(double f) {
-      setFreq(f);
-      return f;
-  }
-
-  public double bowPressure(double p) {
-      bowVelocity = (float)p; // Simplified
-      return p;
-  }
-  
-  public double bowPressure() { return bowVelocity; }
-  
-  public double bowRate(double r) {
-      return r;
-  }
-
-  public double bowRate() { return 0.5; }
-  
-  public double strikePosition(double s) {
-      return s;
-  }
-
-  public double strikePosition() { return 0.5; }
-
-  public double startBowing(double v) {
-      noteOn((float)v);
-      return v;
-  }
-
-  public double stopBowing(double v) {
-      noteOff((float)v);
-      return v;
   }
 
   public void noteOn(float velocity) {

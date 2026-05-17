@@ -61,9 +61,4 @@ public class KBHit extends ChuckObject {
   public long can_wait() {
     return 1L;
   }
-
-  /** Alias for kbhit() */
-  public boolean more() {
-    return !queue.isEmpty();
-  }
 }

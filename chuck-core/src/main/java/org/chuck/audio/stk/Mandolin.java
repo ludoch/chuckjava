@@ -36,14 +36,6 @@ public class Mandolin extends ChuckUGen {
     this.numOutputs = 2; // Stereo output
   }
 
-  public Mandolin() {
-    this(20.0f, 44100.0f);
-  }
-
-  public Mandolin(float sampleRate) {
-      this(20.0f, sampleRate);
-  }
-
   @doc("Set the fundamental frequency of the mandolin.")
   public void freq(double f) {
     this.freq = f;

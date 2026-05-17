@@ -564,7 +564,12 @@ public class ChuckASTVisitor extends ChuckANTLRBaseVisitor<Object> {
           callExp, currentDoc, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
     }
     return new ChuckAST.UnaryExp(
-        op, subExp, false, currentDoc, ctx.getStart().getLine(), ctx.getStart().getCharPositionInLine());
+        op,
+        subExp,
+        false,
+        currentDoc,
+        ctx.getStart().getLine(),
+        ctx.getStart().getCharPositionInLine());
   }
 
   @Override

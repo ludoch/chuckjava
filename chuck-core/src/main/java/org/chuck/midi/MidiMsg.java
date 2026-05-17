@@ -12,10 +12,6 @@ public class MidiMsg extends ChuckObject {
   public int data2 = 0;
   public int data3 = 0;
 
-  public int data1() { return data1; }
-  public int data2() { return data2; }
-  public int data3() { return data3; }
-
   /** Native timestamp (seconds) provided by the driver. */
   public double when = 0;
 

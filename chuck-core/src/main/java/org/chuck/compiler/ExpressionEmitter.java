@@ -70,22 +70,22 @@ public class ExpressionEmitter {
               parent.emitChuckTarget(e.exp(), code, ChuckAST.Operator.CHUCK);
             }
             case POSTFIX_PLUS_PLUS -> {
-                // postfix ++ (handled as non-statement expression: pushes original value)
-                code.addInstruction(new StackInstrs.Dup());
-                code.addInstruction(new StackInstrs.Dup());
-                code.addInstruction(new PushInstrs.PushInt(1));
-                code.addInstruction(new ArithmeticInstrs.AddAny());
-                parent.emitChuckTarget(e.exp(), code, ChuckAST.Operator.CHUCK);
-                code.addInstruction(new StackInstrs.Pop());
+              // postfix ++ (handled as non-statement expression: pushes original value)
+              code.addInstruction(new StackInstrs.Dup());
+              code.addInstruction(new StackInstrs.Dup());
+              code.addInstruction(new PushInstrs.PushInt(1));
+              code.addInstruction(new ArithmeticInstrs.AddAny());
+              parent.emitChuckTarget(e.exp(), code, ChuckAST.Operator.CHUCK);
+              code.addInstruction(new StackInstrs.Pop());
             }
             case POSTFIX_MINUS_MINUS -> {
-                // postfix --
-                code.addInstruction(new StackInstrs.Dup());
-                code.addInstruction(new StackInstrs.Dup());
-                code.addInstruction(new PushInstrs.PushInt(1));
-                code.addInstruction(new ArithmeticInstrs.MinusAny());
-                parent.emitChuckTarget(e.exp(), code, ChuckAST.Operator.CHUCK);
-                code.addInstruction(new StackInstrs.Pop());
+              // postfix --
+              code.addInstruction(new StackInstrs.Dup());
+              code.addInstruction(new StackInstrs.Dup());
+              code.addInstruction(new PushInstrs.PushInt(1));
+              code.addInstruction(new ArithmeticInstrs.MinusAny());
+              parent.emitChuckTarget(e.exp(), code, ChuckAST.Operator.CHUCK);
+              code.addInstruction(new StackInstrs.Pop());
             }
             default -> {}
           }

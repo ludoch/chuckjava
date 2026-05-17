@@ -20,21 +20,21 @@ public class Hid extends ChuckEvent implements AutoCloseable {
     opened = false;
   }
 
-  public int openKeyboard(long index, ChuckVM vm) {
+  public int openKeyboard(int index, ChuckVM vm) {
     this.deviceType = "keyboard";
     this.opened = true;
     vm.registerHid(this);
     return 1; // Success
   }
 
-  public int openMouse(long index, ChuckVM vm) {
+  public int openMouse(int index, ChuckVM vm) {
     this.deviceType = "mouse";
     this.opened = true;
     vm.registerHid(this);
     return 1; // Success
   }
 
-  public int openJoystick(long index, ChuckVM vm) {
+  public int openJoystick(int index, ChuckVM vm) {
     this.deviceType = "joystick";
     this.opened = true;
 
@@ -49,7 +49,7 @@ public class Hid extends ChuckEvent implements AutoCloseable {
                 HidMsg next = new HidMsg();
                 next.x = current.x;
                 next.y = current.y;
-                if (HidNative.pollJoystick((int) index, next, lastButtons)) {
+                if (HidNative.pollJoystick(index, next, lastButtons)) {
                   pushMsg(next);
                   broadcast(vm);
                   current = next;
@@ -63,11 +63,6 @@ public class Hid extends ChuckEvent implements AutoCloseable {
             });
 
     return 1;
-  }
-
-  /** Returns true if messages are waiting. */
-  public boolean more() {
-      return !queue.isEmpty();
   }
 
   public synchronized void pushMsg(HidMsg msg) {

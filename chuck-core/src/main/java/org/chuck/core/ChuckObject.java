@@ -87,12 +87,6 @@ public class ChuckObject {
     // In a real ChucK, this would list all members and methods.
   }
 
-  public long isa(String typeName) {
-      if (type.getName().equals(typeName)) return 1L;
-      // Simplified: doesn't check parent types yet
-      return 0L;
-  }
-
   public Object getRef(int index) {
     return (index < refs.length) ? refs[index] : null;
   }

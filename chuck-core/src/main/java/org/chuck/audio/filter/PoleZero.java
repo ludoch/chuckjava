@@ -33,11 +33,6 @@ public class PoleZero extends ChuckUGen {
     a1 = -pole;
   }
 
-  public double blockZero(double pole) {
-    setBlockZero(pole);
-    return pole;
-  }
-
   // Raw coefficient setters
   public void setB0(double v) {
     b0 = v;

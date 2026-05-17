@@ -10,10 +10,6 @@ public class BlitSquare extends Osc {
     super(sampleRate);
   }
 
-  public BlitSquare() {
-    this(44100.0f);
-  }
-
   @Override
   protected double computeOsc(double phase) {
     double dt = freq / sampleRate;

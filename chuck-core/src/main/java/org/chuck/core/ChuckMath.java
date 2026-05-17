@@ -35,6 +35,4 @@ public class ChuckMath {
   public static double randomf() { return Std.randf(); }
   public static long random2(long min, long max) { return Std.rand2(min, max); }
   public static double random2f(double min, double max) { return Std.rand2f(min, max); }
-  public static long maybe() { return Math.random() > 0.5 ? 1 : 0; }
-  public static boolean equal(double a, double b) { return Math.abs(a - b) < 0.000001; }
 }

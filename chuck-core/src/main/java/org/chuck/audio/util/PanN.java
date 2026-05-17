@@ -8,10 +8,6 @@ public class PanN extends MultiChannelUGen {
     super(numChannels);
   }
 
-  public PanN() {
-    this(8);
-  }
-
   public float pan(float p) {
     this.pan = p;
     return p;
