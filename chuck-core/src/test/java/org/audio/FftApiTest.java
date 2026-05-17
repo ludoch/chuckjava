@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import org.chuck.audio.analysis.FFT;
 import org.chuck.audio.analysis.IFFT;
+import org.chuck.audio.util.Complex;
 import org.chuck.core.ChuckArray;
 import org.chuck.core.ChuckVM;
 import org.junit.jupiter.api.Test;
@@ -41,20 +42,20 @@ public class FftApiTest {
     // Feed some samples and upchuck
     for (int i = 0; i < 16; i++) fft.tick(0.5f, i);
     fft.upchuck();
-    ChuckArray c = fft.cval(0);
+    Complex c = fft.cval(0);
     assertNotNull(c);
-    assertEquals("complex", c.vecTag);
-    assertEquals(2, c.size());
+    assertTrue(Double.isFinite(c.re()));
+    assertTrue(Double.isFinite(c.im()));
   }
 
   @Test
   void testFftCvalOutOfRange() {
     FFT fft = new FFT(8);
-    ChuckArray c = fft.cval(999L);
+    Complex c = fft.cval(999L);
     // Should return zero-filled complex, not throw
     assertNotNull(c);
-    assertEquals(0.0, c.getFloat(0), 1e-9);
-    assertEquals(0.0, c.getFloat(1), 1e-9);
+    assertEquals(0.0, c.re(), 1e-9);
+    assertEquals(0.0, c.im(), 1e-9);
   }
 
   // ── FFT.spectrum(ChuckArray) ───────────────────────────────────────────────
@@ -177,7 +178,7 @@ public class FftApiTest {
             + "<<< \"c:\", fft.cval(0)$polar >>>;\n";
     vm.run(code, "test");
     vm.advanceTime(44100 / 2);
-    assertTrue(out.toString().contains("c:"), "cval output missing: " + out);
+    assertTrue(out.toString().contains("%("), "polar output missing: " + out);
   }
 
   @Test

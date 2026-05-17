@@ -69,6 +69,54 @@ public class ChuckToDSLConverterTest {
   }
 
   @Test
+  public void testChuckChainEmission() throws Exception {
+    String source =
+        """
+            1 => int a => int b;
+            """;
+
+    var input = CharStreams.fromString(source);
+    var lexer = new ChuckANTLRLexer(input);
+    var tokens = new CommonTokenStream(lexer);
+    var parser = new ChuckANTLRParser(tokens);
+
+    var visitor = new ChuckASTVisitor(tokens);
+    @SuppressWarnings("unchecked")
+    List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
+
+    var converter = new ChuckToDSLConverter();
+    String javaCode = converter.convert(ast, "ChainShred");
+
+    assertTrue(javaCode.contains("public long a = (long)(0);"));
+    assertTrue(javaCode.contains("public long b = (long)(0);"));
+    assertTrue(javaCode.contains("a = (long)(1);"));
+    assertTrue(javaCode.contains("b = (long)(a);"));
+  }
+
+  @Test
+  public void testUgenConnectionTargetEmission() throws Exception {
+    String source =
+        """
+            SinOsc s => Bitcrusher bc => dac;
+            """;
+
+    var input = CharStreams.fromString(source);
+    var lexer = new ChuckANTLRLexer(input);
+    var tokens = new CommonTokenStream(lexer);
+    var parser = new ChuckANTLRParser(tokens);
+
+    var visitor = new ChuckASTVisitor(tokens);
+    @SuppressWarnings("unchecked")
+    List<ChuckAST.Stmt> ast = (List<ChuckAST.Stmt>) visitor.visit(parser.program());
+
+    var converter = new ChuckToDSLConverter();
+    String javaCode = converter.convert(ast, "UgenChainShred");
+
+    assertTrue(javaCode.contains("s.chuck(bc)"));
+    assertTrue(javaCode.contains("bc.chuck(dac())"));
+  }
+
+  @Test
   public void testEventCompound() throws Exception {
     String source =
         """
