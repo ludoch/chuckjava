@@ -1599,6 +1599,7 @@ public class ChuckToDSLConverter {
       if (duplicateCount > 0) {
         name = name + "__" + duplicateCount;
       }
+      userFunctions.add(name);
       String retType = mapType(fds.returnType());
       if (retType.endsWith("[]") && !retType.startsWith("ChuckEvent")) {
         retType = "ChuckArray";
@@ -1608,6 +1609,7 @@ public class ChuckToDSLConverter {
         if (i > 0) sb.append(", ");
         String rawArgType = mapType(fds.argTypes().get(i));
         String argType = rawArgType;
+        if ("SndBuf".equals(argType)) argType = "ChuckUGen";
         if (argType.endsWith("[]") && !argType.startsWith("ChuckEvent")) {
           argType = "ChuckArray";
           String argSafe = safeName(fds.argNames().get(i));
@@ -1801,7 +1803,7 @@ public class ChuckToDSLConverter {
   private String emitSporkExpression(ChuckAST.Exp callExp) {
     String callCode = visitExp(callExp);
     StringBuilder prefix = new StringBuilder();
-    for (Map.Entry<String, String> e : varTypes.entrySet()) {
+    for (Map.Entry<String, String> e : new ArrayList<>(varTypes.entrySet())) {
       String var = safeName(e.getKey());
       if (var == null || var.isEmpty() || var.startsWith("__sp_")) continue;
       if (!callCode.matches("(?s).*\\b\\Q" + var + "\\E\\b.*")) continue;
@@ -2063,7 +2065,6 @@ public class ChuckToDSLConverter {
             return lhsCode + ".__op__" + opName + "(" + rhsCode + ")";
           }
         }
-
         // Handle swap for symmetric ops: float * Complex -> Complex.times(float)
         if (isPrimitive(lType)
             && (rType.equals("Complex") || rType.equals("Polar"))
@@ -2081,6 +2082,28 @@ public class ChuckToDSLConverter {
         }
         if (be.op() == ChuckAST.Operator.OR) {
           return "(" + visitBoolExp(be.lhs()) + " || " + visitBoolExp(be.rhs()) + ")";
+        }
+
+        String dynamicOpName =
+            switch (be.op()) {
+              case PLUS -> "plus";
+              case MINUS -> "minus";
+              case TIMES -> "times";
+              case DIVIDE -> "div";
+              default -> null;
+            };
+        if (dynamicOpName != null
+            && userFunctions.contains("__op__" + dynamicOpName)
+            && (be.lhs() instanceof ChuckAST.CallExp
+                || be.rhs() instanceof ChuckAST.CallExp
+                || lhsCode.startsWith("__op__")
+                || rhsCode.startsWith("__op__"))
+            && ((lhsCode.startsWith("__op__") || rhsCode.startsWith("__op__"))
+                || (!isPrimitive(lType)
+                    && !isPrimitive(rType)
+                    && !"String".equals(lType)
+                    && !"String".equals(rType)))) {
+          return "__op__" + dynamicOpName + "(" + lhsCode + ", " + rhsCode + ")";
         }
 
         String op = mapOp(be.op());
@@ -2292,7 +2315,7 @@ public class ChuckToDSLConverter {
           String op = mapOp(be.op());
           return "(" + lhsCode + ".compareTo(" + rhsCode + ") " + op + " 0)";
         }
-        if (isDur(be.lhs()) || isDur(be.rhs())) {
+        if (be.op() != ChuckAST.Operator.LE && (isDur(be.lhs()) || isDur(be.rhs()))) {
           String l = isDur(be.lhs()) ? durationScalar(lhsCode) : lhsCode;
           String r = isDur(be.rhs()) ? durationScalar(rhsCode) : rhsCode;
           return "(" + l + " " + mapOp(be.op()) + " " + r + ")";
@@ -2916,24 +2939,32 @@ public class ChuckToDSLConverter {
       if (rhsCode.equals("now()")) rhsCode = "samp(now())";
 
       if (be.op() == ChuckAST.Operator.LE) {
-        if ("ChuckIO".equals(lhsType)
-            || "org.chuck.core.ChuckIO".equals(lhsType)
-            || "org.chuck.core.ChuckDSL.ChuckIO".equals(lhsType)
-            || (lhsType != null && lhsType.endsWith("ChuckIO"))
-            || "FileIO".equals(lhsType)
-            || "org.chuck.core.FileIO".equals(lhsType)
-            || "SerialIO".equals(lhsType)
-            || "Object".equals(lhsType)
-            || "chout".equals(lhsType)
-            || "cherr".equals(lhsType)
-            || "out".equals(lhsCode)
-            || "cherr".equals(lhsCode)
-            || "chout".equals(lhsCode)
-            || lhsCode.startsWith("_chuckWrite(")
-            || lhsCode.contains(".print(")
-            || lhsCode.contains("cherr.print")
-            || lhsCode.contains("chout.print")) {
+        boolean isWriteTarget =
+            "ChuckIO".equals(lhsType)
+                || "org.chuck.core.ChuckIO".equals(lhsType)
+                || "org.chuck.core.ChuckDSL.ChuckIO".equals(lhsType)
+                || (lhsType != null && lhsType.endsWith("ChuckIO"))
+                || "FileIO".equals(lhsType)
+                || "org.chuck.core.FileIO".equals(lhsType)
+                || "SerialIO".equals(lhsType)
+                || "Object".equals(lhsType)
+                || "chout".equals(lhsType)
+                || "cherr".equals(lhsType)
+                || "out".equals(lhsCode)
+                || "cherr".equals(lhsCode)
+                || "chout".equals(lhsCode)
+                || lhsCode.startsWith("_chuckWrite(")
+                || lhsCode.contains("_chuckWrite(")
+                || lhsCode.contains(".print(")
+                || lhsCode.contains("cherr.print")
+                || lhsCode.contains("chout.print");
+        if (isWriteTarget) {
           return "_chuckWrite(" + lhsCode + ", " + rhsCode + ")";
+        }
+        if (isDur(be.lhs()) || isDur(be.rhs())) {
+          String l = isDur(be.lhs()) ? durationScalar(lhsCode) : lhsCode;
+          String r = isDur(be.rhs()) ? durationScalar(rhsCode) : rhsCode;
+          return "(" + l + " <= " + r + ")";
         }
       }
 
@@ -2997,6 +3028,12 @@ public class ChuckToDSLConverter {
           && stdDe.base() instanceof ChuckAST.IdExp stdBase
           && "Std".equals(stdBase.name())
           && ce.args().size() == 1) {
+        if ("atoi".equals(stdDe.member())) {
+          return "Std.atoi(String.valueOf(" + visitExp(ce.args().get(0)) + "))";
+        }
+        if ("atof".equals(stdDe.member())) {
+          return "Std.atof(String.valueOf(" + visitExp(ce.args().get(0)) + "))";
+        }
         if ("mtof".equals(stdDe.member())) {
           return "mtof(_num(" + visitExp(ce.args().get(0)) + "))";
         }
@@ -3730,6 +3767,9 @@ public class ChuckToDSLConverter {
               + ")";
         }
         if (member.equals("pfreq")) {
+          if (ce.args().isEmpty()) {
+            return "_call(" + baseCode + ", \"pfreq\")";
+          }
           return baseCode + ".freq(" + visitExp(ce.args().get(0)) + ")";
         }
         if (member.equals("lower"))
@@ -4359,6 +4399,11 @@ public class ChuckToDSLConverter {
       if (ue.op() == ChuckAST.Operator.LOGICAL_NOT) {
         String inner = visitExp(ue.exp());
         String innerType = typeOf(ue.exp());
+        if (ue.exp() instanceof ChuckAST.IdExp
+            && "Object".equals(innerType)
+            && userFunctions.contains("__op__not")) {
+          return "__op__not(" + inner + ")";
+        }
         if ("boolean".equals(innerType)) return "!(" + inner + ")";
         if ("long".equals(innerType) || "int".equals(innerType)) return "(" + inner + " == 0)";
         if ("double".equals(innerType) || "float".equals(innerType))
@@ -4376,6 +4421,20 @@ public class ChuckToDSLConverter {
           };
       boolean isIncDec = "++".equals(op) || "--".equals(op);
       String incDelta = "--".equals(op) ? "-1" : "1";
+      if (isIncDec) {
+        String baseFn = "--".equals(op) ? "__op__dec" : "__op__inc";
+        String postfixFn = baseFn + "__1";
+        String arg = visitExp(ue.exp());
+        String expType = typeOf(ue.exp());
+        if (!isPrimitive(expType) && !"String".equals(expType)) {
+          if (ue.isPostfix() && userFunctions.contains(postfixFn)) {
+            return postfixFn + "(" + arg + ")";
+          }
+          if (userFunctions.contains(baseFn)) {
+            return baseFn + "(" + arg + ")";
+          }
+        }
+      }
       if (isIncDec
           && ue.exp() instanceof ChuckAST.CallExp ce2
           && ce2.base() instanceof ChuckAST.DotExp de2
@@ -4834,6 +4893,7 @@ public class ChuckToDSLConverter {
     List<String> mapped = new ArrayList<>();
     for (String raw : rawArgTypes) {
       String t = mapType(raw);
+      if ("SndBuf".equals(t)) t = "ChuckUGen";
       if (t.endsWith("[]") && !t.startsWith("ChuckEvent")) t = "ChuckArray";
       mapped.add(t);
     }
