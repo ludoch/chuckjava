@@ -2208,7 +2208,14 @@ public class ChuckToDSLConverter {
             if (p >= 0 && p + 1 < arg.length()) {
               arg = arg.substring(p + 1).trim();
             }
-            if (arg.endsWith(")")) {
+            int opens = 0;
+            int closes = 0;
+            for (int i = 0; i < arg.length(); i++) {
+              char ch = arg.charAt(i);
+              if (ch == '(') opens++;
+              else if (ch == ')') closes++;
+            }
+            if (arg.endsWith(")") && closes > opens) {
               arg = arg.substring(0, arg.length() - 1).trim();
             }
           }
@@ -2591,6 +2598,12 @@ public class ChuckToDSLConverter {
         }
       }
       String base = visitExp(ce.base());
+      if (base.startsWith("\"") && base.endsWith("\"") && base.length() > 2) {
+        String unquoted = base.substring(1, base.length() - 1);
+        if (unquoted.matches("[A-Za-z_][A-Za-z0-9_]*")) {
+          base = safeName(unquoted);
+        }
+      }
       if (base.startsWith("_CHUCK_INTERNAL_ASSERT_")) {
         String a0 =
             ce.args().isEmpty()
@@ -3263,7 +3276,7 @@ public class ChuckToDSLConverter {
         }
         if ("super".equals(baseCode)) {
           if (ce.args().isEmpty()) {
-            return "super." + member;
+            return "super." + member + "()";
           }
           return "super."
               + member
