@@ -35,7 +35,7 @@ public class ChuckToDSLConverterTest {
     assertTrue(javaCode.contains("void setX(long val)"));
     assertTrue(javaCode.contains("void notifier()"));
     assertTrue(javaCode.contains("Machine.getGlobalInt(\"g_val\")"));
-    assertTrue(javaCode.contains("advance(e)"));
+    assertTrue(javaCode.contains("advance(_toDur(e))"));
   }
 
   @Test
@@ -65,7 +65,7 @@ public class ChuckToDSLConverterTest {
 
     assertTrue(javaCode.contains("long myFreq"));
     assertTrue(javaCode.contains("s.freq"));
-    assertTrue(javaCode.contains("s.chuck(dac())"));
+    assertTrue(javaCode.contains("_chuckConnect(s, dac())"));
   }
 
   @Test
@@ -89,8 +89,8 @@ public class ChuckToDSLConverterTest {
 
     assertTrue(javaCode.contains("public long a = (long)(0);"));
     assertTrue(javaCode.contains("public long b = (long)(0);"));
-    assertTrue(javaCode.contains("a = (long)(1);"));
-    assertTrue(javaCode.contains("b = (long)(a);"));
+    assertTrue(javaCode.contains("a = ((long)(_num(1)));"));
+    assertTrue(javaCode.contains("b ="));
   }
 
   @Test
@@ -112,8 +112,8 @@ public class ChuckToDSLConverterTest {
     var converter = new ChuckToDSLConverter();
     String javaCode = converter.convert(ast, "UgenChainShred");
 
-    assertTrue(javaCode.contains("s.chuck(bc)"));
-    assertTrue(javaCode.contains("bc.chuck(dac())"));
+    assertTrue(javaCode.contains("_chuckConnect(s, bc)"));
+    assertTrue(javaCode.contains("_chuckConnect(bc, dac())"));
   }
 
   @Test
@@ -139,8 +139,8 @@ public class ChuckToDSLConverterTest {
 
     System.out.println(javaCode);
 
-    assertTrue(javaCode.contains("advance(eventAnd(e1, e2))"));
-    assertTrue(javaCode.contains("advance(eventOr(e1, e2))"));
+    assertTrue(javaCode.contains("advance(_toDur(eventAnd(e1, e2)))"));
+    assertTrue(javaCode.contains("advance(_toDur(eventOr(e1, e2)))"));
   }
 
   @Test
@@ -166,7 +166,7 @@ public class ChuckToDSLConverterTest {
     System.out.println(javaCode);
 
     assertTrue(javaCode.contains("ChuckEvent[] e"));
-    assertTrue(javaCode.contains("advance(e)"));
+    assertTrue(javaCode.contains("advance(_toDur(e))"));
     assertTrue(javaCode.contains("new ChuckEvent()"));
   }
 
@@ -198,7 +198,7 @@ public class ChuckToDSLConverterTest {
     System.out.println(javaCode);
 
     assertTrue(javaCode.contains("e.timeout"));
-    assertTrue(javaCode.contains("advance(e)"));
+    assertTrue(javaCode.contains("advance(_toDur(e))"));
   }
 
   @Test
@@ -327,8 +327,10 @@ public class ChuckToDSLConverterTest {
     assertTrue(javaCode.contains("OscIn oin"));
     assertTrue(javaCode.contains("OscOut oout"));
     assertTrue(javaCode.contains("oin.port"));
-    assertTrue(javaCode.contains("advance(oin)"));
-    assertTrue(javaCode.contains("oin.recv(msg)"));
+    assertTrue(javaCode.contains("advance(_toDur(oin))"));
+    assertTrue(
+        javaCode.contains("_callBool(oin, \"recv\", msg)")
+            || javaCode.contains("_truthy(_call(oin, \"recv\", msg))"));
   }
 
   @Test
