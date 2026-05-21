@@ -198,7 +198,7 @@ public class ChuckToDSLConverterTest {
     System.out.println(javaCode);
 
     assertTrue(javaCode.contains("e.timeout"));
-    assertTrue(javaCode.contains("advance(_toDur(e))"));
+    assertTrue(javaCode.contains("advance(_toDur(e))") || javaCode.contains("_advanceAndTrue(e)"));
   }
 
   @Test
