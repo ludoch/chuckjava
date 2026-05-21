@@ -69,7 +69,7 @@ The firmware organizes sound editing through 5 menu groups accessed via the SELE
 | Ratio | `ratio.md` | ✅ | Per-song ratio via G_MASTER_COMP_RATIO + firmware `RMSFeedbackCompressor.java` |
 | Release | `release.md` | ✅ | Per-song release via G_MASTER_COMP_RELEASE + firmware `RMSFeedbackCompressor.java` |
 | Threshold | `threshold.md` | ✅ | Per-song threshold via G_SP_COMPRESSOR_THRESHOLD (song param overrides knob formula when non-zero) |
-| **Index** | `index.md` | ❌ | Full compressor menu not implemented |
+| **Index** | `index.md` | ✅ | Full master compressor parameter controls (Threshold, Attack, Release, Ratio, Blend) fully implemented in bottom Master FX Swing panel and wired to pure Java RMSFeedbackCompressor DSP via Bridge sync thread. |
 
 ### 2.2 Envelope (`menus/envelope/`)
 
