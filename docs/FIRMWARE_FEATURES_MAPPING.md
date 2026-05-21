@@ -30,7 +30,7 @@ The Deluge can run in two modes:
 | Audio Export | `features/audio_export.md` | ✅ | `NativeWavExporter` — pure Java RIFF header + PCM byte buffer export. Offline mastered render via `FirmwareAudioEngine` squeeze-and-render path. |
 | Chord Keyboard | `features/chord_keyboard.md` | ✅ Implemented | CORK/CORL layouts, scale-aware chords, 6 voicing modes |
 | DX7 Synth | `features/dx_synth.md` | ✅ | 6-op FM engine (`FmCore` firmware port), .syx import/export (`DX7Cartridge`, `WaveTableReader`), 32 algorithms, operator editor UI, DX7 tab, XML round-trip, Vintage/Modern/Auto engine type toggle. Envelope: dexed/msfa log-domain envelopes (not standard ADSR); per-operator DX7 envelopes control amplitude directly. |
-| Hardware Character (Master Sat, Filter Drive, 14-bit DAC, Rings Reverb) | — | ✅ | User preferences for hardware-accurate audio character: tanh master bus saturation (firmware `SVFilter` drive param), v1.3.1+ filter drive, 14-bit DAC truncation with TPDF dither, `ReverbBase`/`Freeverb` physical-modeling reverb. Toggled via Settings → Preferences. See §Preferences in guidebook. |
+| Hardware Character (Master Sat, Filter Drive, 14-bit DAC, Rings Reverb) | — | ⚠️ Partial | User preferences for hardware-accurate audio character: tanh master bus saturation (firmware `SVFilter` drive param), v1.3.1+ filter drive, 14-bit DAC truncation with TPDF dither, `ReverbBase`/`Freeverb` physical-modeling reverb. Toggled via Settings → Preferences. See §Preferences in guidebook. NOTE: The 2D anti-aliased state-space tanh lookup (`tanH2d` table + `getTanHAntialiased`) is currently missing, falling back to a standard 1D tanh approximation. |
 | Looping in Grid View | `features/looping_in_grid_view.md` | ✅ | ClipModel.PlayMode.LOOP with context menu, engine auto-re-queue (firmware `Clip` loop logic in `PlaybackHandler`), green rendering in SONG view |
 | MIDI Device Definitions | `features/midi_device_definition_files.md` | ✅ | MidiDeviceDefinition XML model, loader, preferences, feedback service, UI browser |
 | MIDI Follow Mode | `features/midi_follow_mode.md` | ✅ | `MidiFollow.java` (firmware port of `midi_follow.cpp` Phase A): 24 built-in CC→param mappings, 4-stage routing (takeover → device def → registry → fallback), `MidiInputRouter` for clip-follow, `MidiFeedbackService` for feedback light piping. See §10 for detailed status. |
@@ -118,7 +118,7 @@ Firmware has **4 LFOs** (`LFO_COUNT = 4`): LFO1 (global), LFO2 (per-voice), LFO3
 
 | Menu Page | Firmware Params | Status | Details |
 |-----------|----------------|--------|---------|
-| Type | `type.md` | ✅ | Sine/Saw/Square/Triangle/Noise/Sample/DX7 via firmware `OscType` + `BasicWaves` |
+| Type | `type.md` | ⚠️ Partial | Sine/Saw/Square/Triangle/Noise/Sample/DX7 via firmware `OscType` + `BasicWaves`. NOTE: Standard virtual analog oscillators (Saw, Square, Triangle) currently render using naive mathematical waveforms only; the original band-limited multi-sampled saw/square wavetables and multi-sampled triangle tables (above 1420Hz) are missing, resulting in digital foldback aliasing on high notes. |
 | Volume | `volume.md` | ✅ | Per-oscillator volume |
 | Pulse Width | `pulse_width.md` | ✅ | Pulse width slider |
 | Sync | `sync.md` | ✅ | Hard sync checkbox |
