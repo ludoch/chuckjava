@@ -139,7 +139,7 @@ Firmware `PatchSource` enum has 15 source types: `LFO_GLOBAL_1`, `LFO_GLOBAL_2`,
 |-----------|----------------|--------|---------|
 | Patch Cables | — | ✅ | Full `PatchCableSet` (source/dest/amount/polarity) per track, up to 16 cables per track |
 | Mod Knobs | — | ✅ | 4×4 grid of 16 knob param selectors in MODULATION tab |
-| Source options | — | ⚠️ Partial | velocity, envelope 1-2, lfo 1-2, aftertouch, note, random, sidechain — missing envelope 3-4, lfo global 1-2, lfo local 2, X, Y |
+| Source options | — | ✅ | All 18 firmware PatchSource options (Envelopes 0-3, Local LFOs 1-2, Global LFOs 1-2, velocity, key note-tracking, sidechain ducking, unique random, and performance pad X/Y axes) are fully active, computed continuously, and routed in the voice synthesis engine. |
 | MPE (MIDI Polyphonic Expression) | — | ❌ | No per-note pitch-bend, per-note release velocity, or 14-bit MIDI resolution. MIDI bridge treats all data as standard 7-bit. See §8.2 item 9. |
 | Destination options | — | ✅ | All firmware destinations via `Destination.java`: volume, pan, lpfFrequency, lpfResonance, oscAVolume, oscBVolume, pitch, noiseVolume, modFxRate, modFxDepth |
 
