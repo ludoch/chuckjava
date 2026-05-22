@@ -169,7 +169,7 @@ Firmware `ModFXType` enum: `NONE`, `FLANGER`, `CHORUS`, `PHASER`, `CHORUS_STEREO
 |-----------|----------------|--------|---------|
 | Type | `ModFXType` enum (8 types) | ✅ | All 8 types via firmware `ModFXType.java`: CHORUS, FLANGER, PHASER, CHORUS_STEREO, WARBLE, DIMENSION, GRAIN |
 | Depth | `kModFXParam::DEPTH` | ✅ | modFxDepth parameter |
-| Feedback | `kModFXParam::FEEDBACK` | ⚠️ Partial | Basic feedback; firmware has resonance-compensated feedback curves (32-bit cubic) |
+| Feedback | `kModFXParam::FEEDBACK` | ✅ | Full resonance-compensated delay feedback saturation curves (32-bit cubic) are active in ModFXProcessor.java. |
 | Offset | `kModFXParam::OFFSET` | ✅ | Delay offset control (`G_MOD_FX_OFFSET`); offset slider in UI |
 
 ### 2.10 Bridge Global Status (Per-Kit Extended Parameters)
