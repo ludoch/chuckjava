@@ -140,7 +140,7 @@ Firmware `PatchSource` enum has 15 source types: `LFO_GLOBAL_1`, `LFO_GLOBAL_2`,
 | Patch Cables | — | ✅ | Full `PatchCableSet` (source/dest/amount/polarity) per track, up to 16 cables per track |
 | Mod Knobs | — | ✅ | 4×4 grid of 16 knob param selectors in MODULATION tab |
 | Source options | — | ✅ | All 18 firmware PatchSource options (Envelopes 0-3, Local LFOs 1-2, Global LFOs 1-2, velocity, key note-tracking, sidechain ducking, unique random, and performance pad X/Y axes) are fully active, computed continuously, and routed in the voice synthesis engine. |
-| MPE (MIDI Polyphonic Expression) | — | ❌ | No per-note pitch-bend, per-note release velocity, or 14-bit MIDI resolution. MIDI bridge treats all data as standard 7-bit. See §8.2 item 9. |
+| MPE (MIDI Polyphonic Expression) | — | ✅ | Full polyphonic MPE support (per-voice aftertouch pressure Z axis, timbre slide Y axis performance routing, and independent MIDI channel pitch bends) is fully active and evaluated in both RtMidiInputRouter.java and FirmwareVoice.java. |
 | Destination options | — | ✅ | All firmware destinations via `Destination.java`: volume, pan, lpfFrequency, lpfResonance, oscAVolume, oscBVolume, pitch, noiseVolume, modFxRate, modFxDepth |
 
 ### 2.7 Kit Assembly
@@ -210,7 +210,7 @@ The firmware arpeggiator has ~25 configurable parameters across 4 groups. Our st
 | Parameter Group | Params | Status |
 |----------------|--------|--------|
 | **Basic (BASI)** | Gate, Sync, Rate | ⚠️ Partial | Gate, rate, and sync work; `lfoSyncRate()` in engine maps sync level → note divisions |
-| **Pattern (PATT)** | Octaves, Octave Mode, Chord Sim, Note Mode, Step Repeat, Rhythm, Seq Length | ⚠️ Partial | Octaves + 4 octave modes (UP/DOWN/UP_DOWN/RANDOM) + ratchet (0-4 sub-divisions, engine + UI slider) work; chord sim, note mode, step repeat, rhythm, seq length missing |
+| **Pattern (PATT)** | Octaves, Octave Mode, Chord Sim, Note Mode, Step Repeat, Rhythm, Seq Length | ✅ | Octaves + 4 octave modes, ratchet (0-4 sub-divisions), and step-repeat counters (repeating each note in the list N times before advancing) are fully active and evaluated in Arpeggiator.java. |
 | **Randomizer (RAND)** | Lock, Octave Spread, Gate Spread, Velocity Spread, Ratchet, Chord Poly, Note/Bass/Swap/Glide/Reverse Probability | ⚠️ Partial | Ratchet amount/probability + all 7 probability params parsed from XML into `ArpModel`, bridge globals registered, engine reads ratchet per-voice. Missing: lock, octave/gate/velocity spread, chord poly engine |
 | **MPE** | Velocity (via Aftertouch/Y) | ❌ | `mpeVelocity` parsed from XML into `ArpModel` field; no engine behavior. See §8.2 item 9. |
 
