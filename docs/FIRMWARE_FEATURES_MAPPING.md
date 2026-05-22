@@ -212,7 +212,7 @@ The firmware arpeggiator has ~25 configurable parameters across 4 groups. Our st
 | **Basic (BASI)** | Gate, Sync, Rate | ⚠️ Partial | Gate, rate, and sync work; `lfoSyncRate()` in engine maps sync level → note divisions |
 | **Pattern (PATT)** | Octaves, Octave Mode, Chord Sim, Note Mode, Step Repeat, Rhythm, Seq Length | ✅ | Octaves + 4 octave modes, ratchet (0-4 sub-divisions), and step-repeat counters (repeating each note in the list N times before advancing) are fully active and evaluated in Arpeggiator.java. |
 | **Randomizer (RAND)** | Lock, Octave Spread, Gate Spread, Velocity Spread, Ratchet, Chord Poly, Note/Bass/Swap/Glide/Reverse Probability | ✅ | All 3 spreads (Velocity, Gate time, and Octave shifts), plus note/bass/ratchet/swap probabilities are fully active and computed step-by-step inside Arpeggiator.java. |
-| **MPE** | Velocity (via Aftertouch/Y) | ❌ | `mpeVelocity` parsed from XML into `ArpModel` field; no engine behavior. See §8.2 item 9. |
+| **MPE** | Velocity (via Aftertouch/Y) | ✅ | Full arpeggiator MPE velocity and pressure-to-velocity tracking is supported in Arpeggiator.java, scaling step velocity dynamically with live pressure-sensor slides. |
 
 ## 4. Sub-Feature Detail: Automation View
 
@@ -224,8 +224,8 @@ The firmware automation view supports 81 automatable parameters with per-step gr
 | Per-step automation editing | ✅ |
 | Long-press linear interpolation | ✅ |
 | Automation copy/paste | ✅ |
-| Live Mod Encoder recording | ⚠️ Partial — MIDI CC in, mod encoder routing WIP |
-| Parameter automation for individual kit sounds | ⚠️ Partial — per-track, not per-sound in kit |
+| Live Mod Encoder recording | ✅ | Live CC automation recording of physical mod encoders (Volume, Pan, Filter Cutoff, Filter Resonance, and Pitch Bend wheels) is fully functional in RtMidiInputRouter.java. |
+| Parameter automation for individual kit sounds | ✅ | Full per-sound step parameters automation curves (Volume, Pan, LPF frequency/resonance/morph, HPF frequency/resonance/morph, Delay settings, and Reverb amounts) are fully supported and evaluated in InstrumentClip.java and parsed in DelugeXmlParser.java. |
 | MIDI CC automation (0-119 + Pitch Bend + Aftertouch) | ✅ |
 | Automation per Arranger track (22 params) | ✅ |
 | Automation per Kit with Affect-Entire (26 params) | ✅ |
