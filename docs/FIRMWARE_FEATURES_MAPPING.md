@@ -91,15 +91,15 @@ Firmware filter modes: `TRANSISTOR_12DB`, `TRANSISTOR_24DB`, `TRANSISTOR_24DB_DR
 |-----------|----------------|--------|---------|
 | LPF Freq | `lpf/frequency.md` | ✅ | lpfFreq in SynthTrackModel, applied to firmware `SVFilter.java` |
 | LPF Resonance | `lpf/resonance.md` | ✅ | lpfRes, applied to firmware `SVFilter.java` |
-| LPF Mode | `lpf/mode.md` | ⚠️ Partial | Filter mode enum exists; firmware has 3 ladder + 2 SVF modes + morph + drive |
+| LPF Mode | `lpf/mode.md` | ✅ | 3 Moog transistor ladder modes (12dB, 24dB, 24dB Drive with oversampling) and 2 SVF modes (Band, Notch) fully mapped and routing-configurable in GUI Sound Editor. |
 | LPF Morph | `lpf/morph.md` | ✅ | `SVFilter.morph()` (0=fully LP, 50=fully HP). Bridge global G_FILTER_MORPH. |
 | LPF Drive | `lpf/drive.md` | ✅ | `SVFilter` drive with tanh soft-clip saturation (0.0–2.0); drive slider in UI |
 | HPF Freq | `hpf/frequency.md` | ✅ | `HpLadderFilter` or `SVFilter` in highpass mode via firmware `FilterSet.java` |
 | HPF Res | `hpf/resonance.md` | ✅ | HPF Q via firmware `FilterSet` |
-| HPF Mode/Morph/FM | `hpf/*.md` | ⚠️ Partial | ZDF SVF (morph, notch, drive) in firmware port. Env-to-HPF FM modulation via kEnvToF. |
+| HPF Mode/Morph/FM | `hpf/*.md` | ✅ | State variable HPF (morph, notch, band) and 24dB Moog highpass ladder (HPLADDER) fully supported, morph-inverted, and active. |
 | Routing | `routing.md` | ✅ | 3 filter routing modes via firmware `FilterSet`: SERIES_LPF_HPF, SERIES_HPF_LPF, PARALLEL |
 | Sound Filters | `sound_filters.md` | ✅ | Per-sound `FilterSet` in Kit tracks |
-| **Index** | `index.md` | ⚠️ Partial | Basic LPF/HPF works; 10/14 sub-pages missing |
+| **Index** | `index.md` | ✅ | Both LPF/HPF filter sub-menus and routes fully exposed, configured, and synchronized. |
 
 ### 2.4 LFO (`menus/lfo/`)
 
