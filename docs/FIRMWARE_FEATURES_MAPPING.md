@@ -122,7 +122,7 @@ Firmware has **4 LFOs** (`LFO_COUNT = 4`): LFO1 (global), LFO2 (per-voice), LFO3
 | Volume | `volume.md` | ✅ | Per-oscillator volume |
 | Pulse Width | `pulse_width.md` | ✅ | Pulse width slider |
 | Sync | `sync.md` | ✅ | Hard sync checkbox |
-| Retrigger Phase | `retrigger_phase.md` | ✅ | 0-360° |
+| Retrigger Phase | `retrigger_phase.md` | ✅ | Distinct 0-360° phase starting offsets for Osc 1 and Osc 2 are parsed from XML, written to independent model tracks/drums levels, and applied as Q31 initial start phases or FREE-running offsets in key note-on voice setups. |
 | Feedback | `feedback.md` | ✅ | FM feedback amount |
 | Wave Index | `wave_index.md` | ✅ | Wavetable position (0.0-1.0), firmware `WaveTable` + `WaveTableBand` engine |
 | File Browser | `file_browser.md` | ✅ | Library tab |
