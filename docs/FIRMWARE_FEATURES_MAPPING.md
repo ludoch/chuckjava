@@ -126,7 +126,7 @@ Firmware has **4 LFOs** (`LFO_COUNT = 4`): LFO1 (global), LFO2 (per-voice), LFO3
 | Feedback | `feedback.md` | ✅ | FM feedback amount |
 | Wave Index | `wave_index.md` | ✅ | Wavetable position (0.0-1.0), firmware `WaveTable` + `WaveTableBand` engine |
 | File Browser | `file_browser.md` | ✅ | Library tab |
-| **Modulator 1/2** | `modulator/` | ⚠️ Partial | Volume/transpose/destination/feedback exist; retrigger phase missing |
+| **Modulator 1/2** | `modulator/` | ✅ | Volume/transpose/destination/feedback exist, and independent Modulator 1 / Modulator 2 initial starting reset phases are fully active and mapped in both DelugeXmlParser.java and FirmwareVoice.java. |
 | **Sample** | `sample/` (9 files) | ✅ | All 9 sample playback configuration menus (startPoint, endPoint, loopStart, loopEnd, loopMode, reverse, timestretch, transpose, interpolation) fully implemented and wired to the VoiceSample DSP engine. |
 | **Unison** | `unison/` (4 files) | ✅ | Sub-voice spawning with detune, stereo spread. Bridge globals `G_UNISON_NUM/DETUNE/SPREAD`. |
 | **Index** | `index.md` | ⚠️ Partial | Osc params exist in editor; ~7/19 sub-pages missing |
