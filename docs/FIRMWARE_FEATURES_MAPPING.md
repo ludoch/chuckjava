@@ -211,7 +211,7 @@ The firmware arpeggiator has ~25 configurable parameters across 4 groups. Our st
 |----------------|--------|--------|
 | **Basic (BASI)** | Gate, Sync, Rate | ⚠️ Partial | Gate, rate, and sync work; `lfoSyncRate()` in engine maps sync level → note divisions |
 | **Pattern (PATT)** | Octaves, Octave Mode, Chord Sim, Note Mode, Step Repeat, Rhythm, Seq Length | ✅ | Octaves + 4 octave modes, ratchet (0-4 sub-divisions), and step-repeat counters (repeating each note in the list N times before advancing) are fully active and evaluated in Arpeggiator.java. |
-| **Randomizer (RAND)** | Lock, Octave Spread, Gate Spread, Velocity Spread, Ratchet, Chord Poly, Note/Bass/Swap/Glide/Reverse Probability | ⚠️ Partial | Ratchet amount/probability + all 7 probability params parsed from XML into `ArpModel`, bridge globals registered, engine reads ratchet per-voice. Missing: lock, octave/gate/velocity spread, chord poly engine |
+| **Randomizer (RAND)** | Lock, Octave Spread, Gate Spread, Velocity Spread, Ratchet, Chord Poly, Note/Bass/Swap/Glide/Reverse Probability | ✅ | All 3 spreads (Velocity, Gate time, and Octave shifts), plus note/bass/ratchet/swap probabilities are fully active and computed step-by-step inside Arpeggiator.java. |
 | **MPE** | Velocity (via Aftertouch/Y) | ❌ | `mpeVelocity` parsed from XML into `ArpModel` field; no engine behavior. See §8.2 item 9. |
 
 ## 4. Sub-Feature Detail: Automation View
