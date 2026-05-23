@@ -613,14 +613,30 @@ Song projects store file paths pointers resolving execution dependencies at load
 <instrument type="CHUCK">
   <scriptPath>/CHUCKS/custom_fm.ck</scriptPath>
 </instrument>
+```
 
 ### 15.2 Debug Execution Log Consoles
 Workstation sidebar editors expose script execution stdout readouts catching compilation syntax errors diagnostic feedback securely.
 
-```
- 
+## 16. SWING DESKTOP DELUXE UX POWER-UP SUITE
 
+To elevate our pure Swing desktop workstation far past the physical interactive boundaries of the actual hardware, the desktop version includes the premium **Deluxe UX Power-Up Suite** tools:
 
+### 16.1 Shift Hover Previews & Cursor Tooltips
+- **Dynamic Parameter Scanning**: Hold down the `Shift` key and hover the cursor across any backlit cell rows on the grid sequencer matrix. The center status segment display instantly lists the target param short code (e.g. `CUT` for filter cutoff, `ATK` for envelope attack) and its active float/decimal value.
+- **Gold SELECT Encoder Mode**: Toggled in preferences setting cards, this locks focus to the top bar's retro digital SELECT dial. While focused, parameter properties can be tweaked continuously using the mouse scroll wheel, physical system keyboard `Up/Down Arrow` keys, or SELECT dial drag movements.
+- **Popup JSlider Mode**: Summons a dark-neon quick adjustment slider popup right next to the cursor for rapid parameter offsets, auto-committing and dismissing when clicking away.
 
+### 16.2 Row VU Audio Level Indicators
+- **Dynamic Track Level Activity**: Inactive track rows sit silently. When a note triggers or playback steps are active, a dedicated high-fidelity green-orange-red horizontal level meter sits inside the track row label card, bouncing down with smooth exponential sound decay calculations at 30fps.
+- **Decay Physics Calibration**: Zones represent real sound fields: standard active normal range (0-65% green), headroom buffer zone (65-85% orange), and hardware transient clipping zone (85-100% bright red).
 
+### 16.3 Step Probability Heatmaps
+- **Sequence Density Glow**: Note step backlights reflect dynamic random chance values. Active 100% chance notes shine with bright, intense solid track colors. Dimmer, semi-translucent steps represent lower probability thresholds (e.g., a faint mist glow for 10-25% chance of firing), letting your eyes scan sequence density instantly.
 
+### 16.4 Alt-Drag Step Cloning & Drag-and-Drop Hot-Swapping
+- **Alt-Drag Step Copy**: Hold down the `Alt/Option` key while dragging any sequencer cell pad horizontally or vertically. A glowing cyan preview outline trails your cursor. Releasing the mouse button over any destination cell instantly duplicates the complete step payload state, pitch offsets, velocity bounds, probability, and custom modulation parameters!
+- **System Sample Drag-and-Drop**: Drag raw audio sound files (`.wav` or `.aif` PCM files) from your system explorer or Finder, and drop them directly onto the row label card of any Audio track lane or Drum Kit slot row. The sound sample is hot-swapped in real time JNI-free, printing a brief `[ SMPL SWAP ]` LED welcome status display!
+
+### 16.5 Waveform Lane Backdrops
+- **Timeline Transient Alignment**: A symmetrical, translucent green vector audio mirror envelope waveform path is rendered inside the background canvas of each active row lane. This lets you visually inspect sample transients, align steps exactly with beats peaks, and build precise sequences.
