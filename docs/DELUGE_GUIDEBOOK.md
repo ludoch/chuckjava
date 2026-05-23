@@ -34,7 +34,7 @@ The grid viewport is configurable via **Settings → Preferences...** → **Grid
 **How it works:**
 - Changing the Grid Mode resizes the grid cells proportionally to fit the window — more cells = smaller pads, fewer cells = larger pads.
 - The grid always draws `gridMode.rows` voice row slots in the viewport. If the model has more rows (e.g., a 16-sound TR-808 kit), **vertical scroll buttons (▲/▼)** appear in the CLIP view header.
-- The MACROS, SLIDERS, and KEYBOARD rows stay fixed at the bottom regardless of grid mode.
+- The combined MACROS (Macro Sliders) and KEYBOARD rows stay fixed at the bottom regardless of grid mode.
 - **SONG** and **ARRANGEMENT** views also respect the grid mode setting — the viewport shows `gridMode.rows` track slots immediately, no need to load a clip first.
 
 **Per-clip step count:**
@@ -50,7 +50,7 @@ The grid viewport is configurable via **Settings → Preferences...** → **Grid
 -   Active step pads are rendered with **velocity-blended colors**: a step with full velocity (1.0) shows the full track color; lower velocities blend the color toward dark gray (`#333333`).
 -   The cell text in CLIP mode now shows real values: `Ve:<val>` for velocity and `Pr:<val>` for probability, read directly from the engine.
 -   To **set step velocity**, right-click a pad cell to open the **Step Properties** dialog, which includes a Velocity slider (0–100).
--   The **SLIDERS** row (row 9 in CLIP mode) provides per-column velocity faders — click and drag vertically on any column to adjust that step column's velocity across all rows.
+-   The combined **MACROS** row provides a 16-parameter vertical mixing deck (LEVEL, PAN, PITCH, FILTER, etc.) for the active track. Click and drag vertically on a cell to adjust its value in real-time. The active value (e.g. 85%, 2.4kHz, or +12) displays directly as a text overlay while dragging, and reverts back to the parameter name upon release.
 -   The MIDI track click-path and playhead re-sync also respect the velocity blend, so pad brightness always reflects the current velocity value during playback.
 
 ### 1.7 Row-Level Velocity & Probability
