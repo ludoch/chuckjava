@@ -47,12 +47,25 @@ To isolate different areas of the synthesis chain, you will record four specific
 
 ---
 
-## 3. Recording Ground Rules
-To prevent capturing signal path bias, pre-amp clipping, or format conversion issues, please follow these guidelines when recording:
-1. **Direct Connection:** Connect the Deluge Line-Out left output directly to a high-fidelity line-level interface input.
-2. **Bypass FX Chains:** Ensure no external guitar pedal boards, pre-amps, hardware compressors, or software DAW channel strip plugins (like EQs, reverbs, or limiters) are active in the path.
-3. **Format Standard:** Record in **$44.1\text{ kHz}$, 16-bit signed PCM, Mono or Stereo `.wav`** format.
-4. **Gain Levels:** Adjust the Deluge volume knob and interface pre-amp gain so the maximum peak stays between **$-6\text{ dB}$ and $-3\text{ dB}$** (never let the waveform clip or hit $0\text{ dB}$).
+## 3. Recording Methodology & Ground Rules
+
+To achieve perfect comparison analysis, we support two methods of capturing your Deluge's audio. Bouncing/resampling internally is **highly recommended** as it yields the absolute pure digital output of the internal DSP, bypassing all hardware line noise, Pre-Amp EQ coloration, or AD/DA converter latency.
+
+### Method A: Internal Master Resampling (Highly Recommended - Ultimate Gold Standard)
+1. Program or load your target sequence on the Deluge. Stop the transport.
+2. Press **`RECORD` + `PLAY`** simultaneously to start master resampling.
+3. When the notes finish playing, press **`STOP`** to complete the print. The file is saved as a stereo WAV in the `/SAMPLES/RECORD/` folder on the SD card (e.g. `REC01.WAV`).
+4. Connect the Deluge via USB in Mount Mode (hold the **`SELECT`** encoder knob down while powering on, displaying `MNT` on screen) to copy the WAV file directly to your Mac.
+
+### Method B: Direct Analog Line-Out Connection (Alternative)
+1. Connect the Deluge L/Mono Line-Out left jack directly to your audio interface's line-level input using a high-quality balanced/unbalanced cable.
+2. **Bypass FX Chains:** Ensure no external guitar pedal boards, pre-amps, hardware compressors, or software DAW plugins (like noise gates, EQs, reverbs, or limiters) are active in the path.
+3. **Gain Levels:** Adjust the Deluge volume knob and your pre-amp gain so the maximum peak registers between **$-6\text{ dB}$ and $-3\text{ dB}$** (never let the levels hit $0\text{ dB}$ or clip).
+
+### General Wave Format Specifications
+* **Sample Rate:** $44.1\text{ kHz}$
+* **Bit Depth:** 16-bit Signed PCM
+* **Channels:** Mono or Stereo (comparative engine averages channels to mono automatically)
 
 ---
 
