@@ -423,7 +423,9 @@ A lightweight, pure Java desktop UI alternative built entirely on Swing (accessi
 
 ### 10.4 Shift Key Parameters Overlay & Real-Time Editing (Hardware Parity)
 
-Our Swing desktop edition incorporates a complete emulation of the physical Deluge's **Shift Key Parameters Grid Shortcut** layout, translating physical hardware key-combos into a modern desktop workflow:
+Our Swing desktop edition incorporates a complete emulation of the physical Deluge's **Shift Key Parameters Grid Shortcut** layout, translating physical hardware key-combos into a modern desktop workflow. You can toggle your preferred behavior via **Settings > Preferences...** → **Shift Shortcut Style**:
+*   **Desktop Slider (Default):** Clicking a parameter pad cell pops up a standard neon JSlider next to your cursor for local mouse adjustments. Clicking away instantly commits changes and dismisses the slider.
+*   **Hardware Rotary:** Replicates the physical gold encoders workflow. Clicking a pad cell highlights it with a thick golden focus border and locks that parameter to the top-bar's virtual **SELECT Gold Dial Encoder**. You can rotate the select dial (or use your computer keyboard's **Up/Down Arrow keys** / **Mouse Scroll Wheel**) to slide values in real-time, displaying parameters on our retro amber character LED display! Releasing the Shift key instantly commits the change and releases pad focus.
 
 *   **Global Keyboard Shift Detection:** Pressing and holding the physical **`Shift`** key on your computer keyboard instantly hooks into the global key dispatcher, prompting the sequencer matrix grid to shift visual modes.
 *   **Backlit Color Partitions Overlay:** The step cells grid temporarily replaces active sequence gates with dynamic, glowing, color-coded functional columns matching the official physical guidelines card:
