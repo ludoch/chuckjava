@@ -421,6 +421,35 @@ A lightweight, pure Java desktop UI alternative built entirely on Swing (accessi
 - **Step 1b: Clip View (Sequencer Editor pads)**
   ![Swing Clip View](../docs/swing_step1_loaded_clipview.png)
 
+### 10.4 Shift Key Parameters Overlay & Real-Time Editing (Hardware Parity)
+
+Our Swing desktop edition incorporates a complete emulation of the physical Deluge's **Shift Key Parameters Grid Shortcut** layout, translating physical hardware key-combos into a modern desktop workflow:
+
+*   **Global Keyboard Shift Detection:** Pressing and holding the physical **`Shift`** key on your computer keyboard instantly hooks into the global key dispatcher, prompting the sequencer matrix grid to shift visual modes.
+*   **Backlit Color Partitions Overlay:** The step cells grid temporarily replaces active sequence gates with dynamic, glowing, color-coded functional columns matching the official physical guidelines card:
+    *   **Columns 0–1 (Peach):** `SMPL1` & `SMPL2` sample-playback parameters.
+    *   **Columns 2–3 (Coral Red):** `OSC1` & `OSC2` subtractive oscillator parameters.
+    *   **Columns 4–5 (Yellow):** `FM1` & `FM2` operators and distortion parameters.
+    *   **Column 6 (Slate Blue):** `MASTER` track and main panning levels.
+    *   **Column 7 (Deep Blue):** `VOICE` parameters (Unison count, detune, polyphony, glide).
+    *   **Column 8 (Beige):** `ENV 1` ADSR (Volume envelope).
+    *   **Column 9 (Orange):** `ENV 2` ADSR (Filter envelope).
+    *   **Column 10 (Pink):** `SDCHAIN` sidechain ducking settings.
+    *   **Column 11 (Bright Yellow/Green):** `ARP` arpeggiator modes and rates.
+    *   **Columns 12–13 (Light Green/Soft Blue):** `LFO 1` & `LFO 2` modulators.
+    *   **Column 14 (Soft Red):** `DELAY` sends.
+    *   **Column 15 (Ochre/Gold):** `MOD AMT` modulation depth matrix.
+*   **Two-Line Split Label Centering:** Each pad button displays the exact physical parameter label name (e.g., `"WAVE FORM"`, `"RESONANCE"`, `"BASS GAIN"`, `"UNISON DETUNE"`) using an advanced word-splitting vertical text layout that centers long labels inside the small glowing cells perfectly.
+*   **Quick Parameter Edit Popups (JSliders):** Clicking any active parameter pad cell while holding Shift summons a highly responsive **JPopupMenu** styled in our premium dark-neon format. This popup displays:
+    *   A bold cyan title showing the active parameter name.
+    *   A horizontal **JSlider** mapping the parameter values (e.g. logarithmic frequency mappings for LPF/HPF cutoffs, precise decimals for attack/decay timings, or percentages for sustain levels).
+    *   A status text display showing real-time formatted values (e.g., `"1420 Hz"`, `"0.24 s"`, `"75%"`).
+    *   *Real-time Audition & Confirmation:* Sliding the fader immediately re-registers active values in our track model and pushes changes to the JNI playing audio engine, providing instant sonic feedback. Simply **release the mouse and click anywhere else** to confirm values and auto-dismiss the popup menu!
+*   **Dynamic Parameter Applicability Guard:** The grid automatically queries the active track model to verify if the parameter shortcut is supported:
+    *   *Synth Tracks:* All parameters are fully active.
+    *   *Kit & Audio Tracks:* All synth-specific parameters are automatically **greyed out and dimmed** (painted in a dark desaturated charcoal gray with faint gray labels). Only master track sends and parameters (Track Level Volume, Pan, Reverb Size, Delay Rate, Sidechain sends) remain active and interactive.
+    *   *Non-Disruptive Warnings:* Clicking any disabled greyed-out cell pops up a red-glowing **"PARAMETER NOT APPLICABLE"** transient label right next to your cursor, which automatically vanishes in 1.5 seconds without intercepting focus or locking user interactions.
+
 ---
 
 ## 11. FORMAL UI DESIGN SPECIFICATION
