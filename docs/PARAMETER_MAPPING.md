@@ -24,75 +24,26 @@ On the physical Deluge, the column of **8 buttons** next to the key pad matrix a
 
 ## 2. Double-Knob Parameter Mapping Grid (16 Logical Pages)
 
-Below is the complete mapping of what the **Left Gold Knob (Knob 1)** and **Right Gold Knob (Knob 2)** control under all 16 hardware select modes across Subtractive Synth, 6-Operator FM (DX7), and Drum Kit track types:
+Below is the complete mapping of what the **Left Gold Knob (Knob 1)** and **Right Gold Knob (Knob 2)** control under all 16 hardware select modes across Subtractive Synth, 6-Operator FM (DX7), and Drum Kit track types, alongside their **Swing UI Virtual Macro** column shortcut targets:
 
-### 🎛️ Button 1: VOLUME & PAN Page
-*   **Upper Mode (VOLUME - Green LED):**
-    *   **Subtractive / FM Synth:** Left = **`Master Track Volume`** | Right = **`Stereo Pan Position`**
-    *   **Drum Kit Mode:** Left = **`Selected Drum Lane Volume`** | Right = **`Selected Drum Lane Pan`**
-*   **Lower Mode (PAN - Orange LED):**
-    *   **Subtractive / FM Synth:** Left = **`Delay Send Amount`** | Right = **`Reverb Send Amount`**
-    *   **Drum Kit Mode:** Left = **`Delay Send Amount`** | Right = **`Reverb Send Amount`**
-
-### 🎛️ Button 2: TRANSPOSE & PORTAMENTO Page
-*   **Upper Mode (TRANSPOSE - Green LED):**
-    *   **Subtractive / FM Synth:** Left = **`Pitch Transpose (Semitones)`** | Right = **`Fine Tune (Cents)`**
-    *   **Drum Kit Mode:** Left = **`Selected Drum Pitch (Semitones)`** | Right = **`Drum Sample Fine Tune`**
-*   **Lower Mode (PORTAMENTO - Orange LED):**
-    *   **Subtractive / FM Synth:** Left = **`Portamento Glide Time`** | Right = **`Legato Auto-Glide Toggle`**
-    *   **Drum Kit Mode:** *Not Applicable*
-
-### 🎛️ Button 3: LFO 1 & LFO 2 Page
-*   **Upper Mode (LFO 1 - Green LED):**
-    *   **Subtractive Synth:** Left = **`LFO 1 Frequency Speed (Hz)`** | Right = **`LFO 1 Modulation Depth`**
-    *   **FM Synth Mode:** Left = **`DX7 Global LFO Speed (Hz)`** | Right = **`DX7 Global LFO Pitch Depth`**
-    *   **Drum Kit Mode:** Left = **`Selected Lane LFO 1 Speed`** | Right = **`LFO 1 Depth`**
-*   **Lower Mode (LFO 2 - Orange LED):**
-    *   **Subtractive Synth:** Left = **`LFO 2 Frequency Speed (Hz)`** | Right = **`LFO 2 Modulation Depth`**
-    *   **FM Synth Mode:** Left = **`DX7 Global LFO Speed (Hz)`** | Right = **`DX7 Global LFO Amp/Filter Depth`**
-    *   **Drum Kit Mode:** Left = **`Selected Lane LFO 2 Speed`** | Right = **`LFO 2 Depth`**
-
-### 🎛️ Button 4: FILTER & FM Page (Chassis: `CUTOFF / FM` & `RES / FM`)
-*   **Upper Mode (CUTOFF / FM - Green LED):**
-    *   **Subtractive Synth:** Left = **`Lowpass Filter Cutoff (LPF)`** | Right = **`Lowpass Filter Resonance (Q)`**
-    *   **FM Synth Mode:** Left = **`Active Operator Coarse Freq (Ratio)`** | Right = **`Active Operator Fine Freq`**
-    *   **Drum Kit Mode:** Left = **`Selected Lane LPF Cutoff`** | Right = **`Selected Lane LPF Resonance`**
-*   **Lower Mode (RESONANCE / FM - Orange LED):**
-    *   **Subtractive Synth:** Left = **`Highpass Filter Cutoff (HPF)`** | Right = **`Highpass Filter Resonance (Q)`**
-    *   **FM Synth Mode:** Left = **`Active Operator Output Level (0-99)`** | Right = **`Active Operator Detune Offset`**
-    *   **Drum Kit Mode:** Left = **`Selected Lane HPF Cutoff`** | Right = **`Selected Lane HPF Resonance`**
-
-### 🎛️ Button 5: ENV 1 & ENV 2 Page (Envelopes)
-*   **Upper Mode (ENV 1 - Green LED - Amp Envelope):**
-    *   **Subtractive Synth:** Left = **`Attack Time`** *(Sustain via Shift)* | Right = **`Decay Time`** *(Release via Shift)*
-    *   **FM Synth Mode:** Left = **`Operator EG Rate 1 / Rate 2`** | Right = **`Operator EG Rate 3 / Rate 4`**
-    *   **Drum Kit Mode:** Left = **`Drum Amp Attack`** | Right = **`Drum Amp Decay/Release`**
-*   **Lower Mode (ENV 2 - Orange LED - Filter/Mod Envelope):**
-    *   **Subtractive Synth:** Left = **`Attack Time`** *(Sustain via Shift)* | Right = **`Decay Time`** *(Release via Shift)*
-    *   **FM Synth Mode:** Left = **`Operator EG Level 1 / Level 2`** | Right = **`Operator EG Level 3 / Level 4`**
-    *   **Drum Kit Mode:** Left = **`Drum Filter Attack`** | Right = **`Drum Filter Decay/Release`**
-
-### 🎛️ Button 6: MOD FX & DEPTH Page (Modulation Effects)
-*   **Upper Mode (MODRATE - Green LED):**
-    *   **Subtractive / Drum Kit:** Left = **`Mod Chorus/Flanger LFO Rate`** | Right = **`Mod Chorus/Flanger Depth`**
-    *   **FM Synth Mode:** Left = **`FM Algorithm Matrix Selection (0-31)`** | Right = **`FM Feedback Level (0-7)`**
-*   **Lower Mode (DEPTH - Orange LED):**
-    *   **Subtractive / Drum Kit:** Left = **`Mod FX Feedback amount`** | Right = **`Mod FX Type (Chorus/Flange/Phase)`**
-    *   **FM Synth Mode:** Left = **`Carrier Phase Initialization`** | Right = **`Operator Enabled Switch`**
-
-### 🎛️ Button 7: DELAY & REVERB Page
-*   **Upper Mode (DELAY - Green LED):**
-    *   **Subtractive / FM / Kit:** Left = **`Delay Sync Time (e.g. 1/16)`** | Right = **`Delay Feedback amount`**
-*   **Lower Mode (REVERB - Orange LED):**
-    *   **Subtractive / FM / Kit:** Left = **`Reverb Room Size / Decay Time`** | Right = **`Reverb Highpass Damping`**
-
-### 🎛️ Button 8: ARP RATE & GATE Page
-*   **Upper Mode (ARP RATE - Green LED):**
-    *   **Subtractive / Drum Kit:** Left = **`Arpeggiator Rate (Step size)`** | Right = **`Arpeggiator Direction Mode`**
-    *   **FM Synth Mode:** *Not Applicable*
-*   **Lower Mode (GATE - Orange LED):**
-    *   **Subtractive / Drum Kit:** Left = **`Arpeggiator Gate Duration`** | Right = **`Arpeggiator Octave Range (1-4)`**
-    *   **FM Synth Mode:** *Not Applicable*
+| Physical Button & State | Subtractive Synth Mode (Left / Right Knobs) | FM Synth Mode (Left / Right Knobs) | Drum Kit Mode (Left / Right Knobs) | Swing UI Virtual Macro (Col Index) |
+| :--- | :--- | :--- | :--- | :--- |
+| **VOLUME** *(Btn 1 Upper)* | **L:** Master Volume <br> **R:** Stereo Pan position | **L:** Master FM Volume <br> **R:** Stereo Pan position | **L:** Selected Drum Lane Vol <br> **R:** Selected Drum Lane Pan | Column 0: **`LEVEL`** |
+| **PAN** *(Btn 1 Lower)* | **L:** Delay Send Level <br> **R:** Reverb Send Level | **L:** Delay Send Level <br> **R:** Reverb Send Level | **L:** Delay Send Level <br> **R:** Reverb Send Level | Column 1: **`PAN`** |
+| **TRANSPOSE** *(Btn 2 Upper)* | **L:** Transpose (Semitones) <br> **R:** Fine Tune (Cents) | **L:** Transpose (Semitones) <br> **R:** Fine Tune (Cents) | **L:** Lane Drum Pitch (Semi) <br> **R:** Drum Sample Fine Tune | Column 2: **`PITCH`** |
+| **PORTAMENTO** *(Btn 2 Lower)* | **L:** Portamento Glide Time <br> **R:** Legato Auto-Glide switch | **L:** Portamento Glide Time <br> **R:** Legato Auto-Glide switch | *Not Applicable* | *Handled inside custom popup editor* |
+| **LFO1** *(Btn 3 Upper)* | **L:** LFO 1 Frequency Speed <br> **R:** LFO 1 Modulation Depth | **L:** Global LFO Speed (Hz) <br> **R:** Global LFO Pitch Depth | **L:** Selected Lane LFO 1 Speed <br> **R:** Selected Lane LFO 1 Depth | Column 7: **`LFO`** *(Controls speed)* |
+| **LFO2** *(Btn 3 Lower)* | **L:** LFO 2 Frequency Speed <br> **R:** LFO 2 Modulation Depth | **L:** Global LFO Speed (Hz) <br> **R:** Global LFO Amp/Filter Depth | **L:** Selected Lane LFO 2 Speed <br> **R:** Selected Lane LFO 2 Depth | *Handled globally via LFO models* |
+| **CUTOFF / FM** *(Btn 4 Upper)* | **L:** LPF Cutoff Frequency <br> **R:** LPF Resonance (Q) | **L:** Op Coarse Freq (Ratio) <br> **R:** Op Fine Frequency Ratio | **L:** Selected Lane LPF Cutoff <br> **R:** Selected Lane LPF Resonance | Column 3: **`FILTER`** |
+| **RESONANCE / FM** *(Btn 4 Lower)*| **L:** HPF Cutoff Frequency <br> **R:** HPF Resonance (Q) | **L:** Op Output Level (0-99) <br> **R:** Op Detune Offset (-7/+7) | **L:** Selected Lane HPF Cutoff <br> **R:** Selected Lane HPF Resonance | Column 4: **`RESONANCE`** |
+| **ENV1** *(Btn 5 Upper)* | **L:** Amp Attack *(Sus via Shift)* <br> **R:** Amp Decay *(Rel via Shift)* | **L:** Active Op EG Rate 1 / 2 <br> **R:** Active Op EG Rate 3 / 4 | **L:** Selected Lane Amp Attack <br> **R:** Selected Lane Amp Decay/Release| Column 5: **`OSC1`** *(Acts as FM envelope rates select)* |
+| **ENV2** *(Btn 5 Lower)* | **L:** Filter Attack *(Sus via Shift)* <br> **R:** Filter Decay *(Rel via Shift)*| **L:** Active Op EG Level 1 / 2 <br> **R:** Active Op EG Level 3 / 4 | **L:** Selected Lane Filter Attack <br> **R:** Selected Lane Filter Decay/Rel | Column 6: **`OSC2`** *(Acts as FM envelope levels select)* |
+| **MODRATE** *(Btn 6 Upper)* | **L:** Mod FX LFO Rate/Speed <br> **R:** Mod FX Modulation Depth | **L:** FM Algorithm (0-31) <br> **R:** FM Feedback Depth (0-7) | **L:** Selected Lane Mod LFO Rate <br> **R:** Selected Lane Mod LFO Depth | Column 8: **`MOD FX`** *(Controls depth)* |
+| **DEPTH** *(Btn 6 Lower)* | **L:** Mod FX Feedback amount <br> **R:** Mod Type (Chorus/Flg/Phs) | **L:** Carrier Phase Sync <br> **R:** Active Operator Enabled State| **L:** Selected Lane Mod Feedback <br> **R:** Mod Type (Chorus/Flg/Phs) | *Handled inside Mod Config Popup* |
+| **DELAY** *(Btn 7 Upper)* | **L:** Delay Sync Time/Rate <br> **R:** Delay Feedback level | **L:** Delay Sync Time/Rate <br> **R:** Delay Feedback level | **L:** Delay Sync Time/Rate <br> **R:** Delay Feedback level | Column 9: **`DELAY`** |
+| **REVERB** *(Btn 7 Lower)* | **L:** Reverb Decay/Room Size <br> **R:** Reverb Highpass Damping | **L:** Reverb Decay/Room Size <br> **R:** Reverb Highpass Damping | **L:** Reverb Decay/Room Size <br> **R:** Reverb Highpass Damping | Column 10: **`REVERB`** |
+| **ARP RATE** *(Btn 8 Upper)* | **L:** Arpeggiator Step Rate <br> **R:** Arpeggiator Direction Mode | *Not Applicable* | **L:** Arpeggiator Step Rate <br> **R:** Arpeggiator Direction Mode | Column 11: **`STUTTER`** *(Quick performance repeat)* |
+| **GATE** *(Btn 8 Lower)* | **L:** Arpeggiator Gate Duration <br> **R:** Arpeggiator Octave Range | *Not Applicable* | **L:** Arpeggiator Gate Duration <br> **R:** Arpeggiator Octave Range | Column 13: **`GATE`** |
 
 ---
 
