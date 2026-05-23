@@ -4,11 +4,60 @@ import org.chuck.audio.util.StereoUGen;
 import org.chuck.core.doc;
 
 /**
- * FreeVerb: Lush Schroeder-Moorer algorithmic reverb. Uses 8 parallel comb filters and 4 series
- * all-pass filters per channel.
+ * FreeVerb: Lush Schroeder-Moorer algorithmic reverb. Uses 8 parallel feedback comb filters and 4
+ * series all-pass filters per channel, with sample-rate independent damping correction and distinct
+ * stereo spread delays.
  */
 @doc("Lush Schroeder-Moorer algorithmic reverb.")
 public class FreeVerb extends StereoUGen {
+
+  private static final double DEFAULT_SRATE = 44100.0;
+  private static final double STEREO_SPREAD = 23.0;
+
+  private static final double[] COMB_DELAYS = {
+    1116.0 / DEFAULT_SRATE,
+    1188.0 / DEFAULT_SRATE,
+    1277.0 / DEFAULT_SRATE,
+    1356.0 / DEFAULT_SRATE,
+    1422.0 / DEFAULT_SRATE,
+    1491.0 / DEFAULT_SRATE,
+    1557.0 / DEFAULT_SRATE,
+    1617.0 / DEFAULT_SRATE
+  };
+
+  private static final double[] ALLPASS_DELAYS = {
+    556.0 / DEFAULT_SRATE, 441.0 / DEFAULT_SRATE, 341.0 / DEFAULT_SRATE, 225.0 / DEFAULT_SRATE
+  };
+
+  private static final double SCALE_ROOM = 0.28;
+  private static final double OFFSET_ROOM = 0.7;
+  private static final double SCALE_DAMP = 0.4;
+  private static final double ALLPASS_FEEDBACK = 0.5;
+  private static final double FIXED_GAIN = 0.015;
+
+  private static class CombFilter {
+    float[] buf;
+    int pos = 0;
+    int size;
+    double filterState = 0.0;
+
+    CombFilter(int size) {
+      this.size = size;
+      this.buf = new float[size];
+    }
+  }
+
+  private static class AllPassFilter {
+    float[] buf;
+    int pos = 0;
+    int size;
+
+    AllPassFilter(int size) {
+      this.size = size;
+      this.buf = new float[size];
+    }
+  }
+
   private final CombFilter[] combL = new CombFilter[8];
   private final CombFilter[] combR = new CombFilter[8];
   private final AllPassFilter[] allPassL = new AllPassFilter[4];
@@ -18,107 +67,146 @@ public class FreeVerb extends StereoUGen {
   private float damp = 0.5f;
   private float mix = 0.3f;
 
-  private static final int[] COMB_TUNING_L = {1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617};
-  private static final int[] COMB_TUNING_R = {1139, 1211, 1300, 1379, 1445, 1514, 1580, 1640};
-  private static final int[] ALLPASS_TUNING_L = {556, 441, 341, 225};
-  private static final int[] ALLPASS_TUNING_R = {579, 464, 364, 248};
+  private double sampleRate = 44100.0;
+  private double srFact = 1.0;
+  private double feedback = 0.84;
+  private double damp1 = 0.2;
+  private double damp2 = 0.8;
+  private double dampValue = 0.2;
+  private float prvDampFactor = -1.0f;
 
   public FreeVerb() {
+    this.sampleRate =
+        org.chuck.core.ChuckVM.CURRENT_VM.isBound()
+            ? org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate()
+            : DEFAULT_SRATE;
+
+    this.srFact = Math.pow(DEFAULT_SRATE / sampleRate, 0.8);
+
+    // Initialize Comb Filters
     for (int i = 0; i < 8; i++) {
-      combL[i] = new CombFilter(COMB_TUNING_L[i]);
-      combR[i] = new CombFilter(COMB_TUNING_R[i]);
+      int sizeL = (int) (COMB_DELAYS[i] * sampleRate + 0.5);
+      int sizeR = (int) ((COMB_DELAYS[i] + STEREO_SPREAD / DEFAULT_SRATE) * sampleRate + 0.5);
+      combL[i] = new CombFilter(sizeL);
+      combR[i] = new CombFilter(sizeR);
     }
+
+    // Initialize All-pass Filters
     for (int i = 0; i < 4; i++) {
-      allPassL[i] = new AllPassFilter(ALLPASS_TUNING_L[i]);
-      allPassR[i] = new AllPassFilter(ALLPASS_TUNING_R[i]);
+      int sizeL = (int) (ALLPASS_DELAYS[i] * sampleRate + 0.5);
+      int sizeR = (int) ((ALLPASS_DELAYS[i] + STEREO_SPREAD / DEFAULT_SRATE) * sampleRate + 0.5);
+      allPassL[i] = new AllPassFilter(sizeL);
+      allPassR[i] = new AllPassFilter(sizeR);
     }
+
     updateParameters();
   }
 
-  @doc("Set room size (0.0 to 1.0).")
+  @doc("Set room size (0.0 to 1.0). Controls reverb decay time.")
   public void roomSize(float r) {
-    this.roomSize = r;
+    this.roomSize = Math.max(0.0f, Math.min(1.0f, r));
     updateParameters();
   }
 
-  @doc("Set damping factor (0.0 to 1.0).")
+  public float roomSize() {
+    return roomSize;
+  }
+
+  @doc("Set damping factor (0.0 to 1.0). Controls high frequency absorption.")
   public void damp(float d) {
-    this.damp = d;
+    this.damp = Math.max(0.0f, Math.min(1.0f, d));
     updateParameters();
+  }
+
+  public float damp() {
+    return damp;
   }
 
   @doc("Set dry/wet mix (0.0 to 1.0).")
   public void mix(float m) {
-    this.mix = m;
+    this.mix = Math.max(0.0f, Math.min(1.0f, m));
+  }
+
+  public float mix() {
+    return mix;
   }
 
   private void updateParameters() {
-    float feedback = roomSize * 0.28f + 0.7f;
-    float damping = damp * 0.4f;
-    for (int i = 0; i < 8; i++) {
-      combL[i].feedback = feedback;
-      combL[i].damp = damping;
-      combR[i].feedback = feedback;
-      combR[i].damp = damping;
+    feedback = roomSize * SCALE_ROOM + OFFSET_ROOM;
+    if (damp != prvDampFactor) {
+      prvDampFactor = damp;
+      double dVal = damp * SCALE_DAMP;
+      dampValue = Math.pow(dVal, srFact);
     }
+    damp1 = dampValue;
+    damp2 = 1.0 - damp1;
+  }
+
+  @Override
+  protected void computeStereo(float left, float right, long systemTime) {
+    // ── Left Channel ──
+    double outL = 0.0;
+    for (int i = 0; i < 8; i++) {
+      CombFilter comb = combL[i];
+      double x = comb.buf[comb.pos];
+      outL += x;
+
+      // One-pole lowpass damping feedback path
+      comb.filterState = (comb.filterState * damp1) + (x * damp2);
+      comb.buf[comb.pos] = (float) (comb.filterState * feedback + left);
+      if (++comb.pos >= comb.size) {
+        comb.pos = 0;
+      }
+    }
+
+    for (int i = 0; i < 4; i++) {
+      AllPassFilter ap = allPassL[i];
+      double bufOut = ap.buf[ap.pos];
+      double x = bufOut - outL;
+
+      ap.buf[ap.pos] = (float) (outL + bufOut * ALLPASS_FEEDBACK);
+      if (++ap.pos >= ap.size) {
+        ap.pos = 0;
+      }
+      outL = x;
+    }
+
+    // ── Right Channel ──
+    double outR = 0.0;
+    for (int i = 0; i < 8; i++) {
+      CombFilter comb = combR[i];
+      double x = comb.buf[comb.pos];
+      outR += x;
+
+      comb.filterState = (comb.filterState * damp1) + (x * damp2);
+      comb.buf[comb.pos] = (float) (comb.filterState * feedback + right);
+      if (++comb.pos >= comb.size) {
+        comb.pos = 0;
+      }
+    }
+
+    for (int i = 0; i < 4; i++) {
+      AllPassFilter ap = allPassR[i];
+      double bufOut = ap.buf[ap.pos];
+      double x = bufOut - outR;
+
+      ap.buf[ap.pos] = (float) (outR + bufOut * ALLPASS_FEEDBACK);
+      if (++ap.pos >= ap.size) {
+        ap.pos = 0;
+      }
+      outR = x;
+    }
+
+    // Apply fixed gain and blend wet/dry mix
+    float wetL = (float) (outL * FIXED_GAIN);
+    float wetR = (float) (outR * FIXED_GAIN);
+
+    lastOutChannels[0] = left * (1.0f - mix) + wetL * mix;
+    lastOutChannels[1] = right * (1.0f - mix) + wetR * mix;
   }
 
   @Override
   protected void computeStereo(float input, long systemTime) {
-    float outL = 0, outR = 0;
-
-    // 1. Parallel Combs
-    for (int i = 0; i < 8; i++) {
-      outL += combL[i].tick(input);
-      outR += combR[i].tick(input);
-    }
-
-    // 2. Series All-passes
-    for (int i = 0; i < 4; i++) {
-      outL = allPassL[i].tick(outL);
-      outR = allPassR[i].tick(outR);
-    }
-
-    // 3. Dry/Wet Mix
-    lastOutChannels[0] = input * (1.0f - mix) + outL * mix;
-    lastOutChannels[1] = input * (1.0f - mix) + outR * mix;
-  }
-
-  // Internal mini-filters for performance
-  private static class CombFilter {
-    float[] buffer;
-    int pos = 0;
-    float feedback = 0.5f;
-    float damp = 0.5f;
-    float lastStore = 0;
-
-    CombFilter(int size) {
-      buffer = new float[size];
-    }
-
-    float tick(float input) {
-      float output = buffer[pos];
-      lastStore = (output * (1.0f - damp)) + (lastStore * damp);
-      buffer[pos] = input + (lastStore * feedback);
-      pos = (pos + 1) % buffer.length;
-      return output;
-    }
-  }
-
-  private static class AllPassFilter {
-    float[] buffer;
-    int pos = 0;
-
-    AllPassFilter(int size) {
-      buffer = new float[size];
-    }
-
-    float tick(float input) {
-      float bufOut = buffer[pos];
-      float output = -input + bufOut;
-      buffer[pos] = input + (bufOut * 0.5f);
-      pos = (pos + 1) % buffer.length;
-      return output;
-    }
+    computeStereo(input, input, systemTime);
   }
 }
