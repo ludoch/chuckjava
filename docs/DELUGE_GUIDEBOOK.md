@@ -17,7 +17,7 @@ This book is a formal reference to the ChucK-Java Deluge Workstation, built to m
 
 ### 1.3 Hardware Parity & Limits
 -   Our implementation is inspired by the Synthstrom Deluge hardware.
--   We have expanded the Java DSL engine to support up to **64 simultaneous tracks** (e.g., 8 kits of 8 sounds each), allowing you to play multiple kits at once.
+- We have expanded the Java DSL engine to support up to **128 simultaneous tracks** (e.g., handles the full standard 128 MIDI notes range from C1 to G9 melodic pitch grid lanes), allowing high-polyphony tracks and rich arrangements.
 -   For a comprehensive per-feature and per-menu mapping against the official firmware, see [`FIRMWARE_FEATURES_MAPPING.md`](FIRMWARE_FEATURES_MAPPING.md).
 
 ### 1.4 Grid Mode (Viewport Configuration)
@@ -33,6 +33,8 @@ The grid viewport is configurable via **Settings → Preferences...** → **Grid
 
 **How it works:**
 - Changing the Grid Mode resizes the grid cells proportionally to fit the window — more cells = smaller pads, fewer cells = larger pads.
+- **Scroll Zoom Cycling (`Alt + Mouse Wheel` or `Cmd + Mouse Wheel`):** Turning the scroll wheel while holding down Alt/Cmd will cycle sequentially through all four grid size modes: `GRID_8x16 ➔ GRID_16x16 ➔ GRID_24x16 ➔ GRID_16x24` on the fly!
+- **Keyboard Zoom Cycling (`Alt + PageUp / PageDown`):** Instantly cycle through all available grid sizes sequential layout modes using PageUp (forward) and PageDown (backward) hotkeys while holding Alt/Cmd!
 - The grid always draws `gridMode.rows` voice row slots in the viewport. If the model has more rows (e.g., a 16-sound TR-808 kit), **vertical scroll buttons (▲/▼)** appear in the CLIP view header.
 - The combined MACROS (Macro Sliders) and KEYBOARD rows stay fixed at the bottom regardless of grid mode.
 - **SONG** and **ARRANGEMENT** views also respect the grid mode setting — the viewport shows `gridMode.rows` track slots immediately, no need to load a clip first.
@@ -59,12 +61,36 @@ The grid viewport is configurable via **Settings → Preferences...** → **Grid
 -   **Set Row Velocity...**: Opens a dialog (0–100%) that applies the same velocity to all steps in that row. Useful for adjusting the overall dynamics of a sound without editing each step individually.
 -   These operations target the currently edited clip's sequence data and respect the per-step column count (clip length).
 
-### 1.8 Horizontal Grid Scrolling
--   When a clip is **longer than the current viewport** (e.g., a 32-step clip in 16-column grid mode), ◀ and ▶ buttons appear in the CLIP header row.
--   Click ◀ to scroll the visible step window left; click ▶ to scroll right.
--   The step range label (e.g., "1–16 / 32") shows which steps are currently visible and the total clip length.
--   The playhead and background step data sync correctly across all rows when the view is scrolled — steps outside the visible window don't show playhead indicators.
--   This works for both Kit and Synth tracks in CLIP mode.
+### 1.8 Horizontal Grid Scrolling & Loop Lengths
+- **Always-Enabled High-Visibility Scroller:** A solid 12px horizontal Steps scrollbar with a 4px glowing center path line is permanently active at the bottom of the grid viewport! Drag the scrollbar thumb or use **`Shift + Scroll Wheel`** to scroll across steps pages smoothly!
+- **Bottom Step Loop Length Controller Badge `[LENG]`:** Located on the left side of the horizontal scroller! Click or right-click this loop badge, enter a new step length (e.g. 16, 32, 64, or 128 steps) and press enter! This instantly:
+  1. Resizes the step and automation arrays inside the Java Object Model clip.
+  2. Updates the real-time physical audio bridge track loop step bounds.
+  3. Automatically scales the horizontal scrollbar's boundary limits, enabling instant horizontal columns scrolling!
+- When a clip is longer than the current viewport, the step range indicator shows which steps are currently visible (e.g. "1–16 / 64").
+- The playhead and background step data sync correctly across all rows when the view is scrolled — steps outside the visible window don't show active playback sweeps.
+- This works for both Kit and Synth tracks in CLIP mode.
+
+### 1.9 Melodic Pitch Scales & Startup Centering
+- Melodic Synth tracks support the full standard **128 MIDI notes range (C1/0 to G9/127)**!
+- **Startup scroll focus centering:** Melodic synth tracks scroll focus is automatically calibrated at startup to center on the standard mid-register **`C5` note (MIDI 72 / scrollOffset 55)**. This keeps key mid-octave pitches visible right upon initial boot, avoiding empty pitch registers focus!
+
+### 1.10 Click-path Modifier Key Gestures (Alt, Cmd, Tab Modifiers)
+Tuning individual step properties is incredibly fast and direct using keyboard modifier click combinations in CLIP Mode:
+- **`Alt + Mouse Click` (Alt-Click) on a step pad:** Directly launches the **Step Properties Dialog** (velocity/gate/iteration panel) instantly, bypassing the double-click/right-click dialog routines!
+- **`Cmd + Mouse Click` (or `Ctrl + Click`) on a step pad:** Cycles the step **Probability** levels directly: **100% ➔ 75% ➔ 50% ➔ 25% ➔ 100%**! Toggles the step ON if it was off, and dims cell color intensity to match the probability level instantly.
+- **`Tab + Mouse Click` (Tab-Click) on a step pad:** Cycles the step **Velocity** levels directly: **100% ➔ 75% ➔ 50% ➔ 25% ➔ 100%**! Toggles the step ON if it was off, and alters the cell background color velocity blend color instantly so you see volume dynamics directly on the pads deck!
+
+### 1.11 Master Output Resampler Looper
+Real-time digital resampling looper capture follows a standard physical workflow:
+- **Start Resampling:** Click the **`[● RESAMPLE]`** button on the transport toolbar! The main playhead starts sweep cycles and the transport state turns into a glowing gold **`[● SAMPLING]`** button.
+- **Perform:** Click some cell step pads or play notes live. Every audio signal generated by the synthesis engines is captured in perfect digital fidelity.
+- **Stop & Auto-Render WAV Loop:** **Click the active `[● SAMPLING]` button again** (or the STOP transport button!). This immediately:
+  1. Terminates the PCM capture thread.
+  2. Compiles captured blocks into a high-fidelity 16-bit 44.1kHz stereo WAV file.
+  3. Saves the WAV file strictly under the physical hardware standard path:
+     📂 **`SAMPLES/RESAMPLE/Resample_[Timestamp].wav`** inside your Deluge library folder.
+  4. Instantiates a new concrete kit drum track named `"Resample [N]"`, loads your recorded loop, and programs a default 4-on-the-floor beat sequence (Col 0, 4, 8, 12) so it plays back live in tempo sync instantly!
 
 ---
 
