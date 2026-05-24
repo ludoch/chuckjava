@@ -63,7 +63,10 @@ The grid viewport is configurable via **Settings → Preferences...** → **Grid
 
 ### 1.8 Horizontal Grid Scrolling & Loop Lengths
 - **Always-Enabled High-Visibility Scroller:** A solid 12px horizontal Steps scrollbar with a 4px glowing center path line is permanently active at the bottom of the grid viewport! Drag the scrollbar thumb or use **`Shift + Scroll Wheel`** to scroll across steps pages smoothly!
-- **Bottom Step Loop Length Controller Badge `[LENG]`:** Located on the left side of the horizontal scroller! Click or right-click this loop badge, enter a new step length (e.g. 16, 32, 64, or 128 steps) and press enter! This instantly:
+- **Bottom Play Rate Speed Zoom Selector:** A premium drop-down combo box is cabled on the left side of the horizontal scroller! Select sequence play step rate resolution speeds from **`1 Bar`** (whole note) to **`1/2`**, **`1/4`**, **`1/8`**, **`1/16`** (sixteenth note standard), **`1/32`**, **`1/64`**, and **`1/128`** note durations! This:
+  1. Instantly scales the master playhead's real-time step duration interval inside the ChucK synthesis engine to play back at your selected zoom rate in perfect tempo sync!
+  2. Raises transient hardware LED display notifications (e.g., displaying `RATE 1/32` or `RATE 1 Bar` on the screen!).
+- **Bottom Step Loop Length Controller Badge `[LENG]`:** Located next to the Play Rate drop-down! Click or right-click this loop badge, enter a new step length (e.g. 16, 32, 64, or 128 steps) and press enter! This instantly:
   1. Resizes the step and automation arrays inside the Java Object Model clip.
   2. Updates the real-time physical audio bridge track loop step bounds.
   3. Automatically scales the horizontal scrollbar's boundary limits, enabling instant horizontal columns scrolling!
