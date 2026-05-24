@@ -94,7 +94,7 @@ saw => MoogLadder flt => dac;
 ---
 
 ### `Gendy`
-**Planned — not yet ported.**
+**✅ Fully Implemented**
 
 **Description:** 
 Dynamic Stochastic Synthesis oscillator based on Iannis Xenakis' algorithm. It creates waveforms by randomly varying the time and amplitude of a set of breakpoints.
@@ -168,7 +168,7 @@ adc => PVSAnal anal => PVSynth synth => dac;
 ---
 
 ### `Partikkel` (Granular Synthesis)
-**Planned — not yet ported.**
+**✅ Fully Implemented**
 
 **Description:** 
 A highly configurable granular synthesis UGen. Generates a cloud of grain events, each being a sine oscillator with independent envelope, pan, and pitch.
@@ -237,7 +237,7 @@ crossfm xfm => dac;
 ---
 
 ### `freeverb`
-**Planned — not yet ported.**
+**✅ Fully Implemented**
 
 **Description:** 
 Classic Schroeder/Moorer reverb: 8 comb filters in parallel → 4 allpass filters in series. A simpler, cheaper alternative to ReverbSC, useful for "spring" or "plate" reverb styles.
@@ -274,7 +274,7 @@ adc => Freeverb rev => dac;
 ---
 
 ### `modal4`
-**Planned — not yet ported.**
+**✅ Fully Implemented**
 
 **Description:** 
 Modal synthesis with 4 parallel 2nd-order resonant filters. Models the resonant modes of struck objects (metal, glass, wood, ceramic).
@@ -329,6 +329,34 @@ adc => Exciter ex => dac;
 
 ---
 
+### `ScannedSynth`
+**✅ Fully Implemented**
+
+**Description:**
+Scanned Synthesis oscillator based on Bill Verplank, Max Mathews, and Rob Shaw's scanned synthesis algorithm. It simulates a 1D string/mass-spring system under force, whose state variables are scanned (periodically sampled) at audio rate to produce dynamic, organic timbres.
+
+**Csound Source:** `Opcodes/scansyn.c` (857 lines)
+
+**ChucK Syntax:**
+```chuck
+ScannedSynth scan => dac;
+```
+
+**Parameters:**
+*   `.spring` (float): Mass-spring model stiffness constant. Default: `0.5`.
+*   `.damping` (float): String state energy loss scaling factor. Default: `0.1`.
+*   `.mass` (float): Mass weight of nodes in the ODE equation. Default: `1.0`.
+*   `.frequency` (float): Rate at which the mass-spring grid positions are scanned to form audio cycles. Default: `100.0`.
+*   `.nodes` (int): Number of masses in the string state vector. Range: [8, 128]. Default: `64`.
+
+**Technical Note:**
+- String state ODE: solved using Euler or Leapfrog integration steps.
+- Audio lookup scanner reads interpolated positions of masses along string paths.
+- Mass/Spring state updates are separated from the faster audio scan frequency to prevent phase artifacts.
+- Self-contained: no external dependencies.
+
+---
+
 ### Future Porting Candidates (Research-Grade)
 - **babo** (935 lines) — Banded waveguide physical model: gourd/guitar body resonance. Reuses FDN delay structure like ReverbSC but as a resonant body.
 - **wave-terrain** (305 lines) — Wave terrain synthesis: orbit paths over a 2D terrain surface. Unique sound, small code footprint.
@@ -350,18 +378,18 @@ When iterating on these docs, reuse the following "wisdom" from the original Cso
 
 ## Porting Progress Checklist
 
-- [ ] ReverbSC — 8-delay FDN, standalone. Delay line lengths documented above.
+- [x] ReverbSC — 8-delay FDN, standalone. Delay line lengths documented above.
 - [ ] MoogLadder — Extract from newfils.c (3769 lines → ~500 for Moog section).
-- [ ] freeverb — 284 lines, simpler reverb.
+- [x] freeverb — 284 lines, simpler reverb (implemented as `FreeVerb`).
 - [ ] exciter — ~200 lines, harmonic exciter.
 - [ ] PVSAnal/PVSynth — Build on existing FFT.java/IFFT.java.
 - [ ] PVS ops (blur, scale, shift) — Spectral processing.
 - [ ] crossfm — Reuse Dx7Engine infra, 507 lines.
 - [ ] fm4op — 4-op FM, 1151 lines.
-- [ ] Gendy — Xenakis stochastic, 552 lines.
-- [ ] ScannedSynth — Mass-spring ODE, 857 lines.
-- [ ] Partikkel — Grain pool, 1030 lines.
-- [ ] modal4 — Modal synthesis, 534 lines.
+- [x] Gendy — Xenakis stochastic, 552 lines (implemented as `Gendy`).
+- [x] ScannedSynth — Mass-spring ODE, 857 lines (implemented as `ScannedSynth`).
+- [x] Partikkel — Grain pool, 1030 lines (implemented as `Partikkel`).
+- [x] modal4 — Modal synthesis, 534 lines (implemented as `Modal4`).
 - [ ] sndwarp — Sound warping, 390 lines.
 - [ ] babo — Waveguide physical model (deferred).
 - [ ] wave-terrain — Wave terrain synthesis (deferred).

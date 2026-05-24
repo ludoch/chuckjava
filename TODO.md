@@ -6,13 +6,13 @@
 - [x] Document Desktop-optimized UI Interactions & Actions.
 - [x] Consolidate Design into `UNIFIED_DESIGN.md`.
 
-## Phase 2: UI Overhaul (Desktop Optimized)
-- [ ] Implement Sidebar Project Manager (Project Tree + SD Emulator).
-- [ ] Integrate 88-key Piano Keyboard (`PianoKeyboard.java`) as persistent panel.
-- [ ] Implement Persistent Velocity Lane below the Matrix Grid.
-- [ ] Update Matrix Grid to support Dynamic sizing (8x16, 16x16) and Marquee selection.
-- [ ] Implement Keyboard Shortcuts (Space, Ctrl+S/N/C/V, Alt+Drag, etc.).
-- [ ] Add Right-Click Context Menu to Grid Cells.
+## Phase 2: UI Overhaul (Desktop Optimized) [DONE]
+- [x] Implement Sidebar Project Manager (Project Tree + SD Emulator via `SwingProjectSidebarPanel.java`).
+- [x] Integrate Piano Roll Keyboard (`PianoRollComponent.java`) as persistent panel.
+- [x] Implement Persistent Velocity/Automation Lane below the Matrix Grid (`SwingVelocityLanePanel.java`).
+- [x] Update Matrix Grid to support custom sizing (up to 192 steps) and multi-cell step selections.
+- [x] Implement Keyboard Shortcuts (Space, Page Up/Down, Line Up/Down, Delete, Backspace, Escape, etc.).
+- [x] Add Right-Click Context Menu and custom parameter configurations popup to Grid Cells.
 
 ## Phase 3: Advanced Visual Editors
 - [ ] Implement OSC & FM Matrix (Node Editor Pop-up).
