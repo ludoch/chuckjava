@@ -26,6 +26,7 @@ import org.junit.jupiter.api.Timeout;
  * translates them to Java DSL, and verifies they compile.
  */
 @Timeout(value = 60, unit = TimeUnit.SECONDS)
+@org.junit.jupiter.api.Tag("slow")
 public class TranslateAndCompileAllTest {
 
   private record GeneratedUnit(Path ckFile, String fileName, String javaCode, Path javaFile) {}
