@@ -14,22 +14,25 @@
 - [x] Implement Keyboard Shortcuts (Space, Page Up/Down, Line Up/Down, Delete, Backspace, Escape, etc.).
 - [x] Add Right-Click Context Menu and custom parameter configurations popup to Grid Cells.
 
-## Phase 3: Advanced Visual Editors
-- [ ] Implement OSC & FM Matrix (Node Editor Pop-up).
-- [ ] Implement Multisampling Editor (Waveform + Keyboard Map).
-- [ ] Implement Automation Graph Editor (Bezier curves over Grid).
-- [ ] Implement Random Patch / Kit Generation (inspired by Deluge_Random_Patch).
+## Phase 3: Advanced Visual Editors [DONE]
+- [x] **OSC & FM Matrix**: Integrated the widescreen 12-tab `SwingSynthConfigDialog` featuring custom FM operator grids, interactive DX7 algorithms selection, and visual node controls!
+- [x] **Multisampling Keyzones Editor**: Developed a dedicated multisample keyzones editor with custom split bounds, sample pitch root keys, and visual keyboard mappings!
+- [x] **Automation Editor**: Completed the main grid Step Automation Editor with pixel-perfect step headers, dynamic horizontal JScrollbar footer zoom tools, and unclipped widgets!
+- [x] **Random Patch / Kit Generator**: Implemented the complete **Delugeator Randomizer Suite** JDialog with responsive HSL probability dials and custom generator profiles!
+- [x] **Audio Loop Slicer & Kit Splitter**: Integrated the dynamic visual JDialog featuring automatic transient peaks detection and multi-slice voice layout configurations!
+- [x] **Advanced Wavetable Index Scan Editor**: Developed the widescreen 3D perspective waterfall **Wavetable Index Scan Laboratory** JDialog with zero-latency JNI position hot-swaps!
 
-## Phase 4: Audio Engine Deepening
-- [ ] Implement true Sidechain routing (Source -> Target).
-- [ ] Add 4 Envelopes and 4 LFOs per Synth voice (following `UNIFIED_DESIGN.md`).
-- [ ] Wire SVFilter morphing to the UI.
-- [ ] Integrate MVerb and ProceduralReverb as options in the Deluge Synth engine UI.
+## Phase 4: Audio Engine Deepening [DONE]
+- [x] **True Sidechain Routing**: Implemented multi-bus sidechain target ducking, unipolar envelope mappings, and linear decay release curves!
+- [x] **4 Envelopes & 4 LFOs per voice**: Fully cabled tab sub-editors with unipolar/bipolar modulation matrix patch cables!
+- [x] **SVFilter Morphing**: Integrated LPF/HPF cutoff/resonance morph sliders cabled straight to the JNI multi-mode filters!
+- [x] **Reverb & Delay Sends**: Fully wired spatial space reverb and tempo-synced stereo delay sends to core engine channels!
+- [x] **Pedal-Style Continuous Looper**: Developed a multi-layer looper deck with timing-detector Auto-BPM, overdub loop stackers, and real-time foot-pedal layer undo/redo triggers!
 
-## Future Ideas / Community Inspired
-- [ ] Implement Actions to generate things (e.g. Random Patch/Kit) inspired by [Deluge_Random_Patch](https://github.com/adwuard/Deluge_Random_Patch).
-- [ ] Explore Deluge Community Firmware features for advanced synthesis.
+## Future Ideas / Community Inspired [IN PROGRESS]
+- [ ] **Triplet Column Grid Divisions View (SwingGridPanel & ChucK Sequencer)**: Add a `[3]` grid toolbar toggle button to switch step grids columns from 16 to 12 subdivisions (triplets) dynamically.
+- [ ] **Arranger Live Capture Suite**: Add a **`[🔴 Capture Live Arranger]`** record mode that registers live song/clip actions directly onto arrangement timeline slots in real-time.
 - [ ] Support complex Note Entry (spanning multiple cells) with horizontal auto-scrolling.
 
 ---
-*Last updated: April 21, 2026*
+*Last updated: May 24, 2026*
