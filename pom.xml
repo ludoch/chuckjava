@@ -114,7 +114,7 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>3.5.5</version>
                     <configuration>
-                        <argLine>--enable-preview --add-modules jdk.incubator.vector -Dchuck.audio.dummy=true</argLine>
+                        <argLine>--enable-preview --add-modules jdk.incubator.vector -Dchuck.audio.dummy=true -Xmx2048m</argLine>
                         <excludedGroups>slow</excludedGroups>
                     </configuration>
                 </plugin>
