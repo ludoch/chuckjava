@@ -152,7 +152,89 @@ The top menu action **`Tools ➔ Delugeator Randomizer...`** (global shortcut **
 
 ---
 
-## 10. System Settings, Directories Preferences & Shortcuts Table
+## 10. UI Panels & Shift Shortcuts System Behavior
+
+The Deluge Workstation features a deeply integrated Shift action system and dedicated modular sound configuration dialogs. Holding down the **Shift** key (or clicking the virtual Shift button) triggers hardware-accurate shortcuts and sub-labels overlays directly across the main pads grid.
+
+### 10.1 The Shift Grid Shortcuts Overlay (Shift Held)
+
+When Shift state is active, the standard step sequencing grid changes context, displaying backlit function shortcuts sub-labels directly on the pads.
+
+![Sequencer Pad Grid with Shift state active](images/deluge_main_grid_shift.png)
+
+#### Grid Function Shortcuts Map:
+* **Row 1 (Synthesis Osc A/B)**: Quick shortcut mappings for `osc1Type`, `osc1Shape`, `osc1PW`, `osc1Sync`, `osc2Type`, `osc2Shape`, `osc2PW`, `osc2Sync`.
+* **Row 2 (Low-Pass & High-Pass Filters)**: Quick shortcuts for LPF Mode, Cutoff, Resonance, LPF Envelope, HPF Mode, Cutoff, Resonance, and HPF Envelope.
+* **Row 3 (Envelopes ADSR)**: Direct sliders quick focus bounds for Envelope 1 (Attack, Decay, Sustain, Release) and Envelope 2 (Attack, Decay, Sustain, Release).
+* **Row 4 (LFO Modulators)**: Quick focus parameters for LFO 1 Rate, Shape, Depth and LFO 2 Rate, Shape, Depth.
+* **Row 5 (Master Stereo FX Deck)**: Quick dials focus for Mod FX (Chorus, Flanger, Phaser), Reverb damping, Delay feedback, Panning, Master Volume, and Transpose.
+* **Row 6 (Sequencer Clocks & MIDI CC)**: Quick settings keys for Tempo clock, Swing shuffle, Step Quantization, MIDI CC Learn channels, and device Clear actions.
+* **Row 7 (System & File IO Operations)**: Disk quick triggers for Preset Load, Preset Save, Stems Import, XML Export, Undo transitions, and Redo stacks.
+* **Row 8 (Workspaces View Modes)**: Quick view selectors to toggle grids to CLIP, SONG, ARRANGEMENT, AUTOMATION, PERFORMANCE, or system PREFERENCES.
+
+---
+
+### 10.2 Synth Configuration Dialog JTabbedPane Tabs
+
+Double-clicking a Synth track triggers our wide-screen, compact sound editor. It cycles programmatically through twelve dedicated parameter decks:
+
+```carousel
+![DX7 6-Operator FM edit tab](images/deluge_synth_tab_dx7.png)
+<!-- slide -->
+![FM Carrier-Modulator algorithm tab](images/deluge_synth_tab_algorithm.png)
+<!-- slide -->
+![Dual Oscillators control tab](images/deluge_synth_tab_osc.png)
+<!-- slide -->
+![Low Frequency Oscillators rate tab](images/deluge_synth_tab_lfo.png)
+<!-- slide -->
+![Arpeggiator pattern sequence tab](images/deluge_synth_tab_arp.png)
+<!-- slide -->
+![ADSR Envelopes control tab](images/deluge_synth_tab_envelope.png)
+<!-- slide -->
+![Visual Modulation routing patchbay tab](images/deluge_synth_tab_modulation.png)
+<!-- slide -->
+![Stereo Compressor dynamic threshold tab](images/deluge_synth_tab_compressor.png)
+<!-- slide -->
+![2-Band shelving Master EQ tab](images/deluge_synth_tab_eq.png)
+<!-- slide -->
+![Mod FX Chorus Flanger Phaser tab](images/deluge_synth_tab_mod_fx.png)
+<!-- slide -->
+![2-Pole resonant High-Pass Filter tab](images/deluge_synth_tab_hpf.png)
+<!-- slide -->
+![Programmatic parameter automation list tab](images/deluge_synth_tab_automation.png)
+<!-- slide -->
+![MIDI CC Learn controller map tab](images/deluge_synth_tab_midi_learn.png)
+```
+
+1. **DX7 FM Panel (`deluge_synth_tab_dx7.png`)**: Houses a complete Yamaha DX7 voice banks parser! Allows importing standard bulk `.SYX` sysex files, listing all 32 presets, choosing patch entries, and editing FM operator feedback, envelope rates, and keyboard level scaling.
+2. **Algorithm Panel (`deluge_synth_tab_algorithm.png`)**: Displays a high-fidelity vector block diagram of the active FM operator algorithm (Algorithms 1 to 32), illustrating carrier-modulator frequency routing paths.
+3. **OSC Panel (`deluge_synth_tab_osc.png`)**: Adjusts unipolar pulse-width modulations, fine pitch detuning steps, and dual oscillators wave shapes with smooth slate knobs.
+4. **LFO Panel (`deluge_synth_tab_lfo.png`)**: Configures rates, depths, and shapes (Sine, Saw, Triangle, Square, Random/S&H) for all 4 global and local low frequency oscillators.
+5. **Arpeggiator Panel (`deluge_synth_tab_arp.png`)**: A standard modular arpeggiator engine adjusting speed sub-clocks (1/4 to 1/32 notes), octave ranges (+1 to +4), gate lengths, and sorting paths (Up, Down, Order Played, Random).
+6. **Envelope Panel (`deluge_synth_tab_envelope.png`)**: Configures unipolar ADSR times and target parameters amount settings for all 4 sound path envelopes.
+7. **Modulation Matrix Panel (`deluge_synth_tab_modulation.png`)**: Sleek timeline routing rows table where sources are cabled to destinations with unipolar/bipolar sliders.
+8. **Compressor Panel (`deluge_synth_tab_compressor.png`)**: Adjusts dynamic compressor thresholds, ratios, attacks, release, and sidechain HPF filters.
+9. **EQ Panel (`deluge_synth_tab_eq.png`)**: Adjusts master shelving EQ Bass and Treble boost/cut decibels.
+10. **Mod FX Panel (`deluge_synth_tab_mod_fx.png`)**: Configures modulation LFO speeds and feedback depths for active Chorus, Flanger, or Phaser lines.
+11. **HPF Panel (`deluge_synth_tab_hpf.png`)**: Adjusts high-pass filter cutoff frequencies and feedback ladder overdrive drive.
+12. **Automation Panel (`deluge_synth_tab_automation.png`)**: Lists all automate-able parameters with numeric draw step values for step-by-step tweaking.
+13. **MIDI Learn Panel (`deluge_synth_tab_midi_learn.png`)**: Maps sequencer parameters to incoming hardware MIDI controller CC knob events via dynamic listener hooks.
+
+---
+
+### 10.3 Settings Preferences JDialog
+
+The Settings Preferences Dialog is programmatically cabled in high-contrast slate-dark design tokens, providing safe, JNI-free controls:
+
+![Settings Preferences configuration Dialog](images/deluge_preferences.png)
+
+* **Library Path Preferences**: Browse and set the mounted parent library root directory path folder for all sample loading.
+* **Grid Profiles Mode**: Standardize layout resolutions to `Grid 8x16` or `Grid 16x16`.
+* **Sequencer Engine Backend**: Toggle between ChucK (strongly-timed audio synthesis language engine) and Pure Java direct soundcard playback backends.
+
+---
+
+## 11. System Settings, Directories Preferences & Shortcuts Table
 
 The **`Settings ➔ Preferences...`** panel manages your paths and grid configurations without JNI hooks:
 * **SD Card Mounted Library Directory**: Set the root parent directory folder path representing your physical SD card library. All subdirectories (`SAMPLES/`, `KITS/`, `SYNTHS/`, `SONGS/`) are resolved relative to this parent root dynamically.
