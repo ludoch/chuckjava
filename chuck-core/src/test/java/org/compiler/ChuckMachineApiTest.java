@@ -58,8 +58,15 @@ public class ChuckMachineApiTest {
     // Advance time to allow shred to run
     vm.advanceTime(samples);
 
-    // Brief pause to allow virtual threads to finish any final output
-    Thread.sleep(200);
+    // Wait until all shreds finish executing, up to a safety timeout (2 seconds)
+    int elapsed = 0;
+    while (vm.getActiveShredCount() > 0 && elapsed < 2000) {
+      Thread.sleep(20);
+      elapsed += 20;
+    }
+    // Tiny extra buffer to ensure the print listener thread finishes delivering final output
+    // strings
+    Thread.sleep(50);
 
     return output;
   }
