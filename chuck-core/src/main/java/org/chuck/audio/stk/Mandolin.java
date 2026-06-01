@@ -1,144 +1,163 @@
 package org.chuck.audio.stk;
 
 import org.chuck.audio.ChuckUGen;
-import org.chuck.audio.util.Wavetable;
-import org.chuck.audio.util.WavetableRegistry;
+import org.chuck.audio.stk.util.StkDelayA;
+import org.chuck.audio.stk.util.StkDelayL;
+import org.chuck.audio.stk.util.StkOneZero;
+import org.chuck.audio.stk.util.StkWvIn;
+import org.chuck.audio.stk.util.WaveData;
 import org.chuck.core.doc;
 
 /**
- * Mandolin physical model. Based on STK Mandolin class. Uses two detuned Twang strings and a pluck
- * excitation.
+ * Mandolin — STK's commuted dual-string mandolin (PluckTwo + Mandolin), ported verbatim from
+ * ugen_stk.cpp. Two detuned allpass-interpolating delay lines with one-zero loop filters, excited by
+ * the commuted body response (special:mand1) shaped by a comb delay. Mono output, matching native
+ * ChucK. Replaces the earlier Twang-based approximation.
  */
-@doc("Mandolin physical model with two detuned strings and pluck excitation.")
+@doc("Mandolin physical model: two detuned waveguide strings with commuted body excitation.")
 public class Mandolin extends ChuckUGen {
-  private final Twang[] strings = new Twang[2];
-  private final Wavetable excitation;
-  private double freq = 440.0;
+  private final double sampleRate;
+
+  // ── PluckTwo state ────────────────────────────────────────────────────────
+  private final int length;
+  private double baseLoopGain = 0.995;
+  private double loopGain = 0.999;
+  private final StkDelayA delayLine;
+  private final StkDelayA delayLine2;
+  private final StkDelayL combDelay;
+  private final StkOneZero filter = new StkOneZero();
+  private final StkOneZero filter2 = new StkOneZero();
+  private double pluckAmplitude = 0.3;
+  private double pluckPosition = 0.4;
   private double detuning = 0.995;
-  private final float sampleRate;
+  private double lastFrequency;
+  private double lastLength;
+
+  // ── Mandolin state ────────────────────────────────────────────────────────
+  private final StkWvIn soundfile;
+  private long dampTime = 0;
+  private boolean waveDone = true;
 
   public Mandolin(float lowestFrequency, float sampleRate) {
     this.sampleRate = sampleRate;
-    strings[0] = new Twang(sampleRate, false);
-    strings[1] = new Twang(sampleRate, false);
+    length = (int) (sampleRate / lowestFrequency + 1);
+    delayLine = new StkDelayA(length / 2.0, length);
+    delayLine2 = new StkDelayA(length / 2.0, length);
+    combDelay = new StkDelayL(length / 2.0, length);
+    lastFrequency = lowestFrequency * 2.0;
+    lastLength = length * 0.5;
 
-    excitation = new Wavetable(false);
-    excitation.setTable(WavetableRegistry.getPluckExcitation(1024));
-    excitation.loop(0); // single shot pluck
-
-    // Default mandolin parameters
-    for (Twang s : strings) {
-      s.loopGain(0.997);
-      s.pluckPos(0.4);
-    }
-
-    setFreq(440.0);
-    this.numOutputs = 2; // Stereo output
+    soundfile = new StkWvIn(WaveData.MAND1, sampleRate);
+    waveDone = true;
   }
+
+  // ── PluckTwo ──────────────────────────────────────────────────────────────
+
+  public void setFrequency(double frequency) {
+    lastFrequency = (frequency <= 0.0) ? 220.0 : frequency;
+    lastLength = (sampleRate / lastFrequency) - 1; // REPAIRATHON2021 bug-fix (minus 1)
+
+    double delay = (lastLength / detuning) - 0.5;
+    if (delay <= 0.0) delay = 0.3;
+    else if (delay > length) delay = length;
+    delayLine.setDelay(delay);
+
+    delay = (lastLength * detuning) - 0.5;
+    if (delay <= 0.0) delay = 0.3;
+    else if (delay > length) delay = length;
+    delayLine2.setDelay(delay);
+
+    loopGain = baseLoopGain + (frequency * 0.000005);
+    if (loopGain > 1.0) loopGain = 0.99999;
+  }
+
+  public void setDetune(double detune) {
+    detuning = (detune <= 0.0) ? 0.1 : detune;
+    delayLine.setDelay((lastLength / detuning) - 0.5);
+    delayLine2.setDelay((lastLength * detuning) - 0.5);
+  }
+
+  public void setPluckPosition(double position) {
+    pluckPosition = Math.max(0.0, Math.min(1.0, position));
+  }
+
+  public void setBaseLoopGain(double aGain) {
+    baseLoopGain = aGain;
+    loopGain = baseLoopGain + (lastFrequency * 0.000005);
+    if (loopGain > 0.99999) loopGain = 0.99999;
+  }
+
+  // ── Mandolin ──────────────────────────────────────────────────────────────
+
+  public void pluckString(double amplitude) {
+    soundfile.reset();
+    waveDone = false;
+    pluckAmplitude = Math.max(0.0, Math.min(1.0, amplitude));
+    combDelay.setDelay(0.5 * pluckPosition * lastLength);
+    dampTime = (long) lastLength;
+  }
+
+  // ── ChucK control surface (preserved names) ────────────────────────────────
 
   @doc("Set the fundamental frequency of the mandolin.")
   public void freq(double f) {
-    this.freq = f;
-    strings[0].freq(f);
-    strings[1].freq(f * detuning);
+    setFrequency(f);
   }
 
   public void setFreq(double f) {
-    freq(f);
+    setFrequency(f);
   }
 
   @doc("Set the detuning factor between the two strings (e.g. 0.995).")
   public void detune(double d) {
-    this.detuning = d;
-    strings[1].freq(freq * detuning);
+    setDetune(d);
   }
 
   @doc("Set the pluck position (0.0 to 1.0).")
   public void pluckPos(double p) {
-    for (Twang s : strings) s.pluckPos(p);
+    setPluckPosition(p);
   }
 
-  @doc("Set the string sustain (loop gain, 0.0 to 1.0).")
+  @doc("Set the string sustain (base loop gain, 0.0 to 1.0).")
   public void sustain(double g) {
-    for (Twang s : strings) s.loopGain(g);
+    setBaseLoopGain(g);
   }
 
-  @doc("Pluck the strings with given velocity.")
-  public void noteOn(float velocity) {
-    excitation.reset();
-    excitation.gain(velocity);
+  @doc("Pluck the strings with given amplitude.")
+  public void pluck(float amplitude) {
+    pluckString(amplitude);
   }
 
-  public void pluck(float velocity) {
-    noteOn(velocity);
+  public void noteOn(float amplitude) {
+    pluckString(amplitude);
   }
 
-  public void noteOff(float velocity) {
-    sustain(0.9); // dampen strings
-  }
-
-  @Override
-  public void tick(float[] buffer, int offset, int length, long systemTime) {
-    if (systemTime != -1
-        && systemTime == blockStartTime
-        && blockCache != null
-        && blockLength >= length) {
-      if (buffer != null) System.arraycopy(blockCache, 0, buffer, offset, length);
-      return;
-    }
-
-    if (blockCache == null || blockCache.length < length) {
-      blockCache = new float[length];
-    }
-
-    // 1. Tick excitation wavetable
-    float[] pluckBuf = new float[length];
-    excitation.tick(pluckBuf, 0, length, systemTime);
-
-    // 2. Tick strings using the excitation buffer
-    float[] temp0 = new float[length];
-    float[] temp1 = new float[length];
-    strings[0].tick(temp0, 0, length, systemTime, pluckBuf);
-    strings[1].tick(temp1, 0, length, systemTime, pluckBuf);
-
-    // 3. Mix and store
-    for (int i = 0; i < length; i++) {
-      // Average the strings for sane gain levels
-      float out = (temp0[i] + temp1[i]) * 0.5f * gain;
-      blockCache[i] = out;
-      if (buffer != null) buffer[offset + i] = out;
-    }
-
-    blockStartTime = systemTime;
-    blockLength = length;
-    lastTickTime = (systemTime == -1) ? -1 : systemTime + length - 1;
-    if (length > 0) {
-      this.lastL = temp0[length - 1] * gain;
-      this.lastR = temp1[length - 1] * gain;
-      lastOut = blockCache[length - 1];
-    }
+  public void noteOff(float amplitude) {
+    loopGain = (1.0 - amplitude) * 0.5; // PluckTwo::noteOff
   }
 
   @Override
   protected float compute(float input, long systemTime) {
-    float pluckSignal = excitation.tick(systemTime);
+    double temp = 0.0;
+    if (!waveDone) {
+      // Comb-filtered pluck excitation for the duration of the body response.
+      temp = soundfile.tick() * pluckAmplitude;
+      temp = temp - combDelay.tick(temp);
+      waveDone = soundfile.isFinished();
+    }
 
-    // Explicitly pass pluck signal to internal strings
-    float out0 = strings[0].tick(pluckSignal, systemTime);
-    float out1 = strings[1].tick(pluckSignal, systemTime);
-
-    // Update stereo cache (without boost)
-    this.lastL = out0 * gain;
-    this.lastR = out1 * gain;
-
-    // Mixed mono out (sane gain)
-    return (out0 + out1) * 0.5f;
-  }
-
-  private float lastL = 0, lastR = 0;
-
-  @Override
-  public float getChannelLastOut(int i) {
-    return (i == 0) ? lastL : lastR;
+    if (dampTime >= 0) {
+      // Damping hack to avoid overflow on re-plucking (first period uses 0.7 reflection).
+      dampTime -= 1;
+      double out = delayLine.tick(filter.tick(temp + (delayLine.lastOut() * 0.7)));
+      out += delayLine2.tick(filter2.tick(temp + (delayLine2.lastOut() * 0.7)));
+      out *= 0.3;
+      return (float) out * gain;
+    } else {
+      double out = delayLine.tick(filter.tick(temp + (delayLine.lastOut() * loopGain)));
+      out += delayLine2.tick(filter2.tick(temp + (delayLine2.lastOut() * loopGain)));
+      out *= 0.3;
+      return (float) out * gain;
+    }
   }
 }

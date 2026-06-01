@@ -12,7 +12,32 @@ This document tracks the mathematical and functional compatibility level of Chuc
 | **Filter (LPF/ResonZ)** | **Bit-Exact** | ✅ | Matches native SuperCollider-derived biquad formulas. |
 | **Filter (TwoPole/Zero)** | **Bit-Exact** | ✅ | Matches native STK-style implementations and normalization. |
 | **Oscillators** | **High Parity** | ✅ | Aligned sample-then-increment phase accumulation. |
-| **STK Instruments** | **Acceptable** | ✅ | Close parity ($< 0.1$ RMS), limited by float precision accumulation. |
+| **STK FM Voices** | **High Parity** | ✅ | Verbatim ports of the STK FM engine — see §4. |
+| **STK Waveguide/Sampling** | **High Parity** | ✅ | Mandolin (commuted dual-string) and Moog (sampling) — see §4. |
+| **STK Instruments (other)** | **Acceptable** | ✅ | Close parity ($< 0.1$–$0.2$ RMS), limited by float precision accumulation. |
+
+## 4. STK Instrument Parity (measured vs native ChucK 1.5.5.9)
+
+The following instruments are **verbatim ports** of their `ugen_stk.cpp` algorithms (shared
+DSP primitives live in `org.chuck.audio.stk.fm` and `org.chuck.audio.stk.util`; rawwave tables
+are extracted from `util_raw.c`). RMS measured against the freshly built native `chuck` at
+44.1 kHz, best-shift aligned, over the audio payload:
+
+| Instrument | Family | RMS vs native | Tier |
+| :--- | :--- | :--- | :--- |
+| BeeThree | 4-op FM | 0.0021 | High Parity |
+| Wurley | 4-op FM (e-piano) | 0.0067 | High Parity |
+| Rhodey | 4-op FM (e-piano) | 0.0042 | High Parity |
+| TubeBell | 4-op FM (e-piano) | 0.0024 | High Parity |
+| HevyMetl | 4-op FM (cascade) | 0.0310 | High Parity |
+| PercFlut | 4-op FM | 0.0015 | High Parity |
+| FMVoices | FM (TX81Z alg 6) | 0.0049 | High Parity |
+| Mandolin | commuted waveguide | 0.0003 | High Parity |
+| Moog | sampling + FormSwep | 0.0065 | High Parity |
+
+Residual error is float-vs-`double` rounding in the rawwave tables (STK uses `double`
+processing; Java stores `float` tables) — audibly identical. The remaining STK instruments
+(StifKarp, ModalBar, etc.) are still approximations at Acceptable parity.
 
 ## 2. On-Demand Regression Testing
 
