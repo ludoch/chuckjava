@@ -1775,6 +1775,16 @@ public class ExpressionEmitter {
               code.addInstruction(new CallFunc(parent.getFunctions().get(fbk), argc));
             return;
           }
+          // Fallback: allow ChucK's implicit int->float argument promotion. Without this, a call
+          // like play(440, "x") (int arg) fails to match play(float, string) and degrades to a
+          // null-object CallMethod, throwing NullPointerException at runtime.
+          String promotedKey = resolveFnWithPromotion(name, argTypes);
+          if (promotedKey != null) {
+            emitArgsWithPromotion(e.args(), argTypes, promotedKey, code);
+            if (code != null)
+              code.addInstruction(new CallFunc(parent.getFunctions().get(promotedKey), argc));
+            return;
+          }
           if (Set.of("print", "chout", "cherr").contains(name)) {
             for (ChuckAST.Exp arg : e.args()) this.emitExpression(arg, code);
             if (code != null) code.addInstruction(new ChuckPrint(argc));
@@ -1904,5 +1914,65 @@ public class ExpressionEmitter {
   private org.chuck.core.ChuckCompilerException error(ChuckAST.Exp e, String message) {
     return new org.chuck.core.ChuckCompilerException(
         message, parent.getCurrentFile(), e.line(), e.column());
+  }
+
+  /**
+   * Resolves a registered function key for {@code name} called with {@code callArgTypes}, allowing
+   * ChucK's implicit int{@literal ->}float argument promotion. Returns the matching key in {@code
+   * parent.getFunctions()} (e.g. {@code "play:float,string"}) when an int argument lines up with a
+   * float parameter, or null if no name+arity match is promotion-compatible. Used as a fallback
+   * after exact-key lookup so that e.g. {@code play(440, "x")} resolves to {@code play(float,
+   * string)} instead of silently degrading to a no-op {@code CallMethod("unknown")}.
+   */
+  private String resolveFnWithPromotion(String name, List<String> callArgTypes) {
+    String prefix = name + ":";
+    for (String key : parent.getFunctions().keySet()) {
+      if (!key.startsWith(prefix)) continue;
+      List<String> declared = declaredParamTypes(key);
+      if (declared.size() != callArgTypes.size()) continue;
+      boolean ok = true;
+      for (int i = 0; i < declared.size(); i++) {
+        if (!argPromotable(callArgTypes.get(i), declared.get(i))) {
+          ok = false;
+          break;
+        }
+      }
+      if (ok) return key;
+    }
+    return null;
+  }
+
+  /** Parses declared parameter types out of a function key like {@code "play:float,string"}. */
+  private List<String> declaredParamTypes(String key) {
+    int colon = key.indexOf(':');
+    if (colon < 0) return List.of();
+    String sig = key.substring(colon + 1);
+    if (sig.isEmpty() || sig.equals("0")) return List.of();
+    return List.of(sig.split(","));
+  }
+
+  /** True if a call argument of {@code from} can satisfy a parameter of {@code to}. */
+  private boolean argPromotable(String from, String to) {
+    if (from == null || to == null) return false;
+    if (from.equals(to)) return true;
+    return from.equals("int") && to.equals("float"); // ChucK implicit int->float promotion
+  }
+
+  /**
+   * Emits call arguments, inserting an implicit {@code CastToFloat} wherever an int argument is
+   * passed to a float parameter, so the runtime value lands in the frame slot as a proper float.
+   */
+  private void emitArgsWithPromotion(
+      List<ChuckAST.Exp> args, List<String> callArgTypes, String resolvedKey, ChuckCode code) {
+    List<String> declared = declaredParamTypes(resolvedKey);
+    for (int i = 0; i < args.size(); i++) {
+      this.emitExpression(args.get(i), code);
+      if (code != null
+          && i < declared.size()
+          && "float".equals(declared.get(i))
+          && "int".equals(callArgTypes.get(i))) {
+        code.addInstruction(new TypeInstrs.CastToFloat());
+      }
+    }
   }
 }

@@ -81,8 +81,11 @@ public class ParityTester {
     Files.writeString(
         Paths.get(nativeScript), content.replace("comparison/java/", "comparison/native/"));
 
+    // Force native srate to 44100 to match ChucK-Java's CLI default; otherwise native defaults
+    // to 48000 and the sample-by-sample RMS comparison drifts and reports false divergence.
     ProcessBuilder pb =
-        new ProcessBuilder("chuck", "--silent", nativeScript + ":" + wavFile, "--halt");
+        new ProcessBuilder(
+            "chuck", "--silent", "--srate:44100", nativeScript + ":" + wavFile, "--halt");
     Process p = pb.start();
     p.waitFor();
     Files.deleteIfExists(Paths.get(nativeScript));
