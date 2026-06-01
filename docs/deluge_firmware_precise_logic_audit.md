@@ -118,7 +118,16 @@ To maintain strict parity with community firmware commit community **c1.3.0**, t
 | **GAP-01** | Missing 2D Anti-Aliased Saturation | ✅ Resolved | `TanHLookupTable.java`, `FirmwareUtils.java` | Ported the 2D state-space table `tanH2d` and implemented bilinear 2D interpolation `interpolateTableSigned2d`. |
 | **GAP-02** | Naive basic VA Waveforms (No Band-limiting) | ✅ Resolved | `WavetableLoader.java`, `Oscillator.java` | Ported multi-sampled Saw/Square wave tables to binary resource paths and ported Triangle multi-sampled tables to Java classes. |
 | **GAP-03** | Convoluted sign mask in `renderSineSync` | ✅ Resolved | `Oscillator.java` | Refactored sign-extend mask loops back to a direct standard `interpolateTableSigned` library call. |
+| **GAP-04** | RINGMOD synth mode not rendered (degraded to a plain oscillator sum) | ✅ Resolved | `FirmwareVoice.java` | Ported `voice.cpp`'s `SynthMode::RINGMOD` path: render osc A and B at fixed unit amplitude, then output `round(mult(mult(A,B), amplitudeForRingMod))` with the firmware's per-wave-type compensation (saw `<<1`, wavetable `<<2`). Verified by `RingModParityTest` (frequency doubling for equal-frequency sines). |
+| **GAP-05** | Non-firmware `buffer >>= 1\|2` multi-source clipping hack | ✅ Resolved | `FirmwareVoice.java` | Removed; it attenuated multi-oscillator patches by 6–12 dB vs hardware. The firmware sums sources straight (volumes are pre-capped; unison uses `1/sqrt(numUnison)`, which the port already matches) and relies on the master limiter for peaks. |
+
+> [!NOTE]
+> The prose in §2 and §3 above documents the **pre-fix** state at the time of the original audit.
+> Per the summary table, GAP-01 (2D anti-aliased tanh) and GAP-02 (band-limited oscillator tables)
+> are now implemented in code (`TanHLookupTable.java`, `SawLookupTables`/`SquareLookupTables`/
+> `TriangleLookupTables`, `Oscillator.renderOsc`); the default app engine (`PureFirmwareEngine`,
+> pure mode) uses this high-fidelity path — the legacy ChucK-DSL path only runs with `--hifi`.
 
 ---
 
-*Prepared by Antigravity*
+*Prepared by Antigravity; GAP-04/05 and reconciliation by Claude.*
