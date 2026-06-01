@@ -1,73 +1,89 @@
 package org.chuck.audio.stk;
 
-import org.chuck.audio.ChuckUGen;
-import org.chuck.audio.osc.SinOsc;
-import org.chuck.audio.util.Adsr;
+import org.chuck.audio.stk.fm.FmInstrument;
+import org.chuck.audio.stk.fm.FmWaveLoop;
+import org.chuck.audio.stk.fm.Rawwaves;
 
 /**
- * PercFlut — Percussive flute using 4-operator FM synthesis. Fast decay with low FM index produces
- * a breathy, flute-like tone.
+ * PercFlut — STK's 4-operator FM percussive flute, ported verbatim from ugen_stk.cpp
+ * (PercFlut::tick). Operator frequencies are updated each sample from baseFrequency, so
+ * setFrequency only stores the base pitch. Replaces the earlier approximation.
  */
-public class PercFlut extends ChuckUGen {
-  private final SinOsc carrier1;
-  private final SinOsc carrier2;
-  private final SinOsc mod1;
-  private final SinOsc mod2;
-  private final Adsr env1;
-  private final Adsr env2;
-  private double baseFreq = 440.0;
+public class PercFlut extends FmInstrument {
 
-  @SuppressWarnings("unused")
-  private final float sampleRate;
+  public PercFlut() {
+    super();
+    init();
+  }
 
   public PercFlut(float sampleRate) {
-    this.sampleRate = sampleRate;
-    this.carrier1 = new SinOsc(sampleRate);
-    this.carrier2 = new SinOsc(sampleRate);
-    this.mod1 = new SinOsc(sampleRate);
-    this.mod2 = new SinOsc(sampleRate);
-    this.env1 = new Adsr(sampleRate);
-    this.env2 = new Adsr(sampleRate);
-
-    mod1.chuckTo(carrier1);
-    mod2.chuckTo(carrier2);
-    carrier1.setSync(2);
-    carrier2.setSync(2);
-
-    // Fast attack, fast decay — percussive character
-    env1.set(0.001f, 0.3f, 0.0f, 0.05f);
-    env2.set(0.001f, 0.15f, 0.0f, 0.05f);
+    super(sampleRate);
+    init();
   }
 
-  public void setFreq(double freq) {
-    this.baseFreq = freq;
-    carrier1.setFreq(freq);
-    carrier2.setFreq(freq * 1.003); // very slight detune
-    mod1.setFreq(freq * 1.0); // near-unison mod: breathy
-    mod2.setFreq(freq * 2.0); // octave modulator
+  private void init() {
+    waves[0] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[1] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[2] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[3] = new FmWaveLoop(Rawwaves.FWAVBLNK, sampleRate);
+
+    setRatio(0, 1.50 * 1.000);
+    setRatio(1, 3.00 * 0.995);
+    setRatio(2, 2.99 * 1.005);
+    setRatio(3, 6.00 * 0.997);
+
+    gains[0] = FM_GAINS[99];
+    gains[1] = FM_GAINS[71];
+    gains[2] = FM_GAINS[93];
+    gains[3] = FM_GAINS[85];
+    baseGains[0] = gains[0];
+    baseGains[1] = gains[1];
+    baseGains[2] = gains[2];
+    baseGains[3] = gains[3];
+
+    adsr[0].setAllTimes(0.05, 0.05, FM_SUS_LEVELS[14], 0.05);
+    adsr[1].setAllTimes(0.02, 0.50, FM_SUS_LEVELS[13], 0.5);
+    adsr[2].setAllTimes(0.02, 0.30, FM_SUS_LEVELS[11], 0.05);
+    adsr[3].setAllTimes(0.02, 0.05, FM_SUS_LEVELS[13], 0.01);
+
+    twozero.setGain(0.0);
+    modDepth = 0.005;
   }
 
-  public void noteOn(float velocity) {
-    env1.keyOn();
-    env2.keyOn();
+  /** PercFlut::setFrequency — store base pitch only; tick re-sets operator frequencies. */
+  @Override
+  public void setFrequency(double frequency) {
+    baseFrequency = frequency;
   }
 
-  public void noteOff(float velocity) {
-    env1.keyOff();
-    env2.keyOff();
+  /** PercFlut::noteOn scales operator gains by 0.5 (verbatim). */
+  @Override
+  public void noteOn(float amplitude) {
+    for (int i = 0; i < N_OPERATORS; i++) gains[i] = amplitude * baseGains[i] * 0.5;
+    keyOn();
   }
 
   @Override
   protected float compute(float input, long systemTime) {
-    float e1 = env1.tick(systemTime);
-    float e2 = env2.tick(systemTime);
-    float c1 = carrier1.tick(systemTime);
-    float c2 = carrier2.tick(systemTime);
-    @SuppressWarnings("unused")
-    float m1 = mod1.tick(systemTime);
-    @SuppressWarnings("unused")
-    float m2 = mod2.tick(systemTime);
-    float out = (c1 * e1 + c2 * e2 * 0.4f) * gain;
-    return out;
+    double temp2 = vibrato.tick();
+    double temp = temp2 * modDepth * 0.2;
+    for (int i = 0; i < 4; i++) {
+      if (ratios[i] > 0.0) waves[i].setFrequency(baseFrequency * (1.0 + temp) * ratios[i]);
+    }
+
+    waves[3].addPhaseOffset(twozero.lastOut());
+    temp = (1.0 + opAMs[3] * temp2) * gains[3] * adsr[3].tick() * waves[3].tick();
+
+    twozero.tick(temp);
+    waves[2].addPhaseOffset(temp);
+    temp = (1.0 + opAMs[2] * temp2 - (control2 * 0.5)) * gains[2] * adsr[2].tick() * waves[2].tick();
+
+    temp += (1.0 + opAMs[1] * temp2) * control2 * 0.5 * gains[1] * adsr[1].tick() * waves[1].tick();
+    temp = temp * control1;
+
+    waves[0].addPhaseOffset(temp);
+    temp = (1.0 + opAMs[0] * temp2) * gains[0] * adsr[0].tick() * waves[0].tick();
+
+    return (float) (temp * 0.5) * gain;
   }
 }

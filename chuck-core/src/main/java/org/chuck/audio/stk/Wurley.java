@@ -1,74 +1,68 @@
 package org.chuck.audio.stk;
 
-import org.chuck.audio.ChuckUGen;
-import org.chuck.audio.osc.SinOsc;
-import org.chuck.audio.util.Adsr;
-import org.chuck.core.ChuckVM;
+import org.chuck.audio.stk.fm.FmInstrument;
+import org.chuck.audio.stk.fm.FmWaveLoop;
+import org.chuck.audio.stk.fm.Rawwaves;
 
 /**
- * Wurley — Wurlitzer electric piano using 2-operator FM synthesis. More nasal and honky than
- * Rhodey, with a higher modulator ratio.
+ * Wurley — STK's 4-operator FM Wurlitzer electric piano, ported verbatim from ugen_stk.cpp.
+ * Operators 2 and 3 use fixed resonant frequencies (ratios stored as absolute Hz). Uses the shared
+ * Repairathon "compatible" FM tick.
  */
-public class Wurley extends ChuckUGen {
-  private final SinOsc carrier;
-  private final SinOsc modulator;
-  private final Adsr carrierEnv;
-  private final Adsr modulatorEnv;
-  private double baseFreq = 440.0;
-  private float modIndex = 1.0f;
-
-  @SuppressWarnings("unused")
-  private final float sampleRate;
+public class Wurley extends FmInstrument {
 
   public Wurley() {
-    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+    super();
+    init();
   }
 
   public Wurley(float sampleRate) {
-    this.sampleRate = sampleRate;
-    this.carrier = new SinOsc(sampleRate);
-    this.modulator = new SinOsc(sampleRate);
-    this.carrierEnv = new Adsr(sampleRate);
-    this.modulatorEnv = new Adsr(sampleRate);
-
-    modulator.chuckTo(carrier);
-    carrier.setSync(2); // FM mode
-
-    // Wurlitzer: characteristic nasal tone
-    carrierEnv.set(0.002f, 1.2f, 0.0f, 0.08f);
-    modulatorEnv.set(0.001f, 0.3f, 0.0f, 0.05f);
+    super(sampleRate);
+    init();
   }
 
-  public void freq(float f) {
-    setFreq(f);
+  private void init() {
+    waves[0] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[1] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[2] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[3] = new FmWaveLoop(Rawwaves.FWAVBLNK, sampleRate);
+
+    setRatio(0, 1.0);
+    setRatio(1, 4.0);
+    setRatio(2, -510.0);
+    setRatio(3, -510.0);
+
+    gains[0] = FM_GAINS[99];
+    gains[1] = FM_GAINS[82];
+    gains[2] = FM_GAINS[92];
+    gains[3] = FM_GAINS[68];
+    baseGains[0] = gains[0];
+    baseGains[1] = gains[1];
+    baseGains[2] = gains[2];
+    baseGains[3] = gains[3];
+
+    adsr[0].setAllTimes(0.001, 1.50, 0.0, 0.04);
+    adsr[1].setAllTimes(0.001, 1.50, 0.0, 0.04);
+    adsr[2].setAllTimes(0.001, 0.25, 0.0, 0.04);
+    adsr[3].setAllTimes(0.001, 0.15, 0.0, 0.04);
+
+    twozero.setGain(2.0);
+    vibrato.setFrequency(8.0);
+    setFrequency(baseFrequency);
   }
 
-  public void setFreq(double freq) {
-    this.baseFreq = freq;
-    carrier.setFreq(freq);
-    modulator.setFreq(freq * 4.0); // Higher ratio for nasal quality
-  }
-
-  public void noteOn(float velocity) {
-    carrierEnv.keyOn();
-    modulatorEnv.keyOn();
-    modIndex = (float) (baseFreq * velocity * 1.0);
-  }
-
-  public void noteOff(float velocity) {
-    carrierEnv.keyOff();
-    modulatorEnv.keyOff();
+  /** Wurley::setFrequency — ops 2 and 3 are fixed resonances (ratios used as absolute Hz). */
+  @Override
+  public void setFrequency(double frequency) {
+    baseFrequency = frequency;
+    waves[0].setFrequency(baseFrequency * ratios[0]);
+    waves[1].setFrequency(baseFrequency * ratios[1]);
+    waves[2].setFrequency(ratios[2]);
+    waves[3].setFrequency(ratios[3]);
   }
 
   @Override
   protected float compute(float input, long systemTime) {
-    @SuppressWarnings("unused")
-    float mEnv = modulatorEnv.tick(systemTime);
-    float carOut = carrier.tick(systemTime);
-    float modOut = modulator.tick(systemTime);
-    float cEnv = carrierEnv.tick(systemTime);
-    // Wurley has more modulator contribution than Rhodey
-    float out = (carOut + modOut * 0.3f) * cEnv * gain;
-    return out;
+    return tickCompatible();
   }
 }

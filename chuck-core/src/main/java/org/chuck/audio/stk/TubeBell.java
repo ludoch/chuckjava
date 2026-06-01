@@ -1,76 +1,57 @@
 package org.chuck.audio.stk;
 
-import org.chuck.audio.ChuckUGen;
-import org.chuck.audio.osc.SinOsc;
-import org.chuck.audio.util.Adsr;
+import org.chuck.audio.stk.fm.FmInstrument;
+import org.chuck.audio.stk.fm.FmWaveLoop;
+import org.chuck.audio.stk.fm.Rawwaves;
 
 /**
- * TubeBell — Tubular bell synthesized via 4-operator FM. Uses inharmonic modulator ratios (√2 ≈
- * 1.414) for bell-like partials, with a long exponential decay envelope.
+ * TubeBell — STK's 4-operator FM tubular bell, ported verbatim from ugen_stk.cpp. Uses the shared
+ * Repairathon "compatible" FM tick. Replaces the earlier approximation.
  */
-public class TubeBell extends ChuckUGen {
-  private final SinOsc carrier1;
-  private final SinOsc carrier2;
-  private final SinOsc mod1;
-  private final SinOsc mod2;
-  private final Adsr env1;
-  private final Adsr env2;
-  private double baseFreq = 440.0;
+public class TubeBell extends FmInstrument {
 
-  @SuppressWarnings("unused")
-  private final float sampleRate;
-
-  // √2 ratio produces characteristic bell inharmonicity
-  private static final double SQRT2 = Math.sqrt(2.0);
+  public TubeBell() {
+    super();
+    init();
+  }
 
   public TubeBell(float sampleRate) {
-    this.sampleRate = sampleRate;
-    this.carrier1 = new SinOsc(sampleRate);
-    this.carrier2 = new SinOsc(sampleRate);
-    this.mod1 = new SinOsc(sampleRate);
-    this.mod2 = new SinOsc(sampleRate);
-    this.env1 = new Adsr(sampleRate);
-    this.env2 = new Adsr(sampleRate);
-
-    mod1.chuckTo(carrier1);
-    mod2.chuckTo(carrier2);
-    carrier1.setSync(2);
-    carrier2.setSync(2);
-
-    // Bell: fast attack, long decay, no sustain
-    env1.set(0.001f, 3.0f, 0.0f, 0.2f);
-    env2.set(0.001f, 1.5f, 0.0f, 0.1f);
+    super(sampleRate);
+    init();
   }
 
-  public void setFreq(double freq) {
-    this.baseFreq = freq;
-    carrier1.setFreq(freq);
-    carrier2.setFreq(freq * SQRT2); // inharmonic second partial
-    mod1.setFreq(freq * SQRT2); // inharmonic modulator
-    mod2.setFreq(freq * 1.0); // fundamental modulator
-  }
+  private void init() {
+    waves[0] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[1] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[2] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[3] = new FmWaveLoop(Rawwaves.FWAVBLNK, sampleRate);
 
-  public void noteOn(float velocity) {
-    env1.keyOn();
-    env2.keyOn();
-  }
+    setRatio(0, 1.0 * 0.995);
+    setRatio(1, 1.414 * 0.995);
+    setRatio(2, 1.0 * 1.005);
+    setRatio(3, 1.414 * 1.000);
 
-  public void noteOff(float velocity) {
-    env1.keyOff();
-    env2.keyOff();
+    gains[0] = FM_GAINS[94];
+    gains[1] = FM_GAINS[76];
+    gains[2] = FM_GAINS[99];
+    gains[3] = FM_GAINS[71];
+    baseGains[0] = gains[0];
+    baseGains[1] = gains[1];
+    baseGains[2] = gains[2];
+    baseGains[3] = gains[3];
+
+    adsr[0].setAllTimes(0.005, 4.0, 0.0, 0.04);
+    adsr[1].setAllTimes(0.005, 4.0, 0.0, 0.04);
+    adsr[2].setAllTimes(0.001, 2.0, 0.0, 0.04);
+    adsr[3].setAllTimes(0.004, 4.0, 0.0, 0.04);
+
+    twozero.setGain(0.5);
+    vibrato.setFrequency(2.0);
+    setFrequency(baseFrequency);
   }
 
   @Override
   protected float compute(float input, long systemTime) {
-    float e1 = env1.tick(systemTime);
-    float e2 = env2.tick(systemTime);
-    float c1 = carrier1.tick(systemTime);
-    float c2 = carrier2.tick(systemTime);
-    @SuppressWarnings("unused")
-    float m1 = mod1.tick(systemTime);
-    @SuppressWarnings("unused")
-    float m2 = mod2.tick(systemTime);
-    float out = (c1 * e1 + c2 * e2 * 0.5f) * gain;
-    return out;
+    return tickCompatible();
   }
 }

@@ -1,94 +1,94 @@
 package org.chuck.audio.stk;
 
-import org.chuck.audio.ChuckUGen;
-import org.chuck.audio.osc.SinOsc;
-import org.chuck.audio.util.Adsr;
-import org.chuck.core.ChuckVM;
+import org.chuck.audio.stk.fm.FmInstrument;
+import org.chuck.audio.stk.fm.FmWaveLoop;
+import org.chuck.audio.stk.fm.Rawwaves;
 
 /**
- * HevyMetl — Heavy metal distorted FM synthesis. 4-operator FM with high modulation index for
- * metallic, distorted timbre.
+ * HevyMetl — STK's 4-operator FM "heavy metal" lead, ported verbatim from ugen_stk.cpp
+ * (HevyMetl::tick). Cascade FM: op3→op2, op4(feedback)→ blended with op2, → op1. Replaces the
+ * earlier approximation.
  */
-public class HevyMetl extends ChuckUGen {
-  private final SinOsc carrier1;
-  private final SinOsc carrier2;
-  private final SinOsc mod1;
-  private final SinOsc mod2;
-  private final Adsr env1;
-  private final Adsr env2;
-  private double baseFreq = 440.0;
-
-  @SuppressWarnings("unused")
-  private final float sampleRate;
+public class HevyMetl extends FmInstrument {
 
   public HevyMetl() {
-    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+    super();
+    init();
   }
 
   public HevyMetl(float sampleRate) {
-    this.sampleRate = sampleRate;
-    this.carrier1 = new SinOsc(sampleRate);
-    this.carrier2 = new SinOsc(sampleRate);
-    this.mod1 = new SinOsc(sampleRate);
-    this.mod2 = new SinOsc(sampleRate);
-    this.env1 = new Adsr(sampleRate);
-    this.env2 = new Adsr(sampleRate);
-
-    mod1.chuckTo(carrier1);
-    mod2.chuckTo(carrier2);
-    carrier1.setSync(2);
-    carrier2.setSync(2);
-
-    // Fast attack, medium decay — punchy metal sound
-    env1.set(0.001f, 0.5f, 0.2f, 0.1f);
-    env2.set(0.001f, 0.2f, 0.0f, 0.05f);
+    super(sampleRate);
+    init();
   }
 
+  private void init() {
+    waves[0] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[1] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[2] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[3] = new FmWaveLoop(Rawwaves.FWAVBLNK, sampleRate);
+
+    setRatio(0, 1.0 * 1.000);
+    setRatio(1, 4.0 * 0.999);
+    setRatio(2, 3.0 * 1.001);
+    setRatio(3, 0.5 * 1.002);
+
+    gains[0] = FM_GAINS[92];
+    gains[1] = FM_GAINS[76];
+    gains[2] = FM_GAINS[91];
+    gains[3] = FM_GAINS[68];
+    // Note: STK sets all four baseGains to gains[0] here (verbatim).
+    baseGains[0] = gains[0];
+    baseGains[1] = gains[0];
+    baseGains[2] = gains[0];
+    baseGains[3] = gains[0];
+
+    adsr[0].setAllTimes(0.001, 0.001, 1.0, 0.01);
+    adsr[1].setAllTimes(0.001, 0.010, 1.0, 0.50);
+    adsr[2].setAllTimes(0.010, 0.005, 1.0, 0.20);
+    adsr[3].setAllTimes(0.030, 0.010, 0.2, 0.20);
+
+    twozero.setGain(2.0);
+    vibrato.setFrequency(5.5);
+    modDepth = 0.0;
+    setFrequency(baseFrequency);
+  }
+
+  /** {@code m.lfoSpeed(v)} */
   public void lfoSpeed(float v) {
-    // Dummy implementation
+    setModulationSpeed(v);
   }
 
+  /** {@code m.lfoDepth(v)} */
   public void lfoDepth(float v) {
-    // Dummy implementation
+    setModulationDepth(v);
   }
 
-  public void freq(float freq) {
-    setFreq(freq);
-  }
-
+  /** {@code m.freq()} getter */
   public double freq() {
-    return baseFreq;
-  }
-
-  public void setFreq(double freq) {
-    this.baseFreq = freq;
-    carrier1.setFreq(freq);
-    carrier2.setFreq(freq * 1.005); // slight detune for thickness
-    mod1.setFreq(freq * 3.0); // high ratio modulator
-    mod2.setFreq(freq * 1.4); // inharmonic modulator
-  }
-
-  public void noteOn(float velocity) {
-    env1.keyOn();
-    env2.keyOn();
-  }
-
-  public void noteOff(float velocity) {
-    env1.keyOff();
-    env2.keyOff();
+    return baseFrequency;
   }
 
   @Override
   protected float compute(float input, long systemTime) {
-    float e1 = env1.tick(systemTime);
-    float e2 = env2.tick(systemTime);
-    float c1 = carrier1.tick(systemTime);
-    float c2 = carrier2.tick(systemTime);
-    @SuppressWarnings("unused")
-    float m1 = mod1.tick(systemTime);
-    @SuppressWarnings("unused")
-    float m2 = mod2.tick(systemTime);
-    float out = (c1 * e1 + c2 * e2 * 0.5f) * gain;
-    return out;
+    double temp2 = vibrato.tick();
+    double temp = temp2 * modDepth * 0.2;
+    for (int i = 0; i < 4; i++) {
+      if (ratios[i] > 0.0) waves[i].setFrequency(baseFrequency * (1.0 + temp) * ratios[i]);
+    }
+
+    temp = (1.0 + opAMs[2] * temp2) * gains[2] * adsr[2].tick() * waves[2].tick(); // Op3
+    waves[1].addPhaseOffset(temp);
+
+    waves[3].addPhaseOffset(twozero.lastOut()); // Op4
+    temp = (1.0 + opAMs[3] * temp2 - (control2 * 0.5)) * gains[3] * adsr[3].tick() * waves[3].tick();
+    twozero.tick(temp);
+
+    temp += (1.0 + opAMs[1] * temp2) * control2 * 0.5 * gains[1] * adsr[1].tick() * waves[1].tick();
+    temp = temp * control1;
+
+    waves[0].addPhaseOffset(temp);
+    temp = (1.0 + opAMs[0] * temp2) * gains[0] * adsr[0].tick() * waves[0].tick(); // Op1
+
+    return (float) (temp * 0.5) * gain;
   }
 }

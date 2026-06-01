@@ -20,11 +20,19 @@ public abstract class FmInstrument extends ChuckUGen {
   /** __FM_gains[i]: 100 values, gains[99]=1, each prior *= 0.933033 (built top-down). */
   protected static final double[] FM_GAINS = new double[100];
 
+  /** __FM_susLevels[i]: 16 values, susLevels[15]=1, each prior *= 0.707101 (built top-down). */
+  protected static final double[] FM_SUS_LEVELS = new double[16];
+
   static {
     double temp = 1.0;
     for (int i = 99; i >= 0; i--) {
       FM_GAINS[i] = temp;
       temp *= 0.933033;
+    }
+    temp = 1.0;
+    for (int i = 15; i >= 0; i--) {
+      FM_SUS_LEVELS[i] = temp;
+      temp *= 0.707101;
     }
   }
 
@@ -87,6 +95,37 @@ public abstract class FmInstrument extends ChuckUGen {
 
   protected void setModulationDepth(double depth) {
     modDepth = depth;
+  }
+
+  protected void setModulationSpeed(double rate) {
+    vibrato.setFrequency(rate);
+  }
+
+  /**
+   * Shared "compatible" FM tick used by the Repairathon e-piano voices (Wurley, Rhodey, TubeBell)
+   * when bCompatible is set — the default for those instruments. Operator frequencies are fixed at
+   * setFrequency time (not re-set per sample); the vibrato applies amplitude modulation.
+   */
+  protected final float tickCompatible() {
+    double temp2 = vibrato.tick();
+
+    double temp = gains[1] * adsr[1].tick() * waves[1].tick();
+    temp = temp * control1;
+
+    waves[0].addPhaseOffset(temp);
+    waves[3].addPhaseOffset(twozero.lastOut());
+    temp = gains[3] * adsr[3].tick() * waves[3].tick();
+    twozero.tick(temp);
+
+    waves[2].addPhaseOffset(temp);
+    temp = (1.0 - (control2 * 0.5)) * gains[0] * adsr[0].tick() * waves[0].tick();
+    temp += control2 * 0.5 * gains[2] * adsr[2].tick() * waves[2].tick();
+
+    // amplitude modulation
+    temp2 *= modDepth;
+    temp = temp * (1.0 + temp2);
+
+    return (float) (temp * 0.5) * gain;
   }
 
   // ── ChucK control surface (names preserved for reflection-based dispatch) ──────────────────
