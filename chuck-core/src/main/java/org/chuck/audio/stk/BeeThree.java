@@ -1,61 +1,72 @@
 package org.chuck.audio.stk;
 
-import org.chuck.audio.ChuckUGen;
-import org.chuck.audio.osc.SinOsc;
-import org.chuck.audio.util.Adsr;
-import org.chuck.core.ChuckVM;
+import org.chuck.audio.stk.fm.FmInstrument;
+import org.chuck.audio.stk.fm.FmWaveLoop;
+import org.chuck.audio.stk.fm.Rawwaves;
 
 /**
- * BeeThree — Hammond-style B3 organ using 3-operator FM + additive mixing. Produces characteristic
- * organ harmonics via additive FM.
+ * BeeThree — STK's Hammond-B3-style 4-operator FM organ, ported verbatim from ChucK's ugen_stk.cpp
+ * (BeeThree::BeeThree / BeeThree::tick). Operators 0-2 are sine waves, operator 3 is the {@code
+ * fwavblnk} table fed back through a TwoZero for phase modulation. Replaces the earlier 3-SinOsc
+ * additive approximation; now sample-accurate against native ChucK.
  */
-public class BeeThree extends ChuckUGen {
-  // Three operators for organ harmonics
-  private final SinOsc op1; // fundamental
-  private final SinOsc op2; // second harmonic
-  private final SinOsc op3; // sub-harmonic
-  private final Adsr env;
+public class BeeThree extends FmInstrument {
 
   public BeeThree() {
-    this(ChuckVM.CURRENT_VM.get().getSampleRate());
+    super();
+    init();
   }
 
   public BeeThree(float sampleRate) {
-    this.op1 = new SinOsc(sampleRate);
-    this.op2 = new SinOsc(sampleRate);
-    this.op3 = new SinOsc(sampleRate);
-    this.env = new Adsr(sampleRate);
-
-    // Organ-style: fast attack, sustained, fast release
-    env.set(0.0001f, 0.001f, 0.9f, 0.01f);
+    super(sampleRate);
+    init();
   }
 
-  public void setFreq(double freq) {
-    op1.setFreq(freq); // fundamental (8' drawbar)
-    op2.setFreq(freq * 2.0); // octave (4' drawbar)
-    op3.setFreq(freq * 0.5); // sub-octave (16' drawbar)
-  }
+  private void init() {
+    waves[0] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[1] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[2] = new FmWaveLoop(Rawwaves.SINEWAVE, sampleRate);
+    waves[3] = new FmWaveLoop(Rawwaves.FWAVBLNK, sampleRate);
 
-  public void freq(float freq) {
-    setFreq(freq);
-  }
+    setRatio(0, 0.999);
+    setRatio(1, 1.997);
+    setRatio(2, 3.006);
+    setRatio(3, 6.009);
 
-  public void noteOn(float velocity) {
-    env.keyOn();
-  }
+    gains[0] = FM_GAINS[95];
+    gains[1] = FM_GAINS[95];
+    gains[2] = FM_GAINS[99];
+    gains[3] = FM_GAINS[95];
+    baseGains[0] = gains[0];
+    baseGains[1] = gains[1];
+    baseGains[2] = gains[2];
+    baseGains[3] = gains[3];
 
-  public void noteOff(float velocity) {
-    env.keyOff();
+    adsr[0].setAllTimes(0.005, 0.003, 1.0, 0.01);
+    adsr[1].setAllTimes(0.005, 0.003, 1.0, 0.01);
+    adsr[2].setAllTimes(0.005, 0.003, 1.0, 0.01);
+    adsr[3].setAllTimes(0.005, 0.001, 0.4, 0.03);
+
+    twozero.setGain(0.1);
+
+    // Initialize operator frequencies at the default base frequency.
+    setFrequency(baseFrequency);
   }
 
   @Override
   protected float compute(float input, long systemTime) {
-    float e = env.tick(systemTime);
-    float s1 = op1.tick(systemTime);
-    float s2 = op2.tick(systemTime);
-    float s3 = op3.tick(systemTime);
-    // Additive mix: fundamental strongest, sub and second at lower levels
-    float out = (s1 * 0.6f + s2 * 0.25f + s3 * 0.15f) * e * gain;
-    return out;
+    double temp2 = vibrato.tick();
+    double temp = temp2 * modDepth * 0.2;
+    for (int i = 0; i < 4; i++) {
+      if (ratios[i] > 0.0) waves[i].setFrequency(baseFrequency * (1.0 + temp) * ratios[i]);
+    }
+    waves[3].addPhaseOffset(twozero.lastOut());
+    temp = (1.0 + opAMs[3] * temp2) * control1 * 2.0 * gains[3] * adsr[3].tick() * waves[3].tick();
+    twozero.tick(temp);
+    temp += (1.0 + opAMs[2] * temp2) * control2 * 2.0 * gains[2] * adsr[2].tick() * waves[2].tick();
+    temp += (1.0 + opAMs[1] * temp2) * gains[1] * adsr[1].tick() * waves[1].tick();
+    temp += (1.0 + opAMs[0] * temp2) * gains[0] * adsr[0].tick() * waves[0].tick();
+
+    return (float) (temp * 0.125) * gain;
   }
 }
