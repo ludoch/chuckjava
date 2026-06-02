@@ -1,8 +1,8 @@
 package org.chuck.audio.stk.util;
 
 /**
- * STK OneZero filter (ugen_stk.cpp), default coefficients b0=b1=0.5 (a simple two-point averager) as
- * used by PluckTwo's loop filters. Plain DSP object, double precision.
+ * STK OneZero filter (ugen_stk.cpp), default coefficients b0=b1=0.5 (a simple two-point averager)
+ * as used by PluckTwo's loop filters. Plain DSP object, double precision.
  */
 public final class StkOneZero {
   private final double[] b = {0.5, 0.5};

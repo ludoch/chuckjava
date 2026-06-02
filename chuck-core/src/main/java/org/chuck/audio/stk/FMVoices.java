@@ -59,7 +59,9 @@ public class FMVoices extends FmInstrument {
     setModulationDepth(depth);
   }
 
-  /** FMVoices::setFrequency — derive carrier ratios from the current vowel's formant frequencies. */
+  /**
+   * FMVoices::setFrequency — derive carrier ratios from the current vowel's formant frequencies.
+   */
   @Override
   public void setFrequency(double frequency) {
     int i = 0;

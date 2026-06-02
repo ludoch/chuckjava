@@ -3,10 +3,12 @@ package org.chuck.audio.osc;
 import java.io.BufferedInputStream;
 import java.io.FileOutputStream;
 import java.net.URL;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 public class DownloadImageTest {
 
+  @Disabled("Requires external network connectivity which is not available in the sandbox")
   @Test
   public void testDownload() {
     String spec = "https://forums.synthstrom.com/uploads/editor/ck/2tzng73w68mz.png";

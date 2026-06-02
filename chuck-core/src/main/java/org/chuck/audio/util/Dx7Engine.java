@@ -315,6 +315,9 @@ public class Dx7Engine extends ChuckUGen {
   /** LFO delta per sample (Q32). */
   int lfoDelta;
 
+  /** Thermal analog pitch drift state. */
+  private int thermalDrift = 0;
+
   /**
    * Creates a Dx7Engine with the given sample rate. Dx7EngineLookupTables.init() must have been
    * called first.
@@ -424,8 +427,23 @@ public class Dx7Engine extends ChuckUGen {
     return active;
   }
 
+  public boolean isVintage() {
+    if (forceVintage == 1) return true;
+    if (forceVintage == 0) return false;
+    if (patch == null) return false;
+    int algoIdx = (patch[134] & 0xFF);
+    if (algoIdx > 31) algoIdx = 0;
+    int feedback = patch[135] & 0xFF;
+    int fbShift = feedback != 0 ? Dx7EngineLookupTables.FEEDBACK_BITDEPTH - feedback : 16;
+    return fbShift < 16 && (algoIdx == 3 || algoIdx == 5);
+  }
+
   public void setForceVintage(int val) {
     this.forceVintage = val;
+  }
+
+  public void setRandomDetuneScale(int val) {
+    this.randomDetuneScale = val;
   }
 
   // ── Core initialization ──
@@ -552,7 +570,7 @@ public class Dx7Engine extends ChuckUGen {
 
       // Detune ratio
       double detuneRatio = 0.0209 * Math.exp(-0.396 * ((double) logFreqForDetune / (1 << 24))) / 7;
-      int randomScaled = (randomDetune * randomDetuneScale) >> 17;
+      int randomScaled = (randomDetune * randomDetuneScale) >> 15;
       logfreq += (int) (detuneRatio * logFreqForDetune * (detune - 7 + randomScaled));
 
       logfreq += Dx7EngineLookupTables.coarsemul[coarse & 31];
@@ -642,6 +660,11 @@ public class Dx7Engine extends ChuckUGen {
     int pitchMod = Math.max(pmod1, pmod2);
     pitchMod = pitchenv.getsample(patch, 126, n) + (pitchMod * (senslfo < 0 ? -1 : 1));
 
+    // ── Thermal analog pitch drift ──
+    thermalDrift = (thermalDrift - (thermalDrift >> 12)) + (getNoise() >> 26);
+    int driftMod = (thermalDrift * randomDetuneScale) >> 8;
+    int pitchModTotal = pitchMod + driftMod;
+
     // ── Amp modulation ──
     lfoVal = (1 << 24) - lfoVal;
     int ampmoddepth = (patch[140] & 0xFF) * 165 >> 6;
@@ -678,7 +701,7 @@ public class Dx7Engine extends ChuckUGen {
           opFreq[op] = Dx7EngineLookupTables.freqLutLookup(basePitch[op]);
         } else {
           // Ratio mode with pitch modulation
-          opFreq[op] = Dx7EngineLookupTables.freqLutLookup(basePitch[op] + pitchMod);
+          opFreq[op] = Dx7EngineLookupTables.freqLutLookup(basePitch[op] + pitchModTotal);
         }
 
         int level = env[op].getsample(patch, off, n, 0);
@@ -762,7 +785,8 @@ public class Dx7Engine extends ChuckUGen {
                   mkShift);
           mainOutput = y;
           has_contents[0] = true;
-          // Advance phases for the two operators we're consuming
+          // Advance phases for the three operators we're consuming
+          opPhase[0] += opFreq[0];
           opPhase[1] += opFreq[1];
           opPhase[2] += opFreq[2];
           opGain[0] = Dx7EngineLookupTables.kGainLevelThresh + 1; // mark as active
@@ -784,6 +808,7 @@ public class Dx7Engine extends ChuckUGen {
                   mkShift);
           mainOutput = y;
           has_contents[0] = true;
+          opPhase[0] += opFreq[0];
           opPhase[1] += opFreq[1];
           opGain[0] = Dx7EngineLookupTables.kGainLevelThresh + 1;
           opGain[1] = Dx7EngineLookupTables.kGainLevelThresh + 1;
@@ -902,7 +927,19 @@ public class Dx7Engine extends ChuckUGen {
     }
 
     // Convert Q24 to float (-1..1 range)
-    return mainOutput / (float) (1 << 24);
+    float floatOut = mainOutput / 16777216.0f;
+    if (engineMkI) {
+      // Vintage 12-bit quantization
+      float quantized = Math.round(floatOut * 2048.0f) / 2048.0f;
+      // Resistor-ladder DAC step mismatch non-linearity (zero-crossing crossover distortion)
+      if (quantized > 0.0f) {
+        quantized += 0.0005f * (1.0f - quantized);
+      } else if (quantized < 0.0f) {
+        quantized -= 0.0005f * (1.0f + quantized);
+      }
+      return quantized;
+    }
+    return floatOut;
   }
 
   // ── EngineMkI rendering (for feedback algorithms 3 and 5) ──

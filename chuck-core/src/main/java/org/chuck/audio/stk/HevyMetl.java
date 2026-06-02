@@ -80,7 +80,8 @@ public class HevyMetl extends FmInstrument {
     waves[1].addPhaseOffset(temp);
 
     waves[3].addPhaseOffset(twozero.lastOut()); // Op4
-    temp = (1.0 + opAMs[3] * temp2 - (control2 * 0.5)) * gains[3] * adsr[3].tick() * waves[3].tick();
+    temp =
+        (1.0 + opAMs[3] * temp2 - (control2 * 0.5)) * gains[3] * adsr[3].tick() * waves[3].tick();
     twozero.tick(temp);
 
     temp += (1.0 + opAMs[1] * temp2) * control2 * 0.5 * gains[1] * adsr[1].tick() * waves[1].tick();

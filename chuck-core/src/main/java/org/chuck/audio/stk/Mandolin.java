@@ -10,9 +10,9 @@ import org.chuck.core.doc;
 
 /**
  * Mandolin — STK's commuted dual-string mandolin (PluckTwo + Mandolin), ported verbatim from
- * ugen_stk.cpp. Two detuned allpass-interpolating delay lines with one-zero loop filters, excited by
- * the commuted body response (special:mand1) shaped by a comb delay. Mono output, matching native
- * ChucK. Replaces the earlier Twang-based approximation.
+ * ugen_stk.cpp. Two detuned allpass-interpolating delay lines with one-zero loop filters, excited
+ * by the commuted body response (special:mand1) shaped by a comb delay. Mono output, matching
+ * native ChucK. Replaces the earlier Twang-based approximation.
  */
 @doc("Mandolin physical model: two detuned waveguide strings with commuted body excitation.")
 public class Mandolin extends ChuckUGen {

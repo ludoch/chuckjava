@@ -1,8 +1,8 @@
 package org.chuck.audio.stk.util;
 
 /**
- * STK allpass-interpolating delay line (DelayA), ported verbatim from ugen_stk.cpp. Plain DSP object
- * ticked directly by the waveguide instruments. Double precision to match STK's MY_FLOAT.
+ * STK allpass-interpolating delay line (DelayA), ported verbatim from ugen_stk.cpp. Plain DSP
+ * object ticked directly by the waveguide instruments. Double precision to match STK's MY_FLOAT.
  */
 public final class StkDelayA {
   private final double[] inputs;

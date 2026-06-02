@@ -21,7 +21,9 @@ public class StkBiQuad {
     outputs[0] = outputs[1] = outputs[2] = 0.0;
   }
 
-  /** BiQuad::setResonance — resonant poles at (frequency, radius); normalize peak gain via zeros. */
+  /**
+   * BiQuad::setResonance — resonant poles at (frequency, radius); normalize peak gain via zeros.
+   */
   public void setResonance(double frequency, double radius, boolean normalize) {
     a[2] = radius * radius;
     a[1] = -2.0 * radius * Math.cos(2.0 * Math.PI * frequency / sampleRate);

@@ -1,9 +1,10 @@
 package org.chuck.audio.stk.fm;
 
 /**
- * Minimal port of STK's TwoZero filter (ugen_stk.cpp) as used by the FM voices: y[n] = gain·(b0·x[n]
- * + b1·x[n-1] + b2·x[n-2]). Plain DSP object; the FM voice configures b2 = -1 and a small gain and
- * feeds it the operator-3 output, using {@link #lastOut()} as a phase-modulation offset.
+ * Minimal port of STK's TwoZero filter (ugen_stk.cpp) as used by the FM voices: y[n] =
+ * gain·(b0·x[n] + b1·x[n-1] + b2·x[n-2]). Plain DSP object; the FM voice configures b2 = -1 and a
+ * small gain and feeds it the operator-3 output, using {@link #lastOut()} as a phase-modulation
+ * offset.
  */
 public final class StkTwoZero {
   private final double[] b = {1.0, 0.0, 0.0};

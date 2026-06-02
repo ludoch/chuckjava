@@ -33,7 +33,8 @@ public class IntToFloatArgPromotionTest {
   public void intArgToFloatParamWithLocalUGen() throws Exception {
     // Before the fix this threw NullPointerException and produced no output.
     String code =
-        "fun void p(float f){ SinOsc s => blackhole; f => s.freq; <<< s.freq() >>>; }\n" + "p(440);";
+        "fun void p(float f){ SinOsc s => blackhole; f => s.freq; <<< s.freq() >>>; }\n"
+            + "p(440);";
     String out = runAndCapture(code);
     assertTrue(out.contains("440.0"), "Expected the UGen freq 440.0 but got: '" + out + "'");
   }

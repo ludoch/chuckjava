@@ -76,7 +76,8 @@ public class PercFlut extends FmInstrument {
 
     twozero.tick(temp);
     waves[2].addPhaseOffset(temp);
-    temp = (1.0 + opAMs[2] * temp2 - (control2 * 0.5)) * gains[2] * adsr[2].tick() * waves[2].tick();
+    temp =
+        (1.0 + opAMs[2] * temp2 - (control2 * 0.5)) * gains[2] * adsr[2].tick() * waves[2].tick();
 
     temp += (1.0 + opAMs[1] * temp2) * control2 * 0.5 * gains[1] * adsr[1].tick() * waves[1].tick();
     temp = temp * control1;

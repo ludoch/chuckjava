@@ -1,8 +1,8 @@
 package org.chuck.audio.stk.util;
 
 /**
- * STK linear-interpolating delay line (DelayL), ported verbatim from ugen_stk.cpp. Plain DSP object;
- * used as the comb delay in PluckTwo. Double precision to match STK's MY_FLOAT.
+ * STK linear-interpolating delay line (DelayL), ported verbatim from ugen_stk.cpp. Plain DSP
+ * object; used as the comb delay in PluckTwo. Double precision to match STK's MY_FLOAT.
  */
 public final class StkDelayL {
   private final double[] inputs;
