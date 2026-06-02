@@ -29,7 +29,7 @@
 - [x] **Reverb & Delay Sends**: Fully wired spatial space reverb and tempo-synced stereo delay sends to core engine channels!
 - [x] **Pedal-Style Continuous Looper**: Developed a multi-layer looper deck with timing-detector Auto-BPM, overdub loop stackers, and real-time foot-pedal layer undo/redo triggers!
 
-## Future Ideas / Community Inspired [IN PROGRESS]
+## Future Ideas / Community Inspired [DONE]
 - [x] **Triplet Column Grid Divisions View (SwingGridPanel & ChucK Sequencer)**: Add a `[3]` grid toolbar toggle button to switch step grids columns from 16 to 12 subdivisions (triplets) dynamically.
 - [x] **Arranger Live Capture Suite**: Add a **`[🔴 Capture Live Arranger]`** record mode that registers live song/clip actions directly onto arrangement timeline slots in real-time.
 - [x] **Complex Note Entry & Horizontal Auto-Scrolling**: Support drag-to-tie notes entries extending gate durations up to 192 steps in StepData with real-time horizontal auto-scroll matching!
