@@ -294,6 +294,9 @@ public class Dx7Engine extends ChuckUGen {
   /** Random detune scale factor (from patch random_detune, defaults to 0). */
   int randomDetuneScale;
 
+  /** Pitch bend or unison cents offset in Q24 log-frequency domain. */
+  public int pitchBendOffset = 0;
+
   /** Per-operator random detune values (int16, set during initNote). */
   final int[] detunePerVoice = new int[6];
 
@@ -701,7 +704,8 @@ public class Dx7Engine extends ChuckUGen {
           opFreq[op] = Dx7EngineLookupTables.freqLutLookup(basePitch[op]);
         } else {
           // Ratio mode with pitch modulation
-          opFreq[op] = Dx7EngineLookupTables.freqLutLookup(basePitch[op] + pitchModTotal);
+          opFreq[op] =
+              Dx7EngineLookupTables.freqLutLookup(basePitch[op] + pitchModTotal + pitchBendOffset);
         }
 
         int level = env[op].getsample(patch, off, n, 0);
