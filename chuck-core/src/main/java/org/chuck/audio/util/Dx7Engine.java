@@ -297,6 +297,18 @@ public class Dx7Engine extends ChuckUGen {
   /** Pitch bend or unison cents offset in Q24 log-frequency domain. */
   public int pitchBendOffset = 0;
 
+  /** MIDI Modulation Wheel controller value (0-127, defaults to 127 for neutral compatibility). */
+  public int modWheel = 127;
+
+  /** MIDI Aftertouch (pressure) controller value (0-127). */
+  public int aftertouch = 0;
+
+  /** MIDI Breath Controller value (0-127). */
+  public int breathController = 0;
+
+  /** MIDI Foot Controller value (0-127). */
+  public int footController = 0;
+
   /** Per-operator random detune values (int16, set during initNote). */
   final int[] detunePerVoice = new int[6];
 
@@ -451,12 +463,14 @@ public class Dx7Engine extends ChuckUGen {
 
   // ── Core initialization ──
 
-  /** Initialize voice state for a note. Matches firmware DxVoice::init(). */
   private void initNote(int midinote, int vel) {
     this.midiNote = midinote;
     this.velocity = vel;
 
-    int logFreq = Dx7EngineLookupTables.dxNoteToFreq(midinote);
+    // Apply patch transpose (offset by 24)
+    int transpose = patch[144] & 0xFF;
+    int transposedNote = midinote + (transpose - 24);
+    int logFreq = Dx7EngineLookupTables.dxNoteToFreq(transposedNote);
 
     for (int op = 0; op < 6; op++) {
       int off = op * 21;
@@ -652,8 +666,11 @@ public class Dx7Engine extends ChuckUGen {
     int lfoDelay = getdelay(n);
     int lfoVal = lfoValue;
 
-    // ── Pitch modulation ──
+    // ── Pitch modulation scaled by active controllers ──
+    int activePitchMod =
+        Math.max(modWheel, Math.max(aftertouch, Math.max(breathController, footController)));
     int pitchmoddepth = (patch[139] & 0xFF) * 165 >> 6;
+    pitchmoddepth = (pitchmoddepth * activePitchMod) >> 7;
     int pitchmodsens = Dx7EngineLookupTables.pitchmodsenstab[patch[143] & 7];
     long pmd = (long) pitchmoddepth * (long) lfoDelay; // Q32
     int senslfo = pitchmodsens * (lfoVal - (1 << 23));
@@ -668,9 +685,11 @@ public class Dx7Engine extends ChuckUGen {
     int driftMod = (thermalDrift * randomDetuneScale) >> 8;
     int pitchModTotal = pitchMod + driftMod;
 
-    // ── Amp modulation ──
-    lfoVal = (1 << 24) - lfoVal;
+    // ── Amp modulation scaled by active controllers ──
+    int activeAmpMod =
+        Math.max(modWheel, Math.max(aftertouch, Math.max(breathController, footController)));
     int ampmoddepth = (patch[140] & 0xFF) * 165 >> 6;
+    ampmoddepth = (ampmoddepth * activeAmpMod) >> 7;
     long amod1 = ((long) ampmoddepth * (long) lfoDelay) >> 8; // Q24
     amod1 = (amod1 * (long) lfoVal) >> 24;
     int amdMod = (int) amod1;
