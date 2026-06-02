@@ -686,6 +686,9 @@ public class Dx7Engine extends ChuckUGen {
     int pitchModTotal = pitchMod + driftMod;
 
     // ── Amp modulation scaled by active controllers ──
+    // Firmware dx7note.cpp inverts the LFO value here (after pitch mod, before amp mod), so the
+    // tremolo runs opposite-phase to the pitch vibrato. (Restored — was dropped in a refactor.)
+    lfoVal = (1 << 24) - lfoVal;
     int activeAmpMod =
         Math.max(modWheel, Math.max(aftertouch, Math.max(breathController, footController)));
     int ampmoddepth = (patch[140] & 0xFF) * 165 >> 6;
