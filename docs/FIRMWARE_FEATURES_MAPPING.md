@@ -1,9 +1,14 @@
 # Deluge Firmware Features & Menus — Pure Java Implementation Status
 
-> Last updated: 2026-05-16 (pure Java firmware architecture audit — all audio DSP now native Java, no ChucK dependency)
-> Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0**
+> Last updated: 2026-06-03 (verification audit — added "Verified" status; corrected entries found buggy by the firmware-engine test rebuild + hardware A/B)
+> Source: Local `../DelugeFirmware` at commit matching community firmware **c1.3.0** (the SD card in use is c1.2.0)
 
 This document maps every documented hardware feature and menu from the official Deluge Firmware to our Java implementation. Use it to track parity and prioritize future work.
+
+> **IMPORTANT — "✅ Implemented" means WIRED/PRESENT, not VERIFIED CORRECT.** Many entries were marked ✅
+> once the code path existed, before any comparison to real hardware. The 2026-06-03 audit found several
+> ✅ entries that were actually wrong (see §0.5). Treat ✅ as "present"; see the **Verified** column / §0.5
+> for what has actually been checked against firmware source, a unit test, or a hardware recording.
 
 ---
 
@@ -14,44 +19,74 @@ The Deluge can run in two modes:
 | Engine | Description | Status |
 |--------|-------------|--------|
 | **`PureFirmwareEngine`** | Native Java engine. Audio runs through `FirmwareAudioEngine` + `PlaybackHandler` (firmware port) + `JavaAudioDriver` (javax.sound.sampled `SourceDataLine` output). All DSP uses firmware-ported Java classes (`SVFilter`, `LpLadderFilter`, `DelayBuffer`, `Freeverb`, `FmCore`, `GranularProcessor`, `RMSFeedbackCompressor`, etc.). Zero ChucK dependency — only imports `ChuckVM` for BridgeContract parameter access. | ✅ **Primary engine** (all table entries below refer to this engine) |
-| **`DelugeEngineDSL`** | Legacy ChucK-based engine using ChucK UGens (`LiSa`, `WvOut2`, `Dyno`, `DelayL`, etc.). Runs as a `Shred` on the ChucK VM. Still functional but no longer the target for new development. | ⚠️ Legacy (maintained, not extended) |
+| **`DelugeEngineDSL`** | Legacy ChucK-based engine (ChucK UGens on the VM). **UNSUPPORTED as of 2026-06-03** — do not use in tests; the 24 JUnit classes that exercised it are `@Disabled`. Renders some material wrong (e.g. the DX7 BELL song is pure silence in this path while the pure engine is correct). | ❌ Unsupported (do not extend or test) |
 
 **Key:** All "Notes" entries below describe the `PureFirmwareEngine` path unless explicitly noted.
 
 ---
 
+## 0.5 Wired vs. Verified — and corrections from the 2026-06-03 audit
+
+"✅" in the tables below historically meant **the code path exists**. It did **not** mean the output was
+checked against the real Deluge. The verification ladder is:
+
+- **wired** — code path present; never compared to anything. (Most ✅ entries are only this.)
+- **src** — logic verified line-by-line against `../DelugeFirmware` source.
+- **test** — covered by a firmware-pure-engine unit test (`deluge/.../firmware/engine/Firmware*Test`).
+- **hw** — A/B-compared to a real-hardware recording.
+
+**Features marked ✅ that the audit found BUGGY (presence ≠ correctness):**
+
+| Feature (was ✅) | Bug found | Status | Now verified |
+|---|---|---|---|
+| DX7 synth | operators played **~6× too high** (unpack bit-fields, pitch-EG levels read from rate bytes, patch transpose wrongly applied) | **fixed** (commits 38584514, 0e3dad22…) | hw (E.PIANO + TUB BELLS A/B) |
+| Ladder HPF | **silently disabled** — `hpfMode="HPLadder"`→`LADDER_12`→`OFF`; no high-pass at all | **fixed** (5c2b3b91) | src + test |
+| Sample osc | **24/32-bit WAVs decoded as silence** (only 16/8-bit handled) | **fixed** (f0b70b65) | test |
+| LFO (S&H / Random-Walk) | retrigger used signed `(long)phase` → wrong for upper half of every cycle | **fixed** (f0b70b65) | src + test |
+| Envelope as modulation | source **not centred** (firmware returns `(lastValue-2^30)<<1`, bipolar); env→cutoff depth/polarity wrong. VCA volume is fine (uses `lastValue` directly). | **OPEN** — needs hardware A/B before changing | src (firmware diff only) |
+| Native 2-op FM | played-C4 strongest periodicity is **~131 Hz (one octave low)** — real offset or feedback period-doubling, unconfirmed | **OPEN** — needs hardware A/B | test (flagged) |
+
+Firmware-pure-engine tests now exist for: synth voice (osc/env/tuning/poly/filter), patch cables, LFO
+tremolo, native FM, tuning (4 osc × 5 octaves), polyphony, HPF + LPF resonance, ring mod, 24-bit WAV,
+LFO S&H wrap, and song playback. See `deluge/src/test/.../firmware/engine/` and §8.4.
+
+---
+
 ## 1. Feature Status Overview
 
-| Feature | Firmware Doc | Status | Notes |
-|---------|-------------|--------|-------|
-| Arpeggiator | `features/arpeggiator.md` | ✅ | All 9 note modes (UP/DOWN/UPDN/RAND/WLK1-3/PLAY/PATT), 5 octave modes (UP/DOWN/UPDN/ALT/RAND), stepRepeat, rhythm patterns with silences, seqLength, noteProbability, chordPolyphony+probability, ratchet, octave/gate/vel spread. MPE missing. Firmware `Arpeggiator.java` port runs natively in `PlaybackHandler`. |
-| Automation View | `features/automation_view.md` | ✅ | BarAutomationDialog, AutomationParam model (26 synth params), per-step editing, XML save/load, MIDI CC. Uses firmware `AutoParam` + `ParamManager` for automation storage and interpolation. |
-| Audio Recording | `features/audio_export.md` | ✅ | Per-track recording through firmware `AudioClip` → `AudioFileReader` → WAV file. Playback via firmware `Sample` + `SampleCache` engine. |
-| Audio Export | `features/audio_export.md` | ✅ | `NativeWavExporter` — pure Java RIFF header + PCM byte buffer export. Offline mastered render via `FirmwareAudioEngine` squeeze-and-render path. |
-| Chord Keyboard | `features/chord_keyboard.md` | ✅ Implemented | CORK/CORL layouts, scale-aware chords, 6 voicing modes |
-| DX7 Synth | `features/dx_synth.md` | ✅ | 6-op FM engine (`FmCore` firmware port), .syx import/export (`DX7Cartridge`, `WaveTableReader`), 32 algorithms, operator editor UI, DX7 tab, XML round-trip, Vintage/Modern/Auto engine type toggle. Envelope: dexed/msfa log-domain envelopes (not standard ADSR); per-operator DX7 envelopes control amplitude directly. |
-| Hardware Character (Master Sat, Filter Drive, 14-bit DAC, Rings Reverb) | — | ✅ | User preferences for hardware-accurate audio character: tanh master bus saturation (firmware `SVFilter` drive param), v1.3.1+ filter drive, 14-bit DAC truncation with TPDF dither, `ReverbBase`/`Freeverb` physical-modeling reverb. Toggled via Settings → Preferences. See §Preferences in guidebook. NOTE: The 2D anti-aliased state-space tanh lookup is fully implemented via `interpolateTableSigned2d` and `TanHLookupTable.tanH2d`. |
-| Looping in Grid View | `features/looping_in_grid_view.md` | ✅ | ClipModel.PlayMode.LOOP with context menu, engine auto-re-queue (firmware `Clip` loop logic in `PlaybackHandler`), green rendering in SONG view |
-| MIDI Device Definitions | `features/midi_device_definition_files.md` | ✅ | MidiDeviceDefinition XML model, loader, preferences, feedback service, UI browser |
-| MIDI Follow Mode | `features/midi_follow_mode.md` | ✅ | `MidiFollow.java` (firmware port of `midi_follow.cpp` Phase A): 24 built-in CC→param mappings, 4-stage routing (takeover → device def → registry → fallback) with full physical JUMP, PICKUP, and runway-delta SCALE/VALUE_SCALE takeover algorithms, `MidiInputRouter` for clip-follow, `MidiFeedbackService` for feedback light piping. |
-| Note/NoteRow Editor | `features/note_noterow_editor.md` | ✅ | Probability, iterance (0-3), fill (0-100%), Euclidean rhythm generation via dialog (EuclideanRhythmDialog). Firmware `NoteRow` + `Note` model classes. |
-| Performance View | `features/performance_view.md` | ✅ | 16×8 FX column grid, latch/momentary, value editing, param editing, XML save/load |
-| Save/Load Patterns | `features/save_load_patterns.md` | ✅ | PatternModel + PatternSerializer, ClipSnapshot grid state, XML save/load, sidebar UI |
-| Velocity View | `features/velocity_view.md` | ✅ | See §1.6 of guidebook; velocity ramps, per-step editing |
-| Vuefinder | `features/Vuefinder.md` | ➕ N/A | Web-based SD browser (hardware-specific; our Library tab supersedes) |
-| 4 Envelopes | `kNumEnvelopes = 4` in `definitions_cxx.hpp` | ✅ | 4 envelopes per track with independent ADSR (firmware `Envelope.java` port). ENV 0→volume, ENV 1→filter, ENV 2→pitch, ENV 3→pan. Envelope tab UI with 4 sub-panels |
-| 4 LFOs | `LFO_COUNT = 4` in `definitions_cxx.hpp` | ✅ | 4 LFOs (firmware `LFO.java` port) with all 7 waveform types (SINE/SAW/SQUARE/TRIANGLE/S&H/RANDOM_WALK/WARBLER). LFO 0/1 per-voice, LFO 2/3 global |
-| Warbler FX | `ModFXType::WARBLE` in `definitions_cxx.hpp` | ✅ | Firmware `ModFXProcessor.java` port with random-walk + sin LFO modulated delay-line, resonance-compensated feedback, shared `DelayBuffer` core |
-| Dimension FX | `ModFXType::DIMENSION` in `definitions_cxx.hpp` | ✅ | Firmware `ModFXProcessor.java` port with 3-tap stereo chorus at 8/14/20ms base delays, triangle LFO, independent phases |
-| Patch Cable Polarity | `PatchCable::polarity` (UNIPOLAR/BIPOLAR) | ✅ | Per-cable polarity field on `PatchCable.java`, UI polarity toggle in modulation tab |
-| Voice Count (VCNT) | `Sound::maxVoiceCount` | ✅ | Per-track max voice limit (0-8), per-voice active tracking, voice stealing (oldest voice replaced when at limit). PolyphonyMode: POLY/MONO/LEGATO/AUTO/CHOKE. Uses `VoiceAllocator.java`. |
-| Threshold Recording | `ThresholdRecordingMode` enum + SEC/ENC controls | ✅ | 4 threshold modes (OFF/LOW/MEDIUM/HIGH) with state machine (IDLE→RECORDING→STOP with 500ms hold) |
+| Feature | Firmware Doc | Status | Verified | Notes |
+|---------|-------------|--------|----------|-------|
+| Arpeggiator | `features/arpeggiator.md` | ✅ | wired | All 9 note modes, 5 octave modes, stepRepeat, rhythm patterns w/ silences, seqLength, noteProbability, chordPolyphony+probability, ratchet, octave/gate/vel spread. Firmware `Arpeggiator.java` port in `PlaybackHandler`. (MPE velocity — see MPE row, ⚠️.) |
+| Automation View | `features/automation_view.md` | ✅ | wired | BarAutomationDialog, AutomationParam model (26 synth params), per-step editing, XML save/load, MIDI CC. Uses firmware `AutoParam` + `ParamManager`. |
+| Audio Recording | `features/audio_export.md` | ✅ | wired | Per-track recording → firmware `AudioClip` → `AudioFileReader` → WAV. Playback via firmware `Sample` + `SampleCache`. |
+| Audio Export | `features/audio_export.md` | ✅ | wired | `NativeWavExporter` pure-Java RIFF/PCM export; offline mastered render via `FirmwareAudioEngine`. |
+| Chord Keyboard | `features/chord_keyboard.md` | ✅ | wired | CORK/CORL layouts, scale-aware chords, 6 voicing modes. |
+| DX7 Synth | `features/dx_synth.md` | ✅ | **hw** | 6-op FM (`FmCore`/`Dx7Engine`), .syx import (`DX7Cartridge`), 32 algos, MkI/Modern/Auto. **2026-06 audit found 3 pitch bugs (played ~6× high): unpack bit-fields, pitch-EG levels read from rate bytes, patch transpose wrongly applied — all fixed; E.PIANO + TUB BELLS A/B-matched to real hardware.** |
+| Hardware Character (Master Sat, Filter Drive, 14-bit DAC, Rings Reverb) | — | ✅ | wired | tanh master-bus saturation, v1.3.1 filter drive, 14-bit DAC + TPDF dither, `Freeverb`/`ReverbBase`. Settings → Preferences. |
+| Looping in Grid View | `features/looping_in_grid_view.md` | ✅ | wired | `ClipModel.PlayMode.LOOP`, engine auto-re-queue (firmware `Clip` loop logic), green SONG rendering. |
+| MIDI Device Definitions | `features/midi_device_definition_files.md` | ✅ | wired | MidiDeviceDefinition XML model, loader, preferences, feedback service, UI browser. |
+| MIDI Follow Mode | `features/midi_follow_mode.md` | ✅ | wired | `MidiFollow.java` (port of `midi_follow.cpp` Phase A): 24 CC→param maps, 4-stage routing, JUMP/PICKUP/SCALE takeover, feedback piping. |
+| Note/NoteRow Editor | `features/note_noterow_editor.md` | ✅ | wired | Probability, iterance (0-3), fill (0-100%), Euclidean generation. Firmware `NoteRow` + `Note`. |
+| Performance View | `features/performance_view.md` | ✅ | wired | 16×8 FX column grid, latch/momentary, value/param editing, XML save/load. |
+| Save/Load Patterns | `features/save_load_patterns.md` | ✅ | wired | PatternModel + PatternSerializer, ClipSnapshot, XML save/load, sidebar UI. |
+| Velocity View | `features/velocity_view.md` | ✅ | wired | Velocity ramps, per-step editing (guidebook §1.6). |
+| Vuefinder | `features/Vuefinder.md` | ➕ N/A | — | Web SD browser (hardware-specific; our Library tab supersedes). |
+| 4 Envelopes | `kNumEnvelopes = 4` | ⚠️ | **test (shape) / src (mod)** | 4 ADSR envelopes (firmware `Envelope.java`); release shape tested (`FirmwareSynthVoiceTest`). **env-as-modulation source is NOT centred vs firmware (bipolar) — env→cutoff depth/polarity wrong; OPEN, needs hw A/B (§0.5).** Volume VCA correct. |
+| 4 LFOs | `LFO_COUNT = 4` | ✅ | **test + src** | 4 LFOs, all 7 waveforms. S&H/Random-Walk unsigned-wrap bug fixed + tested (`FirmwareLfoModulationTest`, `LfoSampleHoldWrapTest`). |
+| Warbler FX | `ModFXType::WARBLE` | ✅ | wired | `ModFXProcessor.java` random-walk + sin LFO delay-line. |
+| Dimension FX | `ModFXType::DIMENSION` | ✅ | wired | `ModFXProcessor.java` 3-tap stereo chorus. |
+| Patch Cable Polarity | `PatchCable::polarity` | ✅ | test | Per-cable polarity; patch routing tested (`FirmwarePatchCableTest`). |
+| Voice Count (VCNT) | `Sound::maxVoiceCount` | ✅ | test | Max voice limit + stealing; POLY/MONO/LEGATO/AUTO/CHOKE. Voice allocation tested (`FirmwarePolyphonyTest`). |
+| Threshold Recording | `ThresholdRecordingMode` | ✅ | wired | 4 modes (OFF/LOW/MEDIUM/HIGH) state machine. |
+| Native 2-op FM | `SynthMode::FM` (`FmCore`) | ⚠️ | **test (flagged)** | Native FM renders rich/audible (`FirmwareNativeFmTest`), but played-C4 strongest period is ~131 Hz (octave low) — **possible octave offset, OPEN, needs hw A/B (§0.5).** |
+| Ring Mod | `SynthMode::RINGMOD` | ✅ | test | Sum/difference tones, carriers suppressed (`FirmwareRingModTest`). |
 
 ### Legend
-- ✅ **Implemented** — Feature works and is documented
-- ⚠️ **Partial** — Some sub-features exist, others do not
-- ❌ **Not implemented** — Not present in codebase
-- ➕ **N/A** — Not applicable (hardware-specific concern)
+- ✅ **Implemented** — code path present and (per Verified col) working
+- ⚠️ **Partial / suspect** — present but a sub-feature is missing or unverified-and-possibly-wrong
+- ❌ **Not implemented** — not present in codebase
+- ➕ **N/A** — not applicable (hardware-specific)
+- **Verified column:** `wired` (path exists, unchecked) · `src` (matches firmware source) · `test` (firmware unit test) · `hw` (A/B vs real hardware). See §0.5.
 
 ---
 
@@ -96,7 +131,7 @@ Firmware filter modes: `TRANSISTOR_12DB`, `TRANSISTOR_24DB`, `TRANSISTOR_24DB_DR
 | LPF Drive | `lpf/drive.md` | ✅ | `SVFilter` drive with tanh soft-clip saturation (0.0–2.0); drive slider in UI |
 | HPF Freq | `hpf/frequency.md` | ✅ | `HpLadderFilter` or `SVFilter` in highpass mode via firmware `FilterSet.java` |
 | HPF Res | `hpf/resonance.md` | ✅ | HPF Q via firmware `FilterSet` |
-| HPF Mode/Morph/FM | `hpf/*.md` | ✅ | State variable HPF (morph, notch, band) and 24dB Moog highpass ladder (HPLADDER) fully supported, morph-inverted, and active. |
+| HPF Mode/Morph/FM | `hpf/*.md` | ✅ (fixed 2026-06) | SVF HPF (morph/notch/band) + HPLADDER. **BUG fixed: the ladder HPF was silently OFF — `hpfMode="HPLadder"`→`LADDER_12`→`OFF` in `setHpfMode` (default case); now LADDER_12/24/DRIVE→HPLADDER. Verified src+test (`FirmwareFilterModeTest`).** |
 | Routing | `routing.md` | ✅ | 3 filter routing modes via firmware `FilterSet`: SERIES_LPF_HPF, SERIES_HPF_LPF, PARALLEL |
 | Sound Filters | `sound_filters.md` | ✅ | Per-sound `FilterSet` in Kit tracks |
 | **Index** | `index.md` | ✅ | Both LPF/HPF filter sub-menus and routes fully exposed, configured, and synchronized. |
@@ -109,7 +144,7 @@ Firmware has **4 LFOs** (`LFO_COUNT = 4`): LFO1 (global), LFO2 (per-voice), LFO3
 |-----------|----------------|--------|---------|
 | Rate | `rate.md` (Hz) | ✅ | 4 LFOs with independent rates via firmware `LFO.java` port |
 | Sync | `sync.md` | ✅ | LFO sync level via G_LFO_SYNC_LEVEL; works for LFO 0-3 |
-| Type | `type.md` | ✅ | All 7 LFO waveform types via firmware `LFOType` enum: SINE/SAW/SQUARE/TRIANGLE/S&H/RANDOM_WALK/WARBLER |
+| Type | `type.md` | ✅ (fixed 2026-06) | All 7 waveforms. **BUG fixed: S&H / Random-Walk retrigger used signed `(long)phase` → wrong for the upper half of every cycle; now unsigned-masked. Verified src+test (`LfoSampleHoldWrapTest`).** |
 | **Index** | `index.md` | ✅ | 4 LFOs, full UI tab with type/rate/depth/target per LFO |
 
 ### 2.5 Oscillator (`menus/oscillator/`)
@@ -127,7 +162,7 @@ Firmware has **4 LFOs** (`LFO_COUNT = 4`): LFO1 (global), LFO2 (per-voice), LFO3
 | Wave Index | `wave_index.md` | ✅ | Wavetable position (0.0-1.0), firmware `WaveTable` + `WaveTableBand` engine |
 | File Browser | `file_browser.md` | ✅ | Library tab |
 | **Modulator 1/2** | `modulator/` | ✅ | Volume/transpose/destination/feedback exist, and independent Modulator 1 / Modulator 2 initial starting reset phases are fully active and mapped in both DelugeXmlParser.java and FirmwareVoice.java. |
-| **Sample** | `sample/` (9 files) | ✅ | All 9 sample playback configuration menus (startPoint, endPoint, loopStart, loopEnd, loopMode, reverse, timestretch, transpose, interpolation) fully implemented and wired to the VoiceSample DSP engine. |
+| **Sample** | `sample/` (9 files) | ✅ (fixed 2026-06) | All 9 sample-playback menus wired to `VoiceSample`. **BUG fixed: `AudioFileReader` only decoded 16/8-bit PCM — 24-bit and 32-bit WAVs loaded as silence; now decoded (sign-extended / IEEE-float). Verified test (`AudioFileReader24BitTest`).** |
 | **Unison** | `unison/` (4 files) | ✅ | Sub-voice spawning with detune, stereo spread. Bridge globals `G_UNISON_NUM/DETUNE/SPREAD`. |
 | **Index** | `index.md` | ⚠️ Partial | Osc params exist in editor; ~7/19 sub-pages missing |
 
@@ -140,7 +175,7 @@ Firmware `PatchSource` enum has 15 source types: `LFO_GLOBAL_1`, `LFO_GLOBAL_2`,
 | Patch Cables | — | ✅ | Full `PatchCableSet` (source/dest/amount/polarity) per track, up to 16 cables per track |
 | Mod Knobs | — | ✅ | 4×4 grid of 16 knob param selectors in MODULATION tab |
 | Source options | — | ✅ | All 18 firmware PatchSource options (Envelopes 0-3, Local LFOs 1-2, Global LFOs 1-2, velocity, key note-tracking, sidechain ducking, unique random, and performance pad X/Y axes) are fully active, computed continuously, and routed in the voice synthesis engine. |
-| MPE (MIDI Polyphonic Expression) | — | ✅ | Full polyphonic MPE support (per-voice aftertouch pressure Z axis, timbre slide Y axis performance routing, and independent MIDI channel pitch bends) is fully active and evaluated in both RtMidiInputRouter.java and FirmwareVoice.java. |
+| MPE (MIDI Polyphonic Expression) | — | ⚠️ Partial | **Partial — was inconsistently marked ✅ here vs ❌ in §8.2.** WIRED: aftertouch (Z) and timbre/slide (Y) are evaluated as per-voice patch sources in `FirmwareVoice` (`mpePressure`/`mpeTimbre`). NOT WIRED: per-note pitch-bend, per-note release velocity, 14-bit resolution, and the arp `mpeVelocity` field (engine ignores it). See §8.2 #9. |
 | Destination options | — | ✅ | All firmware destinations via `Destination.java`: volume, pan, lpfFrequency, lpfResonance, oscAVolume, oscBVolume, pitch, noiseVolume, modFxRate, modFxDepth |
 
 ### 2.7 Kit Assembly
@@ -212,7 +247,7 @@ The firmware arpeggiator has ~25 configurable parameters across 4 groups. Our st
 | **Basic (BASI)** | Gate, Sync, Rate | ⚠️ Partial | Gate, rate, and sync work; `lfoSyncRate()` in engine maps sync level → note divisions |
 | **Pattern (PATT)** | Octaves, Octave Mode, Chord Sim, Note Mode, Step Repeat, Rhythm, Seq Length | ✅ | Octaves + 4 octave modes, ratchet (0-4 sub-divisions), and step-repeat counters (repeating each note in the list N times before advancing) are fully active and evaluated in Arpeggiator.java. |
 | **Randomizer (RAND)** | Lock, Octave Spread, Gate Spread, Velocity Spread, Ratchet, Chord Poly, Note/Bass/Swap/Glide/Reverse Probability | ✅ | All 3 spreads (Velocity, Gate time, and Octave shifts), plus note/bass/ratchet/swap probabilities are fully active and computed step-by-step inside Arpeggiator.java. |
-| **MPE** | Velocity (via Aftertouch/Y) | ✅ | Full arpeggiator MPE velocity and pressure-to-velocity tracking is supported in Arpeggiator.java, scaling step velocity dynamically with live pressure-sensor slides. |
+| **MPE** | Velocity (via Aftertouch/Y) | ⚠️ Partial | Aftertouch/Y is wired as a patch source; arp `mpeVelocity` field is parsed but the engine does not yet act on it (see MPE row in §2.6 and §8.2 #9). |
 
 ## 4. Sub-Feature Detail: Automation View
 
@@ -317,7 +352,7 @@ Features still not implemented (descending priority):
 7. ✅ **EQ tab** — Bass/treble shelving EQ UI tab added to SwingSynthConfigDialog (previously only model + bridge arrays existed).
 7. ✅ **Compressor menu** — Attack, blend, ratio, release, sidechain HPF UI tab added to `SwingSynthConfigDialog`.
 8. ✅ **Arpeggiator completion** — All modes, randomization, note probability, chord polyphony, rhythm silences done.
-9. **MPE (MIDI Polyphonic Expression)** — No per-note pitch-bend, per-note release velocity, or 14-bit MIDI resolution. `mpeVelocity` field parsed from XML into `ArpModel` but engine never acts on it. MIDI bridge (`MidiInputRouter`) treats all controller data as standard 7-bit. Blocking: MPE-capable controllers (Roli, Osmose) will feel flat.
+9. **MPE (MIDI Polyphonic Expression)** — ⚠️ **Partial** (this is the authoritative MPE status; §2.6 row reconciled to match). WIRED: per-voice aftertouch (Z) and timbre/slide (Y) are evaluated as patch sources in `FirmwareVoice`. NOT WIRED: per-note pitch-bend, per-note release velocity, 14-bit resolution; `mpeVelocity` parsed into `ArpModel` but the engine ignores it; `MidiInputRouter` treats controller data as 7-bit. Blocking: MPE controllers (Roli, Osmose) will feel flat.
 10. ~~**KitShred unison** — Bridge globals and UI exist for kit unison; KitShred engine never spawns sub-voices (only SynthShred has unison).~~ ✅ Done.
 11. ✅ **FM feedback/amount UI sliders** — mod1Fb, mod2Amt, mod2Fb, carrier2Fb sliders added to FM section of main panel (previously only bridge arrays + engine wiring existed).
 
@@ -329,6 +364,27 @@ Features still not implemented (descending priority):
 4. ~~**Compressor threshold wiring** — Done: MasterShred now reads `G_SP_COMPRESSOR_THRESHOLD` as an override (non-zero values replace the knob-derived `1 - 0.8*knob` formula, 0.0 preserves backward compatibility).~~ ✅
 5. ✅ **Unison engine** — Sub-voice spawning with detune, stereo spread, power-normalized gain (<code>1/√N</code>). Uses firmware `WaveTable` oscillator for synth voices, `Sample` for kit voices.
 
+### 8.4 Firmware-pure-engine tests (the "Verified: test" basis)
+
+Behavioral tests on the supported `PureFirmwareEngine` (`deluge/src/test/.../firmware/engine/` unless
+noted). Built 2026-06-03 while migrating off the legacy `DelugeEngineDSL` (24 DSL test classes are now
+`@Disabled`). These are what back the **Verified = test** entries above:
+
+| Test | Covers |
+|------|--------|
+| `FirmwareSynthVoiceTest` | osc types audible/symmetric, env release decay, SINE tuning, polyphony, LPF brightness |
+| `FirmwareTuningTest` | 4 osc × 5 octaves tune to MIDI note (YIN detector) |
+| `FirmwarePatchCableTest` | velocity→cutoff; env→cutoff sweep (the finding-#1 / env-centering vehicle) |
+| `FirmwareLfoModulationTest` | LFO→volume tremolo |
+| `FirmwareNativeFmTest` | native FM richness; flags the ~131 Hz octave question |
+| `FirmwarePolyphonyTest` | POLY allocates 1 voice/note, MONO reuses 1 |
+| `FirmwareFilterModeTest` | HPF removes fundamental; LPF resonance emphasizes cutoff |
+| `FirmwareRingModTest` | sum/difference tones, carriers suppressed |
+| `LfoSampleHoldWrapTest`, `AudioFileReader24BitTest` | the LFO-S&H and 24/32-bit-WAV bug fixes |
+| `Dx7ParityTest` + hardware A/B (`/home/ludo/REC00006/7.wav`) | DX7 vs real Deluge |
+| `DelugeE2ETest#testSongPlayback` | 6-song playback on the pure engine |
+
+**Open verifications needing a hardware A/B:** envelope-source centering (env→filter), native-FM octave.
 
 ## 9. javax.sound Dependency Audit & Replacement
 
