@@ -16,6 +16,14 @@ public class PoleZero extends ChuckUGen {
   private double lastInput = 0.0;
   private double lastOutput = 0.0;
 
+  public PoleZero() {
+    super();
+  }
+
+  public PoleZero(boolean autoRegister) {
+    super(autoRegister);
+  }
+
   /** Unity-gain allpass: b0=coeff, b1=1, a1=coeff */
   public void setAllpass(double coeff) {
     b0 = coeff;

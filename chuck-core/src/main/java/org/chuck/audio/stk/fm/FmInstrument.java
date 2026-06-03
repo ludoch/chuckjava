@@ -23,6 +23,9 @@ public abstract class FmInstrument extends ChuckUGen {
   /** __FM_susLevels[i]: 16 values, susLevels[15]=1, each prior *= 0.707101 (built top-down). */
   protected static final double[] FM_SUS_LEVELS = new double[16];
 
+  /** __FM_attTimes[i]: 32 values, attTimes[0]=8.498186, each next *= 0.707101 (built bottom-up). */
+  protected static final double[] FM_ATT_TIMES = new double[32];
+
   static {
     double temp = 1.0;
     for (int i = 99; i >= 0; i--) {
@@ -32,6 +35,11 @@ public abstract class FmInstrument extends ChuckUGen {
     temp = 1.0;
     for (int i = 15; i >= 0; i--) {
       FM_SUS_LEVELS[i] = temp;
+      temp *= 0.707101;
+    }
+    temp = 8.498186;
+    for (int i = 0; i < 32; i++) {
+      FM_ATT_TIMES[i] = temp;
       temp *= 0.707101;
     }
   }

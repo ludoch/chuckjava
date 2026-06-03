@@ -27,6 +27,7 @@ public class Clarinet extends ChuckUGen {
   private float vibratoGain = 0.1f;
   private float outputGain = 1.0f;
   private final float sampleRate;
+  private final int length;
 
   public Clarinet() {
     this(50.0f, ChuckVM.CURRENT_VM.get().getSampleRate());
@@ -34,8 +35,8 @@ public class Clarinet extends ChuckUGen {
 
   public Clarinet(float lowestFrequency, float sampleRate) {
     this.sampleRate = sampleRate;
-    // Length for half-wavelength (stopped pipe)
-    int length = (int) (0.5 * sampleRate / lowestFrequency + 1);
+    // Full bore length (STK: sampleRate/lowestFrequency + 1); the loop delay is a half-wavelength.
+    this.length = (int) (sampleRate / lowestFrequency + 1);
     this.delayLine = new DelayL(length, sampleRate, false);
     this.reedTable = new ReedTable(false);
     this.reedTable.setOffset(0.7f); // STK default
@@ -53,9 +54,11 @@ public class Clarinet extends ChuckUGen {
 
   @doc("Set the clarinet frequency in Hz.")
   public void freq(double frequency) {
-    // Stopped pipe: fundamental is 4 * length, but feedback loop is 2 * length.
-    // We use 0.5 factor to match STK tuning.
-    double delay = (0.5 * sampleRate / frequency) - 1.0;
+    double freakency = frequency <= 0.0 ? 220.0 : frequency;
+    // STK: half-wavelength delay minus the OneZero filter's group delay (1.5 samples).
+    double delay = (sampleRate / freakency) * 0.5 - 1.5;
+    if (delay <= 0.0) delay = 0.3;
+    else if (delay > length) delay = length;
     delayLine.setDelay(delay);
   }
 
@@ -65,15 +68,18 @@ public class Clarinet extends ChuckUGen {
 
   @doc("Start a note with given volume/velocity.")
   public void noteOn(float velocity) {
-    envelope.setRate(0.005f); // STK default attack rate
-    envelope.setTarget(0.55f + (velocity * 0.30f)); // STK default mapping
-    envelope.keyOn();
+    // STK Clarinet::noteOn -> startBlowing(0.55 + amp*0.30, amp*0.005); outputGain = amp + 0.001.
+    // NOTE: do NOT call envelope.keyOn() — it would overwrite the breath target with 1.0.
+    envelope.setRate(velocity * 0.005f);
+    envelope.setTarget(0.55f + (velocity * 0.30f));
+    outputGain = velocity + 0.001f;
   }
 
   @doc("Stop the note.")
   public void noteOff(float velocity) {
-    envelope.setRate(0.01f); // STK default release rate
-    envelope.keyOff();
+    // STK Clarinet::noteOff -> stopBlowing(amp*0.01): ramp breath target to 0.
+    envelope.setRate(velocity * 0.01f);
+    envelope.setTarget(0.0f);
   }
 
   @Override
@@ -85,11 +91,9 @@ public class Clarinet extends ChuckUGen {
     breathPressure += breathPressure * noiseGain * noise.tick(systemTime);
     breathPressure += breathPressure * vibratoGain * vibrato.tick(systemTime);
 
-    // Calculate pressure difference across reed
-    // STK uses -1.0 reflection at bell, plus low-pass filter
-    float boreOutput = -delayLine.getLastOut();
-    float filteredBore = filter.tick(boreOutput, systemTime);
-    float pressureDiff = filteredBore - breathPressure;
+    // Commuted loss filtering: STK reflects with -0.95 * OneZero(delayLine.lastOut()).
+    float filteredBore = filter.tick(delayLine.getLastOut(), systemTime);
+    float pressureDiff = -0.95f * filteredBore - breathPressure;
 
     // Use reed table to calculate new bore input
     float out =

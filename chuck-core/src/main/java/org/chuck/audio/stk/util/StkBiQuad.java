@@ -21,6 +21,11 @@ public class StkBiQuad {
     outputs[0] = outputs[1] = outputs[2] = 0.0;
   }
 
+  /** STK BiQuad::lastOut — the most recently computed output sample. */
+  public double lastOut() {
+    return outputs[0];
+  }
+
   /**
    * BiQuad::setResonance — resonant poles at (frequency, radius); normalize peak gain via zeros.
    */
