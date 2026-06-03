@@ -184,7 +184,9 @@ public class Dx7Engine extends ChuckUGen {
     boolean down_;
 
     void set(byte[] patch, int pitchOff) {
-      level_ = Dx7EngineLookupTables.pitchenv_tab[patch[pitchOff + 3] & 0xFF] << 19;
+      // Pitch-EG block is 4 rates (pitchOff+0..3) then 4 levels (pitchOff+4..7).
+      // Initial level comes from levels[3] (pitchOff+7), NOT rates[3].
+      level_ = Dx7EngineLookupTables.pitchenv_tab[patch[pitchOff + 4 + 3] & 0xFF] << 19;
       down_ = true;
       advance(patch, pitchOff, 0);
     }
@@ -222,7 +224,8 @@ public class Dx7Engine extends ChuckUGen {
     private void advance(byte[] patch, int pitchOff, int newix) {
       ix_ = newix;
       if (ix_ < 4) {
-        int newlevel = patch[pitchOff + ix_] & 0xFF;
+        // Target level from levels[ix] (pitchOff+4+ix); rate from rates[ix] (pitchOff+ix).
+        int newlevel = patch[pitchOff + 4 + ix_] & 0xFF;
         targetlevel_ = Dx7EngineLookupTables.pitchenv_tab[newlevel] << 19;
         rising_ = targetlevel_ > level_;
         inc_ =
@@ -467,10 +470,9 @@ public class Dx7Engine extends ChuckUGen {
     this.midiNote = midinote;
     this.velocity = vel;
 
-    // Apply patch transpose (offset by 24)
-    int transpose = patch[144] & 0xFF;
-    int transposedNote = midinote + (transpose - 24);
-    int logFreq = Dx7EngineLookupTables.dxNoteToFreq(transposedNote);
+    // The Deluge firmware (dx7note.cpp DxVoice::init) derives the operator log-frequency from the
+    // raw midinote and does NOT apply the patch's transpose parameter. Match that exactly.
+    int logFreq = Dx7EngineLookupTables.dxNoteToFreq(midinote);
 
     for (int op = 0; op < 6; op++) {
       int off = op * 21;
