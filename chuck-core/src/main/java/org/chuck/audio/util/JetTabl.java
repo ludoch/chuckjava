@@ -3,8 +3,8 @@ package org.chuck.audio.util;
 import org.chuck.audio.ChuckUGen;
 
 /**
- * JetTabl — jet table lookup UGen used internally by Flute. Implements STK's non-linear jet
- * "table lookup" via the polynomial output = input * (input^2 - 1), saturated to [-1, 1].
+ * JetTabl — jet table lookup UGen used internally by Flute. Implements STK's non-linear jet "table
+ * lookup" via the polynomial output = input * (input^2 - 1), saturated to [-1, 1].
  */
 public class JetTabl extends ChuckUGen {
 

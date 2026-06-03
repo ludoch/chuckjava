@@ -10,8 +10,8 @@ import org.chuck.audio.util.JetTabl;
 import org.chuck.core.doc;
 
 /**
- * BlowBotl — STK blown-bottle ("pop bottle") physical model. Faithful port of the STK/ChucK
- * {@code BlowBotl}: a {@link StkBiQuad} Helmholtz resonator excited by breath pressure plus a
+ * BlowBotl — STK blown-bottle ("pop bottle") physical model. Faithful port of the STK/ChucK {@code
+ * BlowBotl}: a {@link StkBiQuad} Helmholtz resonator excited by breath pressure plus a
  * pressure-dependent noise term and the {@link JetTabl} non-linearity, output DC-blocked.
  */
 @doc("Blown bottle physical model based on STK. Ported to Java 25.")
