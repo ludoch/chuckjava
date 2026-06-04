@@ -43,8 +43,8 @@ checked against the real Deluge. The verification ladder is:
 | Ladder HPF | **silently disabled** — `hpfMode="HPLadder"`→`LADDER_12`→`OFF`; no high-pass at all | **fixed** (5c2b3b91) | src + test |
 | Sample osc | **24/32-bit WAVs decoded as silence** (only 16/8-bit handled) | **fixed** (f0b70b65) | test |
 | LFO (S&H / Random-Walk) | retrigger used signed `(long)phase` → wrong for upper half of every cycle | **fixed** (f0b70b65) | src + test |
-| Envelope as modulation | source **not centred** (firmware returns `(lastValue-2^30)<<1`, bipolar); env→cutoff depth/polarity wrong. VCA volume is fine (uses `lastValue` directly). | **OPEN** — needs hardware A/B before changing | src (firmware diff only) |
-| Native 2-op FM | played-C4 strongest periodicity is **~131 Hz (one octave low)** — real offset or feedback period-doubling, unconfirmed | **OPEN** — needs hardware A/B | test (flagged) |
+| Envelope as modulation | suspected the source needed centring (firmware returns `(lastValue-2^30)<<1`, bipolar) → env→cutoff polarity | **RESOLVED — false alarm (2026-06-04 A/B).** Hardware env→filter (`ENVFILT.XML`, C3) starts dark-but-**audible** and brightens — matching Java's current **uncentered** behaviour, NOT a fade-from-silence. Java is correct; centering would be wrong. | **hw** |
+| Native 2-op FM | suspected octave issue | **CONFIRMED BUGGY (2026-06-04 A/B), not yet fixed.** Real preset `049 Basic FM` at C3: **hardware ≈130 Hz fundamental + bright** (energy in 5th–16th harmonics); **Java ≈262 Hz (octave high) + dull** (fundamental-dominated, weak harmonics). So native FM has wrong carrier octave AND too little modulation depth. Needs `FmCore` carrier-pitch + modulator-level (OSC_B_VOLUME→index) fix. (DX7 path is unaffected — separate engine.) | **hw (bug confirmed)** |
 
 Firmware-pure-engine tests now exist for: synth voice (osc/env/tuning/poly/filter), patch cables, LFO
 tremolo, native FM, tuning (4 osc × 5 octaves), polyphony, HPF + LPF resonance, ring mod, 24-bit WAV,
@@ -71,14 +71,14 @@ LFO S&H wrap, and song playback. See `deluge/src/test/.../firmware/engine/` and 
 | Save/Load Patterns | `features/save_load_patterns.md` | ✅ | wired | PatternModel + PatternSerializer, ClipSnapshot, XML save/load, sidebar UI. |
 | Velocity View | `features/velocity_view.md` | ✅ | wired | Velocity ramps, per-step editing (guidebook §1.6). |
 | Vuefinder | `features/Vuefinder.md` | ➕ N/A | — | Web SD browser (hardware-specific; our Library tab supersedes). |
-| 4 Envelopes | `kNumEnvelopes = 4` | ⚠️ | **test (shape) / src (mod)** | 4 ADSR envelopes (firmware `Envelope.java`); release shape tested (`FirmwareSynthVoiceTest`). **env-as-modulation source is NOT centred vs firmware (bipolar) — env→cutoff depth/polarity wrong; OPEN, needs hw A/B (§0.5).** Volume VCA correct. |
+| 4 Envelopes | `kNumEnvelopes = 4` | ✅ | **test + hw** | 4 ADSR envelopes (firmware `Envelope.java`); release shape tested (`FirmwareSynthVoiceTest`). **env-as-modulation (env→cutoff) verified correct vs real hardware (2026-06-04 A/B, `ENVFILT.XML`): Java's current uncentered source matches; the firmware's bipolar return value does NOT make the env→cutoff fade from silence. Earlier "needs centering" suspicion was a false alarm.** |
 | 4 LFOs | `LFO_COUNT = 4` | ✅ | **test + src** | 4 LFOs, all 7 waveforms. S&H/Random-Walk unsigned-wrap bug fixed + tested (`FirmwareLfoModulationTest`, `LfoSampleHoldWrapTest`). |
 | Warbler FX | `ModFXType::WARBLE` | ✅ | wired | `ModFXProcessor.java` random-walk + sin LFO delay-line. |
 | Dimension FX | `ModFXType::DIMENSION` | ✅ | wired | `ModFXProcessor.java` 3-tap stereo chorus. |
 | Patch Cable Polarity | `PatchCable::polarity` | ✅ | test | Per-cable polarity; patch routing tested (`FirmwarePatchCableTest`). |
 | Voice Count (VCNT) | `Sound::maxVoiceCount` | ✅ | test | Max voice limit + stealing; POLY/MONO/LEGATO/AUTO/CHOKE. Voice allocation tested (`FirmwarePolyphonyTest`). |
 | Threshold Recording | `ThresholdRecordingMode` | ✅ | wired | 4 modes (OFF/LOW/MEDIUM/HIGH) state machine. |
-| Native 2-op FM | `SynthMode::FM` (`FmCore`) | ⚠️ | **test (flagged)** | Native FM renders rich/audible (`FirmwareNativeFmTest`), but played-C4 strongest period is ~131 Hz (octave low) — **possible octave offset, OPEN, needs hw A/B (§0.5).** |
+| Native 2-op FM | `SynthMode::FM` (`FmCore`) | ⚠️ Buggy | **hw (bug confirmed)** | **CONFIRMED WRONG vs hardware (2026-06-04 A/B, `049 Basic FM` @ C3): hardware ≈130 Hz + bright (5th–16th harmonics); Java ≈262 Hz (octave high) + dull. Wrong carrier octave + too little modulator depth. Not yet fixed — needs `FmCore` carrier-pitch + OSC_B_VOLUME→modulation-index fix.** DX7 path unaffected. |
 | Ring Mod | `SynthMode::RINGMOD` | ✅ | test | Sum/difference tones, carriers suppressed (`FirmwareRingModTest`). |
 
 ### Legend
@@ -384,7 +384,7 @@ noted). Built 2026-06-03 while migrating off the legacy `DelugeEngineDSL` (24 DS
 | `Dx7ParityTest` + hardware A/B (`/home/ludo/REC00006/7.wav`) | DX7 vs real Deluge |
 | `DelugeE2ETest#testSongPlayback` | 6-song playback on the pure engine |
 
-**Open verifications needing a hardware A/B:** envelope-source centering (env→filter), native-FM octave.
+**A/B verifications done (2026-06-04):** env→filter — Java uncentered confirmed CORRECT (no centering needed); native FM — confirmed BUGGY (octave-high + under-modulated), fix pending.
 
 ## 9. javax.sound Dependency Audit & Replacement
 
