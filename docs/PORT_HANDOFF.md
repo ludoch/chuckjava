@@ -41,8 +41,13 @@ java --enable-preview --add-modules=jdk.incubator.vector -cp "$CP" \
     org.chuck.deluge.reproduce.RenderPatchToWav "<patch.XML>" <midiNote> <out.wav> [seconds] [velocity]
 ```
 
-Hardware patches live at `/home/ludo/ludocard/SYNTHS/*.XML` (196 presets). Hardware recordings
-from the prior session: `~/a/REC00009.WAV` (049 Basic FM @ C3).
+Hardware patches live at `/home/ludo/ludocard/SYNTHS/*.XML` (196 presets) — **this is the mounted SD
+card, machine-local; a fresh session only has it if `ludocard` is mounted.** The three A/B patches:
+`049 Basic FM.XML` (FM, C3), `009 Hoover Bass.XML` (filter/velocity/pan, C2),
+`128_SYNTH_DUAL_MOD_C5.XML` (LFO+env, C5). Hardware recording from the prior session:
+`~/a/REC00009.WAV` (049 Basic FM @ C3). **Because the SD patches are machine-local, the P1
+golden-WAV suite must use PROGRAMMATICALLY-built sounds (self-contained), not these XML files;
+the XML patches are only for the hardware A/B (P5).**
 
 ## 2. Render pipeline (how a patch becomes audio)
 
