@@ -50,7 +50,7 @@ Explore the detailed guides and documentation files available in this repository
 
 ### Deluge Integration
 - [Deluge UI User Guide](docs/deluge_ui_user_guide.md): Operation of the JavaFX Deluge Emulator.
-- [Java Deluge User Guide](docs/java_deluge_user_guide.md): Workstation concepts and workflow.
+- [Java Deluge User Guide & Operations Manual](docs/DELUGE_GUIDEBOOK.md): Workstation concepts, physical modeling, and consolidated hardware quick reference.
 - [Deluge XML Examples](docs/deluge_xml_examples.md): Authoritative reference for Deluge song XML files.
 
 ### Project & Developer Notes
