@@ -1,4 +1,4 @@
-# Deluge faithful-port — continuation handoff (2026-06-04)
+# Deluge faithful-port — continuation handoff (2026-06-05)
 
 Self-contained handoff so any session (incl. Gemini, which has no access to the prior
 chat or Claude's memory files) can continue. **The goal is a bit-faithful Java port of the
@@ -7,7 +7,18 @@ is the ground truth.
 
 ---
 
-## 0. Ground rules
+## 0. Start here: continue from the current worktree, not from a clean checkout
+
+- **Do not discard the local WIP.** This handoff is for resuming from the current dirty worktree,
+  not for starting fresh from `main`.
+- **Do not `reset --hard`, `checkout --`, or rebuild the branch from scratch.** There is validated
+  in-progress work in the tree, including merge-resolution content that compiles and passes tests
+  even though Git still reports `UU` for two files in the index.
+- **Treat `docs/PORT_HANDOFF.md` as the map for the current worktree state.** The historical
+  sections below describe what is already merged on `main`; the new sections 2.1–2.3 describe what
+  is only present locally right now.
+
+## 1. Ground rules
 
 - **Firmware source = ground truth.** Reference C++ lives at `~/a/DelugeFirmware/src/deluge/`.
   Port the exact integer/fixed-point math + lookup tables; do NOT substitute float approximations
@@ -18,12 +29,14 @@ is the ground truth.
   hardware access (until ~Sunday), so lean on source + pinning tests.
 - **Supported engine = the PURE firmware engine** (`org.chuck.deluge.firmware.*`). The legacy
   `DelugeEngineDSL` ("--hifi") is UNSUPPORTED — do not use it in tests.
-- **Commit/push discipline:** branch off `main` for changes; keep the deluge suite green; the human
-  has been merging each fix to `main`. End commit messages with
-  `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`. Exclude noise:
+- **Commit/push discipline:** for this WIP, continue from the current worktree first; do not throw
+  away local changes just to recreate them on a fresh branch. Once the current worktree is in the
+  desired state, keep the deluge suite green and commit only the intended files. Historical note:
+  earlier fixes were being merged onto `main` one by one. Do not treat the older Claude-specific
+  trailer from prior sessions as a standing requirement for new commits. Exclude noise:
   `comparison/*.wav`, `.claude/settings.local.json`, `jdk25/`.
 
-## 1. Build / test / run
+## 2. Build / test / run
 
 ```
 # build + test the deluge module (uses JDK 25 + preview + vector incubator via the pom)
@@ -49,7 +62,60 @@ card, machine-local; a fresh session only has it if `ludocard` is mounted.** The
 golden-WAV suite must use PROGRAMMATICALLY-built sounds (self-contained), not these XML files;
 the XML patches are only for the hardware A/B (P5).**
 
-## 2. Render pipeline (how a patch becomes audio)
+## 2.1 Current repo state (2026-06-05, HEAD `67008446`)
+
+- **Current content is green:** on this worktree, both `mvn -pl deluge spotless:apply test` and
+  `mvn clean package` completed successfully.
+- **There is broader local DSP WIP besides the four files summarized below.** Preserve the rest of
+  the modified deluge files unless you have a specific reason and user approval to revert them.
+- **Git index caveat:** `deluge/src/main/java/org/chuck/deluge/firmware/engine/FirmwareFactory.java`
+  and `deluge/src/main/java/org/chuck/deluge/firmware/engine/FirmwareVoice.java` still show as `UU`
+  in `git status` because the merge resolution content has not been staged yet. The files themselves
+  no longer contain conflict markers and do compile/test as-is.
+- **Uncommitted test-fixture updates in this worktree:**
+  - `FirmwareSynthVoiceTest` now uses full track volume (`setVolume(1.0f)`) so its audibility
+    assertions match the current firmware-style volume curve path.
+  - `RingModParityTest` now builds its fixture through `FirmwareFactory` with both oscillators,
+    osc2 pitch, and track volume explicitly configured, so the parity check follows the real
+    model→factory→engine path instead of constructing a partially-configured `FirmwareSound`
+    directly.
+
+## 2.2 In-flight implementation choices already validated on this worktree
+
+If you re-hit the unresolved merge in another session, keep these choices unless you have new
+firmware evidence:
+
+- **Keep the factory's firmware-style volume mapping** in
+  `FirmwareFactory.mapModelToSound(...)`: `LOCAL_VOLUME`, `LOCAL_OSC_A_VOLUME`,
+  `LOCAL_OSC_B_VOLUME`, and `LOCAL_NOISE_VOLUME` should continue to use
+  `normToBipolarParamVolume(...)`, not the older direct `float * 2147483647.0` mapping. The direct
+  mapping was what made the low-volume characterization tests fail on this worktree.
+- **Keep cutoff stored as the recovered knob, not a pre-combined exp value:** use
+  `cutoffKnobFromHz(...)` for LPF/HPF neutral values. Do not resurrect the abandoned
+  `cutoffComboFromHz(...)` branch unless you re-thread the entire exp-combine path and pin it with
+  tests.
+- **Keep the current `FirmwareVoice` final-gain ordering** (render voice → filter →
+  apply `env0 * LOCAL_VOLUME` for non-FM). The alternate conflict side had extra pre-filter gain
+  code and a duplicate local `filterGain` assignment; the current ordering is the one that compiled
+  cleanly and passed `mvn clean package` on this worktree.
+
+## 2.3 Best next implementation target
+
+Start **P1 Golden-WAV regression suite** from the existing self-contained helpers instead of inventing
+new fixtures from scratch:
+
+- Reuse the programmatic model-building pattern in
+  `deluge/src/test/java/org/chuck/deluge/firmware/engine/FirmwareSynthVoiceTest.java`.
+- Reuse the factory-driven ring-mod fixture shape in
+  `deluge/src/test/java/org/chuck/deluge/firmware/engine/RingModParityTest.java`.
+- Put the new golden/signature tests under `deluge/src/test/java/org/chuck/deluge/firmware/engine/`
+  or the existing reproduce area, but keep them **programmatic-first** so CI does not depend on the
+  mounted SD card.
+- Prefer stable signatures (RMS / peak / selected harmonic bins) over raw byte checksums; the
+  current tests already show the right pattern for computing RMS, mean, brightness, and
+  zero-crossing/frequency-style metrics.
+
+## 3. Render pipeline (how a patch becomes audio)
 
 `DelugeXmlParser.parseSynth(File) -> SynthTrackModel` → `ProjectModel.addTrack` →
 `FirmwareFactory.createSong(project) -> Song` → `(InstrumentClip) song.clips.get(0)).sound` is a
@@ -63,7 +129,7 @@ in a test you must also set `sound.paramManager.getAutomatedParam(paramId).curre
 
 ---
 
-## 3. DONE this session (all on `main`, HEAD f350e07a) — do NOT redo
+## 4. DONE before the 2026-06-05 session (all on `main`, HEAD f350e07a) — do NOT redo
 
 | commit | fix |
 |---|---|
@@ -76,7 +142,7 @@ in a test you must also set `sound.paramManager.getAutomatedParam(paramId).curre
 | 70b69ca1 | **Filter makeup gain**: `FirmwareVoice` discarded `filterSet.setConfig(...)`'s return (`filterGain`). Capturing+applying it fixes ~2.4× hot output / clipping. |
 | f350e07a | A/B harness `RenderPatchToWav` + `docs/HARDWARE_AB_PLAN.md`. |
 
-## 4. VERIFIED FAITHFUL — do NOT investigate (already checked vs firmware)
+## 5. VERIFIED FAITHFUL — do NOT investigate (already checked vs firmware)
 
 - **Pitch** (`pow(2,n/12)` is exact ET; firmware `noteFrequencyTable` differs by ~0.007 cent).
 - **Oscillators** (`renderCrude*` for `tableNumber < 6` matches the firmware at normal CPU load
@@ -88,7 +154,7 @@ in a test you must also set `sound.paramManager.getAutomatedParam(paramId).curre
 
 ---
 
-## 5. PENDING WORK (prioritised)
+## 6. PENDING WORK (prioritised)
 
 ### P1 — Golden-WAV regression suite (hardware-free, do FIRST)
 Render representative patches to committed reference signatures and assert in CI. Locks in the 7
@@ -141,7 +207,7 @@ values and won't match (this bit us with 049: its stored LPF cutoff is genuinely
 
 ---
 
-## 6. KEY GOTCHAS / domain notes
+## 7. KEY GOTCHAS / domain notes
 
 - **Volume scale divergence (root of P3/P4):** firmware volume params output 2^29 = unity (headroom to
   2^31 = "4.0"); Java oscillators treat 2^31 = unity. This is why back-compute fails for volume and why
@@ -155,7 +221,7 @@ values and won't match (this bit us with 049: its stored LPF cutoff is genuinely
   stdout on every note. Harmless but noisy — a good cleanup task (gate behind a static flag or remove).
 - **DX7** path (`sound.isDx7()`, `Dx7Engine`) is separate from native FM; verified working earlier.
 
-## 7. File map
+## 8. File map
 
 - Per-voice DSP: `firmware/engine/FirmwareVoice.java` (osc render, FM `renderFm`, env/LFO, pan, filter).
 - Sound/FX chain + global LFO: `firmware/engine/FirmwareSound.java`.
@@ -170,7 +236,7 @@ values and won't match (this bit us with 049: its stored LPF cutoff is genuinely
 - A/B harness: `deluge/src/test/.../reproduce/RenderPatchToWav.java`. Plan: `docs/HARDWARE_AB_PLAN.md`.
 - Feature map: `docs/FIRMWARE_FEATURES_MAPPING.md`.
 
-## 8. Methodology checklist for each fix
+## 9. Methodology checklist for each fix
 
 1. Find the Java code; find the firmware equivalent in `~/a/DelugeFirmware/src/deluge/`.
 2. Port the exact integer math + tables. No float shortcuts for what the firmware does in fixed point.
