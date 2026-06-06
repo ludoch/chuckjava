@@ -143,14 +143,14 @@ files in `deluge/src/test/resources/fidelity/` were generated from the test fixt
 serve as regression checkpoints against their own commit — use them as coarse gates, not as
 "hardware matches."
 
-### P2 — Master compressor (LEVEL-SHIFTING — ideally needs hardware A/B)
+### P2 — Master compressor — DONE (commit 2f6e23d0, pending merge)
 
-`FirmwareAudioEngine` line ~68 has `// masterCompressor.renderVolNeutral(masterBuffer, Q31.ONE);`
-**commented out**; the firmware applies a song master compressor (`audio_engine.cpp:899`
-`globalEffectable.compressor.render(buf, masterVolAdjL>>1, ...)`). The `RMSFeedbackCompressor`
-port is float exp/log/sqrt — verify against `dsp/compressor/*` in the firmware, pin with tests,
-then enable. **Risk: changes ALL output dynamics; defer until hardware A/B unless the port can
-be confidently verified from source.**
+Verified the `RMSFeedbackCompressor` port against the firmware's `rms_feedback.cpp` — the render
+flow (RMS→log→threshold→envelope→exp gain→amplitude increment→saturation) matches. Added 4 unit
+tests (`RMSFeedbackCompressorTest`). Enabled in `FirmwareAudioEngine` by uncommenting
+`masterCompressor.renderVolNeutral(...)`. Re-baselined 2 level-sensitive tests.
+Constructor default threshold=0 (matches prior Java behavior; can be set to firmware default in a
+follow-up UI-knob pass).
 
 ### P3 — postFXVolume application (small, verifiable)
 
