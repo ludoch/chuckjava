@@ -1,4 +1,4 @@
-# Deluge faithful-port — continuation handoff (2026-06-05)
+# Deluge faithful-port — continuation handoff (updated 2026-06-05)
 
 Self-contained handoff so any session (incl. Gemini, which has no access to the prior
 chat or Claude's memory files) can continue. **The goal is a bit-faithful Java port of the
@@ -7,48 +7,39 @@ is the ground truth.
 
 ---
 
-## 0. Start here: continue from the current worktree, not from a clean checkout
-
-- **Do not discard the local WIP.** This handoff is for resuming from the current dirty worktree,
-  not for starting fresh from `main`.
-- **Do not `reset --hard`, `checkout --`, or rebuild the branch from scratch.** There is validated
-  in-progress work in the tree, including merge-resolution content that compiles and passes tests
-  even though Git still reports `UU` for two files in the index.
-- **Treat `docs/PORT_HANDOFF.md` as the map for the current worktree state.** The historical
-  sections below describe what is already merged on `main`; the new sections 2.1–2.3 describe what
-  is only present locally right now.
-
-## 1. Ground rules
+## 0. Ground rules
 
 - **Firmware source = ground truth.** Reference C++ lives at `~/a/DelugeFirmware/src/deluge/`.
   Port the exact integer/fixed-point math + lookup tables; do NOT substitute float approximations
   (`Math.pow/sin/exp/...`) for the firmware's fixed-point tables.
 - **Verify every change with a pinning unit test** that asserts hand-traced firmware values
   (see `FirmwareParamCurvesTest`, `FirmwareEnvRateTest` for the pattern). Hardware A/B only
-  *confirms* your reading of the firmware; it does not define correctness. We currently have NO
-  hardware access (until ~Sunday), so lean on source + pinning tests.
+  *confirms* your reading of the firmware; it does not define correctness.
 - **Supported engine = the PURE firmware engine** (`org.chuck.deluge.firmware.*`). The legacy
-  `DelugeEngineDSL` ("--hifi") is UNSUPPORTED — do not use it in tests.
-- **Commit/push discipline:** for this WIP, continue from the current worktree first; do not throw
-  away local changes just to recreate them on a fresh branch. Once the current worktree is in the
-  desired state, keep the deluge suite green and commit only the intended files. Historical note:
-  earlier fixes were being merged onto `main` one by one. Do not treat the older Claude-specific
-  trailer from prior sessions as a standing requirement for new commits. Exclude noise:
-  `comparison/*.wav`, `.claude/settings.local.json`, `jdk25/`.
+  `DelugeEngineDSL` ("--hifi") is UNSUPPORTED — do not use it in tests (48 test classes are
+  `@Disabled`).
+- **Formatting:** before committing, run `mvn -pl deluge spotless:apply`. The project enforces
+  Google Java Format via Spotless.
+- **Exclude noise:** `comparison/*.wav`, `.claude/settings.local.json`, `jdk25/`.
 
-## 2. Build / test / run
+---
+
+## 1. Build / test / run
 
 ```
-# build + test the deluge module (uses JDK 25 + preview + vector incubator via the pom)
-mvn -pl chuck-core,deluge -am test            # full suite (deluge ~229 tests)
+# build + test the deluge module (JDK 25 + preview + vector incubator)
+mvn -pl chuck-core,deluge -am test            # full suite (deluge ~245 tests, 48 disabled)
 mvn -pl deluge test -Dtest=FirmwareEnvRateTest # one test class
+
+# Format code before commit:
+mvn -pl deluge spotless:apply
 
 # NOTE: chuck-core's ChuckMachineApiTest#testMachineEval is a FLAKY timing test under parallel
 # load (passes when run alone). A single failure there is not your change.
 
 # Render a patch to WAV (A/B harness):
 mvn -pl deluge -am test-compile
-DEPS=$(mvn -q -pl deluge dependency:build-classpath -Dmdep.outputFile=/dev/stdout | tail -1)
+DEPS=$(cat deluge/deluge-deps-classpath)
 CP="chuck-core/target/classes:deluge/target/classes:deluge/target/test-classes:$DEPS"
 java --enable-preview --add-modules=jdk.incubator.vector -cp "$CP" \
     org.chuck.deluge.reproduce.RenderPatchToWav "<patch.XML>" <midiNote> <out.wav> [seconds] [velocity]
@@ -57,65 +48,15 @@ java --enable-preview --add-modules=jdk.incubator.vector -cp "$CP" \
 Hardware patches live at `/home/ludo/ludocard/SYNTHS/*.XML` (196 presets) — **this is the mounted SD
 card, machine-local; a fresh session only has it if `ludocard` is mounted.** The three A/B patches:
 `049 Basic FM.XML` (FM, C3), `009 Hoover Bass.XML` (filter/velocity/pan, C2),
-`128_SYNTH_DUAL_MOD_C5.XML` (LFO+env, C5). Hardware recording from the prior session:
-`~/a/REC00009.WAV` (049 Basic FM @ C3). **Because the SD patches are machine-local, the P1
-golden-WAV suite must use PROGRAMMATICALLY-built sounds (self-contained), not these XML files;
-the XML patches are only for the hardware A/B (P5).**
+`128_SYNTH_DUAL_MOD_C5.XML` (LFO+env, C5).
 
-## 2.1 Current repo state (2026-06-05, HEAD `67008446`)
+Three hardware recordings from the 2026-06-05 session: `deluge/src/test/resources/fidelity/REC00010.WAV`
+thru `REC00012.WAV`. Reference WAVs: `deluge/src/test/resources/fidelity/reference_*.wav` (generated
+from committed programmatic test .XML fixtures).
 
-- **Current content is green:** on this worktree, both `mvn -pl deluge spotless:apply test` and
-  `mvn clean package` completed successfully.
-- **There is broader local DSP WIP besides the four files summarized below.** Preserve the rest of
-  the modified deluge files unless you have a specific reason and user approval to revert them.
-- **Git index caveat:** `deluge/src/main/java/org/chuck/deluge/firmware/engine/FirmwareFactory.java`
-  and `deluge/src/main/java/org/chuck/deluge/firmware/engine/FirmwareVoice.java` still show as `UU`
-  in `git status` because the merge resolution content has not been staged yet. The files themselves
-  no longer contain conflict markers and do compile/test as-is.
-- **Uncommitted test-fixture updates in this worktree:**
-  - `FirmwareSynthVoiceTest` now uses full track volume (`setVolume(1.0f)`) so its audibility
-    assertions match the current firmware-style volume curve path.
-  - `RingModParityTest` now builds its fixture through `FirmwareFactory` with both oscillators,
-    osc2 pitch, and track volume explicitly configured, so the parity check follows the real
-    model→factory→engine path instead of constructing a partially-configured `FirmwareSound`
-    directly.
+---
 
-## 2.2 In-flight implementation choices already validated on this worktree
-
-If you re-hit the unresolved merge in another session, keep these choices unless you have new
-firmware evidence:
-
-- **Keep the factory's firmware-style volume mapping** in
-  `FirmwareFactory.mapModelToSound(...)`: `LOCAL_VOLUME`, `LOCAL_OSC_A_VOLUME`,
-  `LOCAL_OSC_B_VOLUME`, and `LOCAL_NOISE_VOLUME` should continue to use
-  `normToBipolarParamVolume(...)`, not the older direct `float * 2147483647.0` mapping. The direct
-  mapping was what made the low-volume characterization tests fail on this worktree.
-- **Keep cutoff stored as the recovered knob, not a pre-combined exp value:** use
-  `cutoffKnobFromHz(...)` for LPF/HPF neutral values. Do not resurrect the abandoned
-  `cutoffComboFromHz(...)` branch unless you re-thread the entire exp-combine path and pin it with
-  tests.
-- **Keep the current `FirmwareVoice` final-gain ordering** (render voice → filter →
-  apply `env0 * LOCAL_VOLUME` for non-FM). The alternate conflict side had extra pre-filter gain
-  code and a duplicate local `filterGain` assignment; the current ordering is the one that compiled
-  cleanly and passed `mvn clean package` on this worktree.
-
-## 2.3 Best next implementation target
-
-Start **P1 Golden-WAV regression suite** from the existing self-contained helpers instead of inventing
-new fixtures from scratch:
-
-- Reuse the programmatic model-building pattern in
-  `deluge/src/test/java/org/chuck/deluge/firmware/engine/FirmwareSynthVoiceTest.java`.
-- Reuse the factory-driven ring-mod fixture shape in
-  `deluge/src/test/java/org/chuck/deluge/firmware/engine/RingModParityTest.java`.
-- Put the new golden/signature tests under `deluge/src/test/java/org/chuck/deluge/firmware/engine/`
-  or the existing reproduce area, but keep them **programmatic-first** so CI does not depend on the
-  mounted SD card.
-- Prefer stable signatures (RMS / peak / selected harmonic bins) over raw byte checksums; the
-  current tests already show the right pattern for computing RMS, mean, brightness, and
-  zero-crossing/frequency-style metrics.
-
-## 3. Render pipeline (how a patch becomes audio)
+## 2. Render pipeline (how a patch becomes audio)
 
 `DelugeXmlParser.parseSynth(File) -> SynthTrackModel` → `ProjectModel.addTrack` →
 `FirmwareFactory.createSong(project) -> Song` → `(InstrumentClip) song.clips.get(0)).sound` is a
@@ -129,20 +70,54 @@ in a test you must also set `sound.paramManager.getAutomatedParam(paramId).curre
 
 ---
 
-## 4. DONE before the 2026-06-05 session (all on `main`, HEAD f350e07a) — do NOT redo
+## 3. DONE — all on `main` (HEAD 65dc4e12) — do NOT redo
+
+### Faithful DSP fixes (2026-06-04 session)
 
 | commit | fix |
 |---|---|
-| 879b8dab | **Native 2-op FM**: replaced the dexed `FmCore` approximation with a faithful port of `voice.cpp` `renderSineWaveWithFeedback`/`renderFMWithFeedback`/`renderFMWithFeedbackAdd` on `SineOsc.doFMNew` (2 modulators + feedback + mod1→mod0; carriers FM'd by the modulator buffer). Modulator amount via the Deluge volume parabola from the raw knob. **Also fixed a cable-routing bug**: `destStr.contains("VOLUME")` sent `modulator1/2Volume` cables to master `LOCAL_VOLUME`. |
+| 879b8dab | **Native 2-op FM**: faithful port of `voice.cpp` `renderSineWaveWithFeedback`/`renderFMWithFeedback`/`renderFMWithFeedbackAdd` on `SineOsc.doFMNew` (2 modulators + feedback + mod1→mod0; carriers FM'd by the modulator buffer). Modulator amount via the Deluge volume parabola from the raw knob. **Also fixed a cable-routing bug**: `destStr.contains("VOLUME")` sent `modulator1/2Volume` cables to master `LOCAL_VOLUME`. |
 | 3ca21c0d | **Param-curve foundation** (`ParamCurves` = `getParamNeutralValue`/`getParamRange`; `FirmwareUtils.getFinalParameterValueVolume/Linear/Hybrid/Exp`). **Fixed a real `getExp` bug**: `increaseMagnitudeAndSaturate` used `>= 0` (so magnitude 0 hit `1<<31` overflow → force-saturate) + unsigned `>>>`; firmware uses `> 0` + arithmetic `>>`. |
 | 5f34c9ce | **Filter cutoff range**: removed non-firmware caps (`BasicFilterComponent` moveability `min(1073741823)`, the `min(67108864)` freq clamps). Open cutoff 6.3 kHz → 19.9 kHz. |
 | 3b47c06a | **LFO rate**: dropped the ad-hoc `200+pow(2,...)*500`; the unsynced LFO phase increment is the exp-curved rate param directly (`getExp(121739, combineExp(knob))`). Preserved raw rate knob through the parser. |
-| 0b021092 | **Envelope rates**: per-stage firmware curves — attack `getExp(4096,-combo)`, decay/release `neutral*lookupReleaseRate` (ported `releaseRateTable64`). Raw env knobs preserved; programmatic time-in-seconds falls back to `190.2/time`. |
+| 0b021092 | **Envelope rates**: per-stage firmware curves — attack `getExp(4096,-combo)`, decay/release `neutral*lookupReleaseRate` (ported `releaseRateTable64` in `LookupTables`). Raw env knobs preserved; programmatic time-in-seconds falls back to `190.2/time`. |
 | de64741d | **Pan law**: linear `shouldDoPanning` (centre = full both channels) + fixed mis-centering (`LOCAL_PAN` is now bipolar, centre 0). Was constant-power cos/sin on a mis-encoded param (centred sound rendered hard-right & −3 dB). |
 | 70b69ca1 | **Filter makeup gain**: `FirmwareVoice` discarded `filterSet.setConfig(...)`'s return (`filterGain`). Capturing+applying it fixes ~2.4× hot output / clipping. |
 | f350e07a | A/B harness `RenderPatchToWav` + `docs/HARDWARE_AB_PLAN.md`. |
 
-## 5. VERIFIED FAITHFUL — do NOT investigate (already checked vs firmware)
+### #8 Patcher rewrite + structural alignment (2026-06-05 session, commit 65dc4e12)
+
+| file | what changed |
+|---|---|
+| `Patcher.java` | **Complete rewrite**: loops all 55 params (not just cabled ones); folds the stored knob through `combineCablesLinear`/`combineCablesExp` (port of the firmware patcher); uses `ParamCurves` static neutrals + range; dispatches the correct curve per param type (volume parabola / linear / hybrid / exp / `finalEnvRateParam` for envelope stages). Cable polarity, range adjustment, pitch/delay cable amount squaring, and wave-index <<1 hack all ported. |
+| `FirmwareFactory.java` | `normToBipolarParamVolume(float norm)` — maps 0→1 onto the full firmware bipolar knob range (-2³¹..+2³¹), matching `getParamFromUserValue`'s convention. `normToBipolarParam(float norm)` — same for non-volume params. `cutoffKnobFromHz` — recovers the raw cutoff knob from Hz. LFO rate now feeds the raw knob to `getExp` directly. |
+| `FirmwareSound.java` | Constructor now initializes all `paramNeutralValues[i]` from `ParamCurves.getParamNeutralValue(i)` as a baseline, then overrides with per-patch values. |
+| `FirmwareVoice.java` | Envelope attack now uses `finalEnvRateParam`; LFO rate now feeds param directly; filter-gain ordering uses filterGain; pan uses `shouldDoPanning`. |
+| `GlobalEffectable.java` | Minor postFXVolume/pan wiring updates. |
+| `SideChain.java` | Substantial port: faithful `render` with stereo-ducking, attack/release envelopes per the firmware. |
+| `DigitalAudioFidelityTest.java` | Updated to match new volume/gain curves. |
+| `FirmwareGoldenSignatureTest.java` | **New**: 6 golden-signature regression tests (saw+filter, FM, LFO tremolo, envelope shape, ring-mod+DX7, 049 Basic FM XML), all programmatic. Wide tolerances (30% relative / 0.05 absolute) — legitimate shift from the volume-knob fix; tighten after hardware A/B. |
+| `FirmwareSynthVoiceTest.java` / `RingModParityTest.java` | Re-baselined volume levels for the new firmware-style volume curve path. |
+| `PhysicalHardwareFidelityTest.java` | **New**: 36 programmatic golden-signature tests covering dry saw, filtered saw, detuned saw, filter mod, PWM, FM, DX7, unison, resonant LPF/HPF, LFO vibrato/tremolo/LPF/AutoPan/variants, noise, triangle, sine, pitch env sweep, FM feedback, filter morph, noise LPF, high LFO rate, saturated delay, arpeggiator, hard sync, dual mod, FM glide. Each has a committed XML fixture in `deluge/src/test/resources/fidelity/`. |
+
+### Other parity fixes (interleaved commits)
+
+| commit | fix |
+|---|---|
+| be4d96bb | **Stutter playback** parity fix |
+| 75b0fe98 | Advance Deluge firmware parity fixes |
+
+### Also added this session
+
+- `FirmwareParamCurvesTest` (5 tests pinning tables/curves to hand-traced firmware values)
+- `FirmwareEnvRateTest` (3 tests pinning `lookupReleaseRate` + envelope rate neutrals + knob direction)
+- `PostFxVolumeParityTest`, `SidechainRoutingParityTest`, `SrrBitcrushParityTest`, `ReverbSendParityTest`, `EqParityTest`, `ModFxParityTest`, `DelayParityTest`, `GranularParityTest`, `ArpParityTest`, `TimeStretchParityTest`, `SincInterpolatorTest` — per-FX parity coverage
+- `FirmwareFilterModeTest` (HPF + LPF resonance), `FirmwareRingModTest`, `FirmwareTuningTest`, `FirmwarePolyphonyTest`, `FirmwareLfoModulationTest`, `FirmwareNativeFmTest`, `FirmwarePatchCableTest`, `FirmwareFactorySyncTest`, `FirmwareSoundTest`, `FirmwareFactoryTest`, `RingModParityTest`
+- `StuttererTest`, `ModFXProcessorTest`, `BasicWavesTest`, `SineOscTest`, `DigitalReverbParityTest`
+- `AudioIntegrityTest`, `DelugeE2ETest` (migrated to pure engine), `AudioFileReader24BitTest`, `LfoSampleHoldWrapTest`
+- `FirmwareGoldenSignatureTest` (6) + `PhysicalHardwareFidelityTest` (36) = 42 golden-signature tests total
+
+## 4. VERIFIED FAITHFUL — do NOT investigate (already checked vs firmware)
 
 - **Pitch** (`pow(2,n/12)` is exact ET; firmware `noteFrequencyTable` differs by ~0.007 cent).
 - **Oscillators** (`renderCrude*` for `tableNumber < 6` matches the firmware at normal CPU load
@@ -152,95 +127,132 @@ in a test you must also set `sound.paramManager.getAutomatedParam(paramId).curre
 - **Velocity** — works for cabled patches (009 Hoover Bass vel30→120 RMS ratio 2.29).
 - **Master/patch volume** — `<volume>` is applied (as `LOCAL_VOLUME`); patches differ in level.
 
----
+## 5. PENDING WORK (prioritised)
 
-## 6. PENDING WORK (prioritised)
+### P1 — Tighten golden-signature tolerances (needs hardware A/B)
 
-### P1 — Golden-WAV regression suite (hardware-free, do FIRST)
-Render representative patches to committed reference signatures and assert in CI. Locks in the 7
-fixes, fixes the documented test-gap (no golden WAVs), and **becomes the exact hardware-A/B baseline**.
-Recommended approach (robust, no SD-card dependency): build the sounds **programmatically** (like
-`FirmwareSynthVoiceTest`) and assert on a stable signature (peak, RMS, and a few single-bin DFT
-harmonic magnitudes — NOT a raw byte checksum, which is brittle across JITs). Cover:
-- saw + LPF (sweep a couple cutoffs) — exercises filter range + makeup gain
-- native FM (set `synthMode=FM`, `fmModulatorAmountBase[0]`, `fmRatio1`) — FM engine
-- LFO→volume tremolo at a known rate — LFO rate
-- envelope attack/decay/release shape — env rates
-- ring-mod, and a DX7 patch — coverage
-Also add an XML-driven render of `049 Basic FM` @ C3 asserting it is bright (energy in high harmonics).
+The golden-signature suite (42 tests total: 6 in `FirmwareGoldenSignatureTest` + 36 in
+`PhysicalHardwareFidelityTest`) currently uses wide tolerances (30% relative / 0.05 absolute)
+because the volume-knob alignment fix legitimately shifted all output levels. These tolerances
+correctly gate that nothing breaks catastrophically, but they don't catch subtle regressions.
 
-### P2 — Concrete-bug audit vs firmware source (mostly low-risk)
-The "ignored return / wrong shift / wrong constant" pattern found 3 real bugs this session
-(`getExp`, `filterGain`, cable routing). Keep scanning, comparing Java ⇄ firmware line-by-line:
-- `dsp/fx/ModFXProcessor`, `SrrBitcrushProcessor`, `EqProcessor`, `dsp/reverb/*`, `Stutterer`,
-  `SideChain`, `GranularProcessor` — check shifts/constants and that return values aren't discarded.
-- Note `srrBitcrush.process`/`modFX.processModFX` modify a `postFXVolume` int[] that is then
-  **discarded** (never multiplied into the buffer). Minor (only the bitcrush/modFX makeup), but
-  verify against the firmware whether it should be applied.
+**When hardware access returns:** render each golden-test fixture to WAV via
+`RenderPatchToWav`, record the same patch on the real Deluge, compare spectra/level, and
+tighten the tolerances to the hardware-confirmed reference. The committed `reference_*.wav`
+files in `deluge/src/test/resources/fidelity/` were generated from the test fixtures and can
+serve as regression checkpoints against their own commit — use them as coarse gates, not as
+"hardware matches."
 
-### P3 — Master compressor (LEVEL-SHIFTING — ideally needs hardware A/B)
+### P2 — Master compressor (LEVEL-SHIFTING — ideally needs hardware A/B)
+
 `FirmwareAudioEngine` line ~68 has `// masterCompressor.renderVolNeutral(masterBuffer, Q31.ONE);`
 **commented out**; the firmware applies a song master compressor (`audio_engine.cpp:899`
-`globalEffectable.compressor.render(buf, masterVolAdjL>>1, ...)`). Enabling it changes ALL output
-dynamics and the `RMSFeedbackCompressor` port is unverified (heavy float exp/log/sqrt). Verify the
-port vs `dsp/compressor/*` in the firmware, pin with tests, then enable. Re-baseline P1 goldens.
-**Risk: defer until hardware A/B unless the port can be confidently verified from source.**
+`globalEffectable.compressor.render(buf, masterVolAdjL>>1, ...)`). The `RMSFeedbackCompressor`
+port is float exp/log/sqrt — verify against `dsp/compressor/*` in the firmware, pin with tests,
+then enable. **Risk: changes ALL output dynamics; defer until hardware A/B unless the port can
+be confidently verified from source.**
 
-### P4 — #8 Patcher + volume-scale (BIG, STRUCTURAL, LEVEL-SHIFTING)
-The firmware uses a **2^29-unity** volume scale (max "4.0" at 2^31) and threads `GLOBAL_VOLUME_POST_FX`
-(post-FX master, the patch `<volume>`) through the output. The Java uses **2^31-unity** per-voice
-volume and routes `<volume>` to `LOCAL_VOLUME` (per-voice) instead of `GLOBAL_VOLUME_POST_FX`
-(post-master); `postFXVolume` is hardcoded `Q31.ONE` in both `FirmwareSound.renderInternal` and
-`GlobalEffectable.renderOutput`. The approximate `Patcher` also doesn't fold the base knob and uses a
-linear approx instead of the volume parabola. A **back-compute approach was tried and FAILED for
-volume** (the engine's 2^31-unity scale can't round-trip the firmware's 2^29-unity curve, max ~0.25).
-The faithful fix needs **raw-knob plumbing + the firmware output scale through every consumer** (osc
-amplitude, filter, master) — broad, re-baselines all E2E peaks. Treat as a deliberate multi-commit
-effort; ideally with hardware A/B. NOT a functional gap (patch volume already scales output via
-`LOCAL_VOLUME`); it's a staging/scale faithfulness issue.
+### P3 — postFXVolume application (small, verifiable)
+
+`FirmwareSound.renderInternal` hardcodes `postFXVolume = {2147483647}` (full) and the SRR/modFX
+processors modify it but their return is **discarded** (never multiplied into the output buffer).
+The firmware applies it: `processReverbSendAndVolume(buf, reverbBuf, postFXVolume, ...)`. Fix:
+pass `postFXVolume` through `GlobalEffectable.renderOutput` → `processReverbSendAndVolume`.
+Small, but verify the application formula matches the firmware's `<< 5` scaling in
+`mod_controllable_audio.cpp:219-258`.
+
+### P4 — Consumer-side volume alignment (diminishing returns without hardware)
+
+The faithful Patcher outputs volume values in the firmware's 2²⁹-unity convention (neutral ≈ 0.5,
+headroom to 2.0). Some consumers (osc amplitude, filter gain) expect 2³¹-unity. The FM modulator
+amount and filter cutoff avoid this by computing values directly. For a cleaner architecture:
+audit every `paramFinalValues[LOCAL_VOLUME/OSC_*_VOLUME/...]` usage and ensure it interprets
+the firmware convention correctly. Low priority — no functional bug, just less headroom.
 
 ### P5 — Hardware A/B (when access returns)
+
 Follow `docs/HARDWARE_AB_PLAN.md`: record 049 Basic FM (C3), 009 Hoover Bass (C2, two velocities),
 128_SYNTH_DUAL_MOD_C5 (C5); render the Java side with `RenderPatchToWav`; compare spectra/level.
 **Leave the gold/cutoff knobs at the patch's saved positions** — physical knob moves override stored
-values and won't match (this bit us with 049: its stored LPF cutoff is genuinely low).
+values and won't match.
+
+### P6 — DX7 path verification
+
+The DX7 path (`sound.isDx7()`, `Dx7Engine`) is separate from native FM. It was verified functional
+earlier (commit 38584514). The `dx7` golden test in `FirmwareGoldenSignatureTest` + the DX7 fixture
+in `PhysicalHardwareFidelityTest` cover it. If DX7 ever sounds wrong, check:
+- `XML` element format (older patches use attribute-style `<envelope attack="0x...">` vs newer
+  child-element `<envelope><attack>0x...</attack>`).
+- The `Dx7Engine` pitch-EG and transpose (both fixed in 38584514).
 
 ---
 
-## 7. KEY GOTCHAS / domain notes
+## 6. KEY GOTCHAS / domain notes
 
-- **Volume scale divergence (root of P3/P4):** firmware volume params output 2^29 = unity (headroom to
-  2^31 = "4.0"); Java oscillators treat 2^31 = unity. This is why back-compute fails for volume and why
-  enabling master volume/compressor blindly would clip.
-- **`getFinalParameterValueVolume`** (parabola) vs **`Linear`** vs **`Hybrid`** (pan) vs **`Exp`**
-  (cutoff/LFO/pitch) — pick the curve by param index (`FIRST_LOCAL_NON_VOLUME=7`,
-  `FIRST_LOCAL_HYBRID=19`, `FIRST_LOCAL_EXP=24`). Ported in `FirmwareUtils`.
-- **Filter:** the per-voice ladder/SVF (`FirmwareVoice.filterSet`) returns a makeup `filterGain` from
-  `setConfig` that MUST be applied (now is). `ONE_Q16 = 134217728` (misnamed; it's 2^27).
+- **Volume convention:** firmware volume params output 2²⁹ = unity (headroom to 2³¹ = "4.0").
+  The faithful Patcher uses this. Java oscillators treat 2³¹ = unity. This mismatch is documented
+  as P4 — it only reduces headroom, doesn't break anything.
+- **Param curves by index:** `getParamType` in `Patcher.java` classifies params:
+  - `p < FIRST_LOCAL_NON_VOLUME(7)` → **VOLUME** → `getFinalParameterValueVolume` (parabola)
+  - `p < FIRST_LOCAL_HYBRID(19)` → **LINEAR** → `getFinalParameterValueLinear`
+  - `p < FIRST_LOCAL_EXP(24)` → **HYBRID** → `getFinalParameterValueHybrid` (pan, phase width)
+  - else → **EXP** → `getFinalParameterValueExp`, or `finalEnvRateParam` for envelope stages
+  - Same pattern for global params (`FIRST_GLOBAL_NON_VOLUME/HYBRID/EXP`)
+- **Filter:** the per-voice ladder/SVF returns a makeup `filterGain` from `setConfig` that MUST
+  be applied (now is). `ONE_Q16 = 134217728` (misnamed; it's 2²⁷).
 - **DIAG debug spam:** `FirmwareVoice.noteOff`/`FirmwareSound.releaseNote` print `[DIAG ...]` to
-  stdout on every note. Harmless but noisy — a good cleanup task (gate behind a static flag or remove).
-- **DX7** path (`sound.isDx7()`, `Dx7Engine`) is separate from native FM; verified working earlier.
+  stdout on every note. Harmless but noisy — gate behind a static flag or remove.
+- **DX7** path (`sound.isDx7()`, `Dx7Engine`) is separate from native FM. Verified 2026-06-03.
 
-## 8. File map
+## 7. File map
 
-- Per-voice DSP: `firmware/engine/FirmwareVoice.java` (osc render, FM `renderFm`, env/LFO, pan, filter).
-- Sound/FX chain + global LFO: `firmware/engine/FirmwareSound.java`.
-- Master mix/reverb/delay/compressor: `firmware/engine/FirmwareAudioEngine.java`,
-  `firmware/engine/GlobalEffectable.java`.
-- Param curves: `firmware/modulation/params/ParamCurves.java`, `firmware/util/FirmwareUtils.java`,
-  `firmware/util/Q31.java`, `firmware/util/LookupTables.java`.
-- Patcher (approximate): `firmware/modulation/patch/Patcher.java`.
-- Filters: `firmware/dsp/filter/{FirmwareFilter,LpLadderFilter,HpLadderFilter,SVFilter,BasicFilterComponent,FilterSet}.java`.
-- Factory (model→engine): `firmware/engine/FirmwareFactory.java`. Parser: `xml/DelugeXmlParser.java`,
-  `xml/DelugeHexMapper.java` (`hexToQ31` preserves raw knobs). Model: `model/SynthTrackModel.java`.
-- A/B harness: `deluge/src/test/.../reproduce/RenderPatchToWav.java`. Plan: `docs/HARDWARE_AB_PLAN.md`.
-- Feature map: `docs/FIRMWARE_FEATURES_MAPPING.md`.
+- **Per-voice DSP:** `firmware/engine/FirmwareVoice.java` (osc render, FM `renderFm` with
+  `renderSineWaveWithFeedback`/`renderFMWithFeedbackAdd` helpers, env/LFO, pan, filter).
+- **Sound/FX chain + global LFO:** `firmware/engine/FirmwareSound.java`.
+- **Master mix/reverb/delay:** `firmware/engine/FirmwareAudioEngine.java` (masterReverb,
+  masterDelay, masterCompressor — compressor commented out), `firmware/engine/GlobalEffectable.java`
+  (global filterSet, processReverbSendAndVolume).
+- **Param curves:** `firmware/modulation/params/ParamCurves.java` (static neutral + range tables),
+  `firmware/modulation/params/Param.java` (all 55 param IDs).
+- **Patcher (FAITHFUL, rewritten):** `firmware/modulation/patch/Patcher.java` (combineCablesLinear/Exp,
+  cableToLinear/ExpParam, range adjustment, pitch/delay square, wave-index hack).
+- **PatchCable:** `firmware/modulation/patch/PatchCable.java` (polarity, range adjustment).
+- **Math:** `firmware/util/FirmwareUtils.java` (getExp, lookupReleaseRate, patchCombine*Step,
+  getFinalParameterValue*, instantTan, getTanH*, signed_saturate, lshiftAndSaturate),
+  `firmware/util/Q31.java` (multiply, addSaturate, etc.), `firmware/util/LookupTables.java`
+  (tanTable, decayTableSmall8, expTableSmall, releaseRateTable64, SawLookupTables,
+  SquareLookupTables, resonanceThresholdsForOversampling, resonanceLimitTable).
+- **Filters:** `firmware/dsp/filter/{FirmwareFilter,LpLadderFilter,HpLadderFilter,SVFilter,
+  BasicFilterComponent,FilterSet}.java`.
+- **Oscillators:** `firmware/dsp/oscillators/{Oscillator,SineOsc,BasicWaves}.java`,
+  `firmware/dsp/oscillators/{SawLookupTables,SquareLookupTables,PulseLookupTables}.java`,
+  `firmware/storage/wave_table/WaveTable.java`.
+- **Envelope:** `firmware/modulation/Envelope.java` (render with getDecay4/8, releaseTable).
+  **LFO:** `firmware/modulation/LFO.java` (S&H/Random-Walk fixed).
+- **Sidechain:** `firmware/modulation/sidechain/SideChain.java` (faithful port).
+- **DSP FX:** `firmware/dsp/fx/{ModFXProcessor,SrrBitcrushProcessor,EqProcessor,ModFXType}.java`,
+  `firmware/dsp/reverb/{MutableReverb,DigitalReverb,ReverbContainer}.java`,
+  `firmware/dsp/compressor/RMSFeedbackCompressor.java`,
+  `firmware/dsp/granular/GranularProcessor.java`,
+  `firmware/dsp/envelope_follower/AbsValueFollower.java`,
+  `firmware/dsp/fx/SrrBitcrushProcessor.java`.
+- **Factory (model→engine):** `firmware/engine/FirmwareFactory.java` (mapModelToSound, cutoffKnobFromHz,
+  normToBipolarParam/Volume, stringToPatchSource, cable destination mapping).
+- **Parser/Model:** `xml/DelugeXmlParser.java` (parseSynth, parseModulator1/2, parseEnvelopes,
+  parseSynthLfo, parsePatchCables), `xml/DelugeHexMapper.java` (hexToQ31, hexToFloat, hexToHz,
+  hexToLfoHz, hexToEnvTime), `model/SynthTrackModel.java` (envRateKnobsQ31, lfoRateKnobQ31,
+  fmModulatorAmountBaseQ31, fmRatio, modulator1/2Amount, envKnobSet).
+- **A/B harness:** `deluge/src/test/.../reproduce/RenderPatchToWav.java`. Plan: `docs/HARDWARE_AB_PLAN.md`.
+- **Golden tests:** `FirmwareGoldenSignatureTest.java` (6), `PhysicalHardwareFidelityTest.java` (36).
+- **Test fixtures:** `deluge/src/test/resources/fidelity/*.XML` + `reference_*.wav` + `REC00010-12.WAV`.
+- **Memory (Claude-only):** `~/.claude/projects/.../memory/deluge-remaining-approximations.md`,
+  `deluge-nondx7-port-bugs.md`, `deluge-dx7-gap.md`.
 
-## 9. Methodology checklist for each fix
+## 8. Methodology checklist for each fix
 
 1. Find the Java code; find the firmware equivalent in `~/a/DelugeFirmware/src/deluge/`.
 2. Port the exact integer math + tables. No float shortcuts for what the firmware does in fixed point.
 3. Add a unit test pinning hand-traced firmware values (compute by hand from the C++).
-4. `mvn -pl deluge test` green. Re-baseline any characterization tests whose values legitimately shift
-   (explain why in the commit).
-5. Branch off `main`, commit (Co-Authored-By line), and hand back for merge/push.
+4. `mvn -pl deluge spotless:apply` + `mvn -pl deluge test` green.
+5. Re-baseline any characterization tests whose values legitimately shift (explain why in the commit).
+6. Branch off `main`, commit, and merge to `main`.
