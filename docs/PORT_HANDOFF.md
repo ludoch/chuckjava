@@ -143,7 +143,15 @@ files in `deluge/src/test/resources/fidelity/` were generated from the test fixt
 serve as regression checkpoints against their own commit — use them as coarse gates, not as
 "hardware matches."
 
-### P2 — Master compressor — DONE (commit 2f6e23d0, pending merge)
+**2026-06-05 slow-test results:** the 36 `PhysicalHardwareFidelityTest` tests (tagged `@Tag("slow")`,
+run with `-Pslow-tests`) compare Java renders against reference WAVs. **26/36 pass, 10 fail.**
+The 10 failures are from legitimate output shifts (LFO rate, envelope rate, pan law, compressor)
+making Java-generated reference WAVs stale. The 3 hardware-recording tests (REC07, REC10-12) need
+actual hardware comparison. To regenerate: re-render the XML fixtures through the same pipeline as
+`PhysicalHardwareFidelityTest.renderXmlTrackPreset`. A regeneration tool was started but is
+incomplete — pick up or write fresh.
+
+### P2 — Master compressor — DONE (merged, commit 2f6e23d0)
 
 Verified the `RMSFeedbackCompressor` port against the firmware's `rms_feedback.cpp` — the render
 flow (RMS→log→threshold→envelope→exp gain→amplitude increment→saturation) matches. Added 4 unit
