@@ -25,7 +25,20 @@ Note: `FirmwarePatchCableTest.velocityToCutoffBrightensWithVelocity` **passes** 
 
 ## Bucket A — faithful C subsystem ports (do these; follow the rule)
 
-### A1. Sidechain ducking of global volume  *(STARTED — smallest, sharpest signal)*
+### A1. Sidechain ducking of global volume  ✅ DONE (commit d172db0c)
+- Root cause was **not** a missing port: the `Sound::render` global-param duck path already works
+  (legacy proves it). The fw2 bridge copied `paramKnobs` (factory-only) into the fw2 patched-param
+  set, so a **directly-constructed** FirmwareSound (tests setting only `paramNeutralValues`) got
+  zero knobs → the fw2 voice ignored SUSTAIN/volume and decayed → nothing to duck. Fix: a
+  `paramKnobsPopulated` flag (set by the factory); the bridge falls back to `paramNeutralValues`
+  when unset — byte-identical for factory sounds. Also made `GranularProcessor` grain selection
+  deterministic (was `Math.random()`) and re-baselined the now-stable granular audibility bar.
+- **Key insight for bucket B**: any directly-constructed FirmwareSound test on the fw2 default now
+  honors `paramNeutralValues`. Tests still failing that build sounds directly may benefit from / need
+  awareness of this. The legacy↔fw2 param-domain split (paramNeutralValues = curve-outputs for env
+  RATES; raw bipolar knobs otherwise) is the recurring bridge subtlety.
+
+### (original A1 notes) Sidechain ducking of global volume
 - The `SIDECHAIN` patch source already computes correctly (goes negative on a kick). The gap: a cable
   `SIDECHAIN → GLOBAL_VOLUME_POST_REVERB_SEND` must duck the **summed Sound output**, which the C does in
   `Sound::render` via the global source values + global-param patching — not in the per-voice `Voice`.
@@ -55,8 +68,9 @@ Note: `FirmwarePatchCableTest.velocityToCutoffBrightensWithVelocity` **passes** 
 
 ## Bucket B — firmware2 ↔ FirmwareSound bridge fixes (integration, not C-file ports)
 
-- **B1** `Firmware2IntegrationTest`: clear `fw2Voices` when `useFirmware2=false` (and never populate it on
-  the legacy path).
+- **B1** `Firmware2IntegrationTest`: ✅ DONE (commit 5c4d794c). The flag-off path was already correct
+  (legacy voices populated, fw2Voices empty); the test relied on a stale "default OFF" assumption and
+  now opts out of fw2 explicitly. (`useFirmware2` defaults on.)
 - **B2** `AudioIntegrityTest`: after release, the voice must be **culled** so the engine emits true silence
   (faithful to `voice.cpp` end-of-release cull → voice removed from the active list), and the bridge must
   drop it from `fw2Voices`.
@@ -73,4 +87,11 @@ hardware capture to set honest thresholds:
 - `DigitalAudioFidelityTest` steady-state level.
 
 ## Order of attack
-A1 (started) → B1/B2 (cheap, unblock E2E) → A2 (arp) → A3 (MPE) → A4 (patcher) → C (with hardware).
+A1 ✅ → B1 ✅ → **B2 (voice cull / silent-after-release) ← next** → B3 (E2E silence) → A2 (arp) →
+A3 (MPE) → A4 (patcher) → C (with hardware).
+
+## Status: 17 failures / 275 (was 19 at the start of this pass, 32 at the start of the arc).
+Remaining: AudioIntegrityTest (silent-after-release, kit gating), DelugeE2ETest (song silence),
+DigitalAudioFidelityTest (kit/steady-state level), FirmwareGoldenSignatureTest ×6 (golden re-baseline),
+FirmwarePatchCableTest (env2→cutoff depth), FirmwareSoundTest (mono/poly), LiveAutomationMpeTest ×3 (MPE),
+ArpParityTest (arp). Buckets: B2/B3 (bridge), A2/A3 (ports), C (hardware-calibration).
