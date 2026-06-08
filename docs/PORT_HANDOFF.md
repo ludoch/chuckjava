@@ -1,3 +1,10 @@
+> **SUPERSEDED for the firmware2 port (2026-06-08).** The current faithful target is
+> `org.chuck.deluge.firmware2` (a line-for-line C port; `useFirmware2=true` is now the default), NOT the
+> older `org.chuck.deluge.firmware.*` engine this doc calls "supported". For the firmware2 port rules
+> (absolute rule, mandatory pre-edit protocol, int/uint16/long mapping), status (oscillators, patcher, FM,
+> ringmod, DX7 modern+MkI all transcribed), and remaining work, see **`docs/FIRMWARE2_FAITHFUL_PORT.md`**.
+> The general ground rules + build/test commands below still apply.
+
 # Deluge faithful-port — continuation handoff (updated 2026-06-05)
 
 Self-contained handoff so any session (incl. Gemini, which has no access to the prior
