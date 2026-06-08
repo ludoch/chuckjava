@@ -73,7 +73,13 @@ per-source `OscType::DX7`. The cure is always: open the C, mirror its structure.
     `Dx7ParityTest`/`Dx7VoiceTest` pass.
 - `PhaseIncrementFineTuner` + `centAdjustTableSmall[257]`, `PatchSource` enum — verbatim.
 
-## Remaining work (each its own faithful pass)
+## Remaining work
+
+> **The prioritized, test-mapped roadmap for the remaining subsystems lives in
+> [`FIRMWARE2_PORT_ROADMAP.md`](FIRMWARE2_PORT_ROADMAP.md)** — each failing test mapped to its C source,
+> split into faithful C ports (A), bridge fixes (B), and hardware-calibration (C). The summary below remains.
+
+### Remaining work (each its own faithful pass)
 1. **DX7 polish**: `OscType` enum order differs from `definitions_cxx.hpp:367` (SAW/SQUARE/ANALOG swapped) —
    name-based so functionally safe, reorder for full faithfulness. `dx7EngineType` (chuckjava -1/0/1) →
    `engineMode` (C 0/1/2) mapping for forced modern/MkI (auto-detect already faithful).
