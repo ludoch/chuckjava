@@ -38,3 +38,4 @@ cp.txt
 # Claude/Claudex local settings
 .claude/
 /deluge/src/main/resources/DX7/
+jdk25/
