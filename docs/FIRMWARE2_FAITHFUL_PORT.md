@@ -11,13 +11,34 @@ stop and get explicit approval first.
 faithful transcription made a "bug" vanish. Parts that were genuinely copied (value-scaling curves,
 `paramNeutralValues`, `cableTo*` leaf math, wavetables) had no such bugs.
 
+### Mandatory pre-edit protocol (the gate — do this BEFORE writing ANY firmware2 code)
+1. Open the exact C function in `~/a/DelugeFirmware/src/deluge/` that this code corresponds to. Read it.
+2. Mirror the C's **structure**: same control flow, loops, per-source/per-unison/per-block organization,
+   function decomposition, names. The C is the skeleton; Java fills it in. Cite the C `file:line` in comments.
+3. Do **not** let the existing chuckjava model shape the port. If you're about to reuse a chuckjava field/
+   class/structure (e.g. a whole-voice flag, `firmware/` classes, `org.chuck.audio.*`), STOP and check: does
+   the C do it that way? If the C structures it differently (e.g. DX7 is a per-source `OscType::DX7` in
+   `voice.cpp`, not a whole-voice mode), follow the C — add enum values / per-source state / parser changes
+   to match the C's model.
+4. If the C model and the existing chuckjava model genuinely differ, that is a **deviation** → STOP, surface
+   it, get explicit approval before writing. Never silently adapt to the existing model.
+5. After writing, diff the Java against the C line-by-line.
+
+Two incidents where this rule was broken (both = letting existing Java shape the port): a reconstructed
+patcher flow instead of porting `patcher.cpp`; a whole-voice `dx7Active` mode instead of `voice.cpp`'s
+per-source `OscType::DX7`. The cure is always: open the C, mirror its structure.
+
 ### Numeric-type mapping (the #1 error source)
 - C `int32_t` → Java `int` (both 32-bit two's-complement; wraparound matches — rely on it).
 - C `uint32_t` → Java `int` with **unsigned ops**: `>>>`, `Integer.compareUnsigned`, `& 0xFFFFFFFFL`.
+- C `uint16_t` → Java `int` with `& 0xFFFF` at each step the C truncates (e.g. table values, log/exp sums).
 - C `int64_t`/`uint64_t` → Java `long`; 64-bit products via `(long)a * b`.
-- **Never** use `float`/`double` for Q31/Q32 fixed-point. Only where the C literally uses float/double.
+- **Never** use `float`/`double` for Q31/Q32 fixed-point. Only where the C literally uses float/double
+  (e.g. table generators, `log2f` for DX7 pitch).
 - NEON SIMD → scalar per-lane: `vqdmulhq_s32(a,b)` = `(int)(((long)a*b) >> 31)`; `vld1q/vst1q` = unrolled
   per-sample loop; preserve exact shift counts + rounding (`*_rshift32_rounded` adds the round constant).
+- C virtual dispatch (`obj->method()`) → a static conditional in Java is acceptable **iff** the method
+  bodies are faithfully transcribed (e.g. `DxPatch.core->render` → `if (useMkI) EngineMkI.render else FmCore.render`).
 
 ## What is faithfully transcribed (done)
 - **Oscillator** (`oscillator.cpp`/`basic_waves.cpp`): saw, square, triangle, **sine** (renderWave over
@@ -35,14 +56,27 @@ faithful transcription made a "bug" vanish. Parts that were genuinely copied (va
 - **Patcher** wiring: firmware2 `Sound` owns `patchedParamValues` + `patchCableSet`; per-block
   `performInitialPatching` (base) + `performPatching` (cables). Source formulas match `voice.cpp` noteOn.
 - **Envelope**: render was already faithful; fixed the **release routing** (`releaseNote` now reaches fw2 voices).
-- **DX7 math foundation** (`dsp/dx/math_lut.cpp`): `Dx7Tables` exp2 scale fixed (`1<<30`, was `1<<24` → 64×
-  too small) + added `SIN_TAB`/`TANH_TAB`/`FREQ_LUT` + `sin/tanh/freq` lookups; `Freqlut` wired. DX7 now
-  produces correct, distinct output (`Dx7ParityTest`/`Dx7VoiceTest` pass).
+- **DX7 — fully ported** (`dsp/dx/`):
+  - `math_lut.cpp` → `Dx7Tables`: exp2 scale fixed (`1<<30`, was `1<<24` → 64× too small) + `SIN_TAB`/`TANH_TAB`/
+    `FREQ_LUT` + `sin/tanh/freq` lookups; `Freqlut` wired.
+  - `fm_op_kernel.cpp` + `fm_core.cpp` → `FmCore` (modern MSFA engine): `Sin::lookup` (Q24) → `(y*gain)>>24`,
+    post-increment phase, feedback `(y0+y)>>(fb_shift+1)`; gain via the real `Exp2::lookup` (`Dx7Tables.exp2Lookup`).
+  - `EngineMkI.cpp` → `EngineMkI` (Mark I engine): gain = ENV in the **log domain** via `mkiSin`
+    (`sinLogTable`/`sinExpTable`), `compute`/`compute_pure`/`compute_fb` + `compute_fb2`(ALGO 6)/`compute_fb3`(ALGO 4),
+    `render` override (inverted `gain<=ENV_MAX-100` threshold, algo 3/5+fb → `ops[0]=0xc4`).
+  - **Integration**: DX7 is a per-source `OscType.DX7` rendered in `Voice`'s source loop (`voice.cpp:2371-2387`:
+    `adjpitch = log2(phaseIncrement)*(1<<24) - 278023814`; `dxVoice.compute`; `out += mult_32x32_rshift32(uniBuf,
+    sourceAmplitude) << 6`). Per-source `Dx7Voice`/`DxPatch`; `FirmwareSound.dx7Patch` maps source 0 → `OscType.DX7`.
+  - **Engine selection** (`dx7note.cpp:66-79`): `DxPatch.updateEngineMode` sets `useMkI` (engineMode==2, or auto +
+    feedback + algo∈{3,5}); `Dx7Voice.compute` dispatches `EngineMkI.render` vs `FmCore.render`.
+  - Uses the C-port `Dx7Voice`/`FmCore`/`EngineMkI`, **not** the legacy `org.chuck.audio.util.Dx7Engine`.
+    `Dx7ParityTest`/`Dx7VoiceTest` pass.
 - `PhaseIncrementFineTuner` + `centAdjustTableSmall[257]`, `PatchSource` enum — verbatim.
 
 ## Remaining work (each its own faithful pass)
-1. **DX7 finish**: operators still use `SineOsc.doFMNew` instead of `Dx7Tables.sinLookup` (`Sin::lookup`);
-   engine switching (modern/MkI) is stubbed. Port the rest of `dx7note.cpp`/`engine.cpp` Sin usage.
+1. **DX7 polish**: `OscType` enum order differs from `definitions_cxx.hpp:367` (SAW/SQUARE/ANALOG swapped) —
+   name-based so functionally safe, reorder for full faithfulness. `dx7EngineType` (chuckjava -1/0/1) →
+   `engineMode` (C 0/1/2) mapping for forced modern/MkI (auto-detect already faithful).
 2. **Filters**: firmware2 `FilterSet` SVF / HP-ladder — verify against `state_variable_filter` etc.; an HPF
    branch in `Voice.applyFilterAndGain`; `fw2HpfMode`. (Currently LPF ladder only.)
 3. **Full patcher fidelity**: the C `performPatching(sourcesChanged, Sound&, ParamManager&)` uses a
