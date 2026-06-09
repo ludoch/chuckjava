@@ -79,13 +79,16 @@ resampled dispatch), and loop/one-shot end. The fw2 sampler now plays pitched sa
 
 `TIME_STRETCH_ENABLE_BUFFER`/`SampleCache` remain out of scope (= 0/optional, by design).
 
-**Remaining (smaller, optional):**
+**Remaining:**
 - ✅ `getPlayByteLowLevel` interpolation-buffer compensation — DONE (hop old-head reference now exact).
-- Loop pre-margin inside the time-stretch path (hopEnd's `LoopType::TIMESTRETCHER_LEVEL_IF_ACTIVE`
-  branch, time_stretcher.cpp:392-469 — the AudioClip loop-into-pre-margin + anti-click crossfade). A
-  clean but niche port. Plain one-shot/loop is done for non-stretch playback.
+- ✅ Loop pre-margin in time-stretch (hopEnd `TIMESTRETCHER_LEVEL_IF_ACTIVE`, time_stretcher.cpp:392-465)
+  — DONE (anti-click crossfade back into the loop; `hasLoopedBackIntoPreMargin`).
 - The guide transport-sync (`getSyncedNumSamplesIn`) is a SEAM, not a pure C port: it needs a transport
-  clock (`playbackHandler`) that fw2 doesn't have. Wire it when a tempo clock exists.
+  clock (`playbackHandler`) that fw2 doesn't have. Wire it when a tempo clock exists. **This is the only
+  remaining gap, and it is blocked on infrastructure (like the FFT/NE10 boundary), not portable now.**
+
+**The in-RAM sample + time-stretch DSP port is complete.** Every self-contained C function is ported and
+verified; what's left (`getSyncedNumSamplesIn`) cannot be faithfully ported without a tempo clock.
 
 **Engine status: the fw2 sampler plays pitched, looped, and time-stretched in-RAM samples — the DSP that
 was the last blocker to deleting `firmware/` for sample playback.**
