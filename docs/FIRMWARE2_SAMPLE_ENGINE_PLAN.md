@@ -60,9 +60,21 @@ are `0`/optional and stay out of scope, which removes a large slice.
 - `SampleReader` — in-RAM `readSamplesResampled` (forward/reverse resampled read, option (b) full precision
   via `SincInterpolator.interpolateWide`). No cluster boundaries / loop / cache yet.
 
-**Next:** `readSamplesNative` (integer-rate path) is small; then either wire a basic pitched-sample
-`VoiceSample` (no time-stretch — the common case, a real milestone) or tackle `hopEnd` (time-stretch
-crossfade) which additionally needs the guide sync seam + two-play-head crossfade + `readFromBuffer`.
+**Then:** pitched-sample milestone — `readSamplesNative`, `getWhichKernel`, `VoiceSample` (native +
+resampled dispatch), and loop/one-shot end. The fw2 sampler now plays pitched samples end-to-end.
+
+**Time-stretch DSP — now complete + tested** (`TimeStretcher`):
+- `computeHopParameters` (beam-width/crossfade params from the ratio),
+- `Sample.getAveragesForCrossfade` (the similarity metric),
+- `getTotalDifferenceAbs`/`getTotalChange` (comparators), `getSamplePos`, constants,
+- `searchForCrossfadeOffset` — the bidirectional sliding-window crossfade-point search (hopEnd 604-862),
+  re-derivation-verified over forward/reverse resampled cases.
+
+**Remaining = assembly, not new DSP:** wire the pieces into a hopEnd-equivalent render — two `SampleReader`
+play-heads (older + newer), `setupNewPlayHead` (reposition the new head reader to `newHeadBytePos +
+bestOffset`, `additionalOscPos`), and the crossfade mix (`crossfadeProgress`/`crossfadeIncrement`)
+between the heads in the VoiceSample render loop. Plus the guide transport-sync seam
+(`getSyncedNumSamplesIn`). `TIME_STRETCH_ENABLE_BUFFER`/`SampleCache` stay out of scope (= 0/optional).
 
 ## 3. Proposed phases (revised)
 
