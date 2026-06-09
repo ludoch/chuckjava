@@ -53,9 +53,16 @@ So Phase B **cannot start with the DSP core**; it must start with the position/l
 (`SamplePlaybackGuide` + an in-RAM `SampleReader`). `TIME_STRETCH_ENABLE_BUFFER` and the perc `SampleCache`
 are `0`/optional and stay out of scope, which removes a large slice.
 
-**Done so far (faithful + tested, `firmware2/TimeStretcher.java` + `TimeStretcherTest`):** the genuinely
-self-contained pieces — `getTotalDifferenceAbs`, `getTotalChange`, `getSamplePos`, and the `TimeStretch`
-constants. These are the only parts portable without the reader/guide.
+**Done so far (faithful + tested):**
+- `TimeStretcher` self-contained subset — `getTotalDifferenceAbs`, `getTotalChange`, `getSamplePos`, constants.
+- Foundation — `Sample` (in-RAM), `SampleHolder` (`getEndPos`/`getDurationInSamples`), `SamplePlaybackGuide`
+  (`setupPlaybackBounds` + byte-pos getters; transport-sync deferred to a seam).
+- `SampleReader` — in-RAM `readSamplesResampled` (forward/reverse resampled read, option (b) full precision
+  via `SincInterpolator.interpolateWide`). No cluster boundaries / loop / cache yet.
+
+**Next:** `readSamplesNative` (integer-rate path) is small; then either wire a basic pitched-sample
+`VoiceSample` (no time-stretch — the common case, a real milestone) or tackle `hopEnd` (time-stretch
+crossfade) which additionally needs the guide sync seam + two-play-head crossfade + `readFromBuffer`.
 
 ## 3. Proposed phases (revised)
 
