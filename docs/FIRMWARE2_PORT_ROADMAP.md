@@ -97,7 +97,7 @@ Legend:
 | `dsp/fx/srr_bitcrush` | `dsp/fx/SrrBitcrushProcessor.java` (120) | `SrrBitcrush.java` | ✅ 100% — parity-verified vs firmware/ |
 | `modulation/sidechain/sidechain.cpp` | `modulation/sidechain/SideChain.java` (113) | `Sidechain.java` | ⚠️ ported; not yet parity-verified |
 | `dsp/envelope_follower/absolute_value.cpp` (66) | `dsp/envelope_follower/AbsValueFollower.java` (79) | `AbsValueFollower.java` | ⚠️ ported; not yet parity-verified |
-| `dsp/interpolate/interpolate.cpp` (218) | `dsp/interpolate/SincInterpolator.java` (66) | `SincInterpolator.java` | ⚠️ ported; not yet parity-verified |
+| `dsp/interpolate/interpolate.cpp` (218) | `dsp/interpolate/SincInterpolator.java` (66) | `SincInterpolator.java` | ✅ 100% — verified vs C algorithm (re-derived); kernel made int16-exact |
 | `dsp/convolution/` | `dsp/convolution/ImpulseResponseProcessor.java` (41) | *(in Delay.java)* | ⚠️ ported (IR FIR); not yet parity-verified |
 | `dsp/timestretch/time_stretcher.cpp` | `dsp/timestretch/TimeStretcher.java` (112) | — | ❌ |
 | `dsp/interpolate/` (kernels) | `dsp/interpolate/WindowedSincKernel.java` (146) | — | ❌ |
