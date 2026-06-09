@@ -70,11 +70,23 @@ resampled dispatch), and loop/one-shot end. The fw2 sampler now plays pitched sa
 - `searchForCrossfadeOffset` — the bidirectional sliding-window crossfade-point search (hopEnd 604-862),
   re-derivation-verified over forward/reverse resampled cases.
 
-**Remaining = assembly, not new DSP:** wire the pieces into a hopEnd-equivalent render — two `SampleReader`
-play-heads (older + newer), `setupNewPlayHead` (reposition the new head reader to `newHeadBytePos +
-bestOffset`, `additionalOscPos`), and the crossfade mix (`crossfadeProgress`/`crossfadeIncrement`)
-between the heads in the VoiceSample render loop. Plus the guide transport-sync seam
-(`getSyncedNumSamplesIn`). `TIME_STRETCH_ENABLE_BUFFER`/`SampleCache` stay out of scope (= 0/optional).
+**Time-stretch — COMPLETE and working end-to-end** (in-RAM scope):
+- `TimeStretcher.hopEnd` — beam-width placement + crossfade-point search + crossfade setup.
+- `VoiceSample.renderTimeStretched` — the two-play-head crossfade render: `samplePosBig` advances at
+  `combinedIncrement`, hops fork the newer head into the older head (`SampleReader.copyStateFrom`),
+  reposition, and linearly crossfade. Pitch is decoupled from speed.
+- Verified: audible output; deterministic + exact at 1x stretch (randomElement 0).
+
+`TIME_STRETCH_ENABLE_BUFFER`/`SampleCache` remain out of scope (= 0/optional, by design).
+
+**Remaining (smaller, optional):**
+- The guide transport-sync seam (`getSyncedNumSamplesIn`) for clip-synced stretch timing.
+- `getPlayByteLowLevel` interpolation-buffer compensation (currently the reader frame position is used
+  directly — a small documented approximation in `renderTimeStretched`).
+- Loop/end handling inside the time-stretch path (one-shot/loop is done for plain playback).
+
+**Engine status: the fw2 sampler plays pitched, looped, and time-stretched in-RAM samples — the DSP that
+was the last blocker to deleting `firmware/` for sample playback.**
 
 ## 3. Proposed phases (revised)
 
