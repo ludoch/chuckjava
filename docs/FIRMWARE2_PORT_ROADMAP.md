@@ -88,8 +88,10 @@ Legend:
 | `dsp/compressor/rms_feedback.cpp` (167) | `dsp/compressor/RMSFeedbackCompressor.java` (260) | `Compressor.java` | ✅ 100% — parity-verified (firmware/ is non-faithful here: see note below) |
 | `dsp/delay/delay.cpp` (464) | `dsp/delay/Delay.java` (446) | `Delay.java` (in part) | ⚠️ ported (incl. DelayBuffer + ImpulseResponseProcessor); not yet parity-verified |
 | `dsp/delay/delay_buffer.cpp` (191) | `dsp/delay/DelayBuffer.java` (403) | *(in Delay.java)* | ⚠️ ported; not yet parity-verified |
-| `dsp/reverb/` (multiple files) | `dsp/reverb/` (multiple files, ~1200 total) | `Reverb.java`, `Freeverb.java` | ⚠️ ported (lp-state fix applied); not yet parity-verified |
-| `dsp/granular/GranularProcessor.cpp` (347) | `dsp/granular/GranularProcessor.java` (173) | `GranularProcessor.java` | ⚠️ ported; not yet parity-verified |
+| `dsp/reverb/freeverb/*` | `dsp/reverb/freeverb/Freeverb.java` | `Freeverb.java` | ✅ 100% — verified vs C (firmware/ non-faithful: wet2 + cross-feed temp) |
+| `dsp/reverb/mutable.hpp` | `dsp/reverb/MutableReverb.java` | `Reverb.MutableModel` | ✅ 100% — output-scale bug fixed (uint32 max, was 2× quiet) |
+| `dsp/reverb/digital.hpp` | `dsp/reverb/DigitalReverb.java` | `Reverb.DigitalModel` | ✅ 100% — ported (was silently aliased to Mutable) |
+| `dsp/granular/GranularProcessor.cpp` (347) | `dsp/granular/GranularProcessor.java` (173) | `GranularProcessor.java` | ✅ 100% — 6 approximations fixed vs C (firmware/ non-faithful) |
 | `dsp/fx/eq` | `dsp/fx/EqProcessor.java` (76) | `Eq.java` | ✅ 100% — parity-verified vs firmware/ |
 | `dsp/fx/modfx` | `dsp/fx/ModFXProcessor.java` (202) | `ModFx.java` | ✅ 100% — SINE types parity-verified; fw2 MORE faithful for triangle/warble/stereo |
 | `dsp/fx/srr_bitcrush` | `dsp/fx/SrrBitcrushProcessor.java` (120) | `SrrBitcrush.java` | ✅ 100% — parity-verified vs firmware/ |
