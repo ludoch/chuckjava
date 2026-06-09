@@ -79,16 +79,17 @@ resampled dispatch), and loop/one-shot end. The fw2 sampler now plays pitched sa
 
 `TIME_STRETCH_ENABLE_BUFFER`/`SampleCache` remain out of scope (= 0/optional, by design).
 
-**Remaining:**
-- ✅ `getPlayByteLowLevel` interpolation-buffer compensation — DONE (hop old-head reference now exact).
-- ✅ Loop pre-margin in time-stretch (hopEnd `TIMESTRETCHER_LEVEL_IF_ACTIVE`, time_stretcher.cpp:392-465)
-  — DONE (anti-click crossfade back into the loop; `hasLoopedBackIntoPreMargin`).
-- The guide transport-sync (`getSyncedNumSamplesIn`) is a SEAM, not a pure C port: it needs a transport
-  clock (`playbackHandler`) that fw2 doesn't have. Wire it when a tempo clock exists. **This is the only
-  remaining gap, and it is blocked on infrastructure (like the FFT/NE10 boundary), not portable now.**
+**All done:**
+- ✅ `getPlayByteLowLevel` interpolation-buffer compensation (hop old-head reference exact).
+- ✅ Loop pre-margin in time-stretch (hopEnd `TIMESTRETCHER_LEVEL_IF_ACTIVE`, time_stretcher.cpp:392-465).
+- ✅ `getSyncedNumSamplesIn`, `getNumSamplesLaggingBehindSync`, `adjustPitchToCorrectDriftFromSync` — the
+  clip-sync / external-clock-drift math, with the tempo-clock reads injected as seams (same pattern as
+  the Sidechain transport seam). All re-derivation-verified.
 
-**The in-RAM sample + time-stretch DSP port is complete.** Every self-contained C function is ported and
-verified; what's left (`getSyncedNumSamplesIn`) cannot be faithfully ported without a tempo clock.
+**Every C function in the sample / time-stretch path is now ported and verified.** The only thing not
+done is *wiring a transport clock* to feed the sync seams — that is application integration (supplying
+`currentInternalTickCount` / `timePerInternalTick` / `isExternalClockActive` / the actual play position),
+not a DSP port. There is no remaining faithful-C-port work in this subsystem.
 
 **Engine status: the fw2 sampler plays pitched, looped, and time-stretched in-RAM samples — the DSP that
 was the last blocker to deleting `firmware/` for sample playback.**
