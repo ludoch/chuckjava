@@ -81,24 +81,31 @@ Legend:
 | `modulation/params/param_set.h` | `modulation/params/ParamCurves.java` (134) | *(in Functions.java)* | ✅ 100% |
 | `PhaseIncrementFineTuner` | — | `PhaseIncrementFineTuner.java` (32) | ✅ 100% |
 
-### 2.5 Effects — NOT YET PORTED to firmware2
+### 2.5 Effects — ported to firmware2 (most now done)
 
 | C source | firmware/ (old) | firmware2/ | Status |
 |----------|----------------|------------|--------|
-| `dsp/compressor/rms_feedback.cpp` (167) | `dsp/compressor/RMSFeedbackCompressor.java` (260) | — | ❌ |
-| `dsp/delay/delay.cpp` (464) | `dsp/delay/Delay.java` (446) | — | ❌ |
-| `dsp/delay/delay_buffer.cpp` (191) | `dsp/delay/DelayBuffer.java` (403) | — | ❌ |
-| `dsp/reverb/` (multiple files) | `dsp/reverb/` (multiple files, ~1200 total) | — | ❌ |
-| `dsp/granular/GranularProcessor.cpp` (347) | `dsp/granular/GranularProcessor.java` (173) | — | ❌ |
-| `dsp/fx/eq` | `dsp/fx/EqProcessor.java` (76) | — | ❌ |
-| `dsp/fx/modfx` | `dsp/fx/ModFXProcessor.java` (202) | — | ❌ |
-| `dsp/fx/srr_bitcrush` | `dsp/fx/SrrBitcrushProcessor.java` (120) | — | ❌ |
+| `dsp/compressor/rms_feedback.cpp` (167) | `dsp/compressor/RMSFeedbackCompressor.java` (260) | `Compressor.java` | ✅ 100% — parity-verified (firmware/ is non-faithful here: see note below) |
+| `dsp/delay/delay.cpp` (464) | `dsp/delay/Delay.java` (446) | `Delay.java` (in part) | ⚠️ ported (incl. DelayBuffer + ImpulseResponseProcessor); not yet parity-verified |
+| `dsp/delay/delay_buffer.cpp` (191) | `dsp/delay/DelayBuffer.java` (403) | *(in Delay.java)* | ⚠️ ported; not yet parity-verified |
+| `dsp/reverb/` (multiple files) | `dsp/reverb/` (multiple files, ~1200 total) | `Reverb.java`, `Freeverb.java` | ⚠️ ported (lp-state fix applied); not yet parity-verified |
+| `dsp/granular/GranularProcessor.cpp` (347) | `dsp/granular/GranularProcessor.java` (173) | `GranularProcessor.java` | ⚠️ ported; not yet parity-verified |
+| `dsp/fx/eq` | `dsp/fx/EqProcessor.java` (76) | `Eq.java` | ✅ 100% — parity-verified vs firmware/ |
+| `dsp/fx/modfx` | `dsp/fx/ModFXProcessor.java` (202) | `ModFx.java` | ✅ 100% — SINE types parity-verified; fw2 MORE faithful for triangle/warble/stereo |
+| `dsp/fx/srr_bitcrush` | `dsp/fx/SrrBitcrushProcessor.java` (120) | `SrrBitcrush.java` | ✅ 100% — parity-verified vs firmware/ |
+| `modulation/sidechain/sidechain.cpp` | `modulation/sidechain/SideChain.java` (113) | `Sidechain.java` | ⚠️ ported; not yet parity-verified |
+| `dsp/envelope_follower/absolute_value.cpp` (66) | `dsp/envelope_follower/AbsValueFollower.java` (79) | `AbsValueFollower.java` | ⚠️ ported; not yet parity-verified |
+| `dsp/interpolate/interpolate.cpp` (218) | `dsp/interpolate/SincInterpolator.java` (66) | `SincInterpolator.java` | ⚠️ ported; not yet parity-verified |
+| `dsp/convolution/` | `dsp/convolution/ImpulseResponseProcessor.java` (41) | *(in Delay.java)* | ⚠️ ported (IR FIR); not yet parity-verified |
 | `dsp/timestretch/time_stretcher.cpp` | `dsp/timestretch/TimeStretcher.java` (112) | — | ❌ |
-| `dsp/interpolate/interpolate.cpp` (218) | `dsp/interpolate/SincInterpolator.java` (66) | — | ❌ |
 | `dsp/interpolate/` (kernels) | `dsp/interpolate/WindowedSincKernel.java` (146) | — | ❌ |
-| `dsp/envelope_follower/absolute_value.cpp` (66) | `dsp/envelope_follower/AbsValueFollower.java` (79) | — | ❌ |
-| `dsp/convolution/` | `dsp/convolution/ImpulseResponseProcessor.java` (41) | — | ❌ |
 | `dsp/fft/` | `dsp/fft/FFTConfigManager.java` (79) | — | ❌ |
+
+> **firmware/ is not always a faithful oracle.** Its `getTanHAntialiased` path diverges from the C:
+> `interpolateTableSigned2d` runs at 2× scale (C documents ±1073741824 half-scale, functions.h:235),
+> and the compressor's working-value init is off by one (`+2147483647` vs C `+2147483648u`). The modFX
+> triangle LFO is likewise a non-faithful inline approximation in firmware/. Where firmware/ diverges,
+> verify fw2 against the C directly (see `Firmware2FxParityTest.compressorInterp2dHonorsCContract`).
 | `modulation/sidechain/sidechain.cpp` | `modulation/sidechain/SideChain.java` (113) | — | ❌ |
 
 ### 2.6 Bridge layer (Java-only — no C equivalent)
