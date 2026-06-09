@@ -41,7 +41,23 @@ application/infra code, while the **DSP** must be faithful.
 Faithful-portable DSP core ≈ **~800 lines** (`hopEnd` + `readFromBuffer` + the match metrics + position
 math). The remaining ~450 lines are streaming infra to adapt.
 
-## 3. Proposed phases
+## 2b. Revised finding after reading `hopEnd` (entanglement is deeper than estimated)
+
+Reading the C confirmed `hopEnd`/`readFromBuffer` are **not** a cleanly extractable ~800-line DSP block:
+- `hopEnd` is interleaved *throughout* with `voiceSample->getPlayByteLowLevel`, `SampleLowLevelReader`,
+  `guide->getSyncedNumSamplesIn`/`getBytePosToStartPlayback`/`getBytePosToEndOrLoopPlayback`,
+  loop/pre-margin handling, and perc-cache cluster lookahead — even the position math depends on the guide.
+- `readFromBuffer` reads `this->buffer`, which `setupCrossfadeFromCache` fills from a `SampleCache`.
+
+So Phase B **cannot start with the DSP core**; it must start with the position/loop/reader math
+(`SamplePlaybackGuide` + an in-RAM `SampleReader`). `TIME_STRETCH_ENABLE_BUFFER` and the perc `SampleCache`
+are `0`/optional and stay out of scope, which removes a large slice.
+
+**Done so far (faithful + tested, `firmware2/TimeStretcher.java` + `TimeStretcherTest`):** the genuinely
+self-contained pieces — `getTotalDifferenceAbs`, `getTotalChange`, `getSamplePos`, and the `TimeStretch`
+constants. These are the only parts portable without the reader/guide.
+
+## 3. Proposed phases (revised)
 
 **Phase A — in-RAM sample-access adapter (infra, NOT line-for-line; ~1–2 days)**
 - `Sample` (fw2): wraps the loaded PCM as an int array + metadata (channels, rate, loop points,
@@ -52,11 +68,13 @@ math). The remaining ~450 lines are streaming infra to adapt.
 - Stub the cluster "reasons"/cache lifetime methods to no-ops (document each as desktop-N/A).
 
 **Phase B — faithful TimeStretcher DSP port (line-for-line; ~3–5 days)**
-- Port `hopEnd`, `readFromBuffer`, `getTotalDifferenceAbs`, `getTotalChange`, `getSamplePos`, and the
-  position math of `init`/`reInit`/`setupNewPlayHead` verbatim from the C, citing file:line per the rule.
+- ✅ Done: `getTotalDifferenceAbs`, `getTotalChange`, `getSamplePos`, constants (the self-contained subset).
+- Next: port `SamplePlaybackGuide` position/loop/sync math + a `SampleLowLevelReader`-equivalent over the
+  Phase-A `SampleReader` FIRST (hopEnd depends on them throughout — see §2b), then `hopEnd` +
+  `readFromBuffer` verbatim, citing file:line per the rule.
 - Reuse the ported `SincInterpolator` for sub-sample reads (the C uses the same interpolator).
-- Keep `SampleCache` (perc/stretch memoisation) **out of scope** initially — it's an optimisation, not
-  audible behaviour; recompute instead of cache. Add later only if a perf need appears.
+- Keep `SampleCache` (perc/stretch memoisation) **out of scope** — `TIME_STRETCH_ENABLE_BUFFER`/perc cache
+  are `0`/optional; recompute instead. Add later only if a perf need appears.
 
 **Phase C — VoiceSample integration + verification (~2–3 days)**
 - Wire a fw2 `VoiceSample` that drives the TimeStretcher and feeds `Voice`.
