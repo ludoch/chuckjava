@@ -75,9 +75,26 @@ Deluge C function. Needed by the vocoder. Out of scope for the faithful-C-port e
 **seams**. Supplying real values requires a transport/`playbackHandler` clock in fw2 — application
 integration, not DSP.
 
-### 4. Bridge migration (separate track)
-Wiring the bridge (`engine/FirmwareSound`, etc.) to drive these new fw2 sample/live classes, so the old
-`firmware/` sample-playback path can be retired. See task "Fix bridge bugs (Bucket A)".
+### 4. Engine / bridge migration to firmware2 (deletion track)
+What the Swing UI uses today: synth voice DSP + per-sound FX (SRR/EQ/sidechain/modFX) = **firmware2**
+(`FirmwareSound.useFirmware2 = true`); **sample playback** and the **master FX bus** = still firmware/.
+
+- ✅ `engine/dsp/Firmware{Delay,Reverb,Compressor}` (DSL UGen wrappers) now use firmware2.
+- ⏳ **Master FX bus** (`FirmwareAudioEngine` / `PureFirmwareEngine` reverb/delay/compressor) — the swap
+  is straightforward and ready (delay parity-identical; reverb/compressor are faithful corrections), but
+  it is **blocked by the E2E silence bug**: `DelugeE2ETest` songs produce no real audio (dry + reverb-send
+  both 0). The old firmware/ FX masked this with ~1e-9 rounding noise that satisfied `assertTrue(peak>0)`;
+  the correct fw2 FX outputs exactly 0, so the swap fails that test until the songs actually sound. This
+  is the pre-existing **Bucket-A bridge bug** ("release silence" / E2E) — fix that first, then the
+  master-bus migration (and deleting `firmware/dsp/{reverb,delay,compressor}`) lands cleanly.
+- ⏳ **Sample playback** — wire the fw2 sample engine (`Sample`/`SampleReader`/`VoiceSample`) into
+  `FirmwareSound` (replacing `firmware.model.sample.*`), enabling deletion of the firmware/ sample model
+  + the dead `FirmwareVoice` fallback.
+
+**Deletion blockers** (why nothing in `firmware/dsp` is deletable yet): `FirmwareAudioEngine`,
+`PureFirmwareEngine`, and the parity/fidelity tests still reference `firmware/dsp/{reverb,delay,compressor}`.
+
+See task "Fix bridge bugs (Bucket A)".
 
 ## Pointers
 - Memories: `firmware2-port-boundary`, `firmware-nonfaithful-reference-spots`, `deluge-firmware2-goal`.
