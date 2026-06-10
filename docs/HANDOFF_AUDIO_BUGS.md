@@ -4,6 +4,44 @@ Live status of the Mac-reported audio bugs and the master-FX work around them. R
 `FIRMWARE2_DSP_PORT_STATUS.md` and the memories `fw2-master-delay-no-echo-bug`,
 `deluge-remaining-approximations`.
 
+## ⚠️ TOP PRIORITY (added after user reported "synth sounds terrible, nothing works for synth")
+
+**1. Synth output does NOT match the real-Deluge reference WAVs — shape correlation ~0.**
+`PhysicalHardwareFidelityTest` (run with `mvn -pl deluge test -Pslow-tests -Dtest=PhysicalHardwareFidelityTest`)
+renders the actual XML patches and cross-correlates against 37 real Deluge recordings in
+`deluge/src/test/resources/fidelity/*.wav` (the ORACLE the user remembered). **Every correlation is
+~0** (Dry Saw 0.08, Sine 0.19, Detuned Saw -0.25, Eight-Voice Unison 0.03, …; assertion wants ≥0.90).
+These tests are `@Tag("slow")` → **excluded from the default build**, so they've been silently failing.
+This is almost certainly "nothing works for synth." Either the synth DSP shape is wrong, or the test
+methodology is broken (alignment/window/pitch). **Investigate first:**
+   - Quick triage: render `098_DRY_SAW_C5.XML`, check the compared window `sw[88200 .. 88200+4410]` —
+     is it sustained saw audio at the right pitch (note 72 = C5 ≈ 523 Hz)? If near-silent → the note
+     isn't sounding there (envelope/trigger-timing bug). If audible but wrong frequency → pitch bug. If
+     right pitch but low correlation → waveform-shape/aliasing bug (crude oscillator — see
+     `deluge-remaining-approximations`). The large `bestLagOffset` values (±200–340) hint at pitch/phase
+     drift across the window.
+   - The test forces `LOCAL_OSC_A_VOLUME = LOCAL_VOLUME = 53687091` (2.5%) and uses `s.l >> 15`, so it is
+     shape-only (level-independent) and does NOT exercise the 48×/12× driver gain.
+
+**2. "Terrible synth" distortion — FIXED (`d7eb5e48`).** The driver did `(s.l * 48) >> 16` as int×int;
+`s.l * 48` overflows int32 for |s.l| > ~0.02 Q31 (every audible synth note) → wraparound garbage →
+harsh distortion. Fixed: long arithmetic + clamp; gain 48×→12×. Kit drums (~0.003 Q31) didn't overflow,
+so they were merely quiet (see #3).
+
+**3. Kit drums far too quiet (~-49 dB).** A drum sample (~0.8 peak in the file) renders at only ~0.003
+Q31. The per-source sample amplitude path (`LOCAL_OSC_A_VOLUME >> 4` × `overallOscAmplitude`) is
+crushing sample playback. The parallel agent attempted fixes (commits `13b44f13`, `9f4a104d`,
+`7e1fcc77`, `b5b48138` OSC_B/NOISE_VOL=MIN_VALUE, `923e0834` factory param map) but the user still
+reports kit too low. Check the sample-playback amplitude in `Voice` (around lines 540–560, the
+`sampAmp`/`ampArr` path) and `VoiceSample.render` against the C `voice.cpp` sample branch — a sample
+should play near its file level, not 16×-attenuated like an oscillator source.
+
+**Note on the monitor-gain band-aid:** a single fixed driver gain CANNOT serve both -49 dB drums and
+-6 dB loud content. The real fix is engine-level amplitude correctness (#1, #3), validated against the
+fidelity WAVs. Don't keep cranking the driver gain — it just trades "too quiet" for "clips/distorts."
+
+---
+
 ## Done this session (all merged to main + pushed)
 
 | Commit | What |
@@ -16,7 +54,9 @@ Live status of the Mac-reported audio bugs and the master-FX work around them. R
 | `d715a71e` | **Reverb silence fixed**: master engine + DSL UGen now call `setPanLevels` (C audio_engine.cpp:836) |
 | `367a78f0` | Reverb-send made faithful (volume curve + `cableToLinearParamShortcut >>2`) |
 | `62ca8e90` | E2E reverb-send routing test |
-| `b6304429` | **Bug 1 fixed** (see below) |
+| `b6304429` | **Bug 1 fixed** (kit cells all-same-sound; see below) |
+| (parallel agent) | `b5b48138` OSC_B/NOISE_VOL=MIN_VALUE, `13b44f13`/`9f4a104d`/`7e1fcc77` kit sample-amp attempts, `64d4298a`/`923e0834` factory param map, `2bc4529e`/`7857b2f4` driver monitor gain 16×→48× |
+| `d7eb5e48` | **Fixed "terrible synth"**: driver gain int32 overflow (long math + clamp), 48×→12× |
 
 Master-FX scorecard: **Delay** (was broken→fixed), **Reverb** (was broken→fixed), **Compressor** (verified OK)
 — all three had lost their unit tests in the parity-oracle deletion (`6fa73408`); now covered by
