@@ -82,11 +82,20 @@ What the Swing UI uses today: synth voice DSP + per-sound FX (SRR/EQ/sidechain/m
 - ✅ `engine/dsp/Firmware{Delay,Reverb,Compressor}` (DSL UGen wrappers) now use firmware2.
 - ⏳ **Master FX bus** (`FirmwareAudioEngine` / `PureFirmwareEngine` reverb/delay/compressor) — the swap
   is straightforward and ready (delay parity-identical; reverb/compressor are faithful corrections), but
-  it is **blocked by the E2E silence bug**: `DelugeE2ETest` songs produce no real audio (dry + reverb-send
-  both 0). The old firmware/ FX masked this with ~1e-9 rounding noise that satisfied `assertTrue(peak>0)`;
-  the correct fw2 FX outputs exactly 0, so the swap fails that test until the songs actually sound. This
-  is the pre-existing **Bucket-A bridge bug** ("release silence" / E2E) — fix that first, then the
+  it is **blocked by the E2E silence bug** (now diagnosed — see below). Fix that first, then the
   master-bus migration (and deleting `firmware/dsp/{reverb,delay,compressor}`) lands cleanly.
+
+  **E2E / release-silence root cause (diagnosed 2026-06-10, see memory `e2e-release-silence-rootcause`):**
+  fw2 synth voices render 0 because `paramFinalValues[LOCAL_VOLUME] == 0` (and `overallOscAmplitude ∝`
+  it, voice.cpp:984). `getFinalParameterValueVolume(neutral, patched) = parabola(patched)*neutral<<5`
+  returns 0 when the `neutral` arg is 0. The bridge sets `LOCAL_VOLUME = normToBipolarParamVolume(0.5) = 0`
+  (a center knob), and the Patcher uses that 0 as the volume-curve neutral → silence. A center-volume
+  synth must be audible, so the fix is either (a) Patcher uses `getParamNeutralValue(LOCAL_VOLUME)` (the
+  non-zero param-neutral constant) for the volume curve, or (b) `normToBipolarParamVolume` stops
+  collapsing center volume to 0 **and** the default `VELOCITY→LOCAL_VOLUME` cable (sound.cpp:215, missing
+  in the bridge: observed cables=0) is added. **This re-opens task #10/#12** (Patcher curve-neutral + the
+  35 calibration tests), so it needs deliberate work + re-checking those tests. (The old
+  `DelugeE2ETest peak>0` assertion was a false positive on ~1e-9 firmware/-FX rounding noise.)
 - ⏳ **Sample playback** — wire the fw2 sample engine (`Sample`/`SampleReader`/`VoiceSample`) into
   `FirmwareSound` (replacing `firmware.model.sample.*`), enabling deletion of the firmware/ sample model
   + the dead `FirmwareVoice` fallback.
