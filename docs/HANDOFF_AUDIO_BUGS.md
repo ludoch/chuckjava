@@ -4,6 +4,25 @@ Live status of the Mac-reported audio bugs and the master-FX work around them. R
 `FIRMWARE2_DSP_PORT_STATUS.md` and the memories `fw2-master-delay-no-echo-bug`,
 `deluge-remaining-approximations`.
 
+## Slow-test regression scan (`mvn -pl deluge test -Pslow-tests`, 2026-06-10)
+
+**412 run, 17 failures, 0 errors, 98 skipped. ALL 17 failures are `PhysicalHardwareFidelityTest`**
+(synth waveform parity vs the real-Deluge WAVs). Every other slow test passes (sample engine,
+time-stretch, master FX, E2E, MIDI, model, project, UI, ADSR, etc.). Failing cases: testDrySawtoothParity
+(+REC07), testPwmSquareParity, testFilteredLPFParity, testHooverBassRecordingParity, testResonantLpfSawParity,
+testSynthDualModRecordingParity, testDetunedSawParity, testPureNoiseParity, testFmSimpleParity,
+testNoiseLpfModParity, testFilterModSawParity, testLfoAutoPanSawParity, testTriangleSawParity,
+testBasicFmRecordingParity, testDelayTrailSawParity, testFmFeedbackParity.
+
+These are `@Tag("slow")` (excluded from the default build) so they've been red for a while — **not a
+fresh regression from this session** (this session touched master-FX/driver/kit/Patcher-neutral, not the
+oscillator core). Triage of the dry saw: FW2 plays the **correct pitch** (~545 Hz ≈ C5) at **roughly the
+correct level** (FW2 RMS 0.017 at the test's 2.5% volume × 40 ≈ 0.68 ≈ HW 0.56), but the **waveform shape
+differs** — the HW reference is far brighter / more HF (zero-cross rate ~10.7 kHz vs FW2's clean ~545 Hz),
+so cross-correlation is ~0. This is the **oscillator timbre approximation**, not silence or wrong notes.
+See `deluge-remaining-approximations` (crude oscillators). Fixing it = make the fw2 saw/square/etc. match
+the Deluge's band-limited oscillator harmonics; validate by getting these 17 correlations ≥ 0.90.
+
 ## ⚠️ TOP PRIORITY (added after user reported "synth sounds terrible, nothing works for synth")
 
 **1. Synth output does NOT match the real-Deluge reference WAVs — shape correlation ~0.**
