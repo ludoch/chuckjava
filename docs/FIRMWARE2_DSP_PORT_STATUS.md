@@ -76,8 +76,9 @@ Deluge C function. Needed by the vocoder. Out of scope for the faithful-C-port e
 integration, not DSP.
 
 ### 4. Engine / bridge migration to firmware2 (deletion track)
-What the Swing UI uses today: synth voice DSP + per-sound FX (SRR/EQ/sidechain/modFX) = **firmware2**
-(`FirmwareSound.useFirmware2 = true`); **sample playback** and the **master FX bus** = still firmware/.
+What the Swing UI uses today: synth voice DSP + per-sound FX (SRR/EQ/sidechain/modFX) + the **master FX
+bus** (reverb/delay/compressor) = **firmware2** (`FirmwareSound.useFirmware2 = true`); only **sample
+playback** is still firmware/.
 
 - ✅ `engine/dsp/Firmware{Delay,Reverb,Compressor}` (DSL UGen wrappers) now use firmware2.
 - ✅ **E2E / release-silence bug FIXED** (commit 173b7ae7, merged 6b62085e, 2026-06-10). Root cause: the
@@ -88,17 +89,23 @@ What the Swing UI uses today: synth voice DSP + per-sound FX (SRR/EQ/sidechain/m
   `getFinalParameterValueVolume(0, …)=0` → silent voices. Fix: all three Patcher sites use
   `Functions.getParamNeutralValue(p)`. fw2 synth voices are now audible (E2E song2/song3/Dx7A-C produce
   real audio). Two calibration tests re-baselined to the correct behavior. Suite: 326 passing.
-- ⏳ **Master FX bus** (`FirmwareAudioEngine` / `PureFirmwareEngine` reverb/delay/compressor) — **now
-  UNBLOCKED.** The swap is straightforward and ready (delay parity-identical; reverb/compressor are
-  faithful corrections). Do this next, then delete `firmware/dsp/{reverb,delay,compressor}`.
+- ✅ **Master FX bus MIGRATED to firmware2** (commit f3caa3f2, merged 09196934, 2026-06-10).
+  `FirmwareAudioEngine` now uses `firmware2.Reverb.Container`, `firmware2.Delay`, `firmware2.Compressor`
+  on an `int[][]` scratch (public `masterBuffer` stays `StereoSample[]`); `PureFirmwareEngine` uses
+  `firmware2.Reverb.Model`. The fw2 corrections roughly halve the doubled firmware/ master level (E2E
+  song3 0.106→0.054, Dx7 ~0.027→~0.013). The old `DelugeE2ETest peak>0` gate was a false positive on
+  ~1e-9 firmware/-FX rounding noise — now synth/DX7 songs gate on `peak>0.001`, and song1 (sample kit,
+  genuinely silent until the sample engine migrates) asserts transport only.
 - ⏳ **Sample playback** — wire the fw2 sample engine (`Sample`/`SampleReader`/`VoiceSample`) into
   `FirmwareSound` (replacing `firmware.model.sample.*`), enabling deletion of the firmware/ sample model
-  + the dead `FirmwareVoice` fallback.
+  + the dead `FirmwareVoice` fallback. (This is also what makes song1 audible.)
 
-**Deletion blockers** (why nothing in `firmware/dsp` is deletable yet): `FirmwareAudioEngine`,
-`PureFirmwareEngine`, and the parity/fidelity tests still reference `firmware/dsp/{reverb,delay,compressor}`.
-
-See task "Fix bridge bugs (Bucket A)".
+**Deletion of `firmware/dsp/{reverb,delay,compressor}` is still blocked** — no longer by the master
+engine, but by: `Stutterer` (uses `firmware.dsp.delay.Delay`), the legacy `DelugeEngineDSL` (--hifi)
+path, and the deliberate fw2-vs-firmware/ parity oracles (`DelayParityTest`, `ReverbFidelityTest`,
+`DigitalReverbParityTest`, `RMSFeedbackCompressorTest`, `Firmware2FxParityTest`). Next deletion steps:
+migrate `Stutterer` to `firmware2.Delay`, retire/redirect the `--hifi` DSL FX, then drop the firmware/
+dsp classes (keeping or porting the parity tests last).
 
 ## Pointers
 - Memories: `firmware2-port-boundary`, `firmware-nonfaithful-reference-spots`, `deluge-firmware2-goal`.
