@@ -80,22 +80,17 @@ What the Swing UI uses today: synth voice DSP + per-sound FX (SRR/EQ/sidechain/m
 (`FirmwareSound.useFirmware2 = true`); **sample playback** and the **master FX bus** = still firmware/.
 
 - ✅ `engine/dsp/Firmware{Delay,Reverb,Compressor}` (DSL UGen wrappers) now use firmware2.
-- ⏳ **Master FX bus** (`FirmwareAudioEngine` / `PureFirmwareEngine` reverb/delay/compressor) — the swap
-  is straightforward and ready (delay parity-identical; reverb/compressor are faithful corrections), but
-  it is **blocked by the E2E silence bug** (now diagnosed — see below). Fix that first, then the
-  master-bus migration (and deleting `firmware/dsp/{reverb,delay,compressor}`) lands cleanly.
-
-  **E2E / release-silence root cause (diagnosed 2026-06-10, see memory `e2e-release-silence-rootcause`):**
-  fw2 synth voices render 0 because `paramFinalValues[LOCAL_VOLUME] == 0` (and `overallOscAmplitude ∝`
-  it, voice.cpp:984). `getFinalParameterValueVolume(neutral, patched) = parabola(patched)*neutral<<5`
-  returns 0 when the `neutral` arg is 0. The bridge sets `LOCAL_VOLUME = normToBipolarParamVolume(0.5) = 0`
-  (a center knob), and the Patcher uses that 0 as the volume-curve neutral → silence. A center-volume
-  synth must be audible, so the fix is either (a) Patcher uses `getParamNeutralValue(LOCAL_VOLUME)` (the
-  non-zero param-neutral constant) for the volume curve, or (b) `normToBipolarParamVolume` stops
-  collapsing center volume to 0 **and** the default `VELOCITY→LOCAL_VOLUME` cable (sound.cpp:215, missing
-  in the bridge: observed cables=0) is added. **This re-opens task #10/#12** (Patcher curve-neutral + the
-  35 calibration tests), so it needs deliberate work + re-checking those tests. (The old
-  `DelugeE2ETest peak>0` assertion was a false positive on ~1e-9 firmware/-FX rounding noise.)
+- ✅ **E2E / release-silence bug FIXED** (commit 173b7ae7, merged 6b62085e, 2026-06-10). Root cause: the
+  fw2 Patcher used the stored knob as the parameter-curve neutral, but the C uses `paramNeutralValues[p]`,
+  which `functionsInit()` populates ONCE as `getParamNeutralValue(p)` — a static per-param constant
+  (functions.cpp:175-181), NOT the knob (the knob is folded into the cable combination via
+  `combineCablesLinear`, patcher.cpp:218). With the knob (`normToBipolarParamVolume(0.5)=0`) as neutral,
+  `getFinalParameterValueVolume(0, …)=0` → silent voices. Fix: all three Patcher sites use
+  `Functions.getParamNeutralValue(p)`. fw2 synth voices are now audible (E2E song2/song3/Dx7A-C produce
+  real audio). Two calibration tests re-baselined to the correct behavior. Suite: 326 passing.
+- ⏳ **Master FX bus** (`FirmwareAudioEngine` / `PureFirmwareEngine` reverb/delay/compressor) — **now
+  UNBLOCKED.** The swap is straightforward and ready (delay parity-identical; reverb/compressor are
+  faithful corrections). Do this next, then delete `firmware/dsp/{reverb,delay,compressor}`.
 - ⏳ **Sample playback** — wire the fw2 sample engine (`Sample`/`SampleReader`/`VoiceSample`) into
   `FirmwareSound` (replacing `firmware.model.sample.*`), enabling deletion of the firmware/ sample model
   + the dead `FirmwareVoice` fallback.
