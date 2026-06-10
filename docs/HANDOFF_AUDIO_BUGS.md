@@ -4,6 +4,37 @@ Live status of the Mac-reported audio bugs and the master-FX work around them. R
 `FIRMWARE2_DSP_PORT_STATUS.md` and the memories `fw2-master-delay-no-echo-bug`,
 `deluge-remaining-approximations`.
 
+## UPDATE — synth fidelity root cause FIXED (tuning), 17 → 8 failures
+
+**The core "synth terrible / out of tune" bug was a TUNING error, now fixed (`3658b667`).**
+`FirmwareSound` set the pitch-adjust KNOBS (LOCAL_PITCH_ADJUST, LOCAL_OSC_A/B_PITCH_ADJUST, the two
+modulator pitch adjusts) to `16777216` instead of `0`, confusing the param's *output* neutral
+(kMaxSampleValue) with its *knob* value. That non-zero knob ran through the Patcher's exp curve → +37
+cents on LOCAL_PITCH_ADJUST and +37 on LOCAL_OSC_A_PITCH_ADJUST → **+74 cents sharp on every note**
+(note 72 rendered 546 Hz instead of 523 Hz). Fixed to 0 (matches the C, sound.cpp:152,183-186).
+`PhysicalHardwareFidelityTest` went **17 → 8 failures**; Dry Saw 0.08→0.9998, PWM 0.9999, DX7 0.98,
+Filter-Mod Saw 0.95, Detuned Saw 0.90, Dry-Saw-REC07 0.99 now pass. Also fixed the driver int-overflow
+(`d7eb5e48`, "terrible" distortion) and ported the **missing noise generator** (`f3aad481`,
+voice.cpp:1131-1147 — fw2 had no LOCAL_NOISE_VOLUME rendering at all).
+
+### Remaining 8 fidelity failures (run `mvn -pl deluge test -Pslow-tests -Dtest=PhysicalHardwareFidelityTest`)
+1. **testPureNoiseParity / testNoiseLpfModParity** — noise now renders (swRms 0→0.0009) but < the 0.01
+   threshold (HW 0.37). Same engine-wide amplitude/headroom gap (levels ~16–30× low). Fix the amplitude
+   calibration (see below) and these pass.
+2. **testFmSimpleParity (≥0.9), testBasicFmRecordingParity (≥0.35), testFmFeedbackParity (≥0.75)** — FM
+   waveform shape differs from the real Deluge. Investigate the FM render (`renderFmPath` / FmCore /
+   modulator phase + feedback) vs voice.cpp FM path. Pitch is now correct, so this is genuine FM-shape.
+3. **testFilteredLPFParity** — 0.877, just under 0.90. Minor LPF response difference; close.
+4. **testHooverBassRecordingParity (≥0.5, got 0.45), testSynthDualModRecordingParity (≥0.5, got 0.21)** —
+   complex multi-osc/mod patches; likely tied to the FM/mod-shape issue.
+
+**Amplitude/headroom** (the common thread for the "too quiet" + noise-threshold failures): a single
+source at unity params renders ~0.02–0.03 of full scale. The per-voice formulas all match the C
+(verified), so either it's faithful headroom that the fidelity tests' 2.5%-volume normalization should
+accommodate, or there's a unison/source-amplitude scale factor still off. The noise being ~16× under its
+expected level (0.0009 vs ~0.015) is a concrete clue worth chasing in the noiseAmplitude→filter→
+overallOscAmplitude chain.
+
 ## Slow-test regression scan (`mvn -pl deluge test -Pslow-tests`, 2026-06-10)
 
 **412 run, 17 failures, 0 errors, 98 skipped. ALL 17 failures are `PhysicalHardwareFidelityTest`**
