@@ -167,7 +167,15 @@
       "Bash(sed -n '300,325p' src/deluge/util/functions.h)",
       "Bash(sed -n '1481,1495p' src/deluge/util/functions.cpp)",
       "Bash(sed -n '885,940p' src/deluge/dsp/timestretch/time_stretcher.cpp)",
-      "Bash(sed -n '555,595p' src/deluge/dsp/timestretch/time_stretcher.cpp)"
+      "Bash(sed -n '555,595p' src/deluge/dsp/timestretch/time_stretcher.cpp)",
+      "Bash(sed -n '78,92p' model/global_effectable/global_effectable_for_clip.cpp)",
+      "Bash(sed -n '52,90p' model/global_effectable/global_effectable_for_clip.cpp)",
+      "Bash(sed -n '571,580p' deluge/src/main/java/org/chuck/deluge/firmware/engine/FirmwareFactory.java)",
+      "Bash(sed -n '298,303p' deluge/src/main/java/org/chuck/deluge/firmware/engine/FirmwareFactory.java)",
+      "Bash(sed -n '895,905p' processing/engines/audio_engine.cpp)",
+      "Bash(sed -n '1085,1098p' processing/engines/audio_engine.cpp)",
+      "Bash(sed -n '8,20p')",
+      "Bash(sed -n '1148,1175p' model/voice/voice.cpp)"
     ]
   }
 }
