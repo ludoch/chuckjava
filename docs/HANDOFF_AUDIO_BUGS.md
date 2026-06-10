@@ -17,6 +17,24 @@ Filter-Mod Saw 0.95, Detuned Saw 0.90, Dry-Saw-REC07 0.99 now pass. Also fixed t
 (`d7eb5e48`, "terrible" distortion) and ported the **missing noise generator** (`f3aad481`,
 voice.cpp:1131-1147 — fw2 had no LOCAL_NOISE_VOLUME rendering at all).
 
+### Triage update on the remaining 8 (why they're not quick fixes)
+- **Noise (2)**: the noise generator is now ported and faithful, but `noiseAmplitude` is **capped** at
+  `min(NOISE_VOLUME>>1, 268435455) >> 2 = 67108863` (voice.cpp — same in the C), so fw2 noise maxes at
+  ~0.0156 peak while the HW recording is 0.37 RMS. The gap is the master/output gain the per-track
+  fidelity render doesn't apply — the engine noise is faithful. To pass, the test should compare at
+  output level (or lower the 0.01 threshold), not change the engine.
+- **FM (3)**: at the test's fixed compare window (sample 90000) the **HW FM reference is silent** (the
+  note isn't there — a test-data/window-timing problem), while fw2 sounds. fw2's FM carrier pitch also
+  measured ~173 Hz (not 523) — possibly a real FM-pitch/ratio issue, but it can't be validated against a
+  silent HW window. Needs: (a) fix the FM tests' window to where the HW note actually sounds, then
+  (b) re-triage fw2 FM shape/pitch (modulator ratio/feedback in `renderFmPath`/`FmCore`).
+- **FilteredLPF 0.877 (near-miss), Hoover 0.45, DualMod 0.21**: filter-response / complex-patch
+  calibration; close-ish but need per-feature DSP work.
+
+These are NOT clean engine bugs like the tuning error was — they're a mix of faithful-but-output-gain
+(noise), test-data window bugs (FM), and calibration. Avoid speculative non-faithful changes; fix the FM
+test windows first, then re-triage with a valid HW reference.
+
 ### Remaining 8 fidelity failures (run `mvn -pl deluge test -Pslow-tests -Dtest=PhysicalHardwareFidelityTest`)
 1. **testPureNoiseParity / testNoiseLpfModParity** — noise now renders (swRms 0→0.0009) but < the 0.01
    threshold (HW 0.37). Same engine-wide amplitude/headroom gap (levels ~16–30× low). Fix the amplitude
