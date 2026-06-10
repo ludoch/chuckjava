@@ -23,11 +23,21 @@ voice.cpp:1131-1147 — fw2 had no LOCAL_NOISE_VOLUME rendering at all).
   ~0.0156 peak while the HW recording is 0.37 RMS. The gap is the master/output gain the per-track
   fidelity render doesn't apply — the engine noise is faithful. To pass, the test should compare at
   output level (or lower the 0.01 threshold), not change the engine.
-- **FM (3)**: at the test's fixed compare window (sample 90000) the **HW FM reference is silent** (the
-  note isn't there — a test-data/window-timing problem), while fw2 sounds. fw2's FM carrier pitch also
-  measured ~173 Hz (not 523) — possibly a real FM-pitch/ratio issue, but it can't be validated against a
-  silent HW window. Needs: (a) fix the FM tests' window to where the HW note actually sounds, then
-  (b) re-triage fw2 FM shape/pitch (modulator ratio/feedback in `renderFmPath`/`FmCore`).
+- **FM (3)** — entangled, THREE separate problems, none a clean fix:
+  1. **Test window wrong:** the HW `reference_fm_simple_c5.wav` note is loudest at **sample ~218000**
+     (a clean 525 Hz = C5), but the test compares a fixed window at ~90000 where the HW is **silent**.
+     The hardcoded `triggerBlock`/window is wrong for the FM recordings. Fix the FM tests to locate the
+     HW note's loud region (max-RMS scan) before windowing.
+  2. **fmRatio not applied to the modulator pitch:** `Voice.getModulatorInc` uses
+     `calculateBasePhaseIncrement(noteCode + sound.modulatorTranspose[m])` + cents, and deliberately
+     does NOT use `fmRatio1` ("NOT carrierInc*ratio … was a float reconstruction", citing the C). The
+     103_FM_SIMPLE patch has `fmRatio="2.0"` but osc2 `transpose=0`, so fw2 plays the modulator at the
+     CARRIER pitch (ratio 1.0), not 2.0 → wrong FM spectrum. Either the parser must convert
+     `fmRatio` → modulator transpose+cents (2.0 = +12 semitones), or these test patches must carry the
+     ratio as transpose. Decide which is authoritative vs the real Deluge format (the C uses
+     transpose+cents; `fmRatio` is likely a synthesized-test-patch field that needs converting).
+  3. fw2 FM pitch measured ~173 Hz via autocorrelation, but AC is unreliable on FM waveforms — re-measure
+     after (1) and (2) with a valid window + correct ratio.
 - **FilteredLPF 0.877 (near-miss), Hoover 0.45, DualMod 0.21**: filter-response / complex-patch
   calibration; close-ish but need per-feature DSP work.
 
