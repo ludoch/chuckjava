@@ -22,19 +22,24 @@ Single entry point for picking this project up. Read together with:
 Audited 2026-06-11 directly against `~/a/DelugeFirmware/src/deluge/`. Full citations in
 `FIRMWARE2_PORT_ROADMAP.md` §5.5.
 
-| # | Gap | C reference | Also fixes UI |
-|---|-----|-------------|---------------|
-| 1 | Oscillator hard sync | voice.cpp:1100-1106, 1171-1240 (per-unison oscSyncPos) | "Oscillator Sync" toggle (currently no-op) |
-| 2 | Retrigger phase (osc + modulator) | voice_unison_part_source.cpp noteOn; renderOsc retriggerPhase arg | "Retrig Phase" control (no-op) |
-| 3 | Wavefolder | dsp util foldBufferPolyApproximation; voice.cpp:1499/1585 | FOLD param |
-| 4 | Voice clipping/saturation | voice.cpp:1535-1565 (sound.clippingAmount → saturate) | Saturation/clipping menu |
-| 5 | Analog osc models | oscillator.cpp ANALOG_SAW_2/ANALOG_SQUARE paths (fw2 tables already exist; renderOsc remaps them to digital) | Analog osc types |
-| 6 | Wavetable oscillator | oscillator.cpp WAVETABLE + storage/wave_table; voice.cpp:1092-1098 wave-index increments | Wavetable dialog, waveIndex slider (no-op) |
-| 7 | Portamento/glide | sound.cpp portamento | Portamento knob (no-op) |
-| 8 | Arp rhythm patterns | modulation/arpeggiator_rhythms.h | Arp rhythm selector (simplified) |
-| 9 | Live-input sources | voice.cpp:2232-2360 INPUT_L/R/STEREO (LiveInputBuffer/LivePitchShifter already ported, unreachable) | input osc types |
-| 10 | Sample niceties | voice.cpp sample cache / pendingSamplesLate / sampleZoneChanged | — |
-| 11 | Parity verification | Sidechain, AbsValueFollower, Delay, IR convolution (ported, unverified) | — |
+| # | Gap | C reference | Status |
+|---|-----|-------------|--------|
+| 1 | Oscillator hard sync | voice.cpp:1100-1106/1171-1240/2400-2430, render_wave.h:25-90 | ✅ DONE `66211c12` (UI "Oscillator Sync" toggle now real; OscSyncRetrigPhaseTest) |
+| 2 | Retrigger phase (osc + modulator) | sound.h:156-157, vups:79-82, voice.cpp:319-327 | ✅ DONE `66211c12` (raw uint32 units, 0xFFFFFFFF=off; trigger-path bridge propagation) |
+| 3 | Wavefolder | dsp/util.hpp:66-80; voice.cpp:1499/1585 | ✅ DONE `b0b8fb66` (XML "waveFold" wired; WaveFoldTest) |
+| 4 | Voice clipping/saturation | voice.cpp:1535-1565, sound.h:286-294 | ✅ DONE `9487fd12` (clippingAmount wired; SaturationTest) |
+| 5 | Analog osc models | oscillator.cpp:70-77/459-466 | ✅ DONE `726de4df` (remap removed; "analogSaw"/"analogSquare" XML names fixed — silently played SINE before; AnalogOscTest) |
+| 6 | Wavetable oscillator | oscillator.cpp WAVETABLE + storage/wave_table; voice.cpp:1092-1098 wave-index increments | ← NEXT (big: WaveTable band loading + render + waveIndex params) |
+| 7 | Portamento/glide | sound.cpp portamento (portaEnvelope*, voice.cpp:380-397) | open |
+| 8 | Arp rhythm patterns | modulation/arpeggiator_rhythms.h | open |
+| 9 | Live-input sources | voice.cpp:2232-2360 INPUT_L/R/STEREO (LiveInputBuffer/LivePitchShifter already ported, unreachable) | open |
+| 10 | Sample niceties | voice.cpp sample cache / pendingSamplesLate / sampleZoneChanged | open |
+| 11 | Parity verification | Sidechain, AbsValueFollower, Delay, IR convolution (ported, unverified) | open |
+
+⚠️ Test-stability rule learned twice: any fidelity assertion measured on a render with RANDOM
+start phases (retrigPhase -1) is realization-dependent — adding/removing getNoise() draws
+anywhere in noteOn shifts every later random phase. Pin `Voice.testStartPhaseOverrideOsc1/2 = 0`
+(with finally-reset) in such tests; the override also pins per-part modulator phases.
 
 ## Swing UI audit summary (2026-06-11)
 
