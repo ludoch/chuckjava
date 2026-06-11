@@ -29,9 +29,9 @@ Audited 2026-06-11 directly against `~/a/DelugeFirmware/src/deluge/`. Full citat
 | 3 | Wavefolder | dsp/util.hpp:66-80; voice.cpp:1499/1585 | ✅ DONE `b0b8fb66` (XML "waveFold" wired; WaveFoldTest) |
 | 4 | Voice clipping/saturation | voice.cpp:1535-1565, sound.h:286-294 | ✅ DONE `9487fd12` (clippingAmount wired; SaturationTest) |
 | 5 | Analog osc models | oscillator.cpp:70-77/459-466 | ✅ DONE `726de4df` (remap removed; "analogSaw"/"analogSquare" XML names fixed — silently played SINE before; AnalogOscTest) |
-| 6 | Wavetable oscillator | oscillator.cpp WAVETABLE + storage/wave_table; voice.cpp:1092-1098 wave-index increments | ← NEXT (big: WaveTable band loading + render + waveIndex params) |
-| 7 | Portamento/glide | sound.cpp portamento (portaEnvelope*, voice.cpp:380-397) | open |
-| 8 | Arp rhythm patterns | modulation/arpeggiator_rhythms.h | open |
+| 6 | Wavetable oscillator | oscillator.cpp WAVETABLE + storage/wave_table (wave_table.cpp = 1215 lines, FFT-dependent band builder); voice.cpp:1092-1098 wave-index increments | ← NEXT (the big one; start it with a fresh session) |
+| 7 | Portamento/glide | voice.cpp:190/372-397/840-856, sound.h:141 lastNoteCode | ✅ DONE `2ae01523` (PortamentoTest: C3→C5 glide verified) |
+| 8 | Arp rhythm patterns | arpeggiator_rhythms.h + value_scaling.cpp:18/60-62 | ✅ DONE `5aa204c0` (table was already ported but settings.rhythm was never wired; ArpRhythmMappingTest) |
 | 9 | Live-input sources | voice.cpp:2232-2360 INPUT_L/R/STEREO (LiveInputBuffer/LivePitchShifter already ported, unreachable) | open |
 | 10 | Sample niceties | voice.cpp sample cache / pendingSamplesLate / sampleZoneChanged | open |
 | 11 | Parity verification | Sidechain, AbsValueFollower, Delay, IR convolution (ported, unverified) | open |
