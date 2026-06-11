@@ -80,12 +80,16 @@ public class MidiFileOut extends ChuckObject {
     if (trackIndex < 0 || trackIndex >= tracks.size()) return;
     MidiMsg meta = new MidiMsg();
     byte[] nameBytes = name.getBytes(StandardCharsets.UTF_8);
-    byte[] data = new byte[3 + nameBytes.length];
-    data[0] = (byte) 0xFF;
-    data[1] = (byte) 0x03; // Track Name
-    data[2] = (byte) nameBytes.length; // Length (TODO: handle > 127)
-    System.arraycopy(nameBytes, 0, data, 3, nameBytes.length);
-    meta.setData(data);
+    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+    baos.write(0xFF);
+    baos.write(0x03); // Track Name
+    try {
+      writeVarInt(baos, nameBytes.length);
+      baos.write(nameBytes);
+    } catch (IOException e) {
+      // Should never happen for ByteArrayOutputStream
+    }
+    meta.setData(baos.toByteArray());
     meta.when = when;
     write(trackIndex, meta);
   }
