@@ -1,5 +1,18 @@
 # Handoff — audio bugs + master-FX work (2026-06-10)
 
+## UPDATE 2026-06-11 (Later) — Drum Kit Volume and Arpeggiator Mismatch FIXED — `65f5d2a2`
+
+**1. Drum Kit Volume and Sample Timbre/Scaling Fixed:**
+Resolved the issue where sample/kit drums played back ~32 times too quiet (-49 dB).
+- Root cause: `Voice.java` routed `sourceAmplitudes[s]` at Q26 scale, but low-level `SampleReader` rendering and `VoiceSample.render` were not shifting the amplitude by `<< 3` (native) or `<< 4`/`<< 5` (resampled/time-stretch) as required by the C++ Deluge firmware to match the master volume and envelope scale.
+- Added safe, overflow-guarded saturating shifts (`Functions.lshiftAndSaturate`) in `VoiceSample.java` to prevent integer wraps/distortion at maximum volume.
+- Fixed 18 unit tests in `SampleEngineTest.java` to match these new faithful scale factors. All sample engine and time-stretch tests now pass cleanly.
+
+**2. Arpeggiator Clock Mismatch Fixed:**
+Fixed the arpeggiator failing to step through chord notes in Swing UI/E2E playbacks.
+- Root cause: `FirmwareSound.java` maintained its own separate `arpeggiator`, `arpSettings`, and `arpInstr` fields, and sent clock ticks to them. Meanwhile, note triggers were delegated to `fw2Sound.triggerNote` which utilized `fw2Sound.arpeggiator`.
+- Fix: Aliased `FirmwareSound.java` arpeggiator fields directly to `fw2Sound` equivalents, making it a single shared clock/note state. The arpeggiator now cycles notes correctly in mono and chord arpeggiations. `ArpParityTest` passes.
+
 ## UPDATE 2026-06-11 — slow suite GREEN (412 run, 0 failures, was 8) — `72eef114`
 
 **Real engine bug found+fixed: FM modulator volume was never wired through the bridge.**

@@ -8,7 +8,7 @@ Single entry point for picking this project up. Read together with:
 
 ## Current state (all suites green)
 
-- **Default suite**: `mvn -pl deluge test` — 337 run / 0 failures.
+- **Default suite**: `mvn -pl deluge test` — 360 run / 0 failures.
 - **Slow suite**: `mvn -pl deluge test -Pslow-tests` — 414 run / 0 failures. ⚠️ **Always run the
   slow suite after touching `firmware2/Voice.java` or the bridge** — three regressions from the
   unison/flat-buffer rewrite were invisible to the default suite (`c00e4d45`).
