@@ -175,7 +175,9 @@
       "Bash(sed -n '895,905p' processing/engines/audio_engine.cpp)",
       "Bash(sed -n '1085,1098p' processing/engines/audio_engine.cpp)",
       "Bash(sed -n '8,20p')",
-      "Bash(sed -n '1148,1175p' model/voice/voice.cpp)"
+      "Bash(sed -n '1148,1175p' model/voice/voice.cpp)",
+      "Bash(xxd deluge/src/test/resources/fidelity/reference_dry_saw_c5.wav)",
+      "Bash(awk '/float\\\\[\\\\] \\(renderSynthPatch|renderXml|render[A-Za-z]*\\)\\\\\\(/{f=1} f{print NR\": \"$0} /^  }/{if\\(f\\)exit}' deluge/src/test/java/org/chuck/deluge/PhysicalHardwareFidelityTest.java)"
     ]
   }
 }
