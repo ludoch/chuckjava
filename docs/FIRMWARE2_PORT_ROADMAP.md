@@ -227,6 +227,41 @@ mod_controllable_audio.cpp:222/258), and the FM early-return path never advanced
 `overallOscAmplitudeLastTime` so all FM was silent (the C folds the CURRENT block's
 overallOscAmplitude into carrier amps, voice.cpp:1024-1031).
 
+## 5.5 Verified remaining gaps (audited 2026-06-11, post-unison)
+
+Checked directly against the C tree (not the tables above, which lag reality — e.g. the sample
+engine/time-stretch/LivePitchShifter ARE in fw2 now). What is still missing for a true C port:
+
+**Voice/DSP subsystems not ported (each cites the C source):**
+1. **Oscillator hard sync** — fw2 `Voice` never drives `renderOsc`'s sync inputs (C voice.cpp:1100-1106
+   per-unison `oscSyncPos`, `sound.oscillatorSyncMode`). The UI toggle exists and is a silent no-op.
+2. **Wavefolder** — `LOCAL_FOLD` param exists but the render hook is missing
+   (C `dsp::foldBufferPolyApproximation`, voice.cpp:1499/1585).
+3. **Voice clipping/saturation** — `sound.clippingAmount` → `saturate()` output branch
+   (voice.cpp:1535-1565) not ported; only the no-clipping path exists.
+4. **oscRetriggerPhase / modulatorRetriggerPhase** — C noteOn + renderOsc parameter; fw2 only has the
+   static test phase override.
+5. **Wavetable oscillator** — `OscType.WAVETABLE` falls through; `WavetableLoader` is a 30-line stub;
+   `LOCAL_OSC_A/B_WAVE_INDEX` increments (voice.cpp:1092-1098) unwired.
+6. **Analog oscillator models** — `ANALOG_SAW_2`/`ANALOG_SQUARE` are remapped to digital SAW/SQUARE in
+   `Oscillator.renderOsc` even though the fw2 analog tables exist.
+7. **Live-input sources** — `INPUT_L/R/STEREO` osc types (voice.cpp:2232-2360) not rendered;
+   LiveInputBuffer/LivePitchShifter are ported but unreachable from Voice.
+8. **Portamento/glide** — sound.cpp portamento chain absent.
+9. **Arp rhythms** — `arpeggiator_rhythms.h` patterns simplified to all-true.
+10. **Sample engine niceties** — sample cache (`possiblySetUpCache`), un-mute-mid-note late start
+    (`pendingSamplesLate`), `sampleZoneChanged`, STRETCH repeat-mode sync (partial).
+
+**Ported but never parity-verified:** Sidechain, AbsValueFollower, Delay/DelayBuffer (has regression
+tests but no C-parity oracle), IR convolution.
+
+**Documented deviation (user-approved, `be0d8193`):** `getFinalParameterValueVolume/Linear` clamp
+`positivePatchedValue` to [0, 2^30]; the C deliberately does NOT clamp (functions.cpp:215 “allow FM
+modulator amounts to get past where I clipped off volume params”) and relies on int32 wrap.
+
+**Not C-port scope (Java app infra replaces them):** gui/menu_item + gui/ui (100+ files), HID/display,
+io/midi, storage XML reader, model/consequence (undo), playback modes, stem export.
+
 ## 6. C — Hardware calibration plan
 
 All 6 calibration failures are in two tests. The golden values were captured from the
