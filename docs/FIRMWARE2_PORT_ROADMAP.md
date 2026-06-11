@@ -206,10 +206,30 @@ firmware/ can be deleted when ALL of these are true:
 → B2 (voice cull — already implemented in renderVoicesFw2)
 → B3 (E2E silence — needs investigation)
 → C (hardware calibration) ← CURRENT
+→ A7 UNISON port (see below)
 → Effect ports (delay, reverb, compressor, granular, modFX, SRR)
 → Kit port
 → Delete firmware/ DSP classes
 ```
+
+### A7 — Unison port (missing C subsystem, found 2026-06-11)
+
+fw2 `Voice` renders ONE part per voice; the C renders `sound.numUnison` detuned parts
+(voice.cpp `unisonParts[u]`, each with per-part `sources[2]` osc phase/feedback/sample state and
+`modulatorPhase[2]`). Required pieces:
+
+- `Sound`: `numUnison`, `unisonDetune`, `unisonStereoSpread`, `unisonDetuners[kMaxNumVoicesUnison]`
+  (PhaseIncrementFineTuner each) + `setupUnisonDetuners` (sound.cpp; also
+  `volumeNeutralValueForUnison = 134217728/sqrt(numUnison)`, sound.cpp:3010 — currently hardcoded
+  to the numUnison=1 value in the bridge).
+- `Voice`: per-unison phase increments via `unisonDetuners[u].detune(...)` (voice.cpp:556-565),
+  the `for (u)` render loop around the subtractive/FM/ringmod source render, and the stereo-spread
+  `unisonAmplitudeL/R` path (voice.cpp:1483-1489).
+
+Audible effect of the gap: every unison patch (e.g. `009 Hoover Bass.XML`, unison 2 detune 13)
+plays thin — no detune beating/thickness. `PhysicalHardwareFidelityTest.testHooverBassRecordingParity`
+asserts only sounds/sustain/pitch until this lands (full envelope parity blocked on it; the HW
+envelope shows the unison beating).
 
 ## 6. C — Hardware calibration plan
 

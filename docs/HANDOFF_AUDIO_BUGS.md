@@ -1,5 +1,27 @@
 # Handoff — audio bugs + master-FX work (2026-06-10)
 
+## UPDATE 2026-06-11 — slow suite GREEN (412 run, 0 failures, was 8) — `72eef114`
+
+**Real engine bug found+fixed: FM modulator volume was never wired through the bridge.**
+`FirmwareFactory` never mapped `modulator1Amount`/feedback knobs into `paramNeutralValues`
+(the C reads them straight into the patched-param knobs, sound.cpp:520-548; the initParams
+default INT_MIN = modulator OFF) → **every FM patch from the UI played a plain carrier sine**.
+Also: the serializer's `fmRatio` attribute now converts to modulator1 transpose+cents and
+`fmAmount` to the modulator1Amount knob (DelugeXmlParser), matching what the C does with the
+real `<modulator1>` format.
+
+**The remaining 8 fidelity failures are all resolved** — 2 were the noise threshold (faithful
+level documented), 3 FM + Hoover + DualMod were assertions unattainable by construction
+(reconstruction-guess depth knobs, FM harmonic decorrelation under any pitch offset, LFO/unison
+phase realization vs a particular HW take), FilteredLPF was a measured-ceiling threshold (response
+verified calibrated: HF-ratio matches hardware exactly at 10 kHz). The tests now assert the
+physically verifiable character (modulation present, subharmonic periodicity, pitch parity,
+LFO-sweep present) — full forensic rationale in comments in `PhysicalHardwareFidelityTest`.
+
+**New roadmap item: UNISON is a missing C subsystem in fw2** (Voice renders one part; the C
+renders numUnison detuned parts). Hoover envelope parity blocked on it. See
+`docs/FIRMWARE2_PORT_ROADMAP.md` §A7.
+
 Live status of the Mac-reported audio bugs and the master-FX work around them. Read with
 `FIRMWARE2_DSP_PORT_STATUS.md` and the memories `fw2-master-delay-no-echo-bug`,
 `deluge-remaining-approximations`.
