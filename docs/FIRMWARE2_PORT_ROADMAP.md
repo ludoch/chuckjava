@@ -212,24 +212,20 @@ firmware/ can be deleted when ALL of these are true:
 → Delete firmware/ DSP classes
 ```
 
-### A7 — Unison port (missing C subsystem, found 2026-06-11)
+### A7 — Unison port — ✅ DONE (`2a22d09a`, 2026-06-11; regressions fixed in `c00e4d45`)
 
-fw2 `Voice` renders ONE part per voice; the C renders `sound.numUnison` detuned parts
-(voice.cpp `unisonParts[u]`, each with per-part `sources[2]` osc phase/feedback/sample state and
-`modulatorPhase[2]`). Required pieces:
+Landed: `Sound` unison fields + `setupUnisonDetuners`/`setupUnisonStereoSpread`/
+`calculateEffectiveVolume` (sound.cpp:2971-3011), `VoiceUnisonPart` (voice_unison_part.h),
+per-part phase increments via `unisonDetuners[u].detune(...)` (voice.cpp:511-565), the per-part
+render loops for subtractive/sample/DX7/ringmod/FM, stereo spread (`unisonPan[u]` →
+`mul(out,ampL/R)<<2`, voice.cpp:1353/1483), and the FM path now renders carriers into a mono
+buffer before stereo expansion (fixing a pre-existing mono-into-stereo interleave bug).
 
-- `Sound`: `numUnison`, `unisonDetune`, `unisonStereoSpread`, `unisonDetuners[kMaxNumVoicesUnison]`
-  (PhaseIncrementFineTuner each) + `setupUnisonDetuners` (sound.cpp; also
-  `volumeNeutralValueForUnison = 134217728/sqrt(numUnison)`, sound.cpp:3010 — currently hardcoded
-  to the numUnison=1 value in the bridge).
-- `Voice`: per-unison phase increments via `unisonDetuners[u].detune(...)` (voice.cpp:556-565),
-  the `for (u)` render loop around the subtractive/FM/ringmod source render, and the stereo-spread
-  `unisonAmplitudeL/R` path (voice.cpp:1483-1489).
-
-Audible effect of the gap: every unison patch (e.g. `009 Hoover Bass.XML`, unison 2 detune 13)
-plays thin — no detune beating/thickness. `PhysicalHardwareFidelityTest.testHooverBassRecordingParity`
-asserts only sounds/sustain/pitch until this lands (full envelope parity blocked on it; the HW
-envelope shows the unison beating).
+Review fixes (`c00e4d45`): the flat-buffer `GlobalEffectable` had ¼ track gain at neutral
+(restored Q31-unity staging; the C is unity via 2^27-neutral <<5 staging,
+mod_controllable_audio.cpp:222/258), and the FM early-return path never advanced
+`overallOscAmplitudeLastTime` so all FM was silent (the C folds the CURRENT block's
+overallOscAmplitude into carrier amps, voice.cpp:1024-1031).
 
 ## 6. C — Hardware calibration plan
 
