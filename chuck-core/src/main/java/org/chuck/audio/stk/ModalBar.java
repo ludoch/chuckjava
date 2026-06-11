@@ -1,92 +1,250 @@
 package org.chuck.audio.stk;
 
 import org.chuck.audio.ChuckUGen;
+import org.chuck.audio.stk.util.StkBiQuad;
+import org.chuck.audio.stk.util.StkOnePole;
 import org.chuck.core.ChuckVM;
+import org.chuck.core.Std;
 
 /**
- * ModalBar — modal-resonance bar physical model. Models a struck bar (xylophone, vibraphone,
- * marimba) using a superposition of exponentially-decaying sinusoidal modes.
- *
- * <p>The first 4 modes follow a typical bar inharmonic series. Mode ratios: 1.0, 3.984, 10.00,
- * 19.33 (marimba default).
+ * ModalBar — struck resonant bar physical model. Models xylophones, vibraphones, marimbas, agogo
+ * bells, and woodblocks using four parallel resonant modes.
  */
 public class ModalBar extends ChuckUGen {
   private static final int MODES = 4;
 
-  // Inharmonic mode frequency ratios for a free bar
-  private static final double[] MODE_RATIO = {1.0, 3.984, 10.00, 19.33};
-  // Relative gain per mode
-  private static final double[] MODE_GAIN = {1.0, 0.7, 0.5, 0.3};
-  // Decay per mode (seconds): lower modes sustain longer
-  private static final double[] MODE_DECAY = {0.9, 0.5, 0.3, 0.2};
+  private static final double[][][] PRESETS = {
+    // 0: Marimba
+    {
+      {1.0, 3.99, 10.65, -2443.0},
+      {0.9996, 0.9994, 0.9994, 0.999},
+      {0.04, 0.01, 0.01, 0.008},
+      {0.429688, 0.445312, 0.093750}
+    },
+    // 1: Vibraphone
+    {
+      {1.0, 2.01, 3.9, 14.37},
+      {0.99995, 0.99991, 0.99992, 0.9999},
+      {0.025, 0.015, 0.015, 0.015},
+      {0.390625, 0.570312, 0.078125}
+    },
+    // 2: Agogo
+    {
+      {1.0, 4.08, 6.669, -3725.0},
+      {0.999, 0.999, 0.999, 0.999},
+      {0.06, 0.05, 0.03, 0.02},
+      {0.609375, 0.359375, 0.140625}
+    },
+    // 3: Wood1
+    {
+      {1.0, 2.777, 7.378, 15.377},
+      {0.996, 0.994, 0.994, 0.99},
+      {0.04, 0.01, 0.01, 0.008},
+      {0.460938, 0.375000, 0.046875}
+    },
+    // 4: Reso
+    {
+      {1.0, 2.777, 7.378, 15.377},
+      {0.99996, 0.99994, 0.99994, 0.9999},
+      {0.02, 0.005, 0.005, 0.004},
+      {0.453125, 0.250000, 0.101562}
+    },
+    // 5: Wood2
+    {
+      {1.0, 1.777, 2.378, 3.377},
+      {0.996, 0.994, 0.994, 0.99},
+      {0.04, 0.01, 0.01, 0.008},
+      {0.312500, 0.445312, 0.109375}
+    },
+    // 6: Beats
+    {
+      {1.0, 1.004, 1.013, 2.377},
+      {0.9999, 0.9999, 0.9999, 0.999},
+      {0.02, 0.005, 0.005, 0.004},
+      {0.398438, 0.296875, 0.070312}
+    },
+    // 7: Two Fixed
+    {
+      {1.0, 4.0, -1320.0, -3960.0},
+      {0.9996, 0.999, 0.9994, 0.999},
+      {0.04, 0.01, 0.01, 0.008},
+      {0.453125, 0.453125, 0.070312}
+    },
+    // 8: Clump
+    {
+      {1.0, 1.217, 1.475, 1.729},
+      {0.999, 0.999, 0.999, 0.999},
+      {0.03, 0.03, 0.03, 0.03},
+      {0.390625, 0.570312, 0.078125}
+    }
+  };
 
-  private final double[] phase = new double[MODES];
-  private final double[] decayEn = new double[MODES]; // current envelope
-  private final double[] phaseInc = new double[MODES];
-  private final double[] decayCoef = new double[MODES];
+  private final StkBiQuad[] filters = new StkBiQuad[MODES];
+  private final StkOnePole onepole = new StkOnePole();
 
-  private double freq = 440.0;
+  private final double[] ratios = new double[MODES];
+  private final double[] gains = new double[MODES];
+  private final double[] resons = new double[MODES];
+
+  private double baseFreq = 440.0;
+  private double stickHardness = 0.5;
+  private double strikePosition = 0.56;
+  private double directGain = 0.0;
+  private double masterGain = 1.0;
+  private double vibratoGain = 0.0;
+
+  private double excitationDecay = 0.0;
+  private double excitationAmp = 0.0;
+  private double strikeForce = 0.0;
   private final float sampleRate;
 
   public ModalBar() {
     this(ChuckVM.CURRENT_VM.get().getSampleRate());
   }
 
-  public ModalBar(float sr) {
-    this.sampleRate = sr;
+  public ModalBar(float sampleRate) {
+    this.sampleRate = sampleRate;
+
+    for (int i = 0; i < MODES; i++) {
+      filters[i] = new StkBiQuad(sampleRate);
+    }
+
+    setPreset(0); // Default Marimba
     setFreq(440.0);
+  }
+
+  public void setPreset(int preset) {
+    int p = Math.abs(preset % 9);
+    System.arraycopy(PRESETS[p][0], 0, ratios, 0, MODES);
+    System.arraycopy(PRESETS[p][1], 0, resons, 0, MODES);
+    System.arraycopy(PRESETS[p][2], 0, gains, 0, MODES);
+
+    setStickHardness((float) PRESETS[p][3][0]);
+    setStrikePosition((float) PRESETS[p][3][1]);
+    directGain = PRESETS[p][3][2];
+
+    if (p == 1) { // vibraphone
+      vibratoGain = 0.2;
+    } else {
+      vibratoGain = 0.0;
+    }
+    updateFilters();
+  }
+
+  public void preset(int p) {
+    setPreset(p);
+  }
+
+  public void setFreq(double f) {
+    baseFreq = f;
+    updateFilters();
   }
 
   public void freq(float f) {
     setFreq(f);
   }
 
-  public void mode(float v) {
-    // Dummy implementation
+  public void setStickHardness(float hardness) {
+    stickHardness = Math.clamp(hardness, 0.0f, 1.0f);
+    masterGain = 0.1 + (1.8 * stickHardness);
   }
 
-  public void modeRatio(float v) {
-    // Dummy implementation
+  public void stickHardness(float hardness) {
+    setStickHardness(hardness);
   }
 
-  public void modeGain(float v) {
-    // Dummy implementation
+  public void setStrikePosition(float position) {
+    strikePosition = Math.clamp(position, 0.0f, 1.0f);
+
+    double temp2 = strikePosition * Math.PI;
+    double temp = Math.sin(temp2);
+    gains[0] = 0.12 * temp;
+
+    temp = Math.sin(0.05 + (3.9 * temp2));
+    gains[1] = -0.03 * temp;
+
+    temp = Math.sin(-0.05 + (11.0 * temp2));
+    gains[2] = 0.11 * temp;
   }
 
-  public void modeRadius(float v) {
-    // Dummy implementation
+  public void strikePosition(float position) {
+    setStrikePosition(position);
   }
 
-  public void setFreq(double f) {
-    freq = f;
-    for (int m = 0; m < MODES; m++) {
-      phaseInc[m] = 2.0 * Math.PI * f * MODE_RATIO[m] / sampleRate;
-      decayCoef[m] = Math.exp(-1.0 / (MODE_DECAY[m] * sampleRate));
-    }
+  public void strike(float force) {
+    strikeForce = Math.max(0.0f, force);
+    excitationDecay = 0.996 + stickHardness * 0.003;
+    excitationAmp = strikeForce;
+
+    double pole = 0.9 - stickHardness * 0.8;
+    onepole.setPole(pole);
+    onepole.clear();
   }
 
   public void noteOn(float velocity) {
-    for (int m = 0; m < MODES; m++) {
-      decayEn[m] = velocity * (float) MODE_GAIN[m];
-      phase[m] = 0.0;
-    }
+    strike(velocity);
   }
 
   public void noteOff(float velocity) {
-    // Fast mute
-    for (int m = 0; m < MODES; m++) decayEn[m] *= 0.01f;
+    for (int i = 0; i < MODES; i++) {
+      resons[i] *= 0.8;
+    }
+    updateFilters();
+  }
+
+  public void controlChange(int number, float value) {
+    float normalizedValue = value * (1.0f / 128.0f);
+    if (number == 2) {
+      setStickHardness(normalizedValue);
+    } else if (number == 4) {
+      setStrikePosition(normalizedValue);
+    } else if (number == 16) {
+      setPreset((int) value);
+    } else if (number == 8) {
+      directGain = normalizedValue;
+    } else if (number == 1) {
+      vibratoGain = normalizedValue * 0.3;
+    }
+  }
+
+  private void updateFilters() {
+    for (int i = 0; i < MODES; i++) {
+      double modeFreq;
+      if (ratios[i] < 0.0) {
+        modeFreq = -ratios[i];
+      } else {
+        modeFreq = baseFreq * ratios[i];
+      }
+
+      // Limit frequencies below Nyquist
+      if (modeFreq > sampleRate * 0.49) {
+        modeFreq = sampleRate * 0.49;
+      }
+      filters[i].setResonance(modeFreq, resons[i], true);
+    }
   }
 
   @Override
   protected float compute(float input, long systemTime) {
-    float out = 0;
-    for (int m = 0; m < MODES; m++) {
-      out += (float) (Math.sin(phase[m]) * decayEn[m]);
-      phase[m] += phaseInc[m];
-      decayEn[m] *= decayCoef[m];
+    double excitationSample = 0.0;
+
+    if (excitationAmp > 0.0001) {
+      double noise = Std.rand2f(-1.0, 1.0);
+      excitationSample = onepole.tick(excitationAmp * noise);
+      excitationAmp *= excitationDecay;
     }
-    out *= gain;
-    lastOut = out;
-    return out;
+
+    double totalExcitation = excitationSample + input;
+
+    double wetSignal = 0.0;
+    for (int i = 0; i < MODES; i++) {
+      wetSignal += filters[i].tick(totalExcitation) * gains[i];
+    }
+
+    // Direct stick mix matches C++ masterGain * (wet - direct * excitation)
+    double out = masterGain * (wetSignal - directGain * totalExcitation) * 11.5;
+
+    lastOut = (float) (out * gain);
+    return lastOut;
   }
 }

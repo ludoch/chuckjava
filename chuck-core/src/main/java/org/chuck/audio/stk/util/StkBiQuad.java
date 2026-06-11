@@ -39,6 +39,26 @@ public class StkBiQuad {
     }
   }
 
+  public void setA1(double a1) {
+    a[1] = a1;
+  }
+
+  public void setA2(double a2) {
+    a[2] = a2;
+  }
+
+  public void setB0(double b0) {
+    b[0] = b0;
+  }
+
+  public void setB1(double b1) {
+    b[1] = b1;
+  }
+
+  public void setB2(double b2) {
+    b[2] = b2;
+  }
+
   public double tick(double sample) {
     inputs[0] = gain * sample;
     outputs[0] = b[0] * inputs[0] + b[1] * inputs[1] + b[2] * inputs[2];
