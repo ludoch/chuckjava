@@ -32,7 +32,7 @@ Audited 2026-06-11 directly against `~/a/DelugeFirmware/src/deluge/`. Full citat
 | 6 | Wavetable oscillator | oscillator.cpp WAVETABLE + storage/wave_table (wave_table.cpp = 1215 lines, FFT-dependent band builder); voice.cpp:1092-1098 wave-index increments | ← NEXT (the big one; start it with a fresh session) |
 | 7 | Portamento/glide | voice.cpp:190/372-397/840-856, sound.h:141 lastNoteCode | ✅ DONE `2ae01523` (PortamentoTest: C3→C5 glide verified) |
 | 8 | Arp rhythm patterns | arpeggiator_rhythms.h + value_scaling.cpp:18/60-62 | ✅ DONE `5aa204c0` (table was already ported but settings.rhythm was never wired; ArpRhythmMappingTest) |
-| 9 | Live-input sources | voice.cpp:2232-2360 INPUT_L/R/STEREO (LiveInputBuffer/LivePitchShifter already ported, unreachable) | open |
+| 9 | Live-input sources | voice.cpp:2232-2360 INPUT_L/R/STEREO | ✅ DONE `227c9970` (pass-through path; LiveInput block bus; LiveInputOscTest). Follow-ups: pitch-shift sub-path (voice.cpp:2243-2274, shifter already ported) + desktop mic→LiveInput.currentBlock routing (AudioInputCaptureLine feeds only the sampling dialog today). |
 | 10 | Sample niceties | voice.cpp sample cache / pendingSamplesLate / sampleZoneChanged | open |
 | 11 | Parity verification | Sidechain, AbsValueFollower, Delay, IR convolution (ported, unverified) | open |
 
