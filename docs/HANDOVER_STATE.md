@@ -29,12 +29,19 @@ Audited 2026-06-11 directly against `~/a/DelugeFirmware/src/deluge/`. Full citat
 | 3 | Wavefolder | dsp/util.hpp:66-80; voice.cpp:1499/1585 | ✅ DONE `b0b8fb66` (XML "waveFold" wired; WaveFoldTest) |
 | 4 | Voice clipping/saturation | voice.cpp:1535-1565, sound.h:286-294 | ✅ DONE `9487fd12` (clippingAmount wired; SaturationTest) |
 | 5 | Analog osc models | oscillator.cpp:70-77/459-466 | ✅ DONE `726de4df` (remap removed; "analogSaw"/"analogSquare" XML names fixed — silently played SINE before; AnalogOscTest) |
-| 6 | Wavetable oscillator | oscillator.cpp WAVETABLE + storage/wave_table (wave_table.cpp = 1215 lines, FFT-dependent band builder); voice.cpp:1092-1098 wave-index increments | ← NEXT (the big one; start it with a fresh session) |
+| 6 | Wavetable oscillator | oscillator.cpp WAVETABLE + storage/wave_table; voice.cpp:1092-1098 wave-index increments | ✅ DONE `d7489594` (WaveTable render + FFT WavetableGenerator band builder + wave-index increments; WavetableOscTest). Note: the renderer is a fresh implementation in firmware/storage, not a verbatim wave_table.cpp port — verbatim pass is optional follow-up. |
 | 7 | Portamento/glide | voice.cpp:190/372-397/840-856, sound.h:141 lastNoteCode | ✅ DONE `2ae01523` (PortamentoTest: C3→C5 glide verified) |
 | 8 | Arp rhythm patterns | arpeggiator_rhythms.h + value_scaling.cpp:18/60-62 | ✅ DONE `5aa204c0` (table was already ported but settings.rhythm was never wired; ArpRhythmMappingTest) |
 | 9 | Live-input sources | voice.cpp:2232-2360 INPUT_L/R/STEREO | ✅ DONE `227c9970` (pass-through path; LiveInput block bus; LiveInputOscTest). Follow-ups: pitch-shift sub-path (voice.cpp:2243-2274, shifter already ported) + desktop mic→LiveInput.currentBlock routing (AudioInputCaptureLine feeds only the sampling dialog today). |
-| 10 | Sample niceties | voice.cpp sample cache / pendingSamplesLate / sampleZoneChanged | open |
-| 11 | Parity verification | Sidechain, AbsValueFollower, Delay, IR convolution (ported, unverified) | open |
+| 10 | Sample niceties | voice.cpp sample cache / pendingSamplesLate / sampleZoneChanged | ⚠️ PARTIAL `d7489594` (mid-note unmute = setupLate/triggerNoteLate + SampleLateStartTest); sample cache + sampleZoneChanged still open |
+| 11 | Parity verification | Sidechain, AbsValueFollower, Delay, IR convolution | ✅ DONE `d7489594` (Delay/Sidechain/AbsValueFollower ParityTests); IR convolution still unverified |
+
+**Post-merge review 2026-06-12 (`45b4f0cb`):** `65f5d2a2` also fixed the long-standing drum-level
+root cause — VoiceSample was missing the C's amplitude shifts (<<3 native, +<<1 pitch-adjusted,
++<<1 time-stretched; voice_sample.cpp:598-612, verified) — and unified the arp clock by aliasing
+FirmwareSound's arpeggiator to fw2Sound's. One fidelity test (LFO saw vibrato) broke because the
+refactor made noteOn see the real LFO config (more faithful: local LFOs start at their negative
+extreme); rewritten as a pinned-phase character test.
 
 ⚠️ Test-stability rule learned twice: any fidelity assertion measured on a render with RANDOM
 start phases (retrigPhase -1) is realization-dependent — adding/removing getNoise() draws
