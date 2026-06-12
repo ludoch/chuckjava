@@ -71,13 +71,15 @@ anywhere in noteOn shifts every later random phase. Pin `Voice.testStartPhaseOve
 
 ## Next steps (recommended order, 2026-06-12 — gap queue COMPLETE)
 
-1. **Live-apply for synth edits** (highest user value). Dialog knob changes (filter, envelopes,
-   FM depth, unison…) only reach the engine on the next `loadProject` rebuild — you tweak a knob
-   and hear nothing until a reload. Two viable designs: (a) debounced auto-rebuild when a dialog
-   edits the model, or (b) extend the bridge's `syncParamsToFw2`/sync-thread to read the model
-   live. This is the difference between "the engine is faithful" and "the app feels like an
-   instrument". Doing it also forces the final decisions about what the bridge still needs (feeds
-   step 2).
+1. **Live-apply for synth edits** — ✅ DONE 2026-06-12. While `SwingSynthConfigDialog` is open, a
+   200ms Swing timer re-maps the edited model onto the RUNNING engine sound
+   (`FirmwareFactory.applyModelToLiveSound`); the per-block `syncParamsToFw2` forwards everything
+   to fw2, so edits reach even sustained notes within one block. Key pieces: idempotent
+   `mapModelToSound` (clears the cable set), path-guarded `loadOscResources`,
+   `synchronized syncParamsToFw2` vs the apply (cable-set race), and a change-guard on the
+   `G_SP_*` song-param sync (it used to clobber per-track knobs every 20ms). `LiveApplyTest`
+   guards it. The KIT dialog does not live-apply yet (drum mapping is inline in `createKitClip`
+   — extract `mapDrumToSound` to extend it).
 
 2. **Legacy-deletion sweep** — ✅ DONE 2026-06-12 (77 files). Deleted: the `DelugeEngineDSL`
    --hifi path (the 3.9k-line DSL engine, the whole `engine/dsp/` package incl. Native*/
@@ -95,8 +97,19 @@ anywhere in noteOn shifts every later random phase. Pin `Voice.testStartPhaseOve
    design: `firmware/util/Q31` + `modulation/Envelope` + `params/ParamCurves` +
    `dsp/filter/BasicFilterComponent` (live bridge deps), and the `g_sample_*` VM globals (they
    are the pad-label store SwingMatrixPanel reads — removing the writes needs a model-backed
-   label refactor first). `SynthData` array removal remains open (checklist in its javadoc;
-   its last test reader `DelugeEngineTest` is now gone).
+   label refactor first).
+
+   **SynthData physically removed** (follow-up, 2026-06-12): the 80-array class, its ~187 bridge
+   accessors, the dead `NativeMidiInputRouter`/`RtMidiInputRouter`/`VoiceAllocator` chain, and the
+   orphan `G_ENV`/`G_LFO_*` VM arrays are gone. The synth-dialog panels are now **model-backed**
+   (they used to read AND write only the orphan arrays — i.e. several tabs' edits never reached
+   the pure engine at all). In the process the ARP tab became real: `configureArp` now maps the
+   FULL ArpModel (noteMode, seqLength, spreads, all probabilities, ratchet, chord polyphony, MPE
+   velocity, syncType — raw uint32 menu scaling ×85899345) plus a free-rate multiplier on the
+   BPM-derived arp clock; the LFO tab's depth/target now synthesize real patch cables
+   (LFO_GLOBAL_1/LOCAL_1/GLOBAL_2/LOCAL_2 → param) and rate edits drive the firmware exp-curve
+   knob via `FirmwareFactory.lfoRateKnobFromHz` (binary-search inverse). `LiveApplyTest` covers
+   the new mappings.
 
 3. **Roadmap doc refresh.** `FIRMWARE2_PORT_ROADMAP.md`'s file-mapping tables are stale in the
    happy direction — they list as "not ported" several things that are DONE (timestretch, sample
