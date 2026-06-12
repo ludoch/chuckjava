@@ -58,8 +58,13 @@ anywhere in noteOn shifts every later random phase. Pin `Voice.testStartPhaseOve
 - **Dead controls** (no engine feature behind them — they come alive as the gap queue lands):
   oscillator sync (#1), retrigPhase (#2), waveIndex (#6), portamento (#7), `hpfFm`, `synthAlgo`,
   osc linear-interpolation toggles.
-- Cleanup opportunity (not urgent): drop the orphaned `SynthData` fields/getters, and the
-  sidebar's vestigial `g_sample_*`/`G_LOAD_TRIGGER` writes (legacy-DSL-only consumers).
+- Cleanup opportunity (not urgent): drop the orphaned `SynthData` fields/getters (now carries an
+  authoritative ORPHANED-STATE javadoc, `7e5124c3` — do not add state there), and the sidebar's
+  vestigial `g_sample_*`/`G_LOAD_TRIGGER` writes (legacy-DSL-only consumers).
+- 2026-06-12: Settings → "Monitor Audio Input" toggle — continuous mic monitoring through
+  inLeft/inRight/inStereo patches (monitor-only capture mode + LiveInput bus). Wavetable
+  verbatim-pass disposition: scalar renderer tracks the C SIMD structure, spot checks clean;
+  sample-exact audit deferred unless a wavetable fidelity issue surfaces.
 - 2026-06-11 additions: SD CARD EXPLORER header has a 📂 fast directory changer (syncs both
   sidebar instances); unison spread/detune/num now passed in C user units with C clamps.
 
