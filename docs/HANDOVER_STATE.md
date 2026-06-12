@@ -122,10 +122,9 @@ anywhere in noteOn shifts every later random phase. Pin `Voice.testStartPhaseOve
    sample-level parity.
 
 5. **Small items:** file the upstream `LivePitchShifter` OOB bug report (full ready-to-paste
-   text in `docs/UPSTREAM_BUG_live_pitch_shifter_oob.md`); **kit-dialog live-apply** (the synth
-   dialog live-applies, the KIT dialog still needs a `loadProject` rebuild — extract the inline
-   drum mapping from `FirmwareFactory.createKitClip` into a `mapDrumToSound(SoundDrum,
-   FirmwareSound)` and add the same 200ms apply timer to `SwingKitConfigDialog`);
+   text in `docs/UPSTREAM_BUG_live_pitch_shifter_oob.md`); **kit-dialog live-apply** — ✅ DONE
+   2026-06-12 (the KIT dialog now uses the extracted helper `FirmwareFactory.applyModelToLiveSound`
+   on a 200ms Swing Timer, enabling live parameter updates);
    `sampleZoneChanged` whenever live sample-marker editing comes to the UI; input-device
    selection for the Monitor Audio Input toggle.
 
