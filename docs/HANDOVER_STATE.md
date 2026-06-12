@@ -68,6 +68,38 @@ anywhere in noteOn shifts every later random phase. Pin `Voice.testStartPhaseOve
 - 2026-06-11 additions: SD CARD EXPLORER header has a 📂 fast directory changer (syncs both
   sidebar instances); unison spread/detune/num now passed in C user units with C clamps.
 
+## Next steps (recommended order, 2026-06-12 — gap queue COMPLETE)
+
+1. **Live-apply for synth edits** (highest user value). Dialog knob changes (filter, envelopes,
+   FM depth, unison…) only reach the engine on the next `loadProject` rebuild — you tweak a knob
+   and hear nothing until a reload. Two viable designs: (a) debounced auto-rebuild when a dialog
+   edits the model, or (b) extend the bridge's `syncParamsToFw2`/sync-thread to read the model
+   live. This is the difference between "the engine is faithful" and "the app feels like an
+   instrument". Doing it also forces the final decisions about what the bridge still needs (feeds
+   step 2).
+
+2. **Legacy-deletion sweep** (architecture endgame — the roadmap's stated goal is deleting
+   `firmware/` entirely). One focused mechanical session removing: the `DelugeEngineDSL` --hifi
+   path + its `g_sample_*`/`G_LOAD_TRIGGER` consumers (incl. the sidebar's vestigial writes), the
+   old `FirmwareVoice` + superseded `firmware/dsp` classes, and the orphaned `SynthData` arrays
+   (checklist in its ORPHANED-STATE javadoc: arrays → bridge accessors → UI write calls →
+   `DelugeEngineTest`). Removes the "two engines" confusion permanently.
+
+3. **Roadmap doc refresh.** `FIRMWARE2_PORT_ROADMAP.md`'s file-mapping tables are stale in the
+   happy direction — they list as "not ported" several things that are DONE (timestretch, sample
+   engine, wavetable, sidechain…). One pass so the mapping doesn't mislead.
+
+4. **True hardware calibration** (optional, needs the user + a real Deluge). The fidelity tests
+   assert physically-verifiable character because the existing reference WAVs have UNKNOWN patch
+   settings (reconstruction guesses). Recording fresh references with DOCUMENTED patches (exact
+   preset file + note + level, protocol in the roadmap §6) would upgrade those tests to genuine
+   sample-level parity.
+
+5. **Small items:** file the upstream `LivePitchShifter` OOB bug report (full ready-to-paste
+   text in `docs/UPSTREAM_BUG_live_pitch_shifter_oob.md`); `sampleZoneChanged` whenever live
+   sample-marker editing comes to the UI; input-device selection for the Monitor Audio Input
+   toggle.
+
 ## Known deviations from the C (documented, user-approved)
 
 - `getFinalParameterValueVolume/Linear` clamp `positivePatchedValue` to [0, 2^30] (`be0d8193`);
