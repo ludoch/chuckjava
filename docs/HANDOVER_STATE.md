@@ -6,6 +6,15 @@ Single entry point for picking this project up. Read together with:
 - `docs/FIRMWARE2_PORT_ROADMAP.md` — full C→Java file mapping; **§5.5 is the verified gap list**.
 - `docs/HANDOFF_AUDIO_BUGS.md` — history of the audio-bug investigations (FM, noise, kit, volume).
 
+## Port baseline
+
+fw2 mirrors `~/a/DelugeFirmware` at the community **`nightly` tag = commit `0d9cbf04`
+(2026-05-13)**, post-1.2.0 mainline. Pulls up to `9a74e162` (2026-06-12) changed no DSP (only
+MIDI-follow file naming in `param.cpp` — out of port scope), so all C citations remain valid at
+current HEAD. **After every upstream pull**: `git diff --stat <old>..<new> -- src/deluge` — if
+`dsp/`, `processing/sound/`, `model/voice/`, `modulation/`, or `util/functions.*` moved, re-check
+the affected fw2 files against their citations.
+
 ## Current state (all suites green)
 
 - **Default suite**: `mvn -pl deluge test` — 302 run / 0 failures (count dropped from 360 in the
