@@ -8,14 +8,15 @@ Single entry point for picking this project up. Read together with:
 
 ## Current state (all suites green)
 
-- **Default suite**: `mvn -pl deluge test` — 360 run / 0 failures.
-- **Slow suite**: `mvn -pl deluge test -Pslow-tests` — 414 run / 0 failures. ⚠️ **Always run the
+- **Default suite**: `mvn -pl deluge test` — 302 run / 0 failures (count dropped from 360 in the
+  2026-06-12 legacy sweep: tests of deleted legacy classes went with them).
+- **Slow suite**: `mvn -pl deluge test -Pslow-tests` — 0 failures. ⚠️ **Always run the
   slow suite after touching `firmware2/Voice.java` or the bridge** — three regressions from the
   unison/flat-buffer rewrite were invisible to the default suite (`c00e4d45`).
 - Engine: subtractive/FM/ringmod/sample/DX7 voices with **unison** (per-part detuners, stereo
   spread), full filter set, master FX (delay/reverb/compressor), arpeggiator, MPE, sidechain.
-- The Swing UI runs on the **pure engine** (`PureFirmwareEngine`); the legacy `DelugeEngineDSL`
-  (--hifi) still exists but is not the default path.
+- The Swing UI runs on the **pure engine** (`PureFirmwareEngine`) — the only engine since the
+  legacy `DelugeEngineDSL` (--hifi) was deleted in the 2026-06-12 sweep (see Next steps §2).
 
 ## Verified C-port gaps (work queue, in order)
 
@@ -78,12 +79,24 @@ anywhere in noteOn shifts every later random phase. Pin `Voice.testStartPhaseOve
    instrument". Doing it also forces the final decisions about what the bridge still needs (feeds
    step 2).
 
-2. **Legacy-deletion sweep** (architecture endgame — the roadmap's stated goal is deleting
-   `firmware/` entirely). One focused mechanical session removing: the `DelugeEngineDSL` --hifi
-   path + its `g_sample_*`/`G_LOAD_TRIGGER` consumers (incl. the sidebar's vestigial writes), the
-   old `FirmwareVoice` + superseded `firmware/dsp` classes, and the orphaned `SynthData` arrays
-   (checklist in its ORPHANED-STATE javadoc: arrays → bridge accessors → UI write calls →
-   `DelugeEngineTest`). Removes the "two engines" confusion permanently.
+2. **Legacy-deletion sweep** — ✅ DONE 2026-06-12 (77 files). Deleted: the `DelugeEngineDSL`
+   --hifi path (the 3.9k-line DSL engine, the whole `engine/dsp/` package incl. Native*/
+   Switchable*/Firmware* UGens, the `hiFiMode`/`G_HI_FI_MODE` flag and its UI toggles — the
+   Settings menu item, the MasterFx HI-FI checkbox, and the always-true guards in
+   SwingGridPanel/SwingMatrixPanel with their dead `E_PREVIEW` else-branches), 21 superseded
+   `firmware/` classes (oscillators, FilterSet/ladders/SVF, dx FmCore, IR convolution,
+   AbsValueFollower, FFTConfigManager, sinc interpolators, old Arpeggiator, lookup-table classes,
+   StereoFloatSample, WavetableLoader), and 33 legacy test files (29 were already
+   `@Disabled("Legacy DelugeEngineDSL engine is unsupported")` or manual `main()` diagnostics).
+   Coverage preserved: the 3 old-arp feature tests were ported to the fw2 arp as
+   `firmware2/ArpFeaturesTest` (step repeats, spreads/swap, MPE velocity);
+   `Firmware2FxParityTest`'s two cross-checks against deleted firmware/ classes were converted to
+   C-contract assertions (the divergences they proved are documented in place). Still present by
+   design: `firmware/util/Q31` + `modulation/Envelope` + `params/ParamCurves` +
+   `dsp/filter/BasicFilterComponent` (live bridge deps), and the `g_sample_*` VM globals (they
+   are the pad-label store SwingMatrixPanel reads — removing the writes needs a model-backed
+   label refactor first). `SynthData` array removal remains open (checklist in its javadoc;
+   its last test reader `DelugeEngineTest` is now gone).
 
 3. **Roadmap doc refresh.** `FIRMWARE2_PORT_ROADMAP.md`'s file-mapping tables are stale in the
    happy direction — they list as "not ported" several things that are DONE (timestretch, sample
