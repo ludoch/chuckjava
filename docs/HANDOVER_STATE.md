@@ -182,11 +182,10 @@ Everything in "Verified C-port gaps" and "Next steps" above is ✅ DONE (histori
      ours decay at the song's knob. The feedback-amount → repeats/gain mapping.
    - **FM brightness/depth** spectral match.
 2. **XML parser follow-ups** (`docs/XML_PARSER_AUDIT.md` has the per-param table):
-   - env **sustain** still uses the float round-trip (same min-floor class as resonance) — move to raw.
-   - apply the **raw-Q31 reader to preset `<defaultParams>`** too (the firmware uses one reader for
-     both) — riskier: preset fidelity tests are float-calibrated, validate each vs its reference WAV.
-   - audit the **unpatched FX scalar conversions** (modFX/delay/bitcrush/srr/eq/sidechain) vs the
-     firmware curves (not yet done value-by-value).
+    - env **sustain** raw Q31 loading: ✅ DONE (preset + song formats load raw sustain directly).
+    - apply the **raw-Q31 reader to preset `<defaultParams>`**: ✅ DONE (restored raw `<defaultParams>` overlay, fixed arpeggiator test voice summation saturation via volume override).
+    - audit the **unpatched FX scalar conversions** (modFX/delay/bitcrush/srr/eq/sidechain) vs the
+      firmware curves (not yet done value-by-value).
 3. **Small items:** file the upstream `LivePitchShifter` OOB bug (ready-to-paste in
    `docs/UPSTREAM_BUG_live_pitch_shifter_oob.md`); `sampleZoneChanged` when live sample-marker
    editing lands; input-device selection for the Monitor Audio Input toggle.
