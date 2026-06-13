@@ -124,11 +124,18 @@ anywhere in noteOn shifts every later random phase. Pin `Voice.testStartPhaseOve
    happy direction — they list as "not ported" several things that are DONE (timestretch, sample
    engine, wavetable, sidechain…). One pass so the mapping doesn't mislead.
 
-4. **True hardware calibration** (optional, needs the user + a real Deluge). The fidelity tests
-   assert physically-verifiable character because the existing reference WAVs have UNKNOWN patch
-   settings (reconstruction guesses). Recording fresh references with DOCUMENTED patches (exact
-   preset file + note + level, protocol in the roadmap §6) would upgrade those tests to genuine
-   sample-level parity.
+4. **True hardware calibration** — IN PROGRESS (2026-06-12/13). 11 documented test songs recorded
+   on a real Deluge (c1.2.0) live in `deluge/src/test/resources/fidelity/hardware-recordings/`;
+   `HardwareFidelityComparisonTest` runs them by default. Hardware comparison has already found +
+   fixed real bugs: parser dropped clip `<soundParams>` (real songs played instrument defaults),
+   LFO double-curve, real-format note-pitch mapping (`rowYNote`), ladder-LPF gross distortion
+   (min-resonance float round-trip; raw-Q31 overlay), and the missing per-sound delay
+   (now ported into the Sound FX chain). **Remaining finer calibration** (hardware records are
+   reference-grade; these are engine-side): (a) filter cutoff + resonance-Q — `TestFilterFidelity`
+   lacks the hardware's resonant peak and sits at a lower cutoff; (b) delay feedback level — HW
+   echoes grow (near-unity feedback) where ours decay at the song's 0.25; (c) FM brightness/depth
+   spectral match. Tooling note: measure rate/pitch at the engine (probes), not via Goertzel/
+   zero-crossing on vibrato'd or harmonically-rich tones (they lie).
 
 5. **Small items:** file the upstream `LivePitchShifter` OOB bug report (full ready-to-paste
    text in `docs/UPSTREAM_BUG_live_pitch_shifter_oob.md`); **kit-dialog live-apply** — ✅ DONE
