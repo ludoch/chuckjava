@@ -241,7 +241,26 @@ Everything in "Verified C-port gaps" and "Next steps" above is ✅ DONE (histori
     - apply the **raw-Q31 reader to preset `<defaultParams>`**: ✅ DONE (restored raw `<defaultParams>` overlay, fixed arpeggiator test voice summation saturation via volume override).
     - audit the **unpatched FX scalar conversions** (modFX/delay/bitcrush/srr/eq/sidechain) vs the
       firmware curves (not yet done value-by-value).
-3. **Small items:** file the upstream `LivePitchShifter` OOB bug (ready-to-paste in
+3. **Bridge refactoring — eliminate remaining `firmware/` DSP classes** (toward the pure-fw2
+   endgame; roadmap §4).
+   - ✅ **WaveTable + sinc-kernel migration** (`28b85e66`, 2026-06-13, **verified correct**):
+     `WaveTable`/`WaveTableBand`/`WaveTableReader`/`WavetableGenerator` moved
+     `firmware/storage/wave_table` → `firmware2` (git renames, package-only + a local `getMagnitude`
+     inline that is equivalent to `FirmwareUtils.getMagnitude` for the positive-size domain); the
+     `windowedSincKernel` table extracted to `firmware2/SincKernel` is **byte-identical** to the
+     original (digest-verified). `firmware/util/LookupTables` was trimmed (sinc tables removed) but
+     kept for the bridge `Envelope` (`decayTableSmall4`/`noteIntervalTable`) — partial by design.
+     Both suites green (326/0, 365/0).
+   - ⬜ **Next targets — bridge FX chain still drives OLD `firmware/` classes despite fw2 ports
+     existing:** `dsp/fx/EqProcessor`, `dsp/fx/ModFXProcessor`, `dsp/fx/SrrBitcrushProcessor`,
+     `dsp/granular/GranularProcessor`, plus `dsp/filter/FirmwareFilter`, `dsp/oscillators/OscType`,
+     `dsp/StereoSample`, `util/FirmwareUtils`. Migrating these to the fw2 processors is the open
+     "Bridge references ONLY firmware2 types for DSP" line in roadmap §4.
+   - **Kept by design (live bridge deps, NOT to delete blindly):** the param/modulation model
+     (`modulation/params/*`, `modulation/patch/*`, `modulation/Envelope`, `ParamCurves`),
+     `util/Q31`, `dsp/filter/BasicFilterComponent`. Plus the non-port app infra (`gui/`, `hid/`,
+     `playback/`, `storage/`) which has no C-port scope.
+4. **Small items:** file the upstream `LivePitchShifter` OOB bug (ready-to-paste in
    `docs/UPSTREAM_BUG_live_pitch_shifter_oob.md`); `sampleZoneChanged` when live sample-marker
    editing lands; input-device selection for the Monitor Audio Input toggle.
 
