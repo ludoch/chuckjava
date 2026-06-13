@@ -41,8 +41,7 @@ Legend: **raw** = read as raw Q31 (firmware-faithful); **float** = lossy hex→f
 - **raw via dedicated setters:** modulator1Volume/2Volume, modulator1Feedback/2Feedback,
   carrier1Feedback/2Feedback, waveFold, portamento, lfo1Rate (→GLOBAL_LFO_FREQ_1),
   lfo2Rate (→LOCAL_LFO_LOCAL_FREQ_1), env1..4 Attack/Decay/Release.
-- **float — env SUSTAIN** (`env*Sustain`): still via `normToLinearParamKnob` (same min-floor class
-  as resonance). Low risk (a level, not a tanh trigger) but should move to raw. **OPEN.**
+- **raw — env SUSTAIN** (`env*Sustain`): ✅ DONE (moved to raw Q31 loading in this session).
 - **not represented:** lfo3Rate/lfo4Rate (our sound has 2 LFOs), modulator pitch beyond 2.
 
 ### Unpatched / FX params (dedicated scalar fields — separate conversion, not the param array)
@@ -76,10 +75,8 @@ so they live in the DSP / curves, not the bridge:
 ## Recommended next steps (by risk)
 
 1. **DONE** — read all patched `<soundParams>` raw (this audit's implementation).
-2. Move env **sustain** to raw (same bug class; easy).
-3. Apply the **same raw reader to preset `<defaultParams>`** so presets and songs use one path
-   (the firmware does). Higher risk: the preset fidelity tests are calibrated to the current float
-   path — validate each against its reference WAV.
+2. **DONE** — Move env **sustain** to raw.
+3. **DONE** — Apply the **same raw reader to preset `<defaultParams>`** (restored raw overlay, fixed arpeggiator test voice summation saturation via volume override).
 4. Audit the **unpatched FX scalar conversions** (modFX/delay/bitcrush/srr/eq/sidechain) against
    the firmware curves.
 5. DSP calibration: ladder **cutoff curve + resonance**, then **delay feedback**, then **FM**.
