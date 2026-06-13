@@ -11,7 +11,7 @@ The ultimate goal is to delete `org.chuck.deluge.firmware/` entirely. Today it s
 | Role | Files | Can be deleted when... |
 |------|-------|----------------------|
 | **Bridge** | `engine/FirmwareSound`, `engine/FirmwareFactory`, `engine/GlobalSidechainBus` | All effects/models ported to fw2 |
-| **Unported DSP** | `dsp/compressor/`, `dsp/delay/`, `dsp/reverb/`, `dsp/granular/`, `dsp/fx/`, `dsp/timestretch/`, `dsp/interpolate/` | Each subsystem faithfully ported to fw2 |
+| **Unported DSP** | *None* | **COMPLETED** — All legacy DSP under `firmware/dsp` has been migrated to `firmware2` and deleted! |
 | **Java infrastructure** | `model/`, `gui/`, `hid/`, `storage/`, `playback/`, `modulation/automation/` | These are NOT C ports — they are Java application code. They will remain (maybe refactored) but their **types** are referenced by tests and bridge code. |
 
 **ABSOLUTE RULE**: All new DSP code goes in `firmware2/`. Every edit to `firmware/` must be
