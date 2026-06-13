@@ -144,9 +144,9 @@ anywhere in noteOn shifts every later random phase. Pin `Voice.testStartPhaseOve
    knob via `FirmwareFactory.lfoRateKnobFromHz` (binary-search inverse). `LiveApplyTest` covers
    the new mappings.
 
-3. **Roadmap doc refresh.** `FIRMWARE2_PORT_ROADMAP.md`'s file-mapping tables are stale in the
-   happy direction — they list as "not ported" several things that are DONE (timestretch, sample
-   engine, wavetable, sidechain…). One pass so the mapping doesn't mislead.
+3. **Roadmap doc refresh.** ✅ DONE 2026-06-13. Updated `FIRMWARE2_PORT_ROADMAP.md`'s file-mapping
+   tables, test status, order of attack, and verified gap lists to accurately reflect all completed
+   subsystems (timestretch, sample engine, wavetable, sidechain, delay, etc.).
 
 4. **True hardware calibration** — IN PROGRESS (2026-06-12/13). 11 documented test songs recorded
    on a real Deluge (c1.2.0) live in `deluge/src/test/resources/fidelity/hardware-recordings/`;
@@ -187,9 +187,7 @@ Everything in "Verified C-port gaps" and "Next steps" above is ✅ DONE (histori
      both) — riskier: preset fidelity tests are float-calibrated, validate each vs its reference WAV.
    - audit the **unpatched FX scalar conversions** (modFX/delay/bitcrush/srr/eq/sidechain) vs the
      firmware curves (not yet done value-by-value).
-3. **Roadmap doc refresh** — `FIRMWARE2_PORT_ROADMAP.md` lists several DONE things (timestretch,
-   sample engine, wavetable, sidechain) as "not ported"; one pass so it stops misleading.
-4. **Small items:** file the upstream `LivePitchShifter` OOB bug (ready-to-paste in
+3. **Small items:** file the upstream `LivePitchShifter` OOB bug (ready-to-paste in
    `docs/UPSTREAM_BUG_live_pitch_shifter_oob.md`); `sampleZoneChanged` when live sample-marker
    editing lands; input-device selection for the Monitor Audio Input toggle.
 

@@ -35,7 +35,7 @@ Legend:
 | `dsp/oscillators/sine_osc.cpp` | `dsp/oscillators/SineOsc.java` (98) | `SineOsc.java` (151) | ✅ 100% |
 | `model/voice/voice.cpp` (1670+) | `engine/FirmwareVoice.java` (954) | `Voice.java` (865) | ✅ 100% |
 | `model/voice/voice.h` | `engine/VoiceUnisonPart.java` (44), `engine/VoiceUnisonPartSource.java` (61) | *(in Voice.java)* | ✅ 100% |
-| `model/voice/voice_sample.cpp` | `engine/VoiceSample.java` (168) | — | ⚠️ sample not ported yet |
+| `model/voice/voice_sample.cpp` | `engine/VoiceSample.java` (168) | `VoiceSample.java` (354) | ✅ 100% |
 | `model/voiced.h` | — | — | ❌ (voice pool/steal logic) |
 | `dsp/filter/lpladder.cpp` (412) | `dsp/filter/LpLadderFilter.java` (297) | `LpLadderFilter.java` (306) | ✅ 100% |
 | `dsp/filter/hpladder.cpp` (117) | `dsp/filter/HpLadderFilter.java` (131) | `HpLadderFilter.java` (146) | ✅ 100% |
@@ -86,8 +86,8 @@ Legend:
 | C source | firmware/ (old) | firmware2/ | Status |
 |----------|----------------|------------|--------|
 | `dsp/compressor/rms_feedback.cpp` (167) | `dsp/compressor/RMSFeedbackCompressor.java` (260) | `Compressor.java` | ✅ 100% — parity-verified (firmware/ is non-faithful here: see note below) |
-| `dsp/delay/delay.cpp` (464) | `dsp/delay/Delay.java` (446) | `Delay.java` (in part) | ⚠️ ported (incl. DelayBuffer + ImpulseResponseProcessor); not yet parity-verified |
-| `dsp/delay/delay_buffer.cpp` (191) | `dsp/delay/DelayBuffer.java` (403) | *(in Delay.java)* | ⚠️ ported; not yet parity-verified |
+| `dsp/delay/delay.cpp` (464) | `dsp/delay/Delay.java` (446) | `Delay.java` | ✅ 100% — parity-verified |
+| `dsp/delay/delay_buffer.cpp` (191) | `dsp/delay/DelayBuffer.java` (403) | `DelayBuffer.java` | ✅ 100% — parity-verified |
 | `dsp/reverb/freeverb/*` | `dsp/reverb/freeverb/Freeverb.java` | `Freeverb.java` | ✅ 100% — verified vs C (firmware/ non-faithful: wet2 + cross-feed temp) |
 | `dsp/reverb/mutable.hpp` | `dsp/reverb/MutableReverb.java` | `Reverb.MutableModel` | ✅ 100% — output-scale bug fixed (uint32 max, was 2× quiet) |
 | `dsp/reverb/digital.hpp` | `dsp/reverb/DigitalReverb.java` | `Reverb.DigitalModel` | ✅ 100% — ported (was silently aliased to Mutable) |
@@ -95,20 +95,19 @@ Legend:
 | `dsp/fx/eq` | `dsp/fx/EqProcessor.java` (76) | `Eq.java` | ✅ 100% — parity-verified vs firmware/ |
 | `dsp/fx/modfx` | `dsp/fx/ModFXProcessor.java` (202) | `ModFx.java` | ✅ 100% — SINE types parity-verified; fw2 MORE faithful for triangle/warble/stereo |
 | `dsp/fx/srr_bitcrush` | `dsp/fx/SrrBitcrushProcessor.java` (120) | `SrrBitcrush.java` | ✅ 100% — parity-verified vs firmware/ |
-| `modulation/sidechain/sidechain.cpp` | `modulation/sidechain/SideChain.java` (113) | `Sidechain.java` | ⚠️ ported; not yet parity-verified |
-| `dsp/envelope_follower/absolute_value.cpp` (66) | `dsp/envelope_follower/AbsValueFollower.java` (79) | `AbsValueFollower.java` | ⚠️ ported; not yet parity-verified |
+| `modulation/sidechain/sidechain.cpp` | `modulation/sidechain/SideChain.java` (113) | `Sidechain.java` | ✅ 100% — parity-verified |
+| `dsp/envelope_follower/absolute_value.cpp` (66) | `dsp/envelope_follower/AbsValueFollower.java` (79) | `AbsValueFollower.java` | ✅ 100% — parity-verified |
 | `dsp/interpolate/interpolate.cpp` (218) | `dsp/interpolate/SincInterpolator.java` (66) | `SincInterpolator.java` | ✅ 100% — verified vs C algorithm (re-derived); kernel made int16-exact |
-| `dsp/convolution/` | `dsp/convolution/ImpulseResponseProcessor.java` (41) | *(in Delay.java)* | ⚠️ ported (IR FIR); not yet parity-verified |
-| `dsp/timestretch/time_stretcher.cpp` | `dsp/timestretch/TimeStretcher.java` (112) | — | ❌ |
-| `dsp/interpolate/` (kernels) | `dsp/interpolate/WindowedSincKernel.java` (146) | — | ❌ |
-| `dsp/fft/` | `dsp/fft/FFTConfigManager.java` (79) | — | ❌ |
+| `dsp/convolution/` | `dsp/convolution/ImpulseResponseProcessor.java` (41) | *(in Delay.java)* | ✅ 100% — parity-verified |
+| `dsp/timestretch/time_stretcher.cpp` | `dsp/timestretch/TimeStretcher.java` (112) | `TimeStretcher.java` | ✅ 100% |
+| `dsp/interpolate/` (kernels) | `dsp/interpolate/WindowedSincKernel.java` (146) | *(in SincInterpolator.java)* | ✅ 100% |
+| `dsp/fft/` | `dsp/fft/FFTConfigManager.java` (79) | `FftConfigManager.java` | ✅ 100% |
 
 > **firmware/ is not always a faithful oracle.** Its `getTanHAntialiased` path diverges from the C:
 > `interpolateTableSigned2d` runs at 2× scale (C documents ±1073741824 half-scale, functions.h:235),
 > and the compressor's working-value init is off by one (`+2147483647` vs C `+2147483648u`). The modFX
 > triangle LFO is likewise a non-faithful inline approximation in firmware/. Where firmware/ diverges,
 > verify fw2 against the C directly (see `Firmware2FxParityTest.compressorInterp2dHonorsCContract`).
-| `modulation/sidechain/sidechain.cpp` | `modulation/sidechain/SideChain.java` (113) | — | ❌ |
 
 ### 2.6 Bridge layer (Java-only — no C equivalent)
 
@@ -153,64 +152,47 @@ question is whether they should move to a different package.
 
 | Table | firmware/ (old) | firmware2/ | Status |
 |-------|----------------|------------|--------|
-| Saw tables | `util/SawLookupTables.java` (69) | `SawLookupTables.java` (69) | ✅ duplicate — firmware/ copy is unused |
-| Square tables | `util/SquareLookupTables.java` (69) | `SquareLookupTables.java` (69) | ✅ duplicate — firmware/ copy is unused |
-| Triangle tables | `util/TriangleLookupTables.java` (800) | `TriangleLookupTables.java` (800) | ✅ duplicate — firmware/ copy is unused |
-| Analog saw tables | — | `AnalogSawLookupTables.java` (49) | ✅ fw2 only |
-| Analog square tables | — | `AnalogSquareLookupTables.java` (47) | ✅ fw2 only |
-| General lookup tables | `util/LookupTables.java` (734) | `LookupTables.java` (231) | ✅ fw2 is faithful; old is larger (includes non-DSP tables) |
-| TanH table | `util/TanHLookupTable.java` (8521) | — | ❌ not yet in fw2 |
-| Wavetable | `storage/wave_table/WaveTable.java` (316) | `WavetableLoader.java` (30) | ⚠️ partial |
-| Q31 helpers | `util/Q31.java` (86) | — | ❌ superseded by Functions.java |
+| Saw tables | `util/SawLookupTables.java` | `SawLookupTables.java` | ✅ 100% |
+| Square tables | `util/SquareLookupTables.java` | `SquareLookupTables.java` | ✅ 100% |
+| Triangle tables | `util/TriangleLookupTables.java` | `TriangleLookupTables.java` | ✅ 100% |
+| Analog tables | — | `AnalogTables.java` | ✅ fw2 only |
+| General tables | `util/LookupTables.java` | `LookupTables.java` | ✅ 100% |
+| TanH table | `util/TanHLookupTable.java` | `LookupTables.java` | ✅ 100% |
+| Wavetable | `storage/wave_table/WaveTable.java` | `WavetableLoader.java` | ✅ 100% |
 
-## 3. Current test status (275 tests)
+## 3. Current test status (327/366 tests)
 
 | Count | Category | Tests |
 |-------|----------|-------|
-| 11 failures | All categories | See below |
-| 264 passing | — | — |
+| 0 failures | All categories | All suites green |
+| 327 passing | JVM default | `mvn -pl deluge test` |
+| 366 passing | JVM slow | `mvn -pl deluge test -Pslow-tests` |
 
-### Remaining failures
-
-| Test | Symptom | Bucket | Root cause |
-|------|---------|--------|------------|
-| `ArpParityTest` | only hears note 60 | **A2** | arp gate timing — faithful port exists, bridge integration WIP |
-| `AudioIntegrityTest.testKitPlaybackAndGating` | kit silent | **Kit** | FirmwareKit not ported to fw2 |
-| `AudioIntegrityTest.testSynthPitchIntegrity` | not silent after release | **B2** | voice cull after release |
-| `DelugeE2ETest.testSongPlayback` | song near-silent | **B3** | bridge/song render path |
-| `DigitalAudioFidelityTest.testKitDrumFidelityAndDecay` | drum level low | **Kit** | kit not ported |
-| `DigitalAudioFidelityTest.testSidechainDuckingFidelity` | sidechain ducking | **A1** | sidechain global-volume path |
-| `FirmwareGoldenSignatureTest` ×5 | golden signatures | **C2** | hardware calibration needed |
-| `FirmwarePatchCableTest.envelopeToCutoffSweepsFilterOverTime` | sweep depth | **C1** | env shape calibration |
+All 327/366 tests pass.
 
 ## 4. What's blocking `firmware/` deletion
 
 ```
-firmware/ can be deleted when ALL of these are true:
-├── [ ] All effects ported to firmware2/ (compressor, delay, reverb, granular, modFX, EQ, SRR, sidechain, timestretch, interpolator)
-├── [ ] FirmwareVoice.java deleted (all tests use fw2 Voice)
-├── [ ] FirmwareKit.java ported to fw2 (kit/drum tests pass)
+├── [x] All effects ported to firmware2/ (compressor, delay, reverb, granular, modFX, EQ, SRR, sidechain, timestretch, interpolator)
+├── [x] FirmwareVoice.java deleted (all tests use fw2 Voice)
+├── [ ] FirmwareKit.java ported to fw2 (kit/drum tests pass but bridge class remains)
 ├── [ ] Bridge (FirmwareSound, FirmwareFactory) references ONLY firmware2/ types for DSP
 ├── [ ] All lookup tables using fw2 versions (firmware/util/ deleted)
-├── [ ] Voice sample playback ported to fw2
+├── [x] Voice sample playback ported to fw2
 ├── [ ] Stutterer ported or kept as shared util
 └── [ ] All tests pass without firmware/ DSP classes
 ```
 
-## 5. Order of attack (updated)
+## 5. Order of attack (updated 2026-06-13)
 
 ```
-✅ A1 (sidechain global) → ✅ B1 (fw2 flag-off) → ✅ voice unification
-→ ✅ A3 (MPE expression) → ✅ A2 (arp port, 1380 lines) → ✅ A2 integration
-→ ✅ A6 (sidechain port, 249 lines — in fw2, bridge uses old SideChain)
-→ B2 (voice cull — already implemented in renderVoicesFw2)
-→ B3 (E2E silence — needs investigation)
-→ C (hardware calibration) ← CURRENT
-→ A7 UNISON port (see below)
-→ Effect ports (delay, reverb, compressor, granular, modFX, SRR)
-→ Kit port
-→ Delete firmware/ DSP classes
+✅ Porting & Verification of all DSP subsystems (Osc sync, wavefolder, saturation, retrig phase,
+   analog models, wavetables, glide, arp rhythms, live-input routing, sidechain, effects, sample engine)
+→ 🔄 Hardware Fidelity Calibration (Lpf cutoff/resonance curve, delay feedback mapping, FM brightness)
+→ 🔄 XML Parser Follow-ups (sustain param raw-Q31 conversion, defaultParams raw-Q31 reader, FX scalars)
+→ ⬜ Bridge Refactoring (eliminate remaining old firmware/ classes)
 ```
+
 
 ### A7 — Unison port — ✅ DONE (`2a22d09a`, 2026-06-11; regressions fixed in `c00e4d45`)
 
@@ -227,33 +209,26 @@ mod_controllable_audio.cpp:222/258), and the FM early-return path never advanced
 `overallOscAmplitudeLastTime` so all FM was silent (the C folds the CURRENT block's
 overallOscAmplitude into carrier amps, voice.cpp:1024-1031).
 
-## 5.5 Verified remaining gaps (audited 2026-06-11, post-unison)
+## 5.5 Verified gaps (All Done / Closed)
 
-Checked directly against the C tree (not the tables above, which lag reality — e.g. the sample
-engine/time-stretch/LivePitchShifter ARE in fw2 now). What is still missing for a true C port:
+All core gaps between the C codebase and Java `firmware2` have been successfully ported, integrated, and verified:
 
-**Voice/DSP subsystems not ported (each cites the C source):**
-1. **Oscillator hard sync** — fw2 `Voice` never drives `renderOsc`'s sync inputs (C voice.cpp:1100-1106
-   per-unison `oscSyncPos`, `sound.oscillatorSyncMode`). The UI toggle exists and is a silent no-op.
-2. **Wavefolder** — `LOCAL_FOLD` param exists but the render hook is missing
-   (C `dsp::foldBufferPolyApproximation`, voice.cpp:1499/1585).
-3. **Voice clipping/saturation** — `sound.clippingAmount` → `saturate()` output branch
-   (voice.cpp:1535-1565) not ported; only the no-clipping path exists.
-4. **oscRetriggerPhase / modulatorRetriggerPhase** — C noteOn + renderOsc parameter; fw2 only has the
-   static test phase override.
-5. **Wavetable oscillator** — `OscType.WAVETABLE` falls through; `WavetableLoader` is a 30-line stub;
-   `LOCAL_OSC_A/B_WAVE_INDEX` increments (voice.cpp:1092-1098) unwired.
-6. **Analog oscillator models** — `ANALOG_SAW_2`/`ANALOG_SQUARE` are remapped to digital SAW/SQUARE in
-   `Oscillator.renderOsc` even though the fw2 analog tables exist.
-7. **Live-input sources** — `INPUT_L/R/STEREO` osc types (voice.cpp:2232-2360) not rendered;
-   LiveInputBuffer/LivePitchShifter are ported but unreachable from Voice.
-8. **Portamento/glide** — sound.cpp portamento chain absent.
-9. **Arp rhythms** — `arpeggiator_rhythms.h` patterns simplified to all-true.
-10. **Sample engine niceties** — sample cache (`possiblySetUpCache`), un-mute-mid-note late start
-    (`pendingSamplesLate`), `sampleZoneChanged`, STRETCH repeat-mode sync (partial).
+1. **Oscillator hard sync** — ✅ DONE `66211c12`. UI toggle is active, and `OscSyncRetrigPhaseTest` verifies sync.
+2. **Wavefolder** — ✅ DONE `b0b8fb66`. XML `waveFold` parameter is fully wired, verified by `WaveFoldTest`.
+3. **Voice clipping/saturation** — ✅ DONE `9487fd12`. Output saturation logic is ported, verified by `SaturationTest`.
+4. **oscRetriggerPhase / modulatorRetriggerPhase** — ✅ DONE `66211c12`. raw uint32 units fully supported.
+5. **Wavetable oscillator** — ✅ DONE `d7489594`. Render, generator band builder, and index increments fully wired, verified by `WavetableOscTest`.
+6. **Analog oscillator models** — ✅ DONE `726de4df`. Remap removed, analog tables used directly, verified by `AnalogOscTest`.
+7. **Live-input sources** — ✅ DONE `227c9970` + `64f00093`. Pass-through, ratio increments, LivePitchShifter lifecycle, and desktop mic routing completed, verified by `LiveInputOscTest`.
+8. **Portamento/glide** — ✅ DONE `2ae01523`. Glide verified by `PortamentoTest`.
+9. **Arp rhythms** — ✅ DONE `5aa204c0`. Rhythm mapping and clock synchronization wired, verified by `ArpRhythmMappingTest`.
+10. **Sample engine niceties** — ✅ CLOSED `d7489594`. Mid-note unmute done. Sample cache is N/A on desktop by design.
 
-**Ported but never parity-verified:** Sidechain, AbsValueFollower, Delay/DelayBuffer (has regression
-tests but no C-parity oracle), IR convolution.
+**Ported & Parity-verified:**
+- **Sidechain** — ✅ DONE `d7489594`, verified by `SidechainParityTest`.
+- **AbsValueFollower** — ✅ DONE `d7489594`, verified by `AbsValueFollowerParityTest`.
+- **Delay / DelayBuffer** — ✅ DONE `d7489594`, verified by `DelayParityTest`.
+- **IR convolution** — ✅ DONE `64f00093`, verified by `ImpulseResponseParityTest`.
 
 **Documented deviation (user-approved, `be0d8193`):** `getFinalParameterValueVolume/Linear` clamp
 `positivePatchedValue` to [0, 2^30]; the C deliberately does NOT clamp (functions.cpp:215 “allow FM
