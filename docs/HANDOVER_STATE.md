@@ -1,10 +1,22 @@
-# Handover — project state, verified gaps, and work plan (2026-06-11)
+# Handover — project state, verified gaps, and work plan (updated 2026-06-13)
 
 Single entry point for picking this project up. Read together with:
 - `CLAUDE.md` — the ABSOLUTE faithful-port rule (firmware2 = line-for-line C translation).
 - `docs/FIRMWARE2_FAITHFUL_PORT.md` — pre-edit protocol + numeric-type mapping.
 - `docs/FIRMWARE2_PORT_ROADMAP.md` — full C→Java file mapping; **§5.5 is the verified gap list**.
 - `docs/HANDOFF_AUDIO_BUGS.md` — history of the audio-bug investigations (FM, noise, kit, volume).
+- `docs/XML_PARSER_AUDIT.md` — **the song/preset XML reader vs the firmware's deserializer** (the
+  current active work area; see "Open work" below).
+- `docs/HARDWARE_FIDELITY.md` — how to record reference WAVs on a real Deluge + the test-song format.
+
+## TL;DR for a cold start
+
+The engine (gap queue + legacy-deletion) is **complete and faithful**; the live work is now
+**fidelity calibration against real hardware**. A real Deluge owner recorded 11 documented test
+songs (in `deluge/src/test/resources/fidelity/hardware-recordings/`); `HardwareFidelityComparisonTest`
+renders our side and prints a comparison. Every fidelity bug found so far traced to the **XML →
+model bridge** mishandling raw Q31 values, NOT the DSP port. **Open work** is consolidated at the
+bottom of this file; the gap-queue/Next-steps sections below are mostly historical (✅ DONE).
 
 ## Port baseline
 
@@ -17,11 +29,14 @@ the affected fw2 files against their citations.
 
 ## Current state (all suites green)
 
-- **Default suite**: `mvn -pl deluge test` — 302 run / 0 failures (count dropped from 360 in the
-  2026-06-12 legacy sweep: tests of deleted legacy classes went with them).
-- **Slow suite**: `mvn -pl deluge test -Pslow-tests` — 0 failures. ⚠️ **Always run the
+- **Default suite**: `mvn -pl deluge test` — 327 run / 0 failures (2026-06-13; dropped from 360 in
+  the 2026-06-12 legacy sweep, then grew with the hardware-fidelity + parser tests).
+- **Slow suite**: `mvn -pl deluge test -Pslow-tests` — 366 run / 0 failures. ⚠️ **Always run the
   slow suite after touching `firmware2/Voice.java` or the bridge** — three regressions from the
   unison/flat-buffer rewrite were invisible to the default suite (`c00e4d45`).
+- `HardwareFidelityComparisonTest` runs by default against the committed hardware recordings (point
+  elsewhere with `-Dhardware.recordings.dir=…`); it asserts non-silence and prints the comparison
+  report. The synth-config dialogs **live-apply** edits to the running engine (200ms timer).
 - Engine: subtractive/FM/ringmod/sample/DX7 voices with **unison** (per-part detuners, stereo
   spread), full filter set, master FX (delay/reverb/compressor), arpeggiator, MPE, sidechain.
 - The Swing UI runs on the **pure engine** (`PureFirmwareEngine`) — the only engine since the
@@ -58,27 +73,36 @@ start phases (retrigPhase -1) is realization-dependent — adding/removing getNo
 anywhere in noteOn shifts every later random phase. Pin `Voice.testStartPhaseOverrideOsc1/2 = 0`
 (with finally-reset) in such tests; the override also pins per-part modulator phases.
 
-## Swing UI audit summary (2026-06-11)
+## Architecture (current, 2026-06-13 — supersedes the old "Swing UI audit")
 
-- All menus/dialog controls have listeners; none empty.
-- **Live-apply architecture**: dialogs write the track MODEL + the bridge `SynthData` arrays.
-  `SynthData` is orphaned (read only by one test — it fed the deleted legacy DSL engine path).
-  Model edits take effect on the next `loadProject` rebuild. The `PureFirmwareEngine` sync thread
-  live-applies only transport/BPM/master-FX/arp-clock.
-- **Dead controls** (no engine feature behind them — they come alive as the gap queue lands):
-  oscillator sync (#1), retrigPhase (#2), waveIndex (#6), portamento (#7), `hpfFm`, `synthAlgo`,
-  osc linear-interpolation toggles.
-- Cleanup opportunity (not urgent): drop the orphaned `SynthData` fields/getters (now carries an
-  authoritative ORPHANED-STATE javadoc, `7e5124c3` — do not add state there), and the sidebar's
-  vestigial `g_sample_*`/`G_LOAD_TRIGGER` writes (legacy-DSL-only consumers).
-- 2026-06-12: Settings → "Monitor Audio Input" toggle — continuous mic monitoring through
-  inLeft/inRight/inStereo patches (monitor-only capture mode + LiveInput bus). Wavetable
-  verbatim-pass disposition: scalar renderer tracks the C SIMD structure, spot checks clean;
-  sample-exact audit deferred unless a wavetable fidelity issue surfaces.
-- 2026-06-11 additions: SD CARD EXPLORER header has a 📂 fast directory changer (syncs both
-  sidebar instances); unison spread/detune/num now passed in C user units with C clamps.
+> ⚠️ Earlier handovers described dialogs writing bridge `SynthData` arrays with edits applying on
+> the next `loadProject`. **That is gone.** `SynthData` and the legacy DSL engine were deleted; the
+> description below is current.
 
-## Next steps (recommended order, 2026-06-12 — gap queue COMPLETE)
+- **One engine:** the Swing UI runs only on `PureFirmwareEngine` (fw2). The render path for a synth
+  is `FirmwareAudioEngine.renderBlock` → `FirmwareSound.renderInternal` (sums fw2 `Voice`s, then its
+  own FX chain: SRR → stutter → modFX → EQ → **per-sound delay** → sidechain). `fw2Sound` is used by
+  `FirmwareSound` for voices/params/arp; note `fw2 Sound.renderInternal` itself is NOT on the active
+  path (FirmwareSound reimplements the FX chain).
+- **Song load:** `DelugeXmlParser.parseSong` → `ProjectModel` (per-track `SynthTrackModel` etc) →
+  `FirmwareFactory.createSong` builds `FirmwareSound`s. Param values flow model → factory →
+  `paramNeutralValues`/`paramKnobs` → (per block) `syncParamsToFw2` → `fw2Sound.patchedParamValues`.
+- **Model-backed dialogs + live-apply:** synth-config panels read/write the `SynthTrackModel`
+  (NOT bridge arrays); a 200ms timer in `SwingSynthConfigDialog`/`SwingKitConfigDialog` calls
+  `FirmwareFactory.applyModelToLiveSound`, so edits are audible immediately.
+- **`SynthData` removed** (2026-06-12): the 80-array bridge store + ~187 accessors are gone; do not
+  reintroduce a parallel param store. The `g_sample_*` VM globals remain only as the pad-label store
+  `SwingMatrixPanel` reads.
+- **soundParams are raw Q31** (the systemic 2026-06-13 finding): the firmware reads every sound
+  param verbatim as a raw Q31 knob; our parser used a lossy hex→float→knob round-trip. Song patched
+  params now read raw via `SOUNDPARAMS_RAW_PATCHED` in the parser. See `docs/XML_PARSER_AUDIT.md`.
+- Misc UI: Settings → "Monitor Audio Input" (mic monitor via inLeft/inRight/inStereo); SD-card
+  explorer 📂 directory changer; unison spread/detune/num in C user units.
+
+## Next steps — historical log (gap queue COMPLETE; for what's OPEN see "Open work" below)
+
+> Items 1–2 are the detailed DONE record (live-apply, legacy sweep). Items 3–5 are superseded by
+> the consolidated "Open work" section near the bottom.
 
 1. **Live-apply for synth edits** — ✅ DONE 2026-06-12. While `SwingSynthConfigDialog` is open, a
    200ms Swing timer re-maps the edited model onto the RUNNING engine sound
@@ -143,6 +167,31 @@ anywhere in noteOn shifts every later random phase. Pin `Voice.testStartPhaseOve
    on a 200ms Swing Timer, enabling live parameter updates);
    `sampleZoneChanged` whenever live sample-marker editing comes to the UI; input-device
    selection for the Monitor Audio Input toggle.
+
+## Open work (what's actually left, 2026-06-13)
+
+Everything in "Verified C-port gaps" and "Next steps" above is ✅ DONE (historical). The live work:
+
+1. **DSP fidelity calibration** (highest value; needs the hardware recordings, which are committed).
+   These survive correct raw param input, so they're genuine DSP/curve gaps, not parser bugs:
+   - **Ladder filter cutoff curve + resonance strength** — `TestFilterFidelity` (saw C3) on hardware
+     has a strong resonant peak ~H12 and energy to ~H14; ours rolls off by ~H6 with no peak. Compare
+     `curveFrequency` (knob→Hz) and the ladder feedback/`processedResonance` scaling vs `lpladder.cpp`
+     for the same raw knob.
+   - **Delay feedback level** — timing is correct (1.0s); HW echoes grow (near-unity feedback) where
+     ours decay at the song's knob. The feedback-amount → repeats/gain mapping.
+   - **FM brightness/depth** spectral match.
+2. **XML parser follow-ups** (`docs/XML_PARSER_AUDIT.md` has the per-param table):
+   - env **sustain** still uses the float round-trip (same min-floor class as resonance) — move to raw.
+   - apply the **raw-Q31 reader to preset `<defaultParams>`** too (the firmware uses one reader for
+     both) — riskier: preset fidelity tests are float-calibrated, validate each vs its reference WAV.
+   - audit the **unpatched FX scalar conversions** (modFX/delay/bitcrush/srr/eq/sidechain) vs the
+     firmware curves (not yet done value-by-value).
+3. **Roadmap doc refresh** — `FIRMWARE2_PORT_ROADMAP.md` lists several DONE things (timestretch,
+   sample engine, wavetable, sidechain) as "not ported"; one pass so it stops misleading.
+4. **Small items:** file the upstream `LivePitchShifter` OOB bug (ready-to-paste in
+   `docs/UPSTREAM_BUG_live_pitch_shifter_oob.md`); `sampleZoneChanged` when live sample-marker
+   editing lands; input-device selection for the Monitor Audio Input toggle.
 
 ## Known deviations from the C (documented, user-approved)
 
