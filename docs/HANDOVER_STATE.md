@@ -29,11 +29,14 @@ the affected fw2 files against their citations.
 
 ## Current state (all suites green)
 
-- **Default suite**: `mvn -pl deluge test` — 327 run / 0 failures (2026-06-13; dropped from 360 in
-  the 2026-06-12 legacy sweep, then grew with the hardware-fidelity + parser tests).
-- **Slow suite**: `mvn -pl deluge test -Pslow-tests` — 366 run / 0 failures. ⚠️ **Always run the
+- **Default suite**: `mvn -pl deluge test` — **326 run / 0 failures** (2026-06-13, at HEAD
+  `876c51cf`).
+- **Slow suite**: `mvn -pl deluge test -Pslow-tests` — **365 run / 0 failures**. ⚠️ **Always run the
   slow suite after touching `firmware2/Voice.java` or the bridge** — three regressions from the
-  unison/flat-buffer rewrite were invisible to the default suite (`c00e4d45`).
+  unison/flat-buffer rewrite were invisible to the default suite (`c00e4d45`); and the slow suite was
+  left RED by a no-slow-test push as recently as `aebd2e21`/`ec95cba4` (2026-06-13).
+- **Fidelity breakthrough 2026-06-13:** the dry-saw hardware test went 0.48 → **0.995** after the
+  linear-param full-Q31-bipolar fix (`876c51cf`). See the dedicated section below.
 - `HardwareFidelityComparisonTest` runs by default against the committed hardware recordings (point
   elsewhere with `-Dhardware.recordings.dir=…`); it asserts non-silence and prints the comparison
   report. The synth-config dialogs **live-apply** edits to the running engine (200ms timer).
@@ -41,6 +44,56 @@ the affected fw2 files against their citations.
   spread), full filter set, master FX (delay/reverb/compressor), arpeggiator, MPE, sidechain.
 - The Swing UI runs on the **pure engine** (`PureFirmwareEngine`) — the only engine since the
   legacy `DelugeEngineDSL` (--hifi) was deleted in the 2026-06-12 sweep (see Next steps §2).
+
+## 2026-06-13 fidelity breakthrough — linear-param full-Q31-bipolar fix (`876c51cf`)
+
+The dominant remaining hardware-fidelity error was a **single parser-bridge scaling bug**, not a DSP
+gap. `FirmwareFactory.normToLinearParamKnob` mapped a 0..1 model knob into a **quarter-range**
+`[-2^29, +2^29]` (`norm<=0 → -536870912`; `norm*1073741824 - 536870912`) instead of the firmware's
+**full Q31 bipolar** range. Every linear param fed to the patcher (resonance, morph, modFX depth/
+offset, and — via the float path — pitch-affecting knobs) was therefore compressed ~4×, corrupting
+both level AND pitch.
+
+**Fix** (`876c51cf`, parallel worker, reviewed + agreed): `normToLinearParamKnob` now delegates to
+`normToBipolarParam` (`norm<=0 → Integer.MIN_VALUE`; `norm*4294967295 - 2147483648`), so norm=0 maps
+to true `INT_MIN` like the firmware. The companion `FirmwareGoldenSignatureTest` re-baseline is
+legitimate (DSP output changed) and the new golden `f0` values are cleaner semitone-aligned
+frequencies (fm f0 558→**262.5**≈C4, 049 f0 317→**277.4**≈C#4) — evidence the new mapping is *more*
+correct.
+
+**Verified impact** (both suites green; numbers from `PhysicalHardwareFidelityTest`):
+
+| Test | Before (`ec95cba4`) | After (`876c51cf`) | Threshold |
+|---|---|---|---|
+| `testDrySawtoothParityREC07` | 0.48 | **0.995** | 0.90 |
+| `testArpeggiatorGateSpreadParity` | 0.000 | **0.325** | 0.01 |
+| `testResonantLpfSawParity` | flaky (in-suite) | **0.214** | 0.20 |
+
+This **supersedes** the earlier "int16 clipping" / "Q31 saturation" theories for the dry-saw — both
+were symptoms. Confirmed mechanically: `s.l >> 16` on a 32-bit int is always within int16 range, so
+the test's downmix clamp never fires; the dry-saw subtractive gain-staging (`overallOscAmplitude`,
+source amps) is byte-faithful to `voice.cpp:984-1050`. The real cause was the quarter-range knob.
+
+**Ladder filter audited byte-faithful** (this session): `LpLadderFilter.setConfig` matches
+`lpladder.cpp:95-169` exactly for the cold 24dB/12dB ladder — the `resonanceUpperLimit=510000000`
+clamp, `processedResonance = ONE_Q31 - (resonance*resonance<<1)` × `howMuchToKeep<<1`, the
+full-ladder feedback chain (`lpf1/2/3Feedback`, `divideByTotalMoveabilityAndProcessedResonance`),
+and the cold-only `processedResonance × 1150000000 << 1` resonance boost + `gainModifier` filterGain
+scale (drive path `× 0.8`). So the long-documented "resonance much weaker / no resonant peak" gap was
+**the floor bug**, not a filter port deviation — and is now largely resolved (dry-saw exercises the
+wide-open filter at 0.995).
+
+**Residual / caveats:**
+- `testResonantLpfSawParity` passes at **abs 0.214 vs 0.20** (≈7% margin) and the raw correlation is
+  *negative* — `abs()` masks a subtle resonant-peak phase difference. This is calibration that needs
+  hardware A/B, not a faithful-port fix. It is the weakest fidelity test.
+- The fidelity harness is **fragile**: abs-correlation + ±5-lag search + zero-crossing alignment +
+  shared static `Voice.testStartPhaseOverrideOsc1/2` make some results test-ordering-dependent
+  (resonant-lpf passed alone but failed in-suite pre-`876c51cf`). Several thresholds are smoke-level
+  (0.01, 0.20). Hardening the harness (deterministic isolation, honest thresholds) is open work.
+- **Process caution (recurring):** the parallel worker pushed `aebd2e21` + `ec95cba4` **without
+  running the slow suite**, leaving `main`'s slow suite RED (3 fidelity failures) until `876c51cf`
+  rescued it. Always run `-Pslow-tests` before pushing bridge/parser/Voice changes.
 
 ## Verified C-port gaps (work queue, in order)
 
@@ -172,15 +225,17 @@ anywhere in noteOn shifts every later random phase. Pin `Voice.testStartPhaseOve
 
 Everything in "Verified C-port gaps" and "Next steps" above is ✅ DONE (historical). The live work:
 
-1. **DSP fidelity calibration** (highest value; needs the hardware recordings, which are committed).
-   These survive correct raw param input, so they're genuine DSP/curve gaps, not parser bugs:
-   - **Ladder filter cutoff curve + resonance strength** — `TestFilterFidelity` (saw C3) on hardware
-     has a strong resonant peak ~H12 and energy to ~H14; ours rolls off by ~H6 with no peak. Compare
-     `curveFrequency` (knob→Hz) and the ladder feedback/`processedResonance` scaling vs `lpladder.cpp`
-     for the same raw knob.
+1. **DSP fidelity calibration** (needs the committed hardware recordings):
+   - **Ladder filter cutoff + resonance** — ✅ LARGELY RESOLVED by `876c51cf` (the floor bug was the
+     cause; `setConfig` audited byte-faithful — see the 2026-06-13 section above). Residual: the
+     `testResonantLpfSawParity` weak/negative correlation (abs 0.214) — resonant-peak phase, needs
+     hardware A/B.
    - **Delay feedback level** — timing is correct (1.0s); HW echoes grow (near-unity feedback) where
-     ours decay at the song's knob. The feedback-amount → repeats/gain mapping.
-   - **FM brightness/depth** spectral match.
+     ours decay at the song's knob. The feedback-amount → repeats/gain mapping. (OPEN)
+   - **FM brightness/depth** spectral match. (OPEN)
+   - **Harness hardening** — make `PhysicalHardwareFidelityTest` deterministic (kill the shared
+     static phase-override state / test-ordering dependence) and replace smoke-level thresholds
+     (0.01, 0.20) with honest ones. (OPEN, NEW)
 2. **XML parser follow-ups** (`docs/XML_PARSER_AUDIT.md` has the per-param table):
     - env **sustain** raw Q31 loading: ✅ DONE (preset + song formats load raw sustain directly).
     - apply the **raw-Q31 reader to preset `<defaultParams>`**: ✅ DONE (restored raw `<defaultParams>` overlay, fixed arpeggiator test voice summation saturation via volume override).
