@@ -26,7 +26,7 @@ if [ -z "$JAVA_BIN" ]; then
     exit 1
 fi
 
-JAR="chuck-ide/target/chuck-ide-1.0-SNAPSHOT-shaded.jar"
+JAR="chuck-ide/target/chuck-ide-1.0-SNAPSHOT.jar"
 
 if [ ! -f "$JAR" ]; then
     echo "Shaded JAR not found. Building project..."
