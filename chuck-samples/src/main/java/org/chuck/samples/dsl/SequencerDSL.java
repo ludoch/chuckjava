@@ -1,3 +1,5 @@
+package org.chuck.samples.dsl;
+
 /**
  * JAVA DSL VERSION: PRO GRID SEQUENCER ----------------------------------- This class mirrors the
  * ChucK sequencer logic using pure Java DSL. It demonstrates real-time interaction with the 8-track

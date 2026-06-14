@@ -1,3 +1,5 @@
+package org.chuck.samples.dsl;
+
 import static org.chuck.core.ChuckDSL.*;
 
 import org.chuck.audio.fx.Chorus;

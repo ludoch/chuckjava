@@ -103,7 +103,6 @@
                     <configuration>
                         <release>25</release>
                         <compilerArgs>
-                            <arg>--enable-preview</arg>
                             <arg>--add-modules</arg>
                             <arg>jdk.incubator.vector</arg>
                         </compilerArgs>
@@ -114,7 +113,7 @@
                     <artifactId>maven-surefire-plugin</artifactId>
                     <version>3.5.5</version>
                     <configuration>
-                        <argLine>--enable-preview --add-modules jdk.incubator.vector -Dchuck.audio.dummy=true -Xmx2048m</argLine>
+                        <argLine>--add-modules jdk.incubator.vector -Dchuck.audio.dummy=true -Xmx2048m</argLine>
                         <excludedGroups>slow</excludedGroups>
                     </configuration>
                 </plugin>

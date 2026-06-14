@@ -391,19 +391,24 @@ public class ChuckDSL {
     var compilationUnits = fileManager.getJavaFileObjects(sourceFile);
 
     String classpath = System.getProperty("java.class.path");
-    var options =
-        java.util.List.of(
-            "-d", tempDir.toString(), "-cp", classpath, "--enable-preview", "--release", "25");
+    var options = java.util.List.of("-d", tempDir.toString(), "-cp", classpath, "--release", "25");
 
     var task = compiler.getTask(null, fileManager, null, options, null, compilationUnits);
     if (!task.call()) {
       throw new RuntimeException("Compilation failed for " + className);
     }
 
+    String packageName = "";
+    java.util.regex.Matcher matcher =
+        java.util.regex.Pattern.compile("^\\s*package\\s+([^;\\s]+)\\s*;").matcher(source);
+    if (matcher.find()) {
+      packageName = matcher.group(1) + ".";
+    }
+
     java.net.URLClassLoader loader =
         new java.net.URLClassLoader(
             new java.net.URL[] {tempDir.toUri().toURL()}, ChuckDSL.class.getClassLoader());
-    return loader.loadClass(className);
+    return loader.loadClass(packageName + className);
   }
 
   /**
@@ -422,13 +427,19 @@ public class ChuckDSL {
     java.nio.file.Path tempDir = java.nio.file.Files.createTempDirectory("chuck_java_dsl");
     // Use current classpath to ensure the core library is available during compilation
     String classpath = System.getProperty("java.class.path");
-    var options =
-        java.util.List.of(
-            "-d", tempDir.toString(), "-cp", classpath, "--enable-preview", "--release", "25");
+    var options = java.util.List.of("-d", tempDir.toString(), "-cp", classpath, "--release", "25");
 
     var task = compiler.getTask(null, fileManager, null, options, null, compilationUnits);
     if (!task.call()) {
       throw new RuntimeException("Compilation failed for " + path.getFileName());
+    }
+
+    String content = java.nio.file.Files.readString(path);
+    String packageName = "";
+    java.util.regex.Matcher matcher =
+        java.util.regex.Pattern.compile("^\\s*package\\s+([^;\\s]+)\\s*;").matcher(content);
+    if (matcher.find()) {
+      packageName = matcher.group(1) + ".";
     }
 
     String fileName = path.getFileName().toString();
@@ -447,7 +458,7 @@ public class ChuckDSL {
             return super.loadClass(name, resolve);
           }
         };
-    Class<?> clazz = loader.loadClass(className);
+    Class<?> clazz = loader.loadClass(packageName + className);
 
     return () -> {
       try {

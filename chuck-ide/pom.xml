@@ -81,7 +81,6 @@
                 <configuration>
                     <mainClass>org.chuck.ide.ChuckIDE</mainClass>
                     <options>
-                        <option>--enable-preview</option>
                         <option>--add-modules</option>
                         <option>jdk.incubator.vector</option>
                     </options>
@@ -143,8 +142,6 @@
                                         <argument>chuck-java.jar</argument>
                                         <argument>--main-class</argument>
                                         <argument>org.chuck.Launcher</argument>
-                                        <argument>--java-options</argument>
-                                        <argument>--enable-preview</argument>
                                         <argument>--java-options</argument>
                                         <argument>--add-modules=jdk.incubator.vector</argument>
                                         <argument>--dest</argument>
