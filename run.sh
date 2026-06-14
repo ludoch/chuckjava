@@ -47,4 +47,4 @@ for arg in "$@"; do
     fi
 done
 
-"$JAVA_BIN" --enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -jar "$JAR" "${ARGS[@]}"
+"$JAVA_BIN" -XX:+UseZGC --enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -jar "$JAR" "${ARGS[@]}"

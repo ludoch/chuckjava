@@ -18,7 +18,8 @@ fi
 # 2. Handle Machine Mode
 if [ "$1" == "--machine" ]; then
     shift
-    java --enable-preview \
+    java -XX:+UseZGC \
+         --enable-preview \
          --add-modules jdk.incubator.vector \
          --enable-native-access=ALL-UNNAMED \
          -cp "$JAR" \
@@ -40,7 +41,8 @@ for arg in "$@"; do
 done
 
 # 3. Run with modern JVM flags
-java --enable-preview \
+java -XX:+UseZGC \
+     --enable-preview \
      --add-modules jdk.incubator.vector \
      --enable-native-access=ALL-UNNAMED \
      -cp "$JAR" \
