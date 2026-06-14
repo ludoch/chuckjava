@@ -32,4 +32,4 @@ if [ ! -f "$JAR" ]; then
     mvn install -DskipTests
 fi
 
-"$JAVA_BIN" --enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -jar "$JAR" "$@"
+"$JAVA_BIN" --enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xlog:gc*:file=gc.log:time,level,tags -jar "$JAR" "$@"
