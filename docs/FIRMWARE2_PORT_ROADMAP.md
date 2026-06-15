@@ -4,6 +4,16 @@ Companion to `FIRMWARE2_FAITHFUL_PORT.md` (the absolute rule). This file maps ev
 source file to its Java port and tracks whether each is **100% faithful**, **partial**,
 **not ported**, or **not applicable** (Java-only infrastructure).
 
+> **Status — 2026-06-15.** `firmware/` is down to **70 `.java` files** (from 85). Fully gone:
+> all of `firmware/dsp/`, the old voice classes (`FirmwareVoice`, `VoiceSample`,
+> `VoiceUnisonPart`, `VoiceUnisonPartSource`), `GlobalEffectable`, the lookup-table dumps
+> (`SawLookupTables`/`SquareLookupTables`/`TriangleLookupTables`/`TanHLookupTable`), 14 dead
+> stub files, and `firmware/modulation/params/Param.java` (the bridge now uses the
+> `firmware2.Param` superset). Tests: **389 default / 428 slow**, all green. The remaining
+> deletable duplicates are `firmware/modulation/{Envelope,LFO,Patcher,ParamCurves}` and
+> `firmware/util/{FirmwareUtils,LookupTables,Q31}` — blocked only by per-file import
+> disambiguation (names shared with `firmware2/`) across ~61 test files.
+
 ## 1. Why `firmware/` still exists
 
 The ultimate goal is to delete `org.chuck.deluge.firmware/` entirely. Today it serves three roles:
@@ -19,6 +29,11 @@ either (a) updating the bridge to use firmware2 types, or (b) a C→Java port be
 firmware2 (not firmware/). Never add new DSP to firmware/.
 
 ## 2. Full file mapping: C → firmware/ → firmware2/
+
+> **Note:** the **`firmware/ (old)`** column below is historical. Every `firmware/dsp/…` entry
+> (oscillators, filters, voice, DX7, effects, lookup-table dumps) has since been **deleted** —
+> `firmware/dsp/` no longer exists. The column is kept to record where each port came from; the
+> live code is the `firmware2/` column.
 
 Legend:
 - ✅ = 100% faithful line-for-line C port
@@ -115,20 +130,17 @@ These files exist only in `firmware/engine/` and are needed to connect the Java 
 to the firmware2 DSP engine. They will shrink as firmware2 subsumes more, but **cannot be
 deleted until the old firmware/ is completely removed**.
 
+All 7 remaining `firmware/engine/` files (the old voice/unison/GlobalEffectable classes are deleted):
+
 | File | Lines | Role | Fate |
 |------|-------|------|------|
-| `engine/FirmwareSound.java` | 890 | **THE bridge** — routes notes, params, arp, MPE to fw2 | Must stay until everything in fw2; eventually becomes a thin wrapper |
-| `engine/FirmwareFactory.java` | 905 | Creates FirmwareSound from Java models (XML, track models) | Must stay (model→sound construction). Should reference only fw2 types |
-| `engine/FirmwareAudioEngine.java` | 94 | Audio engine init, buffer management | Must stay |
-| `engine/FirmwareVoice.java` | 954 | **OLD voice** — still needed for legacy fallback and some tests | Delete when all tests migrate to fw2 |
-| `engine/FirmwareKit.java` | 55 | Kit/drum support | Delete when kits ported to fw2 |
-| `engine/FirmwareMidiInstrument.java` | 66 | MIDI instrument glue | Keep |
-| `engine/GlobalEffectable.java` | 91 | Global effect routing | Keep until effects ported |
-| `engine/GlobalSidechainBus.java` | 41 | Sidechain bus | Keep until sidechain ported |
-| `engine/Stutterer.java` | 206 | Stutter effect | Keep until ported |
-| `engine/VoiceSample.java` | 168 | Sample voice playback | Delete when samples ported |
-| `engine/VoiceUnisonPart.java` | 44 | Old unison part (superseded by fw2 VoiceSource) | Delete when FirmwareVoice deleted |
-| `engine/VoiceUnisonPartSource.java` | 61 | Old unison source (superseded by fw2 VoiceSource) | Delete when FirmwareVoice deleted |
+| `engine/FirmwareFactory.java` | 1278 | Creates FirmwareSound from Java models (XML, track models); owns the shared `buildNoteRow` mapping | Must stay (model→sound construction). Should reference only fw2 types |
+| `engine/FirmwareSound.java` | 659 | **THE bridge** — routes notes, params, arp, MPE to fw2 (now via `firmware2.Param`) | Must stay until everything in fw2; eventually a thin wrapper |
+| `engine/Stutterer.java` | 206 | Stutter effect | Keep until ported (still referenced by fw2) |
+| `engine/FirmwareAudioEngine.java` | 179 | Audio engine init, buffer management | Must stay |
+| `engine/FirmwareMidiInstrument.java` | 65 | MIDI instrument glue | Keep |
+| `engine/FirmwareKit.java` | 43 | Kit/drum support (fw2 `Kit.java` exists — finish the swap) | Delete when kits fully on fw2 |
+| `engine/GlobalSidechainBus.java` | 41 | Sidechain bus (fw2 `Sidechain.java` exists; still referenced by fw2) | Delete when sidechain fully on fw2 |
 
 ### 2.7 Java infrastructure (not C ports, but needed for the app)
 
@@ -160,37 +172,42 @@ question is whether they should move to a different package.
 | TanH table | `util/TanHLookupTable.java` | `LookupTables.java` | ✅ 100% |
 | Wavetable | `storage/wave_table/WaveTable.java` | `WavetableLoader.java` | ✅ 100% |
 
-## 3. Current test status (327/366 tests)
+## 3. Current test status (389/428 tests)
 
 | Count | Category | Tests |
 |-------|----------|-------|
 | 0 failures | All categories | All suites green |
-| 327 passing | JVM default | `mvn -pl deluge test` |
-| 366 passing | JVM slow | `mvn -pl deluge test -Pslow-tests` |
+| 389 passing | JVM default | `mvn -pl deluge test` |
+| 428 passing | JVM slow | `mvn -pl deluge test -Pslow-tests` |
 
-All 327/366 tests pass.
+All 389/428 tests pass.
 
 ## 4. What's blocking `firmware/` deletion
 
 ```
 ├── [x] All effects ported to firmware2/ (compressor, delay, reverb, granular, modFX, EQ, SRR, sidechain, timestretch, interpolator)
 ├── [x] FirmwareVoice.java deleted (all tests use fw2 Voice)
-├── [ ] FirmwareKit.java ported to fw2 (kit/drum tests pass but bridge class remains)
-├── [ ] Bridge (FirmwareSound, FirmwareFactory) references ONLY firmware2/ types for DSP
-├── [ ] All lookup tables using fw2 versions (firmware/util/ deleted)
-├── [x] Voice sample playback ported to fw2
-├── [ ] Stutterer ported or kept as shared util
+├── [x] Voice sample playback ported to fw2 (VoiceSample / VoiceUnisonPart* deleted)
+├── [x] GlobalEffectable + old lookup-table dumps deleted
+├── [x] 14 dead firmware/ stub files deleted (gui/model/storage/hid)
+├── [x] Bridge Param unified to firmware2.Param (firmware/.../params/Param.java deleted)
+├── [ ] FirmwareKit.java -> fw2 Kit.java (fw2 class exists; finish swap)
+├── [ ] GlobalSidechainBus -> fw2 Sidechain.java (fw2 class exists; finish swap)
+├── [ ] Stutterer ported to fw2 or kept as shared util (still referenced by fw2)
+├── [ ] firmware/modulation/{Envelope,LFO,Patcher,ParamCurves} -> fw2 (needs import disambiguation; ~61 tests)
+├── [ ] firmware/util/{FirmwareUtils,LookupTables,Q31} -> fw2 (Q31 likely moves to fw2 as shared)
 └── [ ] All tests pass without firmware/ DSP classes
 ```
 
-## 5. Order of attack (updated 2026-06-13)
+## 5. Order of attack (updated 2026-06-15)
 
 ```
 ✅ Porting & Verification of all DSP subsystems (Osc sync, wavefolder, saturation, retrig phase,
    analog models, wavetables, glide, arp rhythms, live-input routing, sidechain, effects, sample engine)
 → 🔄 Hardware Fidelity Calibration (Lpf cutoff/resonance curve, delay feedback mapping, FM brightness)
 → 🔄 XML Parser Follow-ups (sustain param raw-Q31 conversion, defaultParams raw-Q31 reader, FX scalars)
-→ ⬜ Bridge Refactoring (eliminate remaining old firmware/ classes)
+→ 🔄 Bridge Refactoring (in progress: dead-file sweep + Param->fw2 done; remaining =
+   Kit/Sidechain swaps, modulation+util duplicate removal, ~61 test migrations)
 ```
 
 
