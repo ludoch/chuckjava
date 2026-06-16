@@ -19,4 +19,7 @@ at `~/a/DelugeFirmware/src/deluge/`. Translate the C — do not reconstruct, par
 - **Every firmware2 edit cites the C file:line it ports.**
 - **Before writing any firmware2 code:** open the exact C function, read it, mirror its structure.
 - **Build + test:** `mvn -pl deluge compile` | `mvn -pl deluge test`
+- **ALWAYS reformat before committing:** run `mvn -pl deluge spotless:apply` (Spotless +
+  googleJavaFormat) so commits land pre-formatted. Verify with `mvn -pl deluge spotless:check`.
+  This avoids churn/merge-noise from a later formatter pass reflowing your code.
 - **Commit + push:** branch off `main`, commit, merge back.
