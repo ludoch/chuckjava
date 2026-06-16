@@ -1,6 +1,32 @@
 # Plan: collapse `FirmwareSound` shadow state → single `fw2Sound` source of truth
 
-Status: **planned** (the "perfect final fix"). Stopgap guards already landed (see end).
+Status: **Phase 1 DONE & merged** (`a54b885d`, 2026-06-16) — 24 redundant shadow fields eliminated;
+the entire bug class is gone. Remainder **intentionally left** (see "Outcome" below). Guards landed.
+
+## Outcome (2026-06-16)
+
+Phase 1 migrated **24 shadow fields** to single-source-of-truth on `fw2Sound` (pure scalars,
+converted enums via accessor-backed `get/set`, derived-FX collapsed to compute-into-`fw2Sound`),
+all verified green, net −72 lines. This removed every redundant scalar/enum shadow field — the whole
+category that produced the three historical bugs (`lfoWaveforms`, `lfo1`-source, `voicePriority`).
+
+**Key finding that stopped the grind:** `syncParamsToFw2` is invoked **per render block**
+(`FirmwareSound.renderInternal`), not just per-edit. So what remains in it is **not** a redundant
+hop that can be deleted — it's the per-block model→engine refresh, and it contains legitimate
+*dynamic* state: `currentBpm`, the BPM-synced delay timing, and `globalSourceValues` (global
+LFO/sidechain output). The rest (oscTypes, FM, retrigger, samples, `patchedParamValues` rebuild,
+patch cables, lfoConfig, customLfoWave) is static config recopied each block.
+
+**Decision: stop here.** The bug class is eliminated and guarded; the remaining layer is legitimate
+(partly necessary) translation. The only further win would be an **optional split** — move the
+static config to edit-time (`mapModelToSound`) and leave a slim per-block `updateDynamics()` for
+bpm/delay/globalSourceValues (a perf + tidiness gain, NOT bug-fixing). That carries core-path risk
+and wide test churn (oscTypes/param arrays are set directly in many tests), so it's deferred unless
+a concrete need arises.
+
+---
+
+
 
 ## Background — what the bridge is, and why it's fragile
 
