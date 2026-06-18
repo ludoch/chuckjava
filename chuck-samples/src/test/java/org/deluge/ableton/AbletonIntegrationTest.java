@@ -3,6 +3,7 @@ package org.deluge.ableton;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.File;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -18,7 +19,7 @@ public class AbletonIntegrationTest {
   public void testDecompressAndParseTemplate() throws Exception {
     String home = System.getProperty("user.home");
     File templateFile = new File(home, "Music/Ableton/User Library/Templates/opz.als");
-    assertTrue(templateFile.exists(), "Template ALS file must exist on the system");
+    Assumptions.assumeTrue(templateFile.exists(), "Skipping: Ableton template not installed");
 
     // 1. Verify decompression
     String xml = AbletonProjectManager.decompressAls(templateFile);
@@ -36,7 +37,7 @@ public class AbletonIntegrationTest {
     String home = System.getProperty("user.home");
     File demoFile =
         new File(home, "Music/Ableton/Factory Packs/Sequencers/Sequencers Demo Set.als");
-    assertTrue(demoFile.exists(), "Demo Set ALS file must exist on the system");
+    Assumptions.assumeTrue(demoFile.exists(), "Skipping: Ableton Demo Set not installed");
 
     // 1. Parse ALS to XML Document
     Document doc = AbletonProjectManager.parseAlsToXml(demoFile);
@@ -84,7 +85,7 @@ public class AbletonIntegrationTest {
     String home = System.getProperty("user.home");
     File demoFile =
         new File(home, "Music/Ableton/Factory Packs/Sequencers/Sequencers Demo Set.als");
-    assertTrue(demoFile.exists(), "Demo Set ALS file must exist on the system");
+    Assumptions.assumeTrue(demoFile.exists(), "Skipping: Ableton Demo Set not installed");
 
     // 1. Parse ALS to XML Document
     Document doc = AbletonProjectManager.parseAlsToXml(demoFile);
@@ -187,7 +188,7 @@ public class AbletonIntegrationTest {
     String home = System.getProperty("user.home");
     File demoFile =
         new File(home, "Music/Ableton/Factory Packs/Sequencers/Sequencers Demo Set.als");
-    assertTrue(demoFile.exists(), "Demo Set ALS file must exist");
+    Assumptions.assumeTrue(demoFile.exists(), "Skipping: Ableton Demo Set not installed");
 
     // 1. Import original set into project1
     Document doc1 = AbletonProjectManager.parseAlsToXml(demoFile);
@@ -196,7 +197,7 @@ public class AbletonIntegrationTest {
 
     // 2. Export project1 to temporary .als file in scratch directory
     File scratchDir =
-        new File(home, ".gemini/jetski/brain/ae27587c-6d7c-4fac-9610-5dd67967a44e/scratch");
+        new File(System.getProperty("java.io.tmpdir"), "deluge-ableton-test");
     if (!scratchDir.exists()) scratchDir.mkdirs();
     File exportedFile = new File(scratchDir, "roundtrip_test.als");
 
