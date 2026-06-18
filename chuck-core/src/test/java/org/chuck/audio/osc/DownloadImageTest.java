@@ -13,7 +13,7 @@ public class DownloadImageTest {
   public void testDownload() {
     String spec = "https://forums.synthstrom.com/uploads/editor/ck/2tzng73w68mz.png";
     String dest =
-        "/Users/ludo/.gemini/jetski/brain/9841caa1-98ab-40d0-a511-4269ef745639/deluge_shortcuts.png";
+        java.nio.file.Path.of("target", "deluge_shortcuts.png").toAbsolutePath().toString();
     try (BufferedInputStream in = new BufferedInputStream(new URL(spec).openStream());
         FileOutputStream out = new FileOutputStream(dest)) {
       byte[] data = new byte[1024];
