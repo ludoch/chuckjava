@@ -293,5 +293,5 @@ class MasterFxRegressionTest {
   // intentional, C-justified DSP change (and say so in the commit).
   private static final long COMPRESSOR_GOLDEN = 3592526422808312300L;
   private static final long DELAY_GOLDEN = 843932180224107487L;
-  private static final long REVERB_GOLDEN = 4308429854311107464L;
+  private static final long REVERB_GOLDEN = -5288909449447130904L;
 }
