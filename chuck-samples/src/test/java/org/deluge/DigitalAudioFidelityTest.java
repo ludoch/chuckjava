@@ -186,11 +186,44 @@ public class DigitalAudioFidelityTest {
                 + " render="
                 + outputWave[i]
                 + " ratio="
-                + (outputWave[i] / Math.max(1E-6, rawKick[i])));
+                + (outputWave[i] / (rawKick[i] == 0 ? 1E-6f : rawKick[i])));
       }
       System.out.println("=========================================");
+
+      // Enforce strict sample-by-sample ratio parity over the active sounding part of the kick.
+      // The expected ratio is 0.125f (unity track gain scaling by 1/8). Any overflow, folding,
+      // or wrapping will cause this ratio to deviate drastically.
+      int checkedSamplesCount = 0;
+      for (int i = 0; i < rawKick.length && i < outputWave.length; i++) {
+        float rawVal = rawKick[i];
+        if (Math.abs(rawVal) > 0.02f) { // check non-silent active part
+          float renderVal = outputWave[i];
+          float expectedRatio = 0.125f;
+          float actualRatio = renderVal / rawVal;
+          assertEquals(
+              expectedRatio,
+              actualRatio,
+              0.0005f,
+              "Audio distortion/wrap-around regression detected at sample "
+                  + i
+                  + "! Raw: "
+                  + rawVal
+                  + ", Rendered: "
+                  + renderVal
+                  + ", Ratio: "
+                  + actualRatio);
+          checkedSamplesCount++;
+        }
+      }
+      assertTrue(
+          checkedSamplesCount > 1000,
+          "Should have checked at least 1000 active samples for ratio parity!");
+      System.out.println(
+          "[TEST] Successfully verified strict sample-by-sample ratio parity over "
+              + checkedSamplesCount
+              + " active samples!");
     } catch (Exception e) {
-      System.out.println("Could not load raw Kick for comparison: " + e.getMessage());
+      fail("Could not load raw Kick or verify ratio parity: " + e.getMessage());
     }
 
     // Wave assertions:
