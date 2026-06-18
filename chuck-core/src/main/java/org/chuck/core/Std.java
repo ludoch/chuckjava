@@ -192,12 +192,21 @@ public class Std {
    * stdin/stdout/stderr.
    */
   public static long system(String cmd) {
+    Process p = null;
     try {
       ProcessBuilder pb = new ProcessBuilder(cmd.split("\\s+"));
       pb.inheritIO();
-      return pb.start().waitFor();
+      p = pb.start();
+      return p.waitFor();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      return -1L;
     } catch (Exception e) {
       return -1L;
+    } finally {
+      if (p != null) {
+        p.destroy();
+      }
     }
   }
 }

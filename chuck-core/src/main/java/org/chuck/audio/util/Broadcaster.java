@@ -80,38 +80,40 @@ public class Broadcaster extends ChuckUGen implements AutoCloseable {
                       "192k",
                       "pipe:1");
               Process p = pb.start();
-
-              // Thread to feed ffmpeg
-              Thread writerThread =
-                  new Thread(
-                      () -> {
-                        try (OutputStream ffmpegIn = p.getOutputStream()) {
-                          while (active) {
-                            byte[] chunk = audioQueue.poll();
-                            if (chunk != null) {
-                              ffmpegIn.write(chunk);
-                              ffmpegIn.flush();
-                            } else {
-                              Thread.sleep(10);
+              try {
+                // Thread to feed ffmpeg
+                Thread writerThread =
+                    new Thread(
+                        () -> {
+                          try (OutputStream ffmpegIn = p.getOutputStream()) {
+                            while (active) {
+                              byte[] chunk = audioQueue.poll();
+                              if (chunk != null) {
+                                ffmpegIn.write(chunk);
+                                ffmpegIn.flush();
+                              } else {
+                                Thread.sleep(10);
+                              }
                             }
+                          } catch (Exception ignored) {
                           }
-                        } catch (Exception ignored) {
-                        }
-                      });
-              writerThread.setDaemon(true);
-              writerThread.start();
+                        });
+                writerThread.setDaemon(true);
+                writerThread.start();
 
-              // Read from ffmpeg and send to HTTP client
-              try (InputStream ffmpegOut = p.getInputStream()) {
-                byte[] buf = new byte[4096];
-                int read;
-                while (active && (read = ffmpegOut.read(buf)) != -1) {
-                  os.write(buf, 0, read);
-                  os.flush();
+                // Read from ffmpeg and send to HTTP client
+                try (InputStream ffmpegOut = p.getInputStream()) {
+                  byte[] buf = new byte[4096];
+                  int read;
+                  while (active && (read = ffmpegOut.read(buf)) != -1) {
+                    os.write(buf, 0, read);
+                    os.flush();
+                  }
+                } catch (Exception ignored) {
                 }
-              } catch (Exception ignored) {
+              } finally {
+                p.destroy();
               }
-              p.destroy();
 
             } else {
               // Raw WAV/PCM stream
