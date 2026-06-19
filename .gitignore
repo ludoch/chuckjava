@@ -39,5 +39,4 @@ cp.txt
 .claude/
 /deluge/src/main/resources/DX7/
 jdk25/
-deluge/src/main/resources/SAMPLES/RESAMPLE/
 gc.log*
