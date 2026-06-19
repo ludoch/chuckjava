@@ -26,8 +26,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <antlr4.version>4.13.2</antlr4.version>
         <javafx.version>23.0.2</javafx.version>
-        <junit.version>6.0.3</junit.version>
-        <asm.version>9.9.1</asm.version>
+        <junit.version>6.1.0</junit.version>
+        <asm.version>9.10.1</asm.version>
     </properties>
 
     <dependencyManagement>
@@ -120,7 +120,7 @@
                 <plugin>
                     <groupId>com.diffplug.spotless</groupId>
                     <artifactId>spotless-maven-plugin</artifactId>
-                    <version>3.4.0</version>
+                    <version>3.6.0</version>
                     <configuration>
                         <java>
                             <googleJavaFormat>
