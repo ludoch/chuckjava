@@ -54,9 +54,6 @@ public class ResampleFidelityTest {
     //    ProjectModel.createDefaultProject() → PresetFinder.findFirstPreset(SYNTHS/) picks the
     //    first file alphabetically, which is 000 Rich Saw Bass.XML.
     File synthFile = new File("src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
-    if (!synthFile.exists()) {
-      synthFile = new File("../deluge/src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
-    }
     assertTrue(
         synthFile.exists(), "000 Rich Saw Bass.XML not found at " + synthFile.getAbsolutePath());
     System.out.println("[Test] Using synth: " + synthFile.getName());
@@ -207,9 +204,7 @@ public class ResampleFidelityTest {
   @Test
   void testSingleNoteOutputLevel() throws Exception {
     // Use the same synth the UI boots with
-    File synthFile = new File("../deluge/src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
-    if (!synthFile.exists())
-      synthFile = new File("src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
+    File synthFile = new File("src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
     assertTrue(synthFile.exists(), "000 Rich Saw Bass.XML not found");
     SynthTrackModel model = DelugeXmlParser.parseSynth(synthFile);
     ProjectModel project = new ProjectModel();
@@ -262,20 +257,15 @@ public class ResampleFidelityTest {
   void testEngineOutputMatchesRealHardwareRecording() throws Exception {
     // 1. Load the golden reference WAV from deluge/src/test/resources/fidelity/
     //    (the chuck-samples pom.xml overlays deluge testResources onto the classpath,
-    //    but File() needs the real filesystem path — use the relative ../deluge/ path)
-    File goldenFile = new File("../deluge/src/test/resources/fidelity/REC00003.WAV");
-    if (!goldenFile.exists()) {
-      goldenFile = new File("src/test/resources/fidelity/REC00003.WAV");
-    }
+    File goldenFile = new File("src/test/resources/fidelity/REC00003.WAV");
+
     assertTrue(goldenFile.exists(), "Golden WAV not found at " + goldenFile.getAbsolutePath());
     double[] goldenEnv = loadWavEnvelope(goldenFile);
     System.out.printf(
         "[Test] Golden WAV: %d blocks, max RMS=%.6f%n", goldenEnv.length, maxOf(goldenEnv));
 
     // 2. Load 000 Rich Saw Bass (the default UI synth)
-    File synthFile = new File("../deluge/src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
-    if (!synthFile.exists())
-      synthFile = new File("src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
+    File synthFile = new File("src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
     assertTrue(synthFile.exists(), "000 Rich Saw Bass.XML not found");
     SynthTrackModel synthModel = DelugeXmlParser.parseSynth(synthFile);
 
