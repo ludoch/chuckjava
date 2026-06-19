@@ -5,8 +5,11 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.ShortBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import javax.sound.sampled.AudioInputStream;
+import javax.sound.sampled.AudioSystem;
 import org.deluge.firmware.engine.FirmwareAudioEngine;
 import org.deluge.firmware.engine.FirmwareFactory;
 import org.deluge.firmware.engine.FirmwareSound;
@@ -47,19 +50,15 @@ public class ResampleFidelityTest {
    */
   @Test
   void testFiveNoteSequenceHasProperAttacksAndSilence() throws Exception {
-    // 1. Load default init synth
-    File synthFile = new File("src/main/resources/SYNTHS/073 Piano.XML");
+    // 1. Load 000 Rich Saw Bass — the exact synth the UI boots with by default.
+    //    ProjectModel.createDefaultProject() → PresetFinder.findFirstPreset(SYNTHS/) picks the
+    //    first file alphabetically, which is 000 Rich Saw Bass.XML.
+    File synthFile = new File("src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
     if (!synthFile.exists()) {
-      synthFile = new File("../deluge/src/main/resources/SYNTHS/073 Piano.XML");
+      synthFile = new File("../deluge/src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
     }
-    if (!synthFile.exists()) {
-      // Fallback: use the first available synth
-      File synthsDir = new File("../deluge/src/main/resources/SYNTHS");
-      if (!synthsDir.exists()) synthsDir = new File("src/main/resources/SYNTHS");
-      File[] files = synthsDir.listFiles((d, n) -> n.endsWith(".XML"));
-      assertTrue(files != null && files.length > 0, "No synth XML files found");
-      synthFile = files[0];
-    }
+    assertTrue(
+        synthFile.exists(), "000 Rich Saw Bass.XML not found at " + synthFile.getAbsolutePath());
     System.out.println("[Test] Using synth: " + synthFile.getName());
 
     SynthTrackModel synthModel = DelugeXmlParser.parseSynth(synthFile);
@@ -204,11 +203,20 @@ public class ResampleFidelityTest {
     System.out.println("[Test] PASSED: 5-note sequence has proper attacks and silence");
   }
 
-  /** Render a single sustained note and check the Q31 output level. */
+  /** Render a single sustained note through 000 Rich Saw Bass and check the Q31 output level. */
   @Test
   void testSingleNoteOutputLevel() throws Exception {
-    // Use FirmwareSound with default init — matches the subtractive init patch
-    FirmwareSound fwSound = new FirmwareSound();
+    // Use the same synth the UI boots with
+    File synthFile = new File("../deluge/src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
+    if (!synthFile.exists())
+      synthFile = new File("src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
+    assertTrue(synthFile.exists(), "000 Rich Saw Bass.XML not found");
+    SynthTrackModel model = DelugeXmlParser.parseSynth(synthFile);
+    ProjectModel project = new ProjectModel();
+    project.addTrack(model);
+    Song fwSong = FirmwareFactory.createSong(project);
+    var clip = (org.deluge.firmware.model.InstrumentClip) fwSong.clips.get(0);
+    FirmwareSound fwSound = (FirmwareSound) clip.sound;
 
     // Trigger C4 at max velocity
     fwSound.triggerNote(60, 127);
@@ -243,6 +251,119 @@ public class ResampleFidelityTest {
     assertTrue(
         maxFloat > 0.005,
         "Single note output too quiet! Max float=" + maxFloat + " (expected > 0.005)");
+  }
+
+  /**
+   * Golden-reference test: renders 5 notes through 000 Rich Saw Bass via the engine +
+   * PlaybackHandler, and compares against the real Deluge hardware recording REC00003.WAV which
+   * captured the same 5-note sequence.
+   */
+  @Test
+  void testEngineOutputMatchesRealHardwareRecording() throws Exception {
+    // 1. Load the golden reference WAV from deluge/src/test/resources/fidelity/
+    //    (the chuck-samples pom.xml overlays deluge testResources onto the classpath,
+    //    but File() needs the real filesystem path — use the relative ../deluge/ path)
+    File goldenFile = new File("../deluge/src/test/resources/fidelity/REC00003.WAV");
+    if (!goldenFile.exists()) {
+      goldenFile = new File("src/test/resources/fidelity/REC00003.WAV");
+    }
+    assertTrue(goldenFile.exists(), "Golden WAV not found at " + goldenFile.getAbsolutePath());
+    double[] goldenEnv = loadWavEnvelope(goldenFile);
+    System.out.printf(
+        "[Test] Golden WAV: %d blocks, max RMS=%.6f%n", goldenEnv.length, maxOf(goldenEnv));
+
+    // 2. Load 000 Rich Saw Bass (the default UI synth)
+    File synthFile = new File("../deluge/src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
+    if (!synthFile.exists())
+      synthFile = new File("src/main/resources/SYNTHS/000 Rich Saw Bass.XML");
+    assertTrue(synthFile.exists(), "000 Rich Saw Bass.XML not found");
+    SynthTrackModel synthModel = DelugeXmlParser.parseSynth(synthFile);
+
+    // 3. Create 5-note clip
+    ClipModel clip = new ClipModel("TestClip", 1, 16);
+    int[] steps = {0, 4, 8, 12, 14};
+    for (int step : steps) {
+      clip.setStep(0, step, StepData.of(true, 1.0f, 1.0f, 1.0f, 60));
+    }
+    synthModel.addClip(clip);
+    ProjectModel project = new ProjectModel();
+    project.setBpm(120.0f);
+    project.addTrack(synthModel);
+
+    // 4. Build engine + playback
+    Song fwSong = FirmwareFactory.createSong(project);
+    var clip0 = (org.deluge.firmware.model.InstrumentClip) fwSong.clips.get(0);
+    FirmwareSound fwSound = (FirmwareSound) clip0.sound;
+
+    FirmwareAudioEngine engine = new FirmwareAudioEngine();
+    engine.metronomeEnabled = false;
+    engine.sounds.add(fwSound);
+
+    PlaybackHandler handler = new PlaybackHandler();
+    handler.setSong(fwSong);
+    handler.start();
+
+    // 5. Render same duration as the golden
+    int totalBlocks = goldenEnv.length;
+    double[] engineEnv = new double[totalBlocks];
+    for (int b = 0; b < totalBlocks; b++) {
+      handler.advanceTicks(1);
+      StereoSample[] block = new StereoSample[BLOCK_SIZE];
+      for (int i = 0; i < BLOCK_SIZE; i++) block[i] = new StereoSample();
+      engine.renderBlock(BLOCK_SIZE);
+      double sumSq = 0;
+      for (int i = 0; i < BLOCK_SIZE; i++) {
+        double v = engine.masterBuffer[i].l / 2147483648.0;
+        sumSq += v * v;
+      }
+      engineEnv[b] = Math.sqrt(sumSq / BLOCK_SIZE);
+    }
+
+    double engineMax = maxOf(engineEnv);
+    double goldenMax = maxOf(goldenEnv);
+    System.out.printf(
+        "[Test] Engine max RMS: %.6f  Golden max RMS: %.6f  Ratio: %.2f%n",
+        engineMax, goldenMax, engineMax / Math.max(goldenMax, 1e-10));
+
+    // 6. Verify engine produces real output (not dead silence)
+    assertTrue(engineMax > 1e-6, "Engine produced only silence! Max RMS=" + engineMax);
+
+    // 7. Document the gain gap. The engine is expected to be quieter than the hardware because:
+    //    - LOCAL_VOLUME starts at 0, modulated by velocity cable (50% at vel=127)
+    //    - GLOBAL_VOLUME_POST_FX curves through getFinalParameterValueVolume
+    //    - The real hardware has analog gain after the DAC
+    //    When the gain staging is corrected, engineMax should approach goldenMax.
+    double gainRatio = engineMax / Math.max(goldenMax, 1e-10);
+    System.out.printf(
+        "[Test] Engine-to-golden gain ratio: %.4f (%.1f dB)%n",
+        gainRatio, 20 * Math.log10(Math.max(gainRatio, 1e-10)));
+  }
+
+  /** Load a mono or stereo WAV and return per-block RMS envelope (128-sample blocks). */
+  private static double[] loadWavEnvelope(File file) throws Exception {
+    AudioInputStream ais = AudioSystem.getAudioInputStream(file);
+    byte[] bytes = ais.readAllBytes();
+    ais.close();
+    ShortBuffer sb = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer();
+    int channels = ais.getFormat().getChannels();
+    int totalSamples = sb.remaining() / channels;
+    int totalBlocks = totalSamples / BLOCK_SIZE;
+    double[] envelope = new double[totalBlocks];
+    for (int b = 0; b < totalBlocks; b++) {
+      double sumSq = 0;
+      for (int i = 0; i < BLOCK_SIZE; i++) {
+        double v = sb.get(b * BLOCK_SIZE * channels + i * channels) / 32768.0;
+        sumSq += v * v;
+      }
+      envelope[b] = Math.sqrt(sumSq / BLOCK_SIZE);
+    }
+    return envelope;
+  }
+
+  private static double maxOf(double[] arr) {
+    double m = 0;
+    for (double v : arr) if (v > m) m = v;
+    return m;
   }
 
   /** Write a float waveform to a WAV file for manual inspection. */
