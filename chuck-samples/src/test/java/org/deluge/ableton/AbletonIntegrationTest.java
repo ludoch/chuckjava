@@ -196,8 +196,7 @@ public class AbletonIntegrationTest {
     AbletonTrackMapper.importAbletonSet(doc1, project1);
 
     // 2. Export project1 to temporary .als file in scratch directory
-    File scratchDir =
-        new File(System.getProperty("java.io.tmpdir"), "deluge-ableton-test");
+    File scratchDir = new File(System.getProperty("java.io.tmpdir"), "deluge-ableton-test");
     if (!scratchDir.exists()) scratchDir.mkdirs();
     File exportedFile = new File(scratchDir, "roundtrip_test.als");
 
