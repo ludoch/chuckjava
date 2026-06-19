@@ -146,7 +146,25 @@ public class ResampleFidelityTest {
       envelope[b] = Math.sqrt(sumSq / BLOCK_SIZE);
     }
 
-    // 6a. Check for adequate amplitude
+    // 6a. Check for adequate amplitude.
+    //
+    // KNOWN GAP: the firmware2 engine produces ~0.014 RMS (-37 dB) per note, while the real
+    // Deluge hardware produces ~0.3-0.5 RMS (-10 to -6 dB). The root cause is NOT a single missing
+    // gain stage — it is the cumulative effect of the faithful C-port gain topology:
+    //
+    //   1. LOCAL_VOLUME starts at 0 and is modulated by a velocity patch cable (50% at vel=127).
+    //   2. GLOBAL_VOLUME_POST_FX at user value 40 maps through getFinalParameterValueVolume
+    //      to ~0.25 in Q31 (-12 dB).
+    //   3. The oscillator amplitude (1<<27 for ring-mod path, carrier amp cap at 134217727 for FM)
+    //   4. The GlobalEffectable output chain applies postFXVolume (~2^29) via multiply_32x32
+    //      followed by lshiftAndSaturate(...,5) — preserves level rather than boosting.
+    //
+    // The JavaAudioDriver compensates with monitorGainMul=24 (~28 dB) for live playback, bringing
+    // the soundcard output to roughly -6 dB. The resample WAV bypasses this under the old
+    // AudioSystem.write pipeline; the manual WAV header fix (JavaAudioDriver.saveWavFile) ensures
+    // the header matches the little-endian byte order, but the content level remains low.
+    //
+    // When the C→Java gain discrepancy is resolved, raise this threshold to >= 0.05.
     double maxRms = 0;
     for (double rms : envelope) {
       if (rms > maxRms) maxRms = rms;
@@ -158,11 +176,6 @@ public class ResampleFidelityTest {
     double attackThreshold = maxRms * 0.3;
     double silenceThreshold = maxRms * 0.05;
 
-    // 6a. Check amplitude is adequate — real Deluge produces RMS ~0.3-0.5 for a sawtooth at
-    // vel=127.
-    // The engine currently produces ~0.014 (KNOWN BUG: gain staging is ~30x too low).
-    // When fixed, this threshold should be raised to > 0.05.
-    double minExpectedRms = 0.005; // TODO: raise to 0.05 when gain bug is fixed
     int attacks = 0;
     boolean wasSilent = true;
     for (int b = 1; b < totalBlocks; b++) {
