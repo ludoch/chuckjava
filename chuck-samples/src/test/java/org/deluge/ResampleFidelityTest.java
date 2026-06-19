@@ -97,12 +97,13 @@ public class ResampleFidelityTest {
     System.out.println("[Test] Total notes in firmware song: " + totalNotes);
     assertTrue(totalNotes >= 5, "Expected >= 5 notes in firmware song, got " + totalNotes);
 
+    FirmwareSound fwSound = (FirmwareSound) clip0.sound;
+
     FirmwareAudioEngine engine = new FirmwareAudioEngine();
     engine.metronomeEnabled = false; // No metronome clicks
 
     // Add the sound to the engine
-    FirmwareSound sound = (FirmwareSound) clip0.sound;
-    engine.sounds.add(sound);
+    engine.sounds.add(fwSound);
 
     // 4. Create playback handler — auto-plays when setSong is called
     PlaybackHandler handler = new PlaybackHandler();
@@ -188,6 +189,53 @@ public class ResampleFidelityTest {
         "Expected > 10% silence between notes, got " + (100 * silenceRatio) + "%");
 
     System.out.println("[Test] PASSED: 5-note sequence has proper attacks and silence");
+  }
+
+  /** Render a single sustained note and check the raw Q31 output level. */
+  @Test
+  void testSingleNoteOutputLevel() throws Exception {
+    // Load default Piano preset to match what the user tested
+    File synthFile = new File("../deluge/src/main/resources/SYNTHS/073 Piano.XML");
+    if (!synthFile.exists()) synthFile = new File("src/main/resources/SYNTHS/073 Piano.XML");
+    assertTrue(synthFile.exists(), "Piano synth XML not found");
+    SynthTrackModel model = DelugeXmlParser.parseSynth(synthFile);
+
+    // Build the firmware sound from the model
+    ProjectModel project = new ProjectModel();
+    project.addTrack(model);
+    Song fwSong = FirmwareFactory.createSong(project);
+    var clip = (org.deluge.firmware.model.InstrumentClip) fwSong.clips.get(0);
+    FirmwareSound fwSound = (FirmwareSound) clip.sound;
+
+    // Trigger C4 at max velocity
+    fwSound.triggerNote(60, 127);
+
+    // Render a few blocks to let envelope attack
+    StereoSample[] block = new StereoSample[128];
+    for (int i = 0; i < 128; i++) block[i] = new StereoSample();
+
+    double maxQ31 = 0;
+    for (int b = 0; b < 100; b++) { // ~300ms
+      for (int i = 0; i < 128; i++) {
+        block[i].l = 0;
+        block[i].r = 0;
+      }
+      fwSound.renderOutput(block, 128, null);
+      for (int i = 0; i < 128; i++) {
+        double absVal = Math.abs((double) block[i].l);
+        if (absVal > maxQ31) maxQ31 = absVal;
+      }
+    }
+
+    double maxFloat = maxQ31 / 2147483648.0;
+    System.out.printf(
+        "[Test] Single note max Q31: %.0f (float: %.6f, dB: %.1f)%n",
+        maxQ31, maxFloat, 20 * Math.log10(Math.max(maxFloat, 1e-10)));
+
+    // A full-velocity sawtooth through max-sustain envelope should reach at least 10% of full scale
+    assertTrue(
+        maxFloat > 0.05,
+        "Single note output too quiet! Max float=" + maxFloat + " (expected > 0.05 for vel=127)");
   }
 
   /** Write a float waveform to a WAV file for manual inspection. */
