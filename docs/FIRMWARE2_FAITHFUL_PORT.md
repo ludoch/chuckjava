@@ -73,6 +73,57 @@ per-source `OscType::DX7`. The cure is always: open the C, mirror its structure.
     `Dx7ParityTest`/`Dx7VoiceTest` pass.
 - `PhaseIncrementFineTuner` + `centAdjustTableSmall[257]`, `PatchSource` enum — verbatim.
 
+## Sanctioned deviations (explicitly approved)
+
+These are the *only* places firmware2 intentionally departs from a literal transcription. Each is
+recorded here with the C it relates to and the path back to full faithfulness. Adding to this list
+requires explicit user approval (per the absolute rule).
+
+### SD-1 — Live sample interpolation forced to linear (`SampleReader.java`)
+**What:** `SampleReader.readSamplesNative` branches on a global flag
+`org.deluge.firmware.engine.FirmwareAudioEngine.realTimeMode`. When `true` (set by
+`JavaAudioDriver` for all real-time playback) it uses 2-tap **linear** interpolation
+(`oscPos >>> 9`, the int16 strength split); when `false` (offline WAV export, all fidelity/golden
+tests) it uses the faithful 24-tap windowed-**sinc** `SincInterpolator.interpolateWide`.
+Motivation: CPU headroom on large songs (~31 tracks) — the same draft-vs-render quality split
+shipped by other DAWs (e.g. Ableton "Hi-Q").
+
+**Why this is a *small* deviation, not an invention:** the Deluge firmware itself drops to linear
+interpolation to save CPU. The pieces the Java fast path mirrors:
+- `dsp/interpolate/interpolate.cpp:70` `Interpolator::interpolateLinear` — *byte-identical* to the
+  Java fast path: `strength2 = phase >> 9`, `strength1 = INT16_MAX - strength2`, 2-tap mix. (The
+  Java shift was corrected `>>>5 → >>>9` to match this exactly.)
+- `model/sample/sample_low_level_reader.cpp:1024` (sinc) vs `:1081` (linear) — the hardware picks per
+  read, branching on `if (interpolationBufferSize > 2)`.
+- `model/sample/sample_controls.cpp:29` `getInterpolationBufferSize(phaseIncrement)` returns `2`
+  (→ linear) when either (a) the source's `InterpolationMode::LINEAR` user setting is on, or
+  (b) **CPU direness fallback**: `if (AudioEngine::cpuDireness)` and the note is pitched up enough
+  (`octave >= 26 - (cpuDireness >> 2)`); otherwise `kInterpolationMaxNumSamples` (→ sinc).
+- `processing/engines/audio_engine.cpp:472` `setDireness` — `cpuDireness` (0..14) is adaptive,
+  measured from real DSP render time per block; it rises when a block overruns and decays (with
+  hysteresis) when comfortable.
+
+**How the deviation differs from the C (what makes it not yet faithful):** the hardware decision is
+**per-source, per-block, adaptive, and pitch-aware** — under load it linearises *only* pitched-up
+samples and keeps sinc for everything else; with no load (`cpuDireness == 0`, the desktop case) it
+*always* uses sinc. The Java flag is a blunt global: live playback uses linear for **all** sample
+voices at **all** pitches regardless of measured load.
+
+**Scope of impact:** read in exactly one place (`SampleReader.java`, the `realTimeMode` branch).
+Affects only sample-based voices (kits with WAV samples, sampled instruments, audio tracks,
+time-stretch/granular). Pure synth oscillators (subtractive/FM/wavetable) never touch `SampleReader`
+and are unaffected. Offline export and all golden/fidelity tests run with `realTimeMode = false`, so
+parity coverage is unchanged. Audible side effects on the live monitor only: mild HF dulling
+(linear ≈ −3.9 dB at Nyquist) and aliasing on samples pitched **up** (linear stopband rejection
+~12–15 dB vs sinc's 60+).
+
+**Path back to faithful (preferred future work):** port `SampleControls.getInterpolationBufferSize`
+and the `cpuDireness` measurement loop (`setDireness`) into the Java audio engine, then branch on the
+returned buffer size (`> 2` → sinc, `== 2` → linear) instead of `realTimeMode`. This yields the exact
+hardware behaviour: sinc by default on desktop, automatic linear fallback only under genuine measured
+load and only for pitched-up samples, plus support for the per-source `InterpolationMode::LINEAR`
+user setting. Until then, `realTimeMode` is an approved CPU-saving approximation of that mechanism.
+
 ## Remaining work
 
 > **The prioritized, test-mapped roadmap for the remaining subsystems lives in
