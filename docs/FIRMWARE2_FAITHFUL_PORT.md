@@ -79,50 +79,41 @@ These are the *only* places firmware2 intentionally departs from a literal trans
 recorded here with the C it relates to and the path back to full faithfulness. Adding to this list
 requires explicit user approval (per the absolute rule).
 
-### SD-1 — Live sample interpolation forced to linear (`SampleReader.java`)
-**What:** `SampleReader.readSamplesNative` branches on a global flag
-`org.deluge.firmware.engine.FirmwareAudioEngine.realTimeMode`. When `true` (set by
-`JavaAudioDriver` for all real-time playback) it uses 2-tap **linear** interpolation
-(`oscPos >>> 9`, the int16 strength split); when `false` (offline WAV export, all fidelity/golden
-tests) it uses the faithful 24-tap windowed-**sinc** `SincInterpolator.interpolateWide`.
-Motivation: CPU headroom on large songs (~31 tracks) — the same draft-vs-render quality split
-shipped by other DAWs (e.g. Ableton "Hi-Q").
+### SD-1 — CPU-direness adaptive sample interpolation ✅ RESOLVED (was: live linear forced)
+**Status:** the original blunt deviation (a global `realTimeMode` flag forcing 2-tap linear for *all*
+sample voices live) has been **replaced by a faithful port of the hardware's CPU-direness mechanism**.
+The `realTimeMode` flag is gone. What remains is only a minor, unavoidable adaptation of *how CPU load
+is measured* (see "Residual adaptation" below).
 
-**Why this is a *small* deviation, not an invention:** the Deluge firmware itself drops to linear
-interpolation to save CPU. The pieces the Java fast path mirrors:
-- `dsp/interpolate/interpolate.cpp:70` `Interpolator::interpolateLinear` — *byte-identical* to the
-  Java fast path: `strength2 = phase >> 9`, `strength1 = INT16_MAX - strength2`, 2-tap mix. (The
-  Java shift was corrected `>>>5 → >>>9` to match this exactly.)
-- `model/sample/sample_low_level_reader.cpp:1024` (sinc) vs `:1081` (linear) — the hardware picks per
-  read, branching on `if (interpolationBufferSize > 2)`.
-- `model/sample/sample_controls.cpp:29` `getInterpolationBufferSize(phaseIncrement)` returns `2`
-  (→ linear) when either (a) the source's `InterpolationMode::LINEAR` user setting is on, or
-  (b) **CPU direness fallback**: `if (AudioEngine::cpuDireness)` and the note is pitched up enough
-  (`octave >= 26 - (cpuDireness >> 2)`); otherwise `kInterpolationMaxNumSamples` (→ sinc).
-- `processing/engines/audio_engine.cpp:472` `setDireness` — `cpuDireness` (0..14) is adaptive,
-  measured from real DSP render time per block; it rises when a block overruns and decays (with
-  hysteresis) when comfortable.
+**What now matches the C (verbatim):**
+- `Functions.getInterpolationBufferSize(phaseIncrement)` ← `SampleControls::getInterpolationBufferSize`
+  (sample_controls.cpp:29): returns `2` (linear) when `cpuDireness != 0` and
+  `octave >= 26 - (cpuDireness >> 2)` (with `octave = getMagnitudeOld(phaseIncrement)`,
+  functions.h:394 = `32 - clz`); else `kInterpolationMaxNumSamples` (16 → sinc).
+- `SampleReader.readResampled` branches `if (interpolationBufferSize > 2)` → sinc, else
+  `interpolateLinear` (`oscPos >>> 9`) — mirroring `sample_low_level_reader.cpp:1024` vs `:1081`.
+  `VoiceSample` computes the buffer size per render and threads it down, mirroring `voice.cpp:2106`.
+- `FirmwareAudioEngine.cpuDireness` (0..14) ← `AudioEngine::cpuDireness` (audio_engine.cpp:161), with
+  `updateDireness` mirroring `setDireness` (audio_engine.cpp:472): same threshold (50), ceiling (14),
+  and decay hysteresis (`kSampleRate>>3`). Result: **sinc by default on desktop**, automatic linear
+  fallback only under genuine sustained load and only for pitched-up samples — exactly the hardware
+  behaviour. Locked by `CpuDirenessInterpolationTest`.
 
-**How the deviation differs from the C (what makes it not yet faithful):** the hardware decision is
-**per-source, per-block, adaptive, and pitch-aware** — under load it linearises *only* pitched-up
-samples and keeps sinc for everything else; with no load (`cpuDireness == 0`, the desktop case) it
-*always* uses sinc. The Java flag is a blunt global: live playback uses linear for **all** sample
-voices at **all** pitches regardless of measured load.
+**Residual adaptation (the only remaining departure):** the hardware reads the audio routine's average
+run-time from its RTOS task scheduler (`getAverageRunTimeForTask`); desktop Java has no such scheduler,
+so `JavaAudioDriver` feeds `updateDireness` the **measured wall-clock render time of each block**
+instead (overrun = `dspTime - blockSamples`, with `numRoutines == 1`). The decision logic and all
+constants are identical; only the load *signal* differs. The C's voice-culling branch of `setDireness`
+is intentionally omitted (desktop has the polyphony headroom; this port governs interpolation only).
 
-**Scope of impact:** read in exactly one place (`SampleReader.java`, the `realTimeMode` branch).
-Affects only sample-based voices (kits with WAV samples, sampled instruments, audio tracks,
-time-stretch/granular). Pure synth oscillators (subtractive/FM/wavetable) never touch `SampleReader`
-and are unaffected. Offline export and all golden/fidelity tests run with `realTimeMode = false`, so
-parity coverage is unchanged. Audible side effects on the live monitor only: mild HF dulling
-(linear ≈ −3.9 dB at Nyquist) and aliasing on samples pitched **up** (linear stopband rejection
-~12–15 dB vs sinc's 60+).
+**Not yet plumbed:** the per-source `InterpolationMode::LINEAR` user setting (sample_controls.cpp:31)
+is not wired into the firmware2 render path (it was not honored by the old `realTimeMode` path either);
+`getInterpolationBufferSize` documents where to force `return 2` once it is.
 
-**Path back to faithful (preferred future work):** port `SampleControls.getInterpolationBufferSize`
-and the `cpuDireness` measurement loop (`setDireness`) into the Java audio engine, then branch on the
-returned buffer size (`> 2` → sinc, `== 2` → linear) instead of `realTimeMode`. This yields the exact
-hardware behaviour: sinc by default on desktop, automatic linear fallback only under genuine measured
-load and only for pitched-up samples, plus support for the per-source `InterpolationMode::LINEAR`
-user setting. Until then, `realTimeMode` is an approved CPU-saving approximation of that mechanism.
+**Scope / guarantees:** affects only sample-based voices (WAV kits, sampled instruments, audio tracks,
+time-stretch/granular); pure synth oscillators never touch `SampleReader`. Offline export
+(`ExportHelper`) and the fidelity generator reset `cpuDireness = 0` at start and never call
+`updateDireness`, so exports and all golden/fidelity tests stay full-sinc — parity coverage unchanged.
 
 ## Remaining work
 
