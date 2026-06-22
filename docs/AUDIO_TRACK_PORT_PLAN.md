@@ -67,9 +67,11 @@ track's volume/pan/FX params (same param plumbing kits/synths use).
 3. **Transport sync + arrangement placement** — ✅ **transport gating DONE**: the engine
    (`FirmwareAudioEngine.setTransportPlaying`, fed by the driver from `PlaybackHandler.isPlaying()`)
    starts/stops `AudioOutput`s on the play edge — clips are silent until the song plays and restart
-   phase-aligned on play (`AudioOutputPlaybackTest` asserts peak==0 when stopped). *Remaining (3b):*
-   arrangement-timeline placement — start/stop on the playhead crossing each clip-instance's bar
-   bounds, and loop at the clip's musical length rather than the whole sample.
+   phase-aligned on play (`AudioOutputPlaybackTest` asserts peak==0 when stopped). **Musical-length
+   loop DONE** (3b part 1): `createAudioSound` sets `AudioOutput.loopLengthSamples` from the clip's
+   tick-length at the song tempo (96 PPQN), so the clip loops in time with the song, not at the raw
+   sample end (`loopsPastSampleEnd` test). *Remaining (3b part 2):* arrangement-timeline placement —
+   start/stop on the playhead crossing each clip-instance's bar bounds (per-instance, multi-clip).
 4. **Live recording / overdub** — reuse `AudioInputCaptureLine` to record input into the clip's file
    at loop start (the capture→WAV path already works for the threshold sampler), then it streams via
    phase 1. Overdub = mix new input with the existing clip.
