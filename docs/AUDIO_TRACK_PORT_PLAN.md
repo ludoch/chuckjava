@@ -70,8 +70,13 @@ track's volume/pan/FX params (same param plumbing kits/synths use).
    phase-aligned on play (`AudioOutputPlaybackTest` asserts peak==0 when stopped). **Musical-length
    loop DONE** (3b part 1): `createAudioSound` sets `AudioOutput.loopLengthSamples` from the clip's
    tick-length at the song tempo (96 PPQN), so the clip loops in time with the song, not at the raw
-   sample end (`loopsPastSampleEnd` test). *Remaining (3b part 2):* arrangement-timeline placement —
-   start/stop on the playhead crossing each clip-instance's bar bounds (per-instance, multi-clip).
+   sample end (`loopsPastSampleEnd` test). **Arrangement placement DONE** (3b part 2): all
+   transport/timeline gating now lives in `AudioOutput.updateTimeline(tick, playing)` (called per
+   block by the engine, fed `PlaybackHandler.lastSwungTickActioned` via `setTransportTick`); when a
+   track has an `ArrangerClip`, `createAudioSound` sets its `[startTick, startTick+duration)` range so
+   the clip starts/stops as the playhead crosses its bar bounds (`arrangementPlacementGatesPlayback`
+   test: silent before, audible inside, only the FX tail after). *Remaining:* multiple instances of
+   the same audio track at different timeline positions (only the first placement is honoured today).
 4. **Live recording / overdub** — ✅ **record-into-audio-track DONE** (part 1): `AudioInputCaptureLine`
    now has an `AudioTrackModel` branch — a captured WAV becomes the track's audio clip, which the
    engine streams via phases 1–3b. `ThresholdRecordDialog` lists audio tracks ("… (Audio Clip)") as
