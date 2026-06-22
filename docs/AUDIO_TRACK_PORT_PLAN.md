@@ -53,9 +53,11 @@ track's volume/pan/FX params (same param plumbing kits/synths use).
   BPM + sample rate, the same clocking `FidelitySongSmokeTest` uses).
 
 ## Phasing (ship incrementally, test each)
-1. **Playback of a loaded clip** — `AudioOutput.renderInternal` streams a `Sample` (start→end, loop)
-   at unity pitch, summed + FX'd by `GlobalEffectable`. Verify: load a song with an audio track +
-   clip, assert non-silent render (extend `FidelitySongSmokeTest`).
+1. **Playback of a loaded clip — ✅ DONE.** `AudioOutput extends GlobalEffectable` streams a `Sample`
+   (start→end, loop) at unity pitch via `VoiceSample`, summed + FX'd by `GlobalEffectable`;
+   `createAudioSound` builds it from `AudioTrackModel`'s first audio clip. Verified non-silent by
+   `AudioOutputPlaybackTest` (RMS ~0.017, no clipping). Loudness is governed by the downstream
+   post-FX volume + master compressor; wiring the per-track volume param is a small later refinement.
 2. **Pitch + time-stretch + reverse** — feed `playRate`/transpose to `phaseIncrement` and the
    `TimeStretcher` ratio (reuse `VoiceSample`'s native-vs-resampled selection). Verify pitched clip
    renders and matches expected duration.
