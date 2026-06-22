@@ -39,10 +39,10 @@ jobs:
         fi
 
 
-    - name: Set up JDK 25
+    - name: Set up JDK 27
       uses: actions/setup-java@v4
       with:
-        java-version: '25'
+        java-version: '27-ea'
         distribution: 'temurin'
         cache: maven
         server-id: github

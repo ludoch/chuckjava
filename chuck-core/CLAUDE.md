@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-A Java implementation of the [ChucK](https://chuck.stanford.edu/) strongly-timed music programming language. It compiles `.ck` source files and executes them with real-time audio via a virtual machine. Built with JDK 25 and uses Java Virtual Threads for concurrency.
+A Java implementation of the [ChucK](https://chuck.stanford.edu/) strongly-timed music programming language. It compiles `.ck` source files and executes them with real-time audio via a virtual machine. Built with JDK 27 and uses Java Virtual Threads for concurrency.
 
 ## Build & Run Commands
 
@@ -27,7 +27,7 @@ mvn javafx:run
 # Package (fat JAR)
 mvn package
 
-# Build GraalVM native executable (all platforms — requires JAVA_HOME → GraalVM JDK 25)
+# Build GraalVM native executable (all platforms — requires JAVA_HOME → GraalVM JDK 27)
 #   Windows: set JAVA_HOME=C:\path\to\graalvm-jdk-25
 #   Mac/Linux: export JAVA_HOME=/path/to/graalvm-jdk-25
 mvn -Pnative package -DskipTests
@@ -252,7 +252,7 @@ The emitter's existing `default` fallthrough already pushes all args and calls `
   - `native-image.properties` — `--enable-preview`, `--add-modules=jdk.incubator.vector`, ANTLR build-time init, `--no-fallback`
   - `reflect-config.json` — reflection registrations for `Std`, `RegEx`, `Reflect`, `SerialIO`, `ChuckUGen`, `ChuckShred` (needed for `CallMethod` dispatch), ANTLR classes
   - `resource-config.json` — includes `examples/*.ck` resources
-- No GraalVM path in pom.xml — relies entirely on `JAVA_HOME` pointing at GraalVM JDK 25
+- No GraalVM path in pom.xml — relies entirely on `JAVA_HOME` pointing at GraalVM JDK 27
 - Output: `target/chuck` (Linux/Mac) or `target/chuck.exe` (Windows) — ~49 MB, no JRE needed
 
 **Native test support (`-DskipNativeTests=false`):**

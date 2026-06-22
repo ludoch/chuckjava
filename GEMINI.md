@@ -12,7 +12,7 @@ Operate using a **Research -> Strategy -> Execution** lifecycle.
 
 ## Technology Stack & Environment
 
--   **Runtime:** JDK 25 (requires `--enable-preview` and `jdk.incubator.vector`).
+-   **Runtime:** JDK 27 (early-access) (requires `--enable-preview` and `jdk.incubator.vector`).
 -   **Build Tool:** Maven.
 -   **Parser:** ANTLR4 (grammar in `src/main/antlr4/org/chuck/compiler/ChuckANTLR.g4`).
 -   **Concurrency:** Java Virtual Threads (Project Loom).

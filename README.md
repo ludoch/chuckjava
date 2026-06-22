@@ -1,11 +1,11 @@
 # ChucK-Java
 
-ChucK-Java is a powerful port of the ChucK audio programming language to the Java platform, leveraging modern JDK 25 features like Project Loom (Virtual Threads) and the Vector API for high-performance audio synthesis.
+ChucK-Java is a powerful port of the ChucK audio programming language to the Java platform, leveraging modern JDK 27 features like Project Loom (Virtual Threads) and the Vector API for high-performance audio synthesis.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
-- **JDK 25** (with preview features enabled)
+- **JDK 27** (early-access; with preview features enabled)
 - **Maven**
 
 ### Building the Project

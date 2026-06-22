@@ -45,7 +45,7 @@ A Java-based regression suite is provided to verify bit-exact parity and prevent
 
 ### Prerequisites
 - Native `chuck` installed and available in the `$PATH`.
-- JDK 25 with the vector incubator module enabled.
+- JDK 27 (early-access) with the vector incubator module enabled.
 
 ### Running the Suite
 1. **Build ChucK-Java**:
