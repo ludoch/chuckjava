@@ -124,6 +124,7 @@ public class TranslateAndCompileAllTest {
       List<GeneratedUnit> nextPending = new ArrayList<>();
       compileFailures.clear();
 
+      String javaVersion = System.getProperty("java.specification.version");
       for (GeneratedUnit unit : pending) {
         List<String> options =
             List.of(
@@ -133,7 +134,7 @@ public class TranslateAndCompileAllTest {
                 compileClasspath,
                 "--enable-preview",
                 "--release",
-                "25");
+                javaVersion);
 
         var fileManager = compiler.getStandardFileManager(null, null, null);
         var compilationUnits = fileManager.getJavaFileObjects(unit.javaFile());

@@ -46,12 +46,13 @@ public class SequencerCompileTest {
 
     // Try to compile it
     String classpath = System.getProperty("java.class.path");
+    String javaVersion = System.getProperty("java.specification.version");
     ProcessBuilder pb =
         new ProcessBuilder(
             "javac",
             "--enable-preview",
             "--release",
-            "25",
+            javaVersion,
             "--add-modules",
             "jdk.incubator.vector",
             "-cp",

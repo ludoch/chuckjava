@@ -22,10 +22,10 @@
     </modules>
 
     <properties>
-        <maven.compiler.release>25</maven.compiler.release>
+        <maven.compiler.release>27</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <antlr4.version>4.13.2</antlr4.version>
-        <javafx.version>23.0.2</javafx.version>
+        <javafx.version>26.0.1</javafx.version>
         <junit.version>6.1.0</junit.version>
         <asm.version>9.10.1</asm.version>
     </properties>
@@ -111,7 +111,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>3.5.5</version>
+                    <version>3.5.6</version>
                     <configuration>
                         <argLine>--add-modules jdk.incubator.vector -Dchuck.audio.dummy=true -Xmx2048m</argLine>
                         <excludedGroups>slow</excludedGroups>
