@@ -58,9 +58,12 @@ track's volume/pan/FX params (same param plumbing kits/synths use).
    `createAudioSound` builds it from `AudioTrackModel`'s first audio clip. Verified non-silent by
    `AudioOutputPlaybackTest` (RMS ~0.017, no clipping). Loudness is governed by the downstream
    post-FX volume + master compressor; wiring the per-track volume param is a small later refinement.
-2. **Pitch + time-stretch + reverse** — feed `playRate`/transpose to `phaseIncrement` and the
-   `TimeStretcher` ratio (reuse `VoiceSample`'s native-vs-resampled selection). Verify pitched clip
-   renders and matches expected duration.
+2. **Pitch + time-stretch — ✅ DONE.** `AudioOutput.setPlayback(playRate, pitchSpeedIndependent)`:
+   coupled mode scales `phaseIncrement` (pitch+speed together, resampled via `VoiceSample.render`);
+   independent mode keeps `phaseIncrement` at unity and routes the rate through `timeStretchRatio`
+   (`VoiceSample.renderTimeStretched`/`TimeStretcher`). `createAudioSound` reads `playRate` +
+   `isPitchSpeedIndependent`. Both verified audible (`AudioOutputPlaybackTest`). Reverse is not
+   wired (no model field). Time-stretch currently one-shot (musical-length loop = Phase 3b).
 3. **Transport sync + arrangement placement** — ✅ **transport gating DONE**: the engine
    (`FirmwareAudioEngine.setTransportPlaying`, fed by the driver from `PlaybackHandler.isPlaying()`)
    starts/stops `AudioOutput`s on the play edge — clips are silent until the song plays and restart
