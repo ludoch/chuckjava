@@ -75,8 +75,10 @@ track's volume/pan/FX params (same param plumbing kits/synths use).
    block by the engine, fed `PlaybackHandler.lastSwungTickActioned` via `setTransportTick`); when a
    track has an `ArrangerClip`, `createAudioSound` sets its `[startTick, startTick+duration)` range so
    the clip starts/stops as the playhead crosses its bar bounds (`arrangementPlacementGatesPlayback`
-   test: silent before, audible inside, only the FX tail after). *Remaining:* multiple instances of
-   the same audio track at different timeline positions (only the first placement is honoured today).
+   test: silent before, audible inside, only the FX tail after). **Multiple instances DONE**:
+   `AudioOutput` holds a list of placement windows (every `ArrangerClip` for the track) and plays in
+   any of them, restarting the clip at each instance's start (`multipleArrangementInstancesEachPlay`
+   test: two placements both play, silent in the gap between).
 4. **Live recording / overdub** — ✅ **record-into-audio-track DONE** (part 1): `AudioInputCaptureLine`
    now has an `AudioTrackModel` branch — a captured WAV becomes the track's audio clip, which the
    engine streams via phases 1–3b. `ThresholdRecordDialog` lists audio tracks ("… (Audio Clip)") as
