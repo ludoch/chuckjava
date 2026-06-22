@@ -83,8 +83,12 @@ track's volume/pan/FX params (same param plumbing kits/synths use).
    now has an `AudioTrackModel` branch — a captured WAV becomes the track's audio clip, which the
    engine streams via phases 1–3b. `ThresholdRecordDialog` lists audio tracks ("… (Audio Clip)") as
    a target. So you can sample the input straight into an audio track and it plays back synced.
-   *Remaining (part 2):* transport-synced loop capture (record exactly N bars at loop start) and
-   overdub (mix new input with the existing clip) — currently threshold-triggered, like the sampler.
+   **Overdub DONE** (part 2): `AudioRecordingUtil.mixPcm16LE` saturating-mixes the new take over the
+   existing clip; `finalizeRecording` uses it when the clip is in overdub mode (`AudioRecordingUtilTest`
+   covers mix + saturation + layering). **Synced capture length DONE**: `AudioRecordingUtil.syncedCaptureFrames`
+   (bars→frames at tempo, tested). *Remaining:* wiring the transport-synced **start/stop** of capture
+   (begin at the loop point, auto-stop after the synced frame count) — currently threshold-triggered;
+   that part is device-coupled and not headless-testable, so it's the one open item.
 
 ## Risks / notes
 - `AudioOutput` is a `GlobalEffectable` subclass that does NOT render synth voices — keep
