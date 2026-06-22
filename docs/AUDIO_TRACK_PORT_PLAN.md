@@ -72,9 +72,12 @@ track's volume/pan/FX params (same param plumbing kits/synths use).
    tick-length at the song tempo (96 PPQN), so the clip loops in time with the song, not at the raw
    sample end (`loopsPastSampleEnd` test). *Remaining (3b part 2):* arrangement-timeline placement —
    start/stop on the playhead crossing each clip-instance's bar bounds (per-instance, multi-clip).
-4. **Live recording / overdub** — reuse `AudioInputCaptureLine` to record input into the clip's file
-   at loop start (the capture→WAV path already works for the threshold sampler), then it streams via
-   phase 1. Overdub = mix new input with the existing clip.
+4. **Live recording / overdub** — ✅ **record-into-audio-track DONE** (part 1): `AudioInputCaptureLine`
+   now has an `AudioTrackModel` branch — a captured WAV becomes the track's audio clip, which the
+   engine streams via phases 1–3b. `ThresholdRecordDialog` lists audio tracks ("… (Audio Clip)") as
+   a target. So you can sample the input straight into an audio track and it plays back synced.
+   *Remaining (part 2):* transport-synced loop capture (record exactly N bars at loop start) and
+   overdub (mix new input with the existing clip) — currently threshold-triggered, like the sampler.
 
 ## Risks / notes
 - `AudioOutput` is a `GlobalEffectable` subclass that does NOT render synth voices — keep
