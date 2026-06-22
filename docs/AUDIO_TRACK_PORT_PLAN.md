@@ -61,8 +61,12 @@ track's volume/pan/FX params (same param plumbing kits/synths use).
 2. **Pitch + time-stretch + reverse** — feed `playRate`/transpose to `phaseIncrement` and the
    `TimeStretcher` ratio (reuse `VoiceSample`'s native-vs-resampled selection). Verify pitched clip
    renders and matches expected duration.
-3. **Transport sync + arrangement placement** — start/stop on playhead crossing clip-instance
-   bounds; loop at clip length in session view.
+3. **Transport sync + arrangement placement** — ✅ **transport gating DONE**: the engine
+   (`FirmwareAudioEngine.setTransportPlaying`, fed by the driver from `PlaybackHandler.isPlaying()`)
+   starts/stops `AudioOutput`s on the play edge — clips are silent until the song plays and restart
+   phase-aligned on play (`AudioOutputPlaybackTest` asserts peak==0 when stopped). *Remaining (3b):*
+   arrangement-timeline placement — start/stop on the playhead crossing each clip-instance's bar
+   bounds, and loop at the clip's musical length rather than the whole sample.
 4. **Live recording / overdub** — reuse `AudioInputCaptureLine` to record input into the clip's file
    at loop start (the capture→WAV path already works for the threshold sampler), then it streams via
    phase 1. Overdub = mix new input with the existing clip.
