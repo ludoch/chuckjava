@@ -35,4 +35,23 @@ if [ ! -f "$JAR" ]; then
     mvn install -DskipTests
 fi
 
-"$JAVA_BIN" -XX:+UseZGC --enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xlog:gc*:file=gc.log:time,level,tags -jar "$JAR" "$@"
+# Project Leyden AOT cache (JDK 27) — OPT-IN (DELUGE_AOT=1).
+# Measured here: boot is already fast (first audio ~540ms, steady ~1.1s) thanks to compact object
+# headers + ZGC, and the cache's biggest lever (archived module graph / CDS heap) is DISABLED
+# because we launch with --enable-preview + the jdk.incubator.vector incubator module
+# ("CDS heap data is disabled because archived full module graph is not used"). So the gain today is
+# marginal and the JVM prints non-fatal [error][aot] lines. Re-evaluate once we can drop
+# --enable-preview (preview APIs finalized). First opt-in run records the cache on a clean exit;
+# later runs reuse it.
+AOT_CACHE="deluge/target/deluge.aot"
+AOT_FLAGS=()
+if [ "$DELUGE_AOT" = "1" ]; then
+    if [ -f "$AOT_CACHE" ] && [ "$AOT_CACHE" -nt "$JAR" ]; then
+        AOT_FLAGS=(-XX:AOTCache="$AOT_CACHE")
+    else
+        echo "[AOT] No up-to-date AOT cache — this run will record one ($AOT_CACHE) on exit."
+        AOT_FLAGS=(-XX:AOTCacheOutput="$AOT_CACHE")
+    fi
+fi
+
+"$JAVA_BIN" -XX:+UseZGC "${AOT_FLAGS[@]}" --enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -Xlog:gc*:file=gc.log:time,level,tags -jar "$JAR" "$@"
