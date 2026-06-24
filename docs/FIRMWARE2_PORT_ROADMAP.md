@@ -199,14 +199,14 @@ All 389/428 tests pass.
 └── [x] All tests pass without firmware/ DSP classes (all 484 tests pass perfectly green!)
 ```
 
-## 5. Order of attack (updated 2026-06-15)
+## 5. Order of attack (updated 2026-06-24)
 
 ```
 ✅ Porting & Verification of all DSP subsystems (Osc sync, wavefolder, saturation, retrig phase,
    analog models, wavetables, glide, arp rhythms, live-input routing, sidechain, effects, sample engine)
 ✅ Bridge Refactoring (100% complete: old duplicate files deleted, imports disambiguated, and Java-only infrastructure stabilized!)
-→ 🔄 Hardware Fidelity Calibration (Lpf cutoff/resonance curve, delay feedback mapping, FM brightness)
-→ 🔄 XML Parser Follow-ups (sustain param raw-Q31 conversion, defaultParams raw-Q31 reader, FX scalars)
+✅ XML Parser Follow-ups (100% complete: sustain param raw-Q31 mapping corrected, defaultParams raw-Q31 reader validated, and FX scalars aligned!)
+✅ Hardware Fidelity Calibration (100% complete: LPF cutoff/resonance curves, delay feedback mapping, and FM synthesis fidelity verified!)
 ```
 
 
