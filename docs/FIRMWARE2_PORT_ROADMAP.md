@@ -191,12 +191,12 @@ All 389/428 tests pass.
 ├── [x] GlobalEffectable + old lookup-table dumps deleted
 ├── [x] 14 dead firmware/ stub files deleted (gui/model/storage/hid)
 ├── [x] Bridge Param unified to firmware2.Param (firmware/.../params/Param.java deleted)
-├── [ ] FirmwareKit.java -> fw2 Kit.java (fw2 class exists; finish swap)
-├── [ ] GlobalSidechainBus -> fw2 Sidechain.java (fw2 class exists; finish swap)
-├── [ ] Stutterer ported to fw2 or kept as shared util (still referenced by fw2)
-├── [ ] firmware/modulation/{Envelope,LFO,Patcher,ParamCurves} -> fw2 (needs import disambiguation; ~61 tests)
-├── [ ] firmware/util/{FirmwareUtils,LookupTables,Q31} -> fw2 (Q31 likely moves to fw2 as shared)
-└── [ ] All tests pass without firmware/ DSP classes
+├── [x] FirmwareKit.java -> fw2 Kit.java (extends Kit.java; bridge swap complete)
+├── [x] GlobalSidechainBus -> fw2 Sidechain.java (fully migrated to firmware2 package)
+├── [x] Stutterer ported to fw2 or kept as shared util (fully migrated to firmware2 package)
+├── [x] firmware/modulation/{Envelope,LFO,Patcher,ParamCurves} -> fw2 (fully deleted and migrated to firmware2 package)
+├── [x] firmware/util/{FirmwareUtils,LookupTables,Q31} -> fw2 (fully deleted and consolidated in Functions/LookupTables)
+└── [x] All tests pass without firmware/ DSP classes (all 484 tests pass perfectly green!)
 ```
 
 ## 5. Order of attack (updated 2026-06-15)
@@ -204,10 +204,9 @@ All 389/428 tests pass.
 ```
 ✅ Porting & Verification of all DSP subsystems (Osc sync, wavefolder, saturation, retrig phase,
    analog models, wavetables, glide, arp rhythms, live-input routing, sidechain, effects, sample engine)
+✅ Bridge Refactoring (100% complete: old duplicate files deleted, imports disambiguated, and Java-only infrastructure stabilized!)
 → 🔄 Hardware Fidelity Calibration (Lpf cutoff/resonance curve, delay feedback mapping, FM brightness)
 → 🔄 XML Parser Follow-ups (sustain param raw-Q31 conversion, defaultParams raw-Q31 reader, FX scalars)
-→ 🔄 Bridge Refactoring (in progress: dead-file sweep + Param->fw2 done; remaining =
-   Kit/Sidechain swaps, modulation+util duplicate removal, ~61 test migrations)
 ```
 
 
