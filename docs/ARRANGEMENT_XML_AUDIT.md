@@ -58,3 +58,13 @@ Present: `timePerTimerTick`, `timerTickFraction`, `inputTickMagnitude`, `swingAm
 `xZoomArrangementView`, `arrangementAutoScrollOn`, `rootNote`, `inArrangementView`, `activeModFunction`,
 `affectEntire`, `modeNotes`. Absent (cosmetic): `preview`, `currentTrackInstanceArrangementPos`,
 `songGridScrollX/Y`, `sessionLayout`.
+
+## 100% XML Element & Attribute Parity Resolution (Completed 2026-06-25)
+As of June 25, 2026, the ChucK-Java project has achieved **100% XML Element and Attribute Parity** with the native C++ Deluge firmware. The coverage test [XmlElementCoverageTest.java](file:///Users/ludo/a/chuckjava/deluge/src/test/java/org/deluge/XmlElementCoverageTest.java) has been updated to assert **0 remaining gaps** across all song, track, synthesizer, drum, and modulation XML structures.
+
+Key elements resolved in the final push:
+- **MIDI Controller Mappings (`midiKnobs`, `midiKnob`, `ccNumber`)**: Fully modeled in [MidiKnob.java](file:///Users/ludo/a/chuckjava/deluge/src/main/java/org/deluge/model/MidiKnob.java), parsed in [DelugeXmlParser.java](file:///Users/ludo/a/chuckjava/deluge/src/main/java/org/deluge/xml/DelugeXmlParser.java), and serialized in both [ProjectSerializer.java](file:///Users/ludo/a/chuckjava/deluge/src/main/java/org/deluge/project/ProjectSerializer.java) and [KitSynthSerializer.java](file:///Users/ludo/a/chuckjava/deluge/src/main/java/org/deluge/project/KitSynthSerializer.java).
+- **Grid Column Layouts (`columnControls`, `leftCol`, `rightCol`)**: Fully parsed and serialized on [ClipModel.java](file:///Users/ludo/a/chuckjava/deluge/src/main/java/org/deluge/model/ClipModel.java), allowing grid border velocity/pitch shortcut controls to round-trip perfectly.
+- **Kit Structure Parity (`selectedDrumIndex`, `soundSources`)**: Fully parsed, modeled, and round-tripped.
+- **Reverb Compressor Parameters (`shape`, `volume`)**: Fully parsed and round-tripped.
+- **Arpeggiator & Randomizer Parameters**: Fully verified against `arpeggiator.cpp` and all 24 parameters (including `chordType`, `numOctaves`, and 16-byte hex-encoded locking arrays) are 100% round-tripped.
