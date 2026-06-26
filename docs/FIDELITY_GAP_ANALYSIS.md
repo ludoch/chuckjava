@@ -90,10 +90,19 @@ faithful to the C link-by-link: knob `0xa8f5c288`, param range `2^30` (default, 
 NEITHER reverb nor delay) — identical evolution across different-FX patches ⇒ not per-patch envelope
 behaviour, but delay echoes / alignment / the time-resolved frames overrunning into adjacent content.
 **Lesson (again): verify against the C before "fixing"; even the time-resolved metric's per-synth
-droppers can be artifacts — don't trust them blind.** (One real-ish sub-thread to confirm separately:
-does the single-synth `renderSynth` path apply the master *delay*? It has `masterDelay`; if delay
-isn't engaged for a single-sound render, delay-heavy patches will read low — a test-harness detail,
-not an engine bug.)
+droppers can be artifacts — don't trust them blind.**
+
+Side-quest from the above (the delay sub-thread): chasing whether delay-heavy House should sustain
+uncovered TWO REAL parser bugs (now FIXED) — the synth's `<delay><syncLevel>` and the direct
+`<delayFeedback>` child of `<sound>` were both read ATTRIBUTE-only while presets use child elements,
+so EVERY preset's delay config was lost (`delaySyncLevel=0`, `delayFeedbackQ31=0` → delay inert). Now
+parsed attribute-or-child; House's delay config reads correctly (`syncLevel=6`, `0xBA000000`).
+**Still OPEN (deeper, separate):** even with the config read, the per-sound delay produces no audible
+echo — when a zero-sustain note decays to silence the voice is culled and the sound stops rendering
+before the (2 s) echo, so the delay TAIL is cut off (`firmware2.Sound` delayTailActive / voice-lifetime
+vs `processFX` delay). That tail-continuation is the real delay fidelity gap to fix next. NOTE: it does
+NOT explain the House/Xylophone time-resolved droppers — those remain measurement artifacts (the HW
+"plateau" is smooth from frame 0, not a 2 s echo; Xylophone has no delay at all).
 
 
 ### 4.0 ⭐ Systematic over-brightness of SUBTRACTIVE synths — the real high-leverage gap
