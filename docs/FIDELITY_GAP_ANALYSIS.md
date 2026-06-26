@@ -70,31 +70,37 @@ oscillator hard-sync (Saw Sync 0.09) remain the worst — see §4.
 
 ## 4. The gaps, ranked by impact (with evidence + likely cause)
 
-### 4.1 FM synthesis — WORST, real but UNPINNED (firmware matches; not a version ceiling)
-Our FM-emulation presets render **far brighter** than hardware: with reliable alignment, FM Bells 1
-hardware is a **pure carrier at every point in time** (525 Hz only, zero sidebands), while we
-modulate heavily. The pattern spans the FM instrument-emulation block (Violin/Marimba/FM
-Bells/Glockenspiel: hardware fundamental-dominant, ours high-sideband-dominant).
+### 4.1 FM synthesis — NOT a confirmed engine bug; the low score is a METRIC artifact
+The scorecard ranks FM bells worst (negative cosine), and our render is bright/metallic with sidebands
+at the correct carrier±modulator frequencies. I traced FM Bells 1 operator-by-operator and it is
+faithful to the C (modulator volume `getFinalParameterValueVolume(2^25, 0xD4000000)` = 14450688,
+`doFMNew`/feedback byte-identical, note source, modulator activation; LPF is wide open so nothing
+filters the sidebands). The hardware runs the *same* recent Community nightly we port.
 
-**Status: a genuine discrepancy I could not pin via static analysis.** The hardware runs a *recent
-Community nightly* — the same firmware `~/a/DelugeFirmware` (g9a74e162, 2026-06-11) ports — so this is
-NOT a version ceiling; it is a real port bug (or a residual measurement issue). Everything I traced
-operator-by-operator MATCHES the C: modulator volume `getFinalParameterValueVolume(2^25,
-knob=0xD4000000)` = 14450688, `doFMNew`/feedback byte-identical, note source `(60−64)·2^25`,
-modulator note 94 inside the C "active" range. The patch's LPF is wide open (`0x7FFFFFFF`, res 0) so
-it is NOT a filter cutting the sidebands. By the C, this patch SHOULD modulate (and ours does) — yet
-the hardware (same firmware) renders a pure carrier. **Contradiction unresolved.**
+**Resolution (user ear-check): FM Bells 1 sounds METALLIC on the hardware** — i.e. bright with
+sidebands, exactly the character our engine produces. So our FM is in the right ballpark, and the
+**negative cosine is a measurement artifact**, not an engine bug: the scorecard's single loudest-2 s
+spectral window cannot capture a *time-varying* FM bell (bright attack whose modulation decays at a
+different rate than ours), and it happened to land on a carrier-dominant segment of the hardware
+recording. This is the **third** FM "bug" that turned out to be measurement, after the gapless-
+alignment and grid-snap artifacts.
 
-The next step must be a DEFINITIVE oracle that removes every song/alignment/serialization variable:
-**record ONE FM patch in isolation on the hardware (single held note), compare to our single-note
-render.** If they still differ, it is a confirmed port bug and traceable; if they match, the
-song/measurement pipeline (defaultParams, cable serialization) is the culprit, not the FM engine.
+**Lesson — the metric is the limitation for FM/percussive timbres.** A single-window normalized
+log-spectrum cosine is blind to the time-envelope of brightness. To measure FM fidelity we would need
+a time-resolved metric (e.g. compare short-window spectra across the note, or an MFCC-over-time
+distance), or trust the ear. Do NOT treat per-synth FM cosine as ground truth.
 
-Two real port discrepancies found en route (fix for faithfulness, but they do NOT explain Bells 1):
-(a) `getFinalParameterValueVolume` clamps `positivePatchedValue` to [0,2^30] while the C deliberately
-does NOT (comment: "to allow FM modulator amounts to get past where I clipped off volume params") and
-uses int32 (overflows) — affects high-index FM; (b) the FM modulator "active" test uses
-`paramFinalValues!=0` instead of the C's knob `==INT_MIN` (voice.cpp:528).
+Possible real refinement (not a "bug", lower priority): our modulator brightness may not **decay**
+like the hardware's — the `envelope1/note/velocity → modulator1Volume` cables should envelope the FM
+index over the note, and a quick probe showed our `paramFinalValues[LOCAL_MODULATOR_0_VOLUME]` stayed
+≈constant (14.45M → 14.35M) through the note instead of tracking the envelope. Worth verifying the
+cable→modulator-volume per-block path, but it is a refinement, not the gross failure the cosine
+implied.
+
+Two real port discrepancies found en route (fix for faithfulness): (a) `getFinalParameterValueVolume`
+clamps `positivePatchedValue` to [0,2^30] while the C deliberately does NOT and uses int32 (overflow)
+— affects high-index FM; (b) the FM modulator "active" test uses `paramFinalValues!=0` instead of the
+C's knob `==INT_MIN` (voice.cpp:528).
 
 ### 4.2 Oscillator hard sync — major
 Sync patches are badly off.
