@@ -99,15 +99,23 @@ Diagnosis (narrowed — and much less alarming than the centroid table implies):
   "2× too bright" was largely the **full-spectrum, log-scaled cosine over-weighting quiet broadband
   hash**, not a gross synthesis error.
 
-⇒ This is partly a METRIC sensitivity (the scorecard's `log10(power)` spectrum, floored at 1e-12 and
-mean-subtracted, amplifies quiet high-frequency bins) and partly a small real effect (we emit some
-−70 dB broadband hash the hardware may not). Both are minor/low-priority versus the headline number.
+⇒ TESTED the metric hypothesis: re-ran the scorecard with a **−60 dB relative-to-peak floor** instead
+of the absolute 1e-12, to discard quiet hash. **It did NOT help** — median 0.724 → 0.693 (slightly
+worse), Warm Strings stayed ~0.495. Reverted. So the steady low-scores are NOT an inaudible-hash
+artifact: the inter-harmonic energy is *above* −60 dB (audible) and the band-level spectral SHAPE
+genuinely differs from hardware even though the centroid is close.
 
-NEXT STEP (lower priority than first thought): (a) make the scorecard metric weight bins by magnitude
-(or cap the noise floor higher, e.g. −60 dB) so it scores audible timbre, not inaudible hash — this
-will lift many steady scores honestly; (b) separately, check whether unison detune or analog-osc
-aliasing emits avoidable broadband hash vs the C. The synthesis core for steady subtractive patches is
-**confirmed faithful** — the apparent gap was mostly measurement.
+**Honest conclusion:** the subtractive *components* are faithful in isolation (osc, filter, unison) and
+the harmonic centroid ≈ HW, but the **full dense-unison patch renders a moderately different spectral
+shape** (cosine ~0.5) — real, audible, modest (NOT the "2× too bright" the full-spectrum centroid
+implied). Most likely cause: the **unison stack's inter-harmonic distribution** (detune→cents-per-voice
+spread / voice count / phase / stereo) differs from hardware, filling between the harmonics
+differently. Not pinned; not a gross error.
+
+NEXT STEP: A/B our unison vs the C `Voice`/`Sound` unison for a held saw (voice count, `unisonDetune`→
+cents spread, stereo spread, phase), comparing inter-harmonic spectral density to hardware. This is the
+remaining real (if modest) subtractive gap. The metric is fine as-is; do not re-attempt the noise-floor
+change (already tried, didn't help).
 
 
 ### 4.1 FM synthesis — NOT a confirmed engine bug; the low score is a METRIC artifact
