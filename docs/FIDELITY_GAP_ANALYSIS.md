@@ -44,23 +44,34 @@ mvn -pl deluge test -Dgpg.skip=true -Dtest=FidelityScorecardTest
 It prints a per-synth table + a summary (mean/median/distribution). Re-run after any change to
 track progress and catch regressions.
 
-## 3. Current score (edbf2480, vs FAITHFUL re-recordings)
+## 3. Current score (vs FAITHFUL re-recordings, principled alignment)
 
-- **169 measurable synths: median 0.70, mean 0.66.**
-- **≥0.90: 9 (5%) · ≥0.80: 43 (25%) · <0.60: 47.**
+- **169 measurable synths: median 0.68, mean 0.65.**
+- **≥0.90: 10 (6%) · ≥0.80: 41 (24%) · <0.60: 54.**
 - 19 not measurable (our engine renders them silent — see §5).
 
-This baseline is now against re-recordings of the **transpose-faithful** songs (the earlier 0.72
-was against transpose-stripped recordings — see history below). The transpose/clipping/master-
-transpose fixes corrected the ground truth but did NOT move the aggregate, as expected: the
-spectral cosine compares both sides at whatever pitch they play, and transpose shifts both
-consistently — so the gap is genuinely in timbre, not pitch.
+Against re-recordings of the **transpose-faithful** songs (the earlier 0.72 was against
+transpose-stripped recordings). The transpose/clipping/master-transpose fixes corrected the ground
+truth but did NOT move the aggregate — the spectral cosine compares both sides at whatever pitch
+they play, so the gap is genuinely timbre, not pitch.
 
-Two metric robustness lessons baked into FidelityScorecardTest: (1) trim BOTH leading AND trailing
-silence before slicing — manual recordings have variable lead/tail, and dividing total length by N
-drifts the per-synth slices (a tail-only difference dropped the apparent median 0.70→0.65); (2) per
-synth, pick the loudest 2 s window on each side. Re-record after any serialization change — the
-ground truth is only valid if the songs faithfully round-trip the presets.
+### ⚠ The measurement is alignment-limited — read this before trusting any PER-SYNTH score
+The hardware recording is 94 synths concatenated, and **locating each synth in it is ambiguous**.
+The notes do NOT start on equal-slice boundaries (a constant offset + drift), so the analysis
+window must be aligned per synth. FidelityScorecardTest now: (1) trims BOTH leading and trailing
+silence; (2) fits a **single global uniform grid** (period+offset by cross-correlation against an
+energy-rise function — robust because the arranger slots are equal-length by construction) with a
+tight ±0.3 s per-synth snap; (3) takes the loudest 2 s window on each side.
+
+**Honest caveat:** several alignment strategies were tried (equal-slice, greedy onset-tracking,
+global grid). They give medians spanning **0.68–0.70**, and individual synths swing wildly with the
+method (FM Bells 1: −0.31 → 0.00). Looser windows score *higher* but that is partly the cosine
+**overfitting** — window-shopping a better-matching segment, sometimes a neighbour's. The global
+grid (0.68) is the most principled and least overfit, so it is the number we trust. **No per-synth
+score is reliable enough for fine diagnosis in a concatenated recording.** The definitive fix is
+structural: regenerate the songs with a short **silence gap between synths** (unambiguous onsets) or
+record synths individually, then re-record. Until then, treat per-synth numbers as indicative only;
+the aggregate ~0.68 is the robust figure.
 
 This is **mediocre overall** but **highly non-uniform**: the failure is concentrated in specific
 synthesis subsystems, while the subtractive core is faithful.
