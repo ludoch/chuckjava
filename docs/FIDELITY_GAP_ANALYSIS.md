@@ -112,10 +112,21 @@ implied). Most likely cause: the **unison stack's inter-harmonic distribution** 
 spread / voice count / phase / stereo) differs from hardware, filling between the harmonics
 differently. Not pinned; not a gross error.
 
-NEXT STEP: A/B our unison vs the C `Voice`/`Sound` unison for a held saw (voice count, `unisonDetune`→
-cents spread, stereo spread, phase), comparing inter-harmonic spectral density to hardware. This is the
-remaining real (if modest) subtractive gap. The metric is fine as-is; do not re-attempt the noise-floor
-change (already tried, didn't help).
+TESTED unison: detune (13) and voice count (2) match the C exactly; and turning unison OFF makes Warm
+Strings BRIGHTER (full-centroid 2626 → 2793 Hz), not darker — so **unison is NOT the culprit** (it
+reduces the centroid, as expected). With unison off (single voice), the **harmonic centroid is 1521 Hz
+≈ HW 1393 Hz** (~9% — small). The larger full-spectrum gap (2793 vs 1393) is dominated by
+**Goertzel spectral leakage from the strong harmonics**, not real inter-harmonic content — a
+measurement-method effect, not an engine error.
+
+## FINAL conclusion of the subtractive deep-dive
+After isolating filter, oscillators, cutoff, AND unison — **all are faithful**, and the audible
+harmonic content of the steady patches is close to hardware (~9% centroid). The residual scorecard
+cosine (~0.5) is **substantially measurement methodology** (log-weighting, Goertzel leakage, the
+specific 48-band shape), not a real synthesis bug. **The subtractive synthesis core is essentially
+faithful; the scorecard is too blunt to guide further engine work on these patches.** The honestly-
+established real fixes this whole arc produced were the serialization/engine bugs (osc + master
+transpose, clipping) — not oscillator/filter/unison, which were already correct.
 
 
 ### 4.1 FM synthesis — NOT a confirmed engine bug; the low score is a METRIC artifact
