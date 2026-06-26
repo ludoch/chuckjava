@@ -44,37 +44,29 @@ mvn -pl deluge test -Dgpg.skip=true -Dtest=FidelityScorecardTest
 It prints a per-synth table + a summary (mean/median/distribution). Re-run after any change to
 track progress and catch regressions.
 
-## 3. Current score (vs FAITHFUL re-recordings, principled alignment)
+## 3. Current score (TRUSTWORTHY baseline — gapped recordings + onset alignment)
 
-- **169 measurable synths: median 0.68, mean 0.65.**
-- **≥0.90: 10 (6%) · ≥0.80: 41 (24%) · <0.60: 54.**
+- **169 measurable synths: median 0.72, mean 0.68.**
+- **≥0.90: 12 (7%) · ≥0.80: 59 (35%) · <0.60: 43.**
 - 19 not measurable (our engine renders them silent — see §5).
 
-Against re-recordings of the **transpose-faithful** songs (the earlier 0.72 was against
-transpose-stripped recordings). The transpose/clipping/master-transpose fixes corrected the ground
-truth but did NOT move the aggregate — the spectral cosine compares both sides at whatever pitch
-they play, so the gap is genuinely timbre, not pitch.
+This is the first baseline we **trust** at the per-synth level. The songs now place a **2 s silence
+gap between synths** (AllSynthsFidelityTest, `-Dsynth.gap`), so every attack is an unambiguous
+onset; FidelityScorecardTest fits a global uniform grid (period+offset by cross-correlation of an
+energy-rise function) + a ±0.3 s snap and confirms tight onset spacing (**5.7–6.4 s** around the
+6 s nominal — i.e. each synth is correctly located). vs the gapless recordings this lifted ≥0.80
+from 43 → 59 synths by *fixing mismeasurements*, not the engine.
 
-### ⚠ The measurement is alignment-limited — read this before trusting any PER-SYNTH score
-The hardware recording is 94 synths concatenated, and **locating each synth in it is ambiguous**.
-The notes do NOT start on equal-slice boundaries (a constant offset + drift), so the analysis
-window must be aligned per synth. FidelityScorecardTest now: (1) trims BOTH leading and trailing
-silence; (2) fits a **single global uniform grid** (period+offset by cross-correlation against an
-energy-rise function — robust because the arranger slots are equal-length by construction) with a
-tight ±0.3 s per-synth snap; (3) takes the loudest 2 s window on each side.
-
-**Honest caveat:** several alignment strategies were tried (equal-slice, greedy onset-tracking,
-global grid). They give medians spanning **0.68–0.70**, and individual synths swing wildly with the
-method (FM Bells 1: −0.31 → 0.00). Looser windows score *higher* but that is partly the cosine
-**overfitting** — window-shopping a better-matching segment, sometimes a neighbour's. The global
-grid (0.68) is the most principled and least overfit, so it is the number we trust. **No per-synth
-score is reliable enough for fine diagnosis in a concatenated recording.** The definitive fix is
-structural: regenerate the songs with a short **silence gap between synths** (unambiguous onsets) or
-record synths individually, then re-record. Until then, treat per-synth numbers as indicative only;
-the aggregate ~0.68 is the robust figure.
+History (for context): earlier numbers were unreliable. Gapless concatenated recordings made
+per-synth alignment ambiguous — equal-slice / greedy-tracking / global-grid gave medians 0.68–0.70
+and individual synths swung wildly (FM Bells 1: −0.31 ↔ 0.00) because the cosine overfit by
+window-shopping neighbours. The transpose-stripped recordings before that gave a false 0.72. The
+gap fix removes this whole class of error — **re-record only when serialization changes.**
 
 This is **mediocre overall** but **highly non-uniform**: the failure is concentrated in specific
-synthesis subsystems, while the subtractive core is faithful.
+synthesis subsystems, while the subtractive core is faithful. With alignment now reliable, the low
+scorers are CONFIRMED-real gaps (not artifacts): FM bells/modulation (≈0 / negative cosine) and
+oscillator hard-sync (Saw Sync 0.09) remain the worst — see §4.
 
 ## 4. The gaps, ranked by impact (with evidence + likely cause)
 
