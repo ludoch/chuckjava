@@ -11,6 +11,12 @@ at `~/a/DelugeFirmware/src/deluge/`. Translate the C — do not reconstruct, par
 **The prioritized test-mapped roadmap is in:**
 [`docs/FIRMWARE2_PORT_ROADMAP.md`](docs/FIRMWARE2_PORT_ROADMAP.md)
 
+**Fidelity is the make-or-break goal.** Current gap analysis vs real hardware (per-synth
+scorecard, what's faithful, what's broken, and the workflow to improve it) is in:
+[`docs/FIDELITY_GAP_ANALYSIS.md`](docs/FIDELITY_GAP_ANALYSIS.md) — run `FidelityScorecardTest`
+to measure; never claim a fidelity fix the scorecard doesn't confirm (RMS/autocorrelation lie —
+use spectral metrics + reset the noise seed).
+
 ## Key constraints
 
 - **No `useFirmware2 = false` bypass hacks.** A failing test means a missing C subsystem —
