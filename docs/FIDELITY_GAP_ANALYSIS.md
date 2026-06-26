@@ -86,22 +86,28 @@ hardware** (consistent direction, so not an alignment artifact):
 
 Our renders are **too bright** — affects ~all subtractive patches, so fixing it moves many scores.
 
-Diagnosis (narrowed):
-- **The filter is NOT the bug.** A pure saw → 24 dB LPF rolls off correctly (~20–25 dB/oct measured:
-  cutoff `0x00000000` gives h2=−13, h4=−33, h8=−58 dB). And a pure saw at Warm Strings' own cutoff is
-  far darker (centroid ~550 Hz) than Warm Strings (2685 Hz). The cutoff knob is applied faithfully
-  (raw `0x3E000000` via rawParamKnobs). So neither the rolloff nor the cutoff value is the cause.
-- **The brightness comes from the oscillator/unison config.** Warm/80s Strings + Rich Saw Lead all use
-  **osc1 square + osc2 analogSaw/saw with UNISON detune 13–24** (no noise). A pure single saw at the
-  same cutoff is dark, so the excess highs come from the **square/analogSaw waveform rendering and/or
-  the unison stack** being brighter than the c1.x hardware.
-- Minor secondary: a ~−71 dB broadband high-frequency floor (aliasing/quantization) exists but is too
-  low to drive the centroid.
+Diagnosis (narrowed — and much less alarming than the centroid table implies):
+- **The filter is faithful.** Pure saw → 24 dB LPF rolls off correctly (~20–25 dB/oct measured).
+- **The oscillators are faithful.** Raw harmonic rolloff (filter wide open) is textbook: saw/analogSaw
+  −6 dB/oct (h2=−6, h8=−18, h16=−25, h32=−32), square odd-only, triangle 1/n². Unison does NOT brighten
+  (it slightly lowers the centroid).
+- **The cutoff is applied correctly** (preset and a synthetic saw at the same knob get the same
+  `paramFinal[LPF_FREQ]`).
+- **KEY:** measuring Warm Strings' centroid over HARMONICS ONLY gives **1521 Hz ≈ HW's 1393 Hz** — our
+  audible harmonic content is right. The full-spectrum centroid (2685 Hz) is inflated by **broadband
+  inter-harmonic energy** (a ~−71 dB floor: unison-detune density and/or oscillator aliasing). So the
+  "2× too bright" was largely the **full-spectrum, log-scaled cosine over-weighting quiet broadband
+  hash**, not a gross synthesis error.
 
-NEXT STEP: isolate which of {square wave, analogSaw wave, unison detune stack} renders too bright by
-A/B-ing each against the C (`dsp/` oscillator + unison): render square-only, analogSaw-only, and
-unison-on/off, compare harmonic content. The common factor across the over-bright steady patches is
-square+analogSaw+unison, so the fix is in oscillator/unison fidelity — this is where the number moves.
+⇒ This is partly a METRIC sensitivity (the scorecard's `log10(power)` spectrum, floored at 1e-12 and
+mean-subtracted, amplifies quiet high-frequency bins) and partly a small real effect (we emit some
+−70 dB broadband hash the hardware may not). Both are minor/low-priority versus the headline number.
+
+NEXT STEP (lower priority than first thought): (a) make the scorecard metric weight bins by magnitude
+(or cap the noise floor higher, e.g. −60 dB) so it scores audible timbre, not inaudible hash — this
+will lift many steady scores honestly; (b) separately, check whether unison detune or analog-osc
+aliasing emits avoidable broadband hash vs the C. The synthesis core for steady subtractive patches is
+**confirmed faithful** — the apparent gap was mostly measurement.
 
 
 ### 4.1 FM synthesis — NOT a confirmed engine bug; the low score is a METRIC artifact
