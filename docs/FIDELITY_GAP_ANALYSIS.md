@@ -86,18 +86,22 @@ hardware** (consistent direction, so not an alignment artifact):
 
 Our renders are **too bright** — affects ~all subtractive patches, so fixing it moves many scores.
 
-Diagnosis so far (Warm Strings, cutoff knob `0x3E000000`, faithfully applied via rawParamKnobs):
-- Sweeping the cutoff DOWN reduces centroid only **partway** (2685 → ~1953 Hz) and **floors ~1953 Hz**
-  — well above HW's 1393. So it is **not just a too-high cutoff**: even with the filter mostly closed
-  our render stays too bright.
-- ⇒ The cause is either (a) the **24 dB LPF rolloff is too weak** (high harmonics leak through), or
-  (b) **added high-frequency content** the filter can't remove (oscillator harmonics/aliasing, the
-  noise source, or post-filter saturation/`clippingAmount`). Cutoff sweep was also slightly
-  non-monotonic at very low knobs — worth checking the filter curve at the low end.
+Diagnosis (narrowed):
+- **The filter is NOT the bug.** A pure saw → 24 dB LPF rolls off correctly (~20–25 dB/oct measured:
+  cutoff `0x00000000` gives h2=−13, h4=−33, h8=−58 dB). And a pure saw at Warm Strings' own cutoff is
+  far darker (centroid ~550 Hz) than Warm Strings (2685 Hz). The cutoff knob is applied faithfully
+  (raw `0x3E000000` via rawParamKnobs). So neither the rolloff nor the cutoff value is the cause.
+- **The brightness comes from the oscillator/unison config.** Warm/80s Strings + Rich Saw Lead all use
+  **osc1 square + osc2 analogSaw/saw with UNISON detune 13–24** (no noise). A pure single saw at the
+  same cutoff is dark, so the excess highs come from the **square/analogSaw waveform rendering and/or
+  the unison stack** being brighter than the c1.x hardware.
+- Minor secondary: a ~−71 dB broadband high-frequency floor (aliasing/quantization) exists but is too
+  low to drive the centroid.
 
-NEXT STEP: render a single saw (no FX) into the LPF and verify the rolloff slope vs the C
-`dsp/filter/*` (24 dB ladder); then check whether the noise source / saturation adds broadband highs.
-This is where the fidelity number will actually move.
+NEXT STEP: isolate which of {square wave, analogSaw wave, unison detune stack} renders too bright by
+A/B-ing each against the C (`dsp/` oscillator + unison): render square-only, analogSaw-only, and
+unison-on/off, compare harmonic content. The common factor across the over-bright steady patches is
+square+analogSaw+unison, so the fix is in oscillator/unison fidelity — this is where the number moves.
 
 
 ### 4.1 FM synthesis — NOT a confirmed engine bug; the low score is a METRIC artifact
