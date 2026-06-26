@@ -70,6 +70,36 @@ oscillator hard-sync (Saw Sync 0.09) remain the worst — see §4.
 
 ## 4. The gaps, ranked by impact (with evidence + likely cause)
 
+### 4.0 ⭐ Systematic over-brightness of SUBTRACTIVE synths — the real high-leverage gap
+This is the most important *metric-reliable* finding (the spectral cosine IS trustworthy for steady
+timbres). Across every steady low-scorer, **our render's spectral centroid is ~1.5–2× higher than
+hardware** (consistent direction, so not an alignment artifact):
+
+| steady synth | OURS centroid | HW centroid |
+|---|---|---|
+| Warm Strings | 2685 Hz | 1393 Hz |
+| 80s Strings | 2746 Hz | 1845 Hz |
+| Rich Saw Lead | 2713 Hz | 1744 Hz |
+| Nasal Choir | 2738 Hz | 1598 Hz |
+| High Harsh Pad | 2674 Hz | 1699 Hz |
+| Dark Saturated Bass | 1909 Hz | 375 Hz |
+
+Our renders are **too bright** — affects ~all subtractive patches, so fixing it moves many scores.
+
+Diagnosis so far (Warm Strings, cutoff knob `0x3E000000`, faithfully applied via rawParamKnobs):
+- Sweeping the cutoff DOWN reduces centroid only **partway** (2685 → ~1953 Hz) and **floors ~1953 Hz**
+  — well above HW's 1393. So it is **not just a too-high cutoff**: even with the filter mostly closed
+  our render stays too bright.
+- ⇒ The cause is either (a) the **24 dB LPF rolloff is too weak** (high harmonics leak through), or
+  (b) **added high-frequency content** the filter can't remove (oscillator harmonics/aliasing, the
+  noise source, or post-filter saturation/`clippingAmount`). Cutoff sweep was also slightly
+  non-monotonic at very low knobs — worth checking the filter curve at the low end.
+
+NEXT STEP: render a single saw (no FX) into the LPF and verify the rolloff slope vs the C
+`dsp/filter/*` (24 dB ladder); then check whether the noise source / saturation adds broadband highs.
+This is where the fidelity number will actually move.
+
+
 ### 4.1 FM synthesis — NOT a confirmed engine bug; the low score is a METRIC artifact
 The scorecard ranks FM bells worst (negative cosine), and our render is bright/metallic with sidebands
 at the correct carrier±modulator frequencies. I traced FM Bells 1 operator-by-operator and it is
