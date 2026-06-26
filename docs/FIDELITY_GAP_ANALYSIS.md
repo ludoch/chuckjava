@@ -44,11 +44,23 @@ mvn -pl deluge test -Dgpg.skip=true -Dtest=FidelityScorecardTest
 It prints a per-synth table + a summary (mean/median/distribution). Re-run after any change to
 track progress and catch regressions.
 
-## 3. Current score (296716b4)
+## 3. Current score (edbf2480, vs FAITHFUL re-recordings)
 
-- **170 measurable synths: median 0.72, mean 0.67.**
-- **≥0.90: 15 (9%) · ≥0.80: 53 (31%) · <0.60: 49.**
-- 18 not measurable (our engine renders them silent — see §5).
+- **169 measurable synths: median 0.70, mean 0.66.**
+- **≥0.90: 9 (5%) · ≥0.80: 43 (25%) · <0.60: 47.**
+- 19 not measurable (our engine renders them silent — see §5).
+
+This baseline is now against re-recordings of the **transpose-faithful** songs (the earlier 0.72
+was against transpose-stripped recordings — see history below). The transpose/clipping/master-
+transpose fixes corrected the ground truth but did NOT move the aggregate, as expected: the
+spectral cosine compares both sides at whatever pitch they play, and transpose shifts both
+consistently — so the gap is genuinely in timbre, not pitch.
+
+Two metric robustness lessons baked into FidelityScorecardTest: (1) trim BOTH leading AND trailing
+silence before slicing — manual recordings have variable lead/tail, and dividing total length by N
+drifts the per-synth slices (a tail-only difference dropped the apparent median 0.70→0.65); (2) per
+synth, pick the loudest 2 s window on each side. Re-record after any serialization change — the
+ground truth is only valid if the songs faithfully round-trip the presets.
 
 This is **mediocre overall** but **highly non-uniform**: the failure is concentrated in specific
 synthesis subsystems, while the subtractive core is faithful.
