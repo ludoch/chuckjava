@@ -79,6 +79,23 @@ oscillator hard-sync (Saw Sync 0.09) remain the worst — see §4.
 
 ## 4. The gaps, ranked by impact (with evidence + likely cause)
 
+### 4.−1 DISPROVEN: "envelope decay too fast" (House/Xylophone) — decay rate is FAITHFUL
+The time-resolved metric flagged House/Xylophone (our render decays to silence in ~1 s; the HW window
+"sustains" at ~59%). Investigated fully and it is **NOT an engine bug** — the decay rate is verified
+faithful to the C link-by-link: knob `0xa8f5c288`, param range `2^30` (default, functions.cpp:81),
+`lookupReleaseRate` byte-identical, decay neutral `70<<9` (functions.cpp:139). Our decay rate (192 ≈
+1 s) is exactly what the C computes. Both patches have **envelope sustain = 0**, so our dry render
+*correctly* decays to silence. The HW "sustain" is a MEASUREMENT artifact: House and Xylophone show
+*identical* HW RMS plateaus (~59%) despite different FX (House has delay `0xBA000000`; Xylophone has
+NEITHER reverb nor delay) — identical evolution across different-FX patches ⇒ not per-patch envelope
+behaviour, but delay echoes / alignment / the time-resolved frames overrunning into adjacent content.
+**Lesson (again): verify against the C before "fixing"; even the time-resolved metric's per-synth
+droppers can be artifacts — don't trust them blind.** (One real-ish sub-thread to confirm separately:
+does the single-synth `renderSynth` path apply the master *delay*? It has `masterDelay`; if delay
+isn't engaged for a single-sound render, delay-heavy patches will read low — a test-harness detail,
+not an engine bug.)
+
+
 ### 4.0 ⭐ Systematic over-brightness of SUBTRACTIVE synths — the real high-leverage gap
 This is the most important *metric-reliable* finding (the spectral cosine IS trustworthy for steady
 timbres). Across every steady low-scorer, **our render's spectral centroid is ~1.5–2× higher than
