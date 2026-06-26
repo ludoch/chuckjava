@@ -70,14 +70,30 @@ oscillator hard-sync (Saw Sync 0.09) remain the worst — see §4.
 
 ## 4. The gaps, ranked by impact (with evidence + likely cause)
 
-### 4.1 FM synthesis — WORST (negative/near-zero cosine)
-Our 2-op FM timbre is wrong (often anti-correlated — energy in the wrong harmonics).
-- `056 FM Bell Modulation` **−0.14**, `093 FM Distorted Bells` **0.06**, `068 FM Bells 1` **0.13**,
-  `084 FM Narrow Band` **0.22**, `069 FM Bells 2` **0.31**, FM pads 0.6–0.8.
-- Likely C subsystems: `model/voice/voice.cpp` FM path (`renderFmPath`/`renderCarrier*`), modulator
-  phase-increment + feedback, `dsp/` operator math. Check modulator→carrier index scaling,
-  feedback, and the modulator transpose/cents (we just reworked source transpose — verify FM
-  modulator transpose path too). Compare our `Voice.renderFmPath` against the C operator-by-operator.
+### 4.1 FM synthesis — WORST, but likely a FIRMWARE-VERSION mismatch (not a port bug)
+Our FM-emulation presets render **far brighter** than hardware: with reliable alignment, FM Bells 1
+hardware is a **pure carrier at every point in time** (525 Hz only, zero sidebands), while we
+modulate heavily. The same pattern spans the FM instrument-emulation block (Violin/Marimba/FM
+Bells/Glockenspiel all: hardware fundamental-dominant, ours high-sideband-dominant).
+
+**Crucial caveat — the reference may not match the hardware.** Tracing FM Bells 1 operator-by-
+operator, our port is faithful to the C: modulator volume `getFinalParameterValueVolume(2^25,
+knob=0xD4000000)` = 14450688 (matches the C formula), `doFMNew`/feedback byte-identical, note source
+`(60−64)·2^25` matches, modulator note 94 is well inside the C's "active" range. **By the C source,
+this patch SHOULD modulate — yet the c1.2.0 hardware produces none.** The reason: `~/a/DelugeFirmware`
+is the **Community Firmware nightly (g9a74e162, 2026-06-11)**, but the hardware recordings are from a
+different (older/official **c1.2.0**) build. The FM modulator behaviour diverged between versions, so
+**faithful-port-of-Community ≠ match-the-c1.2.0-hardware** for FM. This is a *fidelity ceiling*, not a
+fixable port bug, until the firmware versions are reconciled (reflash the hardware to the matching
+Community build and re-record, OR port against the c1.2.0 source). ⚠ ACTION: confirm the exact
+firmware on the test hardware before doing any more FM "fidelity" work.
+
+Two real port discrepancies were found en route (worth fixing for Community-faithfulness, but they do
+NOT explain Bells 1): (a) `getFinalParameterValueVolume` clamps `positivePatchedValue` to [0,2^30]
+while the C deliberately does NOT (comment: "to allow FM modulator amounts to get past where I
+clipped off volume params") and uses int32 (overflows) — affects high-index FM; (b) the FM
+modulator "active" test uses `paramFinalValues!=0` instead of the C's knob `==INT_MIN`
+(voice.cpp:528).
 
 ### 4.2 Oscillator hard sync — major
 Sync patches are badly off.
