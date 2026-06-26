@@ -46,9 +46,18 @@ track progress and catch regressions.
 
 ## 3. Current score (TRUSTWORTHY baseline — gapped recordings + onset alignment)
 
-- **169 measurable synths: median 0.72, mean 0.68.**
-- **≥0.90: 12 (7%) · ≥0.80: 59 (35%) · <0.60: 43.**
-- 19 not measurable (our engine renders them silent — see §5).
+Two metrics now (FidelityScorecardTest prints both):
+
+| metric | median | mean | ≥0.80 | <0.60 |
+|---|---|---|---|---|
+| single-window (loudest 2 s spectral cosine) | 0.72 | 0.68 | 59 | 43 |
+| **TIME-RESOLVED** (avg per-frame 250 ms cosine, onset-aligned) | **0.77** | **0.73** | **71 (42%)** | **30** |
+
+- 169 measurable; 19 not measurable (our engine renders them silent — see §5).
+- **Use the TIME-RESOLVED metric as the headline** — it captures the time-envelope of brightness
+  (FM decay, reverb tail, chorus/arp movement) that the single-window cosine is blind to. It lifted
+  time-varying patches most (e.g. Busy Arp 0.76→0.91, Synthwave Bass Arp 0.84→0.92), confirming the
+  engine is **more faithful than the single-window number implied** — the gap was partly the metric.
 
 This is the first baseline we **trust** at the per-synth level. The songs now place a **2 s silence
 gap between synths** (AllSynthsFidelityTest, `-Dsynth.gap`), so every attack is an unambiguous
