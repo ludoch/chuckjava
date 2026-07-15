@@ -47,7 +47,7 @@ public class Adsr extends ChuckUGen {
   private float releaseInc;
 
   public Adsr() {
-    this(44100f, true);
+    this(org.chuck.core.ChuckVM.CURRENT_VM.get().getSampleRate(), true);
   }
 
   public Adsr(float sampleRate) {
@@ -66,12 +66,7 @@ public class Adsr extends ChuckUGen {
   }
 
   public float value() {
-    return currentLevel;
-  }
-
-  public double value(double v) {
-    this.currentLevel = (float) v;
-    return v;
+    return getCurrentLevel();
   }
 
   public int state() {

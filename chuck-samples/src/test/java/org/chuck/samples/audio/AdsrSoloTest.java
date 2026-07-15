@@ -66,7 +66,7 @@ public class AdsrSoloTest {
           bufWv.chuck(dac());
 
           // Configure ADSR
-          env.set(0.001, 0, 1, 0.05);
+          env.set(0.001f, 0f, 1f, 0.05f);
           env.forceMute();
 
           // Load sample

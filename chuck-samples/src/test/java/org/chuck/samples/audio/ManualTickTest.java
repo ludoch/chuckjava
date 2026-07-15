@@ -46,7 +46,7 @@ public class ManualTickTest {
 
     buf.pos(0);
     buf.rate(1.0f);
-    env.set(0.001, 0.0, 1.0, 0.05);
+    env.set(0.001f, 0.0f, 1.0f, 0.05f);
     env.keyOn();
 
     // Open WAV output

@@ -68,7 +68,7 @@ public class MinimalSndBufTest {
             if (buf.samples() > 0) {
               buf.pos(0);
               buf.rate(1.0f);
-              env.set(0.001, 0.0, 1.0, 0.05);
+              env.set(0.001f, 0.0f, 1.0f, 0.05f);
               env.keyOn();
 
               wvOut.wavWrite(wavPath);
@@ -194,7 +194,7 @@ public class MinimalSndBufTest {
           // Play
           buf.pos(0);
           buf.rate(1.0f);
-          env.set(0.001, 0.0, 1.0, 0.05);
+          env.set(0.001f, 0.0f, 1.0f, 0.05f);
           env.keyOn();
 
           // Advance through sample
