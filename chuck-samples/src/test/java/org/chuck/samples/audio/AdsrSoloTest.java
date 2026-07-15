@@ -46,7 +46,7 @@ public class AdsrSoloTest {
           // MINIMAL chain: SndBuf -> Adsr -> Gain (tap) -> WvOut2 -> dac
           // AND: SndBuf -> Gain (tap) -> WvOut2 -> dac
           SndBuf buf = new SndBuf();
-          DelugeAdsr env = new DelugeAdsr();
+          Adsr env = new Adsr(sr);
 
           // Main chain: buf -> env -> dac
           buf.chuck(env).chuck(dac());

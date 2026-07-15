@@ -5,7 +5,7 @@ import org.chuck.core.doc;
 
 /**
  * 6-operator FM synthesis engine implementing the Yamaha DX7 voice architecture, ported from the
- * Deluge firmware's dexed/msfa implementation.
+ * dexed/msfa implementation.
  *
  * <p>This is a single {@link ChuckUGen} that manages 6 internal operators, each with its own phase
  * accumulator, sine lookup, envelope generator (EG), and frequency calculation. The 32 DX7
@@ -470,7 +470,7 @@ public class Dx7Engine extends ChuckUGen {
     this.midiNote = midinote;
     this.velocity = vel;
 
-    // The Deluge firmware (dx7note.cpp DxVoice::init) derives the operator log-frequency from the
+    // The FM engine derives the operator log-frequency from the
     // raw midinote and does NOT apply the patch's transpose parameter. Match that exactly.
     int logFreq = Dx7EngineLookupTables.dxNoteToFreq(midinote);
 

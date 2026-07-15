@@ -3,8 +3,8 @@ package org.chuck.audio.fx;
 import org.chuck.audio.ChuckUGen;
 
 /**
- * WARBLER ModFX: modulated delay-tap with dual LFOs and resonance-compensated feedback. Emulates
- * the Deluge firmware's warble effect with a random-walk LFO driving delay modulation.
+ * WARBLER ModFX: modulated delay-tap with dual LFOs and resonance-compensated feedback. Features a
+ * warble effect with a random-walk LFO driving delay modulation.
  */
 public class WarblerModFx extends ChuckUGen {
   private final DelayL delayLine;

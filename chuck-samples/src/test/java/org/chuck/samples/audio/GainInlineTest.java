@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Test: does Gain work as a drop-in replacement for ADSR? Chain: buf -> gain -> wv -> dac If this
- * works, the issue is specific to DelugeAdsr.compute().
+ * works, the issue is specific to ADSR compute().
  */
 public class GainInlineTest {
 

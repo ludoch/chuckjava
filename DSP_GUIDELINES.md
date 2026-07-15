@@ -53,4 +53,4 @@ A legendary, decades-old mailing list and code repository where plugin developer
 
 ---
 
-*Note: In embedded hardware (like the actual Synthstrom Deluge or Eurorack modules), the processors often lack 64-bit FPUs. Hardware engineers are forced to use 32-bit floats and must write hacky "dithering" code (injecting microscopic white noise into the signal) to manually disrupt the limit cycles and denormals. Because desktop CPUs process 64-bit math with zero performance penalty, we bypass those hacks entirely and simply use `double`.*
+*Note: In embedded hardware (like embedded DSP hardware or Eurorack modules), the processors often lack 64-bit FPUs. Hardware engineers are forced to use 32-bit floats and must write hacky "dithering" code (injecting microscopic white noise into the signal) to manually disrupt the limit cycles and denormals. Because desktop CPUs process 64-bit math with zero performance penalty, we bypass those hacks entirely and simply use `double`.*

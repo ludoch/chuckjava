@@ -46,6 +46,10 @@ public class Adsr extends ChuckUGen {
   private float decayInc;
   private float releaseInc;
 
+  public Adsr() {
+    this(44100f, true);
+  }
+
   public Adsr(float sampleRate) {
     this(sampleRate, true);
   }
@@ -54,6 +58,20 @@ public class Adsr extends ChuckUGen {
     super(autoRegister);
     this.sampleRate = sampleRate;
     updateIncrements();
+  }
+
+  public void forceMute() {
+    this.currentLevel = 0.0f;
+    this.state = State.DONE_ENUM;
+  }
+
+  public float value() {
+    return currentLevel;
+  }
+
+  public double value(double v) {
+    this.currentLevel = (float) v;
+    return v;
   }
 
   public int state() {

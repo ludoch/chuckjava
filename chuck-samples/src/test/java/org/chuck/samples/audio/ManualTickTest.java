@@ -3,7 +3,7 @@ package org.chuck.samples.audio;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.io.*;
-import org.chuck.audio.util.DelugeAdsr;
+import org.chuck.audio.util.Adsr;
 import org.chuck.audio.util.Gain;
 import org.chuck.audio.util.SndBuf;
 import org.chuck.audio.util.WvOut2;
@@ -34,7 +34,7 @@ public class ManualTickTest {
 
     // Create UGens
     SndBuf buf = new SndBuf();
-    DelugeAdsr env = new DelugeAdsr(sampleRate);
+    Adsr env = new Adsr(sampleRate);
     WvOut2 wvOut = new WvOut2(sampleRate);
 
     // Chain: buf → env → wvOut

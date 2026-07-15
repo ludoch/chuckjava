@@ -33,7 +33,7 @@ You can run ChucK-Java in different modes:
 
 - **Native RtMidiJava Support**: Ultra-low latency MIDI drivers via pure Java FFM (Panama).
 - **High-Performance Audio**: Optimized Vector API paths and Project Loom concurrency.
-- **Deluge Workstation Emulation**: Software emulation of the Synthstrom Deluge workflow.
+- **Modern IDE Workstation**: Interactive JavaFX IDE with live coding, visualizers, and code editor.
 
 ## 📚 Documentation
 
@@ -48,15 +48,9 @@ Explore the detailed guides and documentation files available in this repository
 - [UGen Reference](chuck-core/UGEN_REFERENCE.md): Detailed list of available Unit Generators and their parameters.
 - [MIDI Guide](chuck-core/MIDI_GUIDE.md): How to use MIDI input, output, and polyphony.
 
-### Deluge Integration
-- [Deluge UI User Guide](docs/deluge_ui_user_guide.md): Operation of the JavaFX Deluge Emulator.
-- [Java Deluge User Guide & Operations Manual](docs/DELUGE_GUIDEBOOK.md): Workstation concepts, physical modeling, and consolidated hardware quick reference.
-- [Deluge XML Examples](docs/deluge_xml_examples.md): Authoritative reference for Deluge song XML files.
-
 ### Project & Developer Notes
 - [JDK Roadmap](chuck-core/JDK_ROADMAP.md): Analysis of future JDK features for ChucK-Java.
 - [Maven Guide](MAVEN_GUIDE.md): How to use ChucK-Java as a dependency and publish artifacts.
 - [TODO List](TODO.md): Current task list and future ideas.
-- [Audio Stability Report](AUDIO_STABILITY_REPORT.md): Notes on audio engine stability.
 - [DSP Guidelines](DSP_GUIDELINES.md): Best practices for DSP development in Java.
 - [Project Guidelines](GEMINI.md): Foundational mandates for working on the project.

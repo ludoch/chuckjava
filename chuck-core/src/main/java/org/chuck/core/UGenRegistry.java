@@ -193,7 +193,6 @@ public class UGenRegistry {
     register("Envelope", (sr, args) -> new Envelope(sr));
     register("ADSR", (sr, args) -> new Adsr(sr));
     register("Adsr", (sr, args) -> new Adsr(sr));
-    register("DelugeAdsr", (sr, args) -> new org.chuck.audio.util.DelugeAdsr(sr));
 
     // --- Chugins (Java ports of C++ chugins) ---
     register("Bitcrusher", (sr, args) -> new Bitcrusher());

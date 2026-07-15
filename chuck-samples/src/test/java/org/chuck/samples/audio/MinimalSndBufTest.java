@@ -54,7 +54,7 @@ public class MinimalSndBufTest {
           try {
             float sr = (float) sampleRate();
             SndBuf buf = new SndBuf();
-            DelugeAdsr env = new DelugeAdsr();
+            Adsr env = new Adsr(sr);
             WvOut2 wvOut = new WvOut2(sr);
 
             // Chain: buf → env → wvOut → dac
@@ -181,7 +181,7 @@ public class MinimalSndBufTest {
     vm.spork(
         () -> {
           SndBuf buf = new SndBuf();
-          DelugeAdsr env = new DelugeAdsr();
+          Adsr env = new Adsr();
           // Chain: buf → env → dac
           buf.chuck(env).chuck(dac());
 

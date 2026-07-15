@@ -2064,7 +2064,7 @@ Class: `org.chuck.audio.analysis.ZeroX`
 ## Dx7Engine
 Class: `org.chuck.audio.util.Dx7Engine`
 
-**Description:** 6-operator FM synthesis engine implementing the Yamaha DX7 voice architecture, ported from the Deluge firmware's dexed/msfa implementation. A single ChuckUGen managing 6 phase accumulators with per-operator envelopes, sine lookup, and 32 algorithm matrices.
+**Description:** 6-operator FM synthesis engine implementing the Yamaha DX7 voice architecture, ported from the dexed/msfa implementation. A single ChuckUGen managing 6 phase accumulators with per-operator envelopes, sine lookup, and 32 algorithm matrices.
 
 Relies on `Dx7EngineLookupTables.init()` being called once at VM startup (per sample rate). Patches are loaded as 156-byte blobs created by `Dx7Patch.fromHex(hexString)`.
 
@@ -2073,15 +2073,6 @@ Relies on `Dx7EngineLookupTables.init()` being called once at VM startup (per sa
 - `freq` (double) — base frequency (alternative to MIDI note for non-MIDI use)
 - `midiNote` (int, 0-127)
 - `velocity` (int, 0-127)
-
-### Methods
-- `loadPatch(byte[] patchData)` -> void : Load a DX7 patch from 156-byte raw array
-- `loadPatch(Dx7Patch p)` -> void : Load from a decoded Dx7Patch record
-- `setFreq(double freq)` -> void : Set base note frequency (auto-converts to MIDI note)
-- `noteOn(int midiNote, int velocity)` -> void : Trigger note-on with MIDI note and velocity; initializes all 6 operators with correct frequency, envelope, key/velocity scaling per patch
-- `noteOn()` -> void : Legacy note-on using previously set parameters
-- `noteOff()` -> void : Trigger note-off; all 6 operators enter release phase
-- `isActive()` -> boolean : Returns true while any operator is above the gain threshold
 
 ### Math Conventions
 - phase: Q32 (wraps naturally on 32-bit overflow)

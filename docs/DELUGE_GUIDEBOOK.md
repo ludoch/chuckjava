@@ -1,1 +1,0 @@
-../deluge/src/main/resources/docs/DELUGE_GUIDEBOOK.md

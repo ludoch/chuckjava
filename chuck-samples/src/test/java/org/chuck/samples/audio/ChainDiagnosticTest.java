@@ -52,7 +52,7 @@ public class ChainDiagnosticTest {
 
           // Build the exact kit chain
           SndBuf buf = new SndBuf();
-          DelugeAdsr env = new DelugeAdsr();
+          Adsr env = new Adsr(sr);
           Pan2 pan = new Pan2();
           Gain master = new Gain();
           HPF hpf = new HPF(sr);

@@ -36,7 +36,5 @@ cp.txt
 /org/
 
 # Claude/Claudex local settings
-.claude/
-/deluge/src/main/resources/DX7/
 jdk25/
 gc.log*

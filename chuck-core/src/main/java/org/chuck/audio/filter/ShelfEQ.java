@@ -7,8 +7,7 @@ import org.chuck.audio.ChuckUGen;
 import org.chuck.core.doc;
 
 /**
- * Two-band shelving equalizer (Bass and Treble) suitable for the Deluge EQ section. Cascades a
- * low-shelf and high-shelf biquad filter.
+ * Two-band shelving equalizer (Bass and Treble). Cascades a low-shelf and high-shelf biquad filter.
  */
 @doc("Two-band shelving equalizer (Bass and Treble).")
 public class ShelfEQ extends ChuckUGen {

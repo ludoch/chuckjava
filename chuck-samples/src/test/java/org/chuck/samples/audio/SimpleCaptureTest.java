@@ -106,7 +106,7 @@ public class SimpleCaptureTest {
           buf.pos(0);
           buf.gain(0.8f);
 
-          DelugeAdsr env = new DelugeAdsr();
+          Adsr env = new Adsr();
           env.set(0.001, 0.0, 1.0, 0.001);
           env.forceMute();
 

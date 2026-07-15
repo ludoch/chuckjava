@@ -1,7 +1,7 @@
 package org.chuck.audio.util;
 
 /**
- * Static lookup tables ported from the Deluge firmware's dexed/msfa implementation.
+ * Static lookup tables ported from the dexed/msfa implementation.
  *
  * <p>All tables are initialized once via {@link #init(double)} and then shared across all Dx7Engine
  * instances. Math conventions match the firmware:

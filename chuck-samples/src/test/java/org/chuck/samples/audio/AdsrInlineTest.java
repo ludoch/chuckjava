@@ -34,7 +34,7 @@ public class AdsrInlineTest {
     String absPath = localTarget.getAbsolutePath();
     System.out.println("Kick sample: " + absPath);
 
-    File tempDir = new File(System.getProperty("java.io.tmpdir"), "deluge-adsrinline");
+    File tempDir = new File(System.getProperty("java.io.tmpdir"), "adsrinline");
     tempDir.mkdirs();
     String wavPath = new File(tempDir, "adsrinline.wav").getAbsolutePath();
 
@@ -45,7 +45,7 @@ public class AdsrInlineTest {
           // DIRECT chain: SndBuf -> Adsr -> WvOut2 -> dac
           // The WvOut2 is INLINE, not a tap.
           SndBuf buf = new SndBuf();
-          DelugeAdsr env = new DelugeAdsr();
+          Adsr env = new Adsr(sr);
           WvOut2 wv = new WvOut2(sr);
 
           // Chain: buf -> env -> wv -> dac

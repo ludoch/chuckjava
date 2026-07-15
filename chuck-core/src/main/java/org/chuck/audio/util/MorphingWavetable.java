@@ -86,7 +86,7 @@ public class MorphingWavetable extends ChuckUGen {
     int t1 = Math.min(t0 + 1, numTables - 1);
     float tFrac = index - t0;
     // Advance phase + FM modulation from input
-    // Mirrors the real Deluge firmware: carrierPhase += modulatorSample (+ wrapping phase shift)
+    // Mirrors carrierPhase += modulatorSample (+ wrapping phase shift)
     // input is the modulator UGen's output sample (after modulator gain clamped to 1.0).
     // modGain scales the FM depth independently for usable modulation levels.
     phase += rate;

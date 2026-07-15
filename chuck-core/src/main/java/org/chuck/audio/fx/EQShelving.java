@@ -3,10 +3,9 @@ package org.chuck.audio.fx;
 import org.chuck.audio.ChuckUGen;
 
 /**
- * Shelving filter UGen matching the real Deluge firmware's EQ approach.
+ * Shelving filter UGen using first-order one-pole IIR filters:
  *
- * <p>Based on {@code ModControllableAudio::doEQ()} from the firmware source (c1.3.0). The real
- * firmware uses <b>first-order one-pole IIR filters</b> — not biquads:
+ * <p>Based on one-pole shelving EQ topology (first-order IIR filters) — not biquads:
  *
  * <ul>
  *   <li>LOW_SHELF (bass): 1-pole lowpass, output = input + lowpass_state * gain_mix
