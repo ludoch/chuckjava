@@ -1146,6 +1146,14 @@ public class ChuckToDSLConverter {
         if (is.elseBranch() != null) collectFields(List.of(is.elseBranch()));
       } else if (s instanceof ChuckAST.WhileStmt ws) {
         collectFields(List.of(ws.body()));
+      } else if (s instanceof ChuckAST.DoStmt ds) {
+        collectFields(List.of(ds.body()));
+      } else if (s instanceof ChuckAST.UntilStmt us) {
+        collectFields(List.of(us.body()));
+      } else if (s instanceof ChuckAST.RepeatStmt rs) {
+        collectFields(List.of(rs.body()));
+      } else if (s instanceof ChuckAST.ForEachStmt fes) {
+        collectFields(List.of(fes.body()));
       } else if (s instanceof ChuckAST.ForStmt fs) {
         collectFields(List.of(fs.body()));
       } else if (s instanceof ChuckAST.BlockStmt bs) {
@@ -1465,7 +1473,8 @@ public class ChuckToDSLConverter {
       }
       return res;
     } else if (stmt instanceof ChuckAST.DoStmt ds) {
-      String cond = visitExp(ds.condition());
+      String cond = visitBoolExp(ds.condition());
+      if (cond.equals("1")) cond = "true";
       if (ds.isUntil()) cond = "!(" + cond + ")";
       return "do " + ensureBraces(visitStmt(ds.body())) + " while (" + cond + ");";
     } else if (stmt instanceof ChuckAST.RepeatStmt rs) {
@@ -1523,12 +1532,6 @@ public class ChuckToDSLConverter {
           + indent("}", 1)
           + "\n"
           + "}";
-    } else if (stmt instanceof ChuckAST.WhileStmt ws) {
-      String cond = visitExp(ws.condition());
-      if (cond.equals("1")) cond = "true";
-      return "while (" + cond + ") " + ensureBraces(visitStmt(ws.body()));
-    } else if (stmt instanceof ChuckAST.UntilStmt us) {
-      return "while (!(" + visitExp(us.condition()) + ")) " + ensureBraces(visitStmt(us.body()));
     } else if (stmt instanceof ChuckAST.SwitchStmt ss) {
       StringBuilder sb = new StringBuilder();
       sb.append("switch (").append(visitExp(ss.condition())).append(") {\n");
