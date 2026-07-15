@@ -3,8 +3,8 @@ package org.chuck.audio.util;
 /**
  * Decoded representation of a Yamaha DX7 voice patch (156 bytes).
  *
- * <p>DX7 patches can be stored as hex-encoded 156-byte strings. This class parses the hex string into
- * structured operator and global parameter fields matching the real DX7 SysEx format.
+ * <p>DX7 patches can be stored as hex-encoded 156-byte strings. This class parses the hex string
+ * into structured operator and global parameter fields matching the real DX7 SysEx format.
  *
  * <p>Layout (156 bytes):
  *

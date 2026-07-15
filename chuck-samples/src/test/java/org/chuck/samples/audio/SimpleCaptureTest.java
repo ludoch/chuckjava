@@ -107,7 +107,7 @@ public class SimpleCaptureTest {
           buf.gain(0.8f);
 
           Adsr env = new Adsr();
-          env.set(0.001, 0.0, 1.0, 0.001);
+          env.set(0.001f, 0.0f, 1.0f, 0.001f);
           env.forceMute();
 
           Gain master = new Gain();

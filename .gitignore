@@ -36,5 +36,6 @@ cp.txt
 /org/
 
 # Claude/Claudex local settings
+.claude/
 jdk25/
 gc.log*
