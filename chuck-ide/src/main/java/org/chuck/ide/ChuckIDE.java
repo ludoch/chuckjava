@@ -27,6 +27,7 @@ import org.chuck.audio.analysis.FFT;
 import org.chuck.audio.util.Gain;
 import org.chuck.audio.util.Scope;
 import org.chuck.core.ChuckVM;
+import org.chuck.ide.model.*;
 import org.chuck.midi.ChuckMidiNative;
 import org.chuck.midi.ChuckMidiOutNative;
 
@@ -36,9 +37,14 @@ import org.chuck.midi.ChuckMidiOutNative;
  */
 public class ChuckIDE extends Application {
   private final Preferences prefs = Preferences.userNodeForPackage(ChuckIDE.class);
+  private final UndoRedoStack undoRedoStack = new UndoRedoStack(64);
   private Stage stage;
   private ChuckVM vm;
   private ChuckAudio audio;
+
+  public UndoRedoStack getUndoRedoStack() {
+    return undoRedoStack;
+  }
 
   // Components
   private EditorSupport editorSupport;
@@ -259,6 +265,16 @@ public class ChuckIDE extends Application {
             (obs, old, val) -> {
               audio.setMasterGain(val.floatValue());
               prefs.putFloat("audio.masterGain", val.floatValue());
+              undoRedoStack.replaceLast(
+                  new PreferenceConsequence<>(
+                      "audio.masterGain",
+                      old.floatValue(),
+                      val.floatValue(),
+                      (k, v) -> {
+                        audio.setMasterGain(v);
+                        prefs.putFloat(k, v);
+                        masterGainSlider.setValue(v);
+                      }));
             });
     VBox masterBox = new VBox(5, new Label("Vol"), masterGainSlider);
     masterBox.setPadding(new Insets(5));
@@ -394,15 +410,25 @@ public class ChuckIDE extends Application {
     undoItem.setAccelerator(new KeyCodeCombination(KeyCode.Z, KeyCombination.CONTROL_DOWN));
     undoItem.setOnAction(
         e -> {
-          if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et)
+          if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et
+              && et.getEditor().getUndoManager().isUndoAvailable()) {
             et.getEditor().undo();
+          } else if (undoRedoStack.canUndo()) {
+            Consequence c = undoRedoStack.undo();
+            if (c != null) print("Undo: " + c.description() + "\n");
+          }
         });
     MenuItem redoItem = new MenuItem("Redo");
     redoItem.setAccelerator(new KeyCodeCombination(KeyCode.Y, KeyCombination.CONTROL_DOWN));
     redoItem.setOnAction(
         e -> {
-          if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et)
+          if (tabPane.getSelectionModel().getSelectedItem() instanceof EditorTab et
+              && et.getEditor().getUndoManager().isRedoAvailable()) {
             et.getEditor().redo();
+          } else if (undoRedoStack.canRedo()) {
+            Consequence c = undoRedoStack.redo();
+            if (c != null) print("Redo: " + c.description() + "\n");
+          }
         });
     MenuItem selectAll = new MenuItem("Select All");
     selectAll.setAccelerator(new KeyCodeCombination(KeyCode.A, KeyCombination.CONTROL_DOWN));
@@ -768,6 +794,20 @@ public class ChuckIDE extends Application {
           if (id > 0) {
             et.setLastSporkedShredId(id);
             shredListView.getItems().add(new ShredInfo(id, name, vm.getShred(id)));
+            final File finalFile = f;
+            undoRedoStack.push(
+                new ShredConsequence(
+                    id,
+                    name,
+                    true,
+                    sid -> vm.removeShred(sid),
+                    fn -> {
+                      try {
+                        int nid = vm.spork(org.chuck.core.ChuckDSL.load(finalFile.toPath()));
+                        if (nid > 0) et.setLastSporkedShredId(nid);
+                      } catch (Exception ignored) {
+                      }
+                    }));
           }
         } catch (Exception e) {
           print("❌ Java DSL Error: " + e.getMessage() + "\n");
@@ -779,6 +819,16 @@ public class ChuckIDE extends Application {
         if (id > 0) {
           et.setLastSporkedShredId(id);
           shredListView.getItems().add(new ShredInfo(id, name, vm.getShred(id)));
+          undoRedoStack.push(
+              new ShredConsequence(
+                  id,
+                  name,
+                  true,
+                  sid -> vm.removeShred(sid),
+                  fn -> {
+                    int nid = vm.run(code, name);
+                    if (nid > 0) et.setLastSporkedShredId(nid);
+                  }));
         }
       }
     }
