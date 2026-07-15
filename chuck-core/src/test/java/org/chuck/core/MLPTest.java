@@ -48,6 +48,32 @@ public class MLPTest {
     assertEquals(1L, ok);
   }
 
+  @Test
+  void testInitAndTrain_withNonLinearOutputLayer() {
+    // Verify that uniform activation applies to ALL layers including the output layer (mirroring
+    // C++ ulib_ai commit 3eaa05ed)
+    ChuckArray nodes = intArr(2, 3, 1);
+    long ok = mlp.init(nodes, MLP.ACT_SIGMOID);
+    assertEquals(1L, ok);
+
+    ChuckArray x = floatArr(0.5, -0.5);
+    ChuckArray y = floatArr(0.8);
+    // Forward pass: output should be bounded by sigmoid (0..1)
+    mlp.forward(x);
+    ChuckArray aOut = floatArr(0.0);
+    assertEquals(1L, mlp.getActivations(2, aOut));
+    double outVal = aOut.getFloat(0);
+    assertTrue(
+        outVal >= 0.0 && outVal <= 1.0, "sigmoid output layer bounded [0, 1], got " + outVal);
+
+    // Backprop pass: delta and weight updates should run without errors using sigmoid derivative on
+    // output layer
+    assertEquals(1L, mlp.backprop(y, 0.1));
+    ChuckArray gOut = floatArr(0.0);
+    assertEquals(1L, mlp.getGradients(1, gOut));
+    assertFalse(Double.isNaN(gOut.getFloat(0)), "output gradient valid after non-linear backprop");
+  }
+
   // ── train() with lr + epochs args ─────────────────────────────────────────
 
   @Test
@@ -153,6 +179,15 @@ public class MLPTest {
     assertEquals(1L, mlp.save(f.getAbsolutePath()));
     assertTrue(f.exists());
     assertTrue(Files.size(f.toPath()) > 0);
+    String savedContent = Files.readString(f.toPath());
+    assertTrue(
+        savedContent.startsWith("# layers"),
+        "saved model must start with '# layers' per C++ parity");
+    assertTrue(
+        savedContent.contains("# activation functions"),
+        "saved model must have '# activation functions'");
+    assertTrue(savedContent.contains("# weights"), "saved model must have '# weights'");
+    assertTrue(savedContent.contains("# biases"), "saved model must have '# biases'");
 
     // load into new MLP and predict
     MLP mlp2 = new MLP();
@@ -206,9 +241,11 @@ public class MLPTest {
     vm.run(code, "test");
     vm.advanceTime(1);
     String output = out.toString();
-    assertTrue(output.contains("Sigmoid:"), "got: " + output);
-    assertTrue(output.contains("ReLU:"), "got: " + output);
-    assertTrue(output.contains("Linear:"), "got: " + output);
+    assertTrue(output.contains("Sigmoid: 1"), "got: " + output);
+    assertTrue(output.contains("ReLU: 2"), "got: " + output);
+    assertTrue(output.contains("Tanh: 3"), "got: " + output);
+    assertTrue(output.contains("Linear: 0"), "got: " + output);
+    assertTrue(output.contains("Softmax: 4"), "got: " + output);
   }
 
   @Test

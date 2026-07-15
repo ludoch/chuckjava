@@ -19,10 +19,10 @@ import org.chuck.core.ChuckType;
 public class MLP extends ChuckObject {
 
   // ── Activation type constants (mirror AI.Sigmoid etc.) ────────────────────
-  public static final int ACT_SIGMOID = 0;
-  public static final int ACT_TANH = 1;
+  public static final int ACT_LINEAR = 0;
+  public static final int ACT_SIGMOID = 1;
   public static final int ACT_RELU = 2;
-  public static final int ACT_LINEAR = 3;
+  public static final int ACT_TANH = 3;
   public static final int ACT_SOFTMAX = 4;
 
   public MLP() {
@@ -79,7 +79,7 @@ public class MLP extends ChuckObject {
       if (activArr != null && l < activArr.size()) {
         layerActivations[l] = (int) activArr.getInt(l);
       } else if (uniformAct >= 0) {
-        layerActivations[l] = (l < numWeightLayers - 1) ? uniformAct : ACT_LINEAR;
+        layerActivations[l] = uniformAct;
       } else {
         // default: sigmoid for hidden, linear for output
         layerActivations[l] = (l < numWeightLayers - 1) ? ACT_SIGMOID : ACT_LINEAR;
@@ -189,6 +189,7 @@ public class MLP extends ChuckObject {
           case "relu", "ReLU" -> ACT_RELU;
           case "tanh", "Tanh" -> ACT_TANH;
           case "linear", "Linear" -> ACT_LINEAR;
+          case "softmax", "Softmax" -> ACT_SOFTMAX;
           default -> ACT_SIGMOID;
         };
     if (layerActivations != null) {
@@ -308,21 +309,40 @@ public class MLP extends ChuckObject {
 
   // ── Model persistence ─────────────────────────────────────────────────────
 
-  /** {@code mlp.save(path)} */
+  /**
+   * {@code mlp.save(path)} — saves in exact C++ ChucK ulib_ai format (# layers, # activation
+   * functions, # weights, # biases)
+   */
   public long save(String path) {
     if (weights == null) return 0L;
     try (PrintWriter pw = new PrintWriter(path)) {
-      pw.println("chuck-mlp-v1");
-      pw.println(layerSizes.length);
-      for (int s : layerSizes) pw.print(s + " ");
+      pw.println("# layers");
+      for (int i = 0; i < layerSizes.length; i++) {
+        pw.print(layerSizes[i] + (i < layerSizes.length - 1 ? " " : ""));
+      }
       pw.println();
-      for (int a : layerActivations) pw.print(a + " ");
+      pw.println("# activation functions (0=Linear, 1=Sigmoid, 2=ReLU, 3=Tanh, 4=Softmax)");
+      for (int i = 0; i < layerActivations.length; i++) {
+        pw.print(layerActivations[i] + (i < layerActivations.length - 1 ? " " : ""));
+      }
       pw.println();
-      for (double[][] layer : weights) {
-        for (double[] row : layer) {
-          for (double v : row) pw.print(v + " ");
+      pw.println("# weights");
+      for (int l = 0; l < weights.length; l++) {
+        int out = layerSizes[l + 1], in = layerSizes[l];
+        for (int j = 0; j < out; j++) {
+          for (int i = 0; i < in; i++) {
+            pw.print(weights[l][j][i] + (i < in - 1 ? " " : ""));
+          }
           pw.println();
         }
+      }
+      pw.println("# biases");
+      for (int l = 0; l < weights.length; l++) {
+        int out = layerSizes[l + 1], in = layerSizes[l];
+        for (int j = 0; j < out; j++) {
+          pw.print(weights[l][j][in] + (j < out - 1 ? " " : ""));
+        }
+        pw.println();
       }
     } catch (Exception e) {
       return 0L;
@@ -330,33 +350,102 @@ public class MLP extends ChuckObject {
     return 1L;
   }
 
-  /** {@code mlp.load(path)} */
+  /** {@code mlp.load(path)} — loads both C++ ChucK format and legacy chuck-mlp-v1 format */
   public long load(String path) {
     try (BufferedReader br = new BufferedReader(new FileReader(path))) {
-      String header = br.readLine();
-      if (header == null || !header.startsWith("chuck-mlp")) return 0L;
-      int n = Integer.parseInt(br.readLine().trim());
-      layerSizes = new int[n];
-      String[] szTokens = br.readLine().trim().split("\\s+");
-      for (int i = 0; i < n; i++) layerSizes[i] = Integer.parseInt(szTokens[i]);
-      layerActivations = new int[n - 1];
-      String[] acTokens = br.readLine().trim().split("\\s+");
-      for (int i = 0; i < n - 1; i++) layerActivations[i] = Integer.parseInt(acTokens[i]);
+      String firstLine = br.readLine();
+      if (firstLine == null) return 0L;
+      firstLine = firstLine.trim();
 
-      int L = n - 1;
-      weights = new double[L][][];
-      for (int l = 0; l < L; l++) {
-        int out = layerSizes[l + 1], in = layerSizes[l];
-        weights[l] = new double[out][in + 1];
-        for (int j = 0; j < out; j++) {
-          String[] row = br.readLine().trim().split("\\s+");
-          for (int i = 0; i <= in; i++) weights[l][j][i] = Double.parseDouble(row[i]);
+      if (firstLine.startsWith("# layers") || firstLine.startsWith("#")) {
+        // C++ ChucK ulib_ai.cpp format
+        String sizesLine = readNextNonCommentLine(br);
+        if (sizesLine == null) return 0L;
+        String[] szTokens = sizesLine.trim().split("\\s+");
+        int n = szTokens.length;
+        layerSizes = new int[n];
+        for (int i = 0; i < n; i++) layerSizes[i] = Integer.parseInt(szTokens[i]);
+
+        String actLine = readNextNonCommentLine(br);
+        if (actLine == null) return 0L;
+        String[] acTokens = actLine.trim().split("\\s+");
+        layerActivations = new int[n - 1];
+        for (int i = 0; i < n - 1 && i < acTokens.length; i++) {
+          layerActivations[i] = Integer.parseInt(acTokens[i]);
         }
+
+        int L = n - 1;
+        weights = new double[L][][];
+        // Read weights
+        String wHeader = readNextNonCommentLine(br);
+        boolean nextIsRow = (wHeader != null && !wHeader.startsWith("#"));
+        for (int l = 0; l < L; l++) {
+          int out = layerSizes[l + 1], in = layerSizes[l];
+          weights[l] = new double[out][in + 1];
+          for (int j = 0; j < out; j++) {
+            String row = nextIsRow ? wHeader : readNextNonCommentLine(br);
+            nextIsRow = false;
+            if (row == null || row.startsWith("#")) {
+              row = readNextNonCommentLine(br);
+            }
+            String[] rowTokens = row.trim().split("\\s+");
+            for (int i = 0; i < in && i < rowTokens.length; i++) {
+              weights[l][j][i] = Double.parseDouble(rowTokens[i]);
+            }
+          }
+        }
+        // Read biases
+        String bHeader = readNextNonCommentLine(br);
+        nextIsRow = (bHeader != null && !bHeader.startsWith("#"));
+        for (int l = 0; l < L; l++) {
+          int out = layerSizes[l + 1], in = layerSizes[l];
+          String row = nextIsRow ? bHeader : readNextNonCommentLine(br);
+          nextIsRow = false;
+          if (row == null || row.startsWith("#")) {
+            row = readNextNonCommentLine(br);
+          }
+          if (row == null) return 0L;
+          String[] bTokens = row.trim().split("\\s+");
+          for (int j = 0; j < out && j < bTokens.length; j++) {
+            weights[l][j][in] = Double.parseDouble(bTokens[j]);
+          }
+        }
+      } else if (firstLine.startsWith("chuck-mlp")) {
+        // Legacy Java format
+        int n = Integer.parseInt(br.readLine().trim());
+        layerSizes = new int[n];
+        String[] szTokens = br.readLine().trim().split("\\s+");
+        for (int i = 0; i < n; i++) layerSizes[i] = Integer.parseInt(szTokens[i]);
+        layerActivations = new int[n - 1];
+        String[] acTokens = br.readLine().trim().split("\\s+");
+        for (int i = 0; i < n - 1; i++) layerActivations[i] = Integer.parseInt(acTokens[i]);
+
+        int L = n - 1;
+        weights = new double[L][][];
+        for (int l = 0; l < L; l++) {
+          int out = layerSizes[l + 1], in = layerSizes[l];
+          weights[l] = new double[out][in + 1];
+          for (int j = 0; j < out; j++) {
+            String[] row = br.readLine().trim().split("\\s+");
+            for (int i = 0; i <= in; i++) weights[l][j][i] = Double.parseDouble(row[i]);
+          }
+        }
+      } else {
+        return 0L;
       }
     } catch (Exception e) {
       return 0L;
     }
     return 1L;
+  }
+
+  private String readNextNonCommentLine(BufferedReader br) throws Exception {
+    String line;
+    while ((line = br.readLine()) != null) {
+      line = line.trim();
+      if (!line.isEmpty() && !line.startsWith("#")) return line;
+    }
+    return null;
   }
 
   // ── Internal forward/backward ─────────────────────────────────────────────
@@ -392,10 +481,13 @@ public class MLP extends ChuckObject {
     int L = weights.length;
     double[][] deltas = new double[L][];
 
-    // output layer delta (linear: derivative = 1.0)
+    // output layer delta
     double[] out = lastActs[L];
     deltas[L - 1] = new double[out.length];
-    for (int j = 0; j < out.length; j++) deltas[L - 1][j] = (out[j] - (j < y.length ? y[j] : 0));
+    for (int j = 0; j < out.length; j++) {
+      double diff = out[j] - (j < y.length ? y[j] : 0);
+      deltas[L - 1][j] = diff * activationDeriv(out[j], layerActivations[L - 1], true);
+    }
 
     // hidden layer deltas
     for (int l = L - 2; l >= 0; l--) {
@@ -404,7 +496,7 @@ public class MLP extends ChuckObject {
         double sum = 0;
         for (int k = 0; k < deltas[l + 1].length; k++)
           sum += weights[l + 1][k][j] * deltas[l + 1][k];
-        deltas[l][j] = sum * activationDeriv(lastActs[l + 1][j], layerActivations[l]);
+        deltas[l][j] = sum * activationDeriv(lastActs[l + 1][j], layerActivations[l], false);
       }
     }
 
@@ -421,7 +513,6 @@ public class MLP extends ChuckObject {
   }
 
   private double applyActivation(double z, int actType, boolean isOutput) {
-    if (isOutput && actType == ACT_SIGMOID) return z; // default output = linear
     return switch (actType) {
       case ACT_RELU -> Math.max(0, z);
       case ACT_TANH -> Math.tanh(z);
@@ -431,12 +522,12 @@ public class MLP extends ChuckObject {
     };
   }
 
-  private double activationDeriv(double a, int actType) {
+  private double activationDeriv(double a, int actType, boolean isOutput) {
     return switch (actType) {
       case ACT_RELU -> a > 0 ? 1.0 : 0.0;
       case ACT_TANH -> 1 - a * a;
       case ACT_LINEAR -> 1.0;
-      case ACT_SOFTMAX -> a * (1 - a); // simplified; full Jacobian not needed for cross-entropy
+      case ACT_SOFTMAX -> isOutput ? 1.0 : a * (1 - a); // cross-entropy + softmax on output = 1.0
       default -> a * (1 - a); // sigmoid
     };
   }

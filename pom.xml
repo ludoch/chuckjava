@@ -18,7 +18,6 @@
         <module>chuck-cli</module>
         <module>chuck-ide</module>
         <module>chuck-samples</module>
-        <module>deluge</module>
     </modules>
 
     <properties>
