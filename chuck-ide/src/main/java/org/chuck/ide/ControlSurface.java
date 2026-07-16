@@ -12,17 +12,21 @@ import javafx.geometry.Insets;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
+import javafx.scene.control.TextField;
+import javafx.scene.control.ToggleButton;
 import javafx.scene.control.Tooltip;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.util.Duration;
 import org.chuck.core.ChuckVM;
+import org.chuck.ide.model.AutomationTrack;
+import org.chuck.ide.view.AutomationCanvas;
 import org.chuck.midi.ChuckMidiNative;
 
 /**
- * A control surface for ChucK global variables. Polls the VM for global ints and floats and
- * provides sliders to control them. Supports MIDI Learn for auto-mapping CC messages.
+ * A control surface for ChucK global variables with MIDI CC auto-mapping (MIDI Learn), real-time
+ * parameter breakpoint automation recording, LFO generation, and custom scaling.
  */
 public class ControlSurface extends VBox {
   private ChuckVM vm;
@@ -32,21 +36,23 @@ public class ControlSurface extends VBox {
   private final Preferences prefs = Preferences.userNodeForPackage(ControlSurface.class);
 
   public ControlSurface() {
-    setSpacing(10);
-    setPadding(new Insets(10));
+    setSpacing(8);
+    setPadding(new Insets(8));
     setStyle("-fx-background-color: #f8f8f8; -fx-border-color: #ccc; -fx-border-width: 0 1 0 0;");
 
-    Label title = new Label("Control Surface");
+    HBox titleBox = new HBox(10);
+    Label title = new Label("Control Surface & Automation");
     title.setStyle("-fx-font-weight: bold; -fx-text-fill: #333; -fx-font-size: 13;");
-    getChildren().add(title);
+    titleBox.getChildren().add(title);
+    getChildren().add(titleBox);
 
-    rowContainer = new VBox(5);
+    rowContainer = new VBox(6);
     getChildren().add(rowContainer);
 
-    timeline = new Timeline(new KeyFrame(Duration.millis(100), e -> update()));
+    timeline = new Timeline(new KeyFrame(Duration.millis(80), e -> update()));
     timeline.setCycleCount(Timeline.INDEFINITE);
 
-    // Global MIDI Monitor for Learn feature
+    // Global MIDI Monitor for Learn feature & Automation Recording
     ChuckMidiNative.addMonitor(
         (device, msg) -> {
           int status = msg.data1 & 0xF0;
@@ -143,6 +149,14 @@ public class ControlSurface extends VBox {
     final Button learnBtn;
     final Label midiLabel;
 
+    // Automation State
+    final AutomationTrack automationTrack = new AutomationTrack();
+    final AutomationCanvas automationCanvas;
+    final ToggleButton recBtn;
+    final ToggleButton playBtn;
+    final ToggleButton curveBtn;
+    final VBox expandBox;
+
     public ControlRow(String key, boolean isInt, double initialValue) {
       this.key = key;
       this.isInt = isInt;
@@ -177,7 +191,6 @@ public class ControlSurface extends VBox {
                   "-fx-background-color: yellow; -fx-font-size: 10; -fx-padding: 2 4;");
               midiLabel.setText("Learning...");
             } else {
-              // Cancel learning, but keep mapping if it exists
               if (mappedChannel >= 0) {
                 learnBtn.setStyle(
                     "-fx-background-color: lightgreen; -fx-font-size: 10; -fx-padding: 2 4;");
@@ -189,7 +202,6 @@ public class ControlSurface extends VBox {
             }
           });
 
-      // Context menu to unmap
       javafx.scene.control.ContextMenu ctxMenu = new javafx.scene.control.ContextMenu();
       javafx.scene.control.MenuItem unmapItem = new javafx.scene.control.MenuItem("Unmap MIDI");
       unmapItem.setOnAction(
@@ -200,30 +212,38 @@ public class ControlSurface extends VBox {
             learnBtn.setStyle("-fx-font-size: 10; -fx-padding: 2 4;");
             learnBtn.setTooltip(new Tooltip("MIDI Learn"));
             midiLabel.setText("");
-
-            // Clear persistence
             prefs.remove("midi.learn.chan." + key);
             prefs.remove("midi.learn.cc." + key);
           });
       ctxMenu.getItems().add(unmapItem);
       learnBtn.setContextMenu(ctxMenu);
 
-      HBox header = new HBox(5, nameLabel, learnBtn, midiLabel);
-      header.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+      recBtn = new ToggleButton("●");
+      recBtn.setStyle(
+          "-fx-font-size: 9; -fx-padding: 2 5; -fx-text-fill: #b71c1c; -fx-font-weight: bold;");
+      recBtn.setTooltip(new Tooltip("Record parameter changes into automation curve"));
+
+      playBtn = new ToggleButton("▶");
+      playBtn.setStyle(
+          "-fx-font-size: 9; -fx-padding: 2 5; -fx-text-fill: #1b5e20; -fx-font-weight: bold;");
+      playBtn.setTooltip(new Tooltip("Loop parameter automation"));
+
+      curveBtn = new ToggleButton("📈");
+      curveBtn.setStyle("-fx-font-size: 9; -fx-padding: 2 5;");
+      curveBtn.setTooltip(new Tooltip("Show/Hide automation curve & LFO editor"));
 
       double min = 0;
       double max = 1.0;
-
       if (isInt) {
         max = Math.max(127, initialValue * 2);
       } else {
         String lower = key.toLowerCase();
         if (lower.contains("freq") || lower.contains("pitch") || initialValue > 20.0) {
-          max = 20000.0; // Audio frequency range
+          max = 20000.0;
         } else if (initialValue > 1.0) {
           max = initialValue * 2.0;
         } else {
-          max = 1.0; // Standard gain range
+          max = 1.0;
         }
       }
 
@@ -234,6 +254,49 @@ public class ControlSurface extends VBox {
       valueLabel.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 11;");
       valueLabel.setMinWidth(45);
 
+      automationCanvas = new AutomationCanvas(automationTrack, min, max);
+      automationCanvas.setOnCurveModified(
+          () -> {
+            if (!playBtn.isSelected()) playBtn.setSelected(true);
+          });
+
+      TextField minField = new TextField(String.valueOf(min));
+      minField.setPrefWidth(55);
+      minField.setStyle("-fx-font-size: 9;");
+      TextField maxField = new TextField(String.valueOf(max));
+      maxField.setPrefWidth(55);
+      maxField.setStyle("-fx-font-size: 9;");
+
+      Button setRangeBtn = new Button("Set Range");
+      setRangeBtn.setStyle("-fx-font-size: 9; -fx-padding: 2 5;");
+      setRangeBtn.setOnAction(
+          e -> {
+            try {
+              double nMin = Double.parseDouble(minField.getText());
+              double nMax = Double.parseDouble(maxField.getText());
+              slider.setMin(nMin);
+              slider.setMax(nMax);
+              automationCanvas.setRange(nMin, nMax);
+            } catch (NumberFormatException ignored) {
+            }
+          });
+
+      HBox rangeBox =
+          new HBox(4, new Label("Min:"), minField, new Label("Max:"), maxField, setRangeBtn);
+      rangeBox.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+      rangeBox.setPadding(new Insets(2, 0, 2, 0));
+
+      expandBox = new VBox(4, automationCanvas, rangeBox);
+      expandBox.setVisible(false);
+      expandBox.setManaged(false);
+
+      curveBtn.setOnAction(
+          e -> {
+            boolean show = curveBtn.isSelected();
+            expandBox.setVisible(show);
+            expandBox.setManaged(show);
+          });
+
       slider.setOnMousePressed(e -> isDragging = true);
       slider.setOnMouseReleased(e -> isDragging = false);
 
@@ -242,20 +305,15 @@ public class ControlSurface extends VBox {
           .addListener(
               (obs, oldVal, newVal) -> {
                 if (isDragging) {
-                  if (isInt) {
-                    long val = newVal.longValue();
-                    vm.setGlobalInt(key, val);
-                    valueLabel.setText(String.valueOf(val));
-                  } else {
-                    double val = newVal.doubleValue();
-                    vm.setGlobalFloat(key, val);
-                    valueLabel.setText(String.format("%.3f", val));
-                  }
+                  applyValueToVm(newVal.doubleValue(), true);
                 }
               });
 
+      HBox header = new HBox(5, nameLabel, learnBtn, recBtn, playBtn, curveBtn, midiLabel);
+      header.setAlignment(javafx.geometry.Pos.CENTER_LEFT);
+
       HBox controls = new HBox(5, slider, valueLabel);
-      node = new VBox(2, header, controls);
+      node = new VBox(3, header, controls, expandBox);
       node.setPadding(new Insets(5, 0, 5, 0));
       node.setStyle("-fx-border-color: #ddd; -fx-border-width: 0 0 1 0;");
     }
@@ -264,8 +322,28 @@ public class ControlSurface extends VBox {
       return node;
     }
 
+    private void applyValueToVm(double val, boolean fromUserOrMidi) {
+      if (fromUserOrMidi && recBtn.isSelected() && vm != null) {
+        automationTrack.addPoint(vm.getCurrentTime(), val);
+        automationCanvas.draw();
+      }
+
+      if (isInt) {
+        long v = (long) val;
+        if (vm != null) vm.setGlobalInt(key, v);
+        valueLabel.setText(String.valueOf(v));
+      } else {
+        if (vm != null) vm.setGlobalFloat(key, val);
+        valueLabel.setText(String.format("%.3f", val));
+      }
+    }
+
     public void update(double value) {
-      if (!isDragging) {
+      if (playBtn.isSelected() && vm != null && !isDragging) {
+        double autoVal = automationTrack.evaluate(vm.getCurrentTime(), value);
+        slider.setValue(autoVal);
+        applyValueToVm(autoVal, false);
+      } else if (!isDragging) {
         slider.setValue(value);
         if (isInt) {
           valueLabel.setText(String.valueOf((long) value));
@@ -279,16 +357,7 @@ public class ControlSurface extends VBox {
       double pct = val / 127.0;
       double newVal = slider.getMin() + pct * (slider.getMax() - slider.getMin());
       slider.setValue(newVal);
-
-      // Push to VM immediately
-      if (isInt) {
-        long v = (long) newVal;
-        vm.setGlobalInt(key, v);
-        valueLabel.setText(String.valueOf(v));
-      } else {
-        vm.setGlobalFloat(key, newVal);
-        valueLabel.setText(String.format("%.3f", newVal));
-      }
+      applyValueToVm(newVal, true);
     }
   }
 }

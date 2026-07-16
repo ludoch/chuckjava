@@ -14,6 +14,11 @@
   - Live DAC audio recorder (`WvOut`) to `.wav` files via `[● Record WAV]`.
 - [x] **Pluggable Audio Backend Architecture (`org.chuck.audio.backend`)**: Driver abstractions and concrete FFM implementations (`WASAPIBackend`, `CoreAudioBackend`, `JackBackend`, `JavaSoundBackend`) with auto-negotiation (`AudioBackendRegistry`).
 - [x] **Phase 3 Native FFM Audio Drivers**: Low-latency WASAPI Exclusive/Shared Mode (Windows via `Ole32`/`Avrt`), CoreAudio (`AudioToolbox`), and JACK (`libjack`) backends via Foreign Function & Memory API (Project Panama), reducing round-trip audio latency from `~20ms` down to `<5ms`.
+- [x] **Phase 4 Interactive MIDI CC Learn & Parameter Automation (`org.chuck.ide`)**:
+  - Two-way MIDI CC Learn (`[L]`) auto-mapping physical controller knobs/faders to live UGen/global variables (`ControlSurface.java`).
+  - Real-time parameter breakpoint recording (`[● Rec]`), loop playback (`[▶ Play]`), and curve interpolation engine (`AutomationTrack.java`).
+  - Interactive breakpoint curve canvas with instant LFO presets (`Sine LFO`, `Triangle LFO`, `Ramp Up/Down`, `Random S&H`) (`AutomationCanvas.java`).
+  - Custom Min/Max Range Scaling (`[Set Range]`) transforming raw `0..127` MIDI CC values to physical units ($20\text{ Hz}$–$20\text{ kHz}$).
 - [x] **Consequence Undo/Redo System (`org.chuck.ide.model`)**: Bounded Command/Memento undo/redo stack (`UndoRedoStack`) with coalescing and global VM action tracking.
 
 ## Future Enhancements
