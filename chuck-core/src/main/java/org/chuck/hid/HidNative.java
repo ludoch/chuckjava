@@ -4,7 +4,7 @@ import java.lang.foreign.*;
 import java.lang.invoke.MethodHandle;
 
 /**
- * Advanced HID discovery and polling using JDK 25 Foreign Function & Memory API. Binds to Windows
+ * Advanced HID discovery and polling using JDK 27 Foreign Function & Memory API. Binds to Windows
  * WinMM and User32 APIs.
  */
 public class HidNative {

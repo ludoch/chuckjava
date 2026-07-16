@@ -1,5 +1,5 @@
 // Note: Requires --add-modules jdk.incubator.vector
-// In JDK 25, this is still the standard location for Vector API.
+// In JDK 27, this is still the standard location for Vector API.
 package org.chuck.audio.util;
 
 import java.util.List;
@@ -44,7 +44,7 @@ public class Gain extends ChuckUGen {
     return lastOut;
   }
 
-  /** SIMD Optimized block processing using the JDK 25 Vector API. */
+  /** SIMD Optimized block processing using the JDK 27 Vector API. */
   @Override
   public void tick(float[] buffer, int offset, int length, long systemTime) {
     if (systemTime != -1

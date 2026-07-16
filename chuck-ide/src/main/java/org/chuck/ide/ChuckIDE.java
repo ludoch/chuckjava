@@ -569,7 +569,7 @@ public class ChuckIDE extends Application {
           Alert a =
               new Alert(
                   Alert.AlertType.INFORMATION,
-                  "ChucK-Java IDE\nJDK 25 + Project Loom + Panama\nModular component architecture.");
+                  "ChucK-Java IDE\nJDK 27 + Project Loom + Panama\nModular component architecture.");
           a.show();
         });
     helpMenu.getItems().addAll(githubItem, aboutItem);

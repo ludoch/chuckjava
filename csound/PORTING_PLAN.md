@@ -4,9 +4,9 @@ This document outlines the strategic roadmap for porting high-value algorithms a
 
 ## 1. Architectural Strategy
 
-We will leverage **JDK 25** advanced features to ensure the Java port is as efficient as (or more efficient than) the original C implementation, particularly focusing on parallelism and SIMD.
+We will leverage **JDK 27** advanced features to ensure the Java port is as efficient as (or more efficient than) the original C implementation, particularly focusing on parallelism and SIMD.
 
-### JDK 25 Integration Points
+### JDK 27 Integration Points
 *   **Project Loom (Virtual Threads):** 
     *   *Where:* Used in **Granular Synthesis (`partikkel`)** and **Asynchronous Disk I/O (`diskin2`)**.
     *   *Why:* Each grain in a high-density cloud can be managed by a virtual thread if it involves complex parameter modulation, or more likely, we use virtual threads to handle the orchestration of grain pools without blocking the main audio thread.
@@ -21,12 +21,12 @@ We will leverage **JDK 25** advanced features to ensure the Java port is as effi
 
 ## 2. Architectural Strategy: The "Pure Java" Native Path
 
-A critical decision for the ChucK-Java port is the move away from traditional JNI (Java Native Interface) in favor of the **JDK 25 Foreign Function & Memory (FFM) API**.
+A critical decision for the ChucK-Java port is the move away from traditional JNI (Java Native Interface) in favor of the **JDK 27 Foreign Function & Memory (FFM) API**.
 
 ### Native Interop Strategy
 As demonstrated in our sibling project `rtmidijava`, we can achieve high-performance interaction with native system libraries (like `winmm.dll`, `libasound.so`, or `CoreMIDI`) without writing a single line of C/C++ wrapper code.
 
-*   **JNI vs. FFM:** We will **NOT** use JNI or the latest JNI support in JDK 25 for new porting efforts. JNI adds significant complexity to the build system and introduces "brittle" boundaries.
+*   **JNI vs. FFM:** We will **NOT** use JNI or the latest JNI support in JDK 27 for new porting efforts. JNI adds significant complexity to the build system and introduces "brittle" boundaries.
 *   **The FFM Advantage:**
     *   **In-Java Declarations:** We define native struct layouts (like `MIDIHDR` or Csound's `PVSDAT`) and function signatures (using `Linker` and `SymbolLookup`) directly in Java code.
     *   **Performance:** FFM is designed to be as fast as JNI while providing better safety and off-heap memory management via `Arena`.
@@ -148,14 +148,14 @@ The plan proposes a 3-tier testing strategy with `.csd` oracle files and native 
 
 ### 4.7 Build / JDK Version Gap
 
-The plan assumes JDK 25 with incubator modules (Vector API, FFM) but doesn't address:
+The plan assumes JDK 27 with incubator modules (Vector API, FFM) but doesn't address:
 
 - **Module system**: `jdk.incubator.vector` requires `--add-modules jdk.incubator.vector` in Maven compiler config
-- **FFM**: `java.lang.foreign` is in preview/preliminary in many JDK 25 builds
+- **FFM**: `java.lang.foreign` is in preview/preliminary in many JDK 27 builds
 - **Fallback path**: What happens when these modules aren't available? Need a pure-Java fallback.
 - **Maven profile**: Create a `-Pvector` / `-Pffm` profile, not unconditional dependency
 
-**Recommendation:** Add a Maven profile section to the plan. Pure-Java fallback for each feature should be the default, with JDK 25 optimizations enabled by opt-in profile.
+**Recommendation:** Add a Maven profile section to the plan. Pure-Java fallback for each feature should be the default, with JDK 27 optimizations enabled by opt-in profile.
 
 ### 4.8 Csound OPDS / perf / init Dispatch Pattern
 
@@ -235,7 +235,7 @@ The plan lists opcodes in isolation but doesn't model their dependencies:
 | :--- | :--- | :--- |
 | **Unit Tests** | `mvn test` | Rapid validation of logic and mathematical transforms. |
 | **Integration** | `mvn verify` | Reference WAV comparison against pre-computed oracles (not native csound). |
-| **Vector API** | `mvn test -Pvector` | Enable JDK 25 Vector API tests (opt-in, not default). |
+| **Vector API** | `mvn test -Pvector` | Enable JDK 27 Vector API tests (opt-in, not default). |
 | **FFM Tests** | `mvn test -Pffm` | Enable Foreign Memory API tests (opt-in, not default). |
 | **Formatting** | `mvn spotless:apply` | Enforce code style consistency before porting. |
 

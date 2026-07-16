@@ -55,7 +55,7 @@ Since we won't use the ChucK VM, we need a native-style audio callback in Java.
 
 **Feasibility: High.** 
 
-With **JDK 25**, the previous barriers to a pure Java audio engine (GC jitter, lack of SIMD, poor timing) are largely resolved by **Project Loom**, the **Vector API**, and **FFM API**.
+With **JDK 27**, the previous barriers to a pure Java audio engine (GC jitter, lack of SIMD, poor timing) are largely resolved by **Project Loom**, the **Vector API**, and **FFM API**.
 
 ### Why do this?
 1.  **Lower Latency:** Eliminate the ChucK VM's interpretation layer and JNI bridge.

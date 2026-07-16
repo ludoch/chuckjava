@@ -5,7 +5,7 @@ REM Check if java is on PATH
 where java >nul 2>nul
 if %errorlevel% neq 0 (
     echo Error: java command not found on PATH.
-    echo Please install JDK 25 and make sure it is added to your PATH.
+    echo Please install JDK 27 and make sure it is added to your PATH.
     exit /b 1
 )
 
@@ -18,8 +18,8 @@ for /f "tokens=3" %%g in ('java -version 2^>^&1 ^| findstr /i "version"') do (
 )
 
 if "!major!" neq "25" (
-    echo Error: JDK 25 is required to run ChucK-Java, but version !major! was found.
-    echo Please install JDK 25 and configure your PATH.
+    echo Error: JDK 27 is required to run ChucK-Java, but version !major! was found.
+    echo Please install JDK 27 and configure your PATH.
     exit /b 1
 )
 

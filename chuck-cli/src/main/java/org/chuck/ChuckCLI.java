@@ -69,7 +69,7 @@ public class ChuckCLI {
             System.exit(0);
           }
           case "--version" -> {
-            System.out.println("ChucK-Java version 0.1.0 (JDK 25)");
+            System.out.println("ChucK-Java version 0.1.0 (JDK 27)");
             System.exit(0);
           }
           case "--probe" -> {
@@ -192,7 +192,7 @@ public class ChuckCLI {
     try {
       if (verbose > 0 && !Boolean.getBoolean("chuck.print.tags")) {
         System.out.println(
-            "🎸 ChucK-Java (JDK 25) - [VERIFIED] " + (silent ? "Silent Mode" : "Real-time Audio"));
+            "🎸 ChucK-Java (JDK 27) - [VERIFIED] " + (silent ? "Silent Mode" : "Real-time Audio"));
       }
 
       ChuckVM vm = new ChuckVM(sampleRate);

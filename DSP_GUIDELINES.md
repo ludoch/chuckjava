@@ -7,7 +7,7 @@ This document serves as a reference for the core DSP architectural decisions in 
 In `chuck-core`, we employ a **hybrid precision architecture**:
 
 1. **The Transport Layer (32-bit `float`)**: 
-   All audio buffers (`float[]`), I/O, and the `ChuckUGen.tick()` pipeline use 32-bit single-precision floats. This ensures that the JDK 25 Vector API (SIMD) can process the maximum number of samples per CPU instruction (typically 8 floats per 256-bit vector register), keeping the engine blazing fast and memory bandwidth low.
+   All audio buffers (`float[]`), I/O, and the `ChuckUGen.tick()` pipeline use 32-bit single-precision floats. This ensures that the JDK 27 Vector API (SIMD) can process the maximum number of samples per CPU instruction (typically 8 floats per 256-bit vector register), keeping the engine blazing fast and memory bandwidth low.
    
 2. **The "Danger Zone" Internal State (64-bit `double`)**: 
    Inside specific UGens that use feedback, recursion, or accumulation, the *internal private variables* and delay lines must use 64-bit double-precision math.

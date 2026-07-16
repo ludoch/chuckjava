@@ -1,7 +1,7 @@
 # JDK Upgrade Roadmap
 
 Analysis of JDK 26 and JDK 27 features relevant to this project.
-Current baseline: **JDK 25** (September 2025 LTS).
+Current baseline: **JDK 27 (early-access)**.
 
 > **Key clarification up front:** JDK 27 is **not** an LTS release.
 > The next LTS after JDK 25 is **JDK 29 (September 2027)**.
