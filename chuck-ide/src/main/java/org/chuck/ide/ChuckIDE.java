@@ -39,11 +39,15 @@ public class ChuckIDE extends Application {
   private final Preferences prefs = Preferences.userNodeForPackage(ChuckIDE.class);
   private final UndoRedoStack undoRedoStack = new UndoRedoStack(64);
   private Stage stage;
-  private ChuckVM vm;
+  ChuckVM vm;
   private ChuckAudio audio;
 
   public UndoRedoStack getUndoRedoStack() {
     return undoRedoStack;
+  }
+
+  public ChuckVM getVM() {
+    return vm;
   }
 
   // Components
@@ -57,7 +61,7 @@ public class ChuckIDE extends Application {
   private TabPane tabPane;
   private TabPane leftTabPane;
   private ListView<ShredInfo> shredListView;
-  private TextArea outputArea;
+  private VirtualConsolePanel outputArea;
   private Button addShredBtnRef;
   private Button replaceBtnRef;
   private Menu recentMenu;
@@ -179,9 +183,7 @@ public class ChuckIDE extends Application {
     primaryStage.setTitle("ChucK-Java IDE");
 
     // Pre-initialize components used by MenuBar
-    outputArea = new TextArea();
-    outputArea.setEditable(false);
-    outputArea.setStyle("-fx-font-family: 'Monospaced'; -fx-font-size: 12;");
+    outputArea = new VirtualConsolePanel();
 
     pianoKeyboard = new PianoKeyboard();
     pianoKeyboard.setPrefHeight(100);
@@ -285,6 +287,7 @@ public class ChuckIDE extends Application {
 
     HBox bottomHBox = new HBox(5, outputArea, masterBox);
     HBox.setHgrow(outputArea, Priority.ALWAYS);
+    outputArea.setDockedParent(bottomHBox, 0);
 
     footer = new VBox(bottomHBox, pianoKeyboard, statusBar);
     SplitPane verticalSplit = new SplitPane(horizontalSplit, footer);
@@ -950,11 +953,9 @@ public class ChuckIDE extends Application {
   }
 
   private void print(String s) {
-    Platform.runLater(
-        () -> {
-          outputArea.appendText(s);
-          if (outputArea.getText().length() > 20000) outputArea.deleteText(0, 5000);
-        });
+    if (outputArea != null) {
+      outputArea.appendLog(s);
+    }
   }
 
   private void setupMidiMonitors() {
@@ -1024,6 +1025,8 @@ public class ChuckIDE extends Application {
       if (empty || item == null) {
         setGraphic(null);
         setText(null);
+        setOnMouseClicked(null);
+        setContextMenu(null);
       } else {
         HBox hbox = new HBox(5, new Label("[" + item.id + "] " + item.name), new Region());
         HBox.setHgrow(hbox.getChildren().get(1), Priority.ALWAYS);
@@ -1031,6 +1034,21 @@ public class ChuckIDE extends Application {
         remove.setOnAction(e -> ide.vm.removeShred(item.id));
         hbox.getChildren().add(remove);
         setGraphic(hbox);
+
+        setOnMouseClicked(
+            e -> {
+              if (e.getClickCount() == 2 && item != null) {
+                ShredInspectorDialog.show(ide, item);
+              }
+            });
+
+        ContextMenu cm = new ContextMenu();
+        MenuItem inspectItem = new MenuItem("Inspect Shred Details...");
+        inspectItem.setOnAction(e -> ShredInspectorDialog.show(ide, item));
+        MenuItem removeItem = new MenuItem("Remove / Kill Shred");
+        removeItem.setOnAction(e -> ide.vm.removeShred(item.id));
+        cm.getItems().addAll(inspectItem, removeItem);
+        setContextMenu(cm);
       }
     }
   }
