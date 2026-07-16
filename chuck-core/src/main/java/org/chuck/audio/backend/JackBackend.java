@@ -68,8 +68,8 @@ public class JackBackend implements AudioBackend {
     list.add(
         new DeviceInfo(
             "Default JACK Audio Connection Kit (Low-Latency FFM)",
-            0,
             2,
+            0,
             List.of(44100, 48000, 96000),
             44100,
             List.of(
@@ -87,8 +87,8 @@ public class JackBackend implements AudioBackend {
     list.add(
         new DeviceInfo(
             "Default JACK Audio Connection Kit Input (FFM)",
-            2,
             0,
+            2,
             List.of(44100, 48000, 96000),
             44100,
             List.of(

@@ -60,8 +60,8 @@ public class CoreAudioBackend implements AudioBackend {
     list.add(
         new DeviceInfo(
             "Default CoreAudio Output (Low-Latency FFM)",
-            0,
             2,
+            0,
             List.of(44100, 48000, 96000),
             44100,
             List.of(
@@ -79,8 +79,8 @@ public class CoreAudioBackend implements AudioBackend {
     list.add(
         new DeviceInfo(
             "Default CoreAudio Input (Low-Latency FFM)",
-            2,
             0,
+            2,
             List.of(44100, 48000, 96000),
             44100,
             List.of(
