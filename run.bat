@@ -1,52 +1,58 @@
 @echo off
 setlocal enabledelayedexpansion
+cd /d "%~dp0"
 
-REM Check if java is on PATH
-where java >nul 2>nul
-if %errorlevel% neq 0 (
-    echo Error: java command not found on PATH.
-    echo Please install JDK 25 and make sure it is added to your PATH.
-    exit /b 1
+REM Provision JDK 27-ea per machine, then launch.
+if exist "chuck-ide.jar" (
+    set "JAR=chuck-ide.jar"
+) else (
+    for %%f in (chuck-ide\target\chuck-ide-*.jar) do set "JAR=%%f"
 )
 
-REM Verify java version is 25
-set major=0
-for /f "tokens=3" %%g in ('java -version 2^>^&1 ^| findstr /i "version"') do (
-    set val=%%g
-    set val=!val:"=!
-    for /f "delims=." %%a in ("!val!") do set major=%%a
+if not defined JAR set "JAR=chuck-ide\target\chuck-ide-1.0-SNAPSHOT.jar"
+
+if exist jdk27\bin\java.exe (
+    set "JAVA_EXEC=jdk27\bin\java.exe"
+) else (
+    java -version 2>&1 | findstr /C:"version \"27" >nul
+    if !errorlevel! equ 0 (
+        set "JAVA_EXEC=java"
+    ) else (
+        echo Java 27 is required but not found.
+        echo Downloading OpenJDK 27 ^(early-access^) from Adoptium...
+
+        set ARCH=x64
+        if /I "%PROCESSOR_ARCHITECTURE%"=="ARM64" set ARCH=aarch64
+
+        set "URL=https://api.adoptium.net/v3/binary/latest/27/ea/windows/!ARCH!/jdk/hotspot/normal/eclipse?project=jdk"
+        echo Downloading JDK 27 for Windows ^(!ARCH!^)...
+        powershell -Command "[System.Net.ServicePointManager]::SecurityProtocol=[System.Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri '!URL!' -OutFile 'openjdk27.zip'"
+
+        echo Extracting JDK 27...
+        if exist jdk27_temp rd /s /q jdk27_temp
+        mkdir jdk27_temp
+        powershell -Command "Expand-Archive -Path 'openjdk27.zip' -DestinationPath 'jdk27_temp' -Force"
+        for /d %%i in (jdk27_temp\*) do move "%%i" jdk27 >nul
+        rd /s /q jdk27_temp
+        del openjdk27.zip
+
+        set "JAVA_EXEC=jdk27\bin\java.exe"
+    )
 )
 
-if "!major!" neq "25" (
-    echo Error: JDK 25 is required to run ChucK-Java, but version !major! was found.
-    echo Please install JDK 25 and configure your PATH.
-    exit /b 1
+if not exist "%JAR%" (
+    echo %JAR% not found -- building it ^(first run^)...
+    if exist "mvnw.cmd" (
+        call mvnw.cmd -q clean package -DskipTests
+    ) else (
+        call mvn -q clean package -DskipTests
+    )
+    for %%f in (chuck-ide\target\chuck-ide-*.jar) do set "JAR=%%f"
 )
 
-REM Run ChucK-Java IDE with necessary JVM flags for JDK 25
-REM Required: --enable-preview, --add-modules jdk.incubator.vector, --enable-native-access=ALL-UNNAMED
+echo Launching ChucK-Java IDE (%JAR%)...
+set "SCALE_FLAGS="
+if defined CHUCK_UI_SCALE set "SCALE_FLAGS=-Dsun.java2d.uiScale=%CHUCK_UI_SCALE% -Dsun.java2d.uiScale.enabled=true"
+"!JAVA_EXEC!" --enable-preview --enable-native-access=ALL-UNNAMED --add-modules jdk.incubator.vector %SCALE_FLAGS% -Dawt.useSystemAAFontSettings=on -Dswing.aatext=true -jar "%JAR%" %*
 
-set JAR=chuck-ide\target\chuck-ide-1.0-SNAPSHOT-shaded.jar
-
-if not exist %JAR% (
-    echo Shaded JAR not found. Building project...
-    call mvn install -DskipTests
-)
-
-REM Handle path adjustments for examples and examples_dsl
-set ARGS=
-:loop
-if "%~1"=="" goto endloop
-set ARG=%~1
-if "%ARG:~0,9%"=="examples/" (
-    set ARG=chuck-samples/src/main/resources/%ARG%
-) else if "%ARG:~0,13%"=="examples_dsl/" (
-    for %%i in ("%ARG%") do set FILENAME=%%~nxi
-    set ARG=chuck-samples/src/main/java/org/chuck/samples/dsl/%FILENAME%
-)
-set ARGS=%ARGS% %ARG%
-shift
-goto loop
-:endloop
-
-java --enable-preview --add-modules jdk.incubator.vector --enable-native-access=ALL-UNNAMED -jar %JAR% %ARGS%
+pause

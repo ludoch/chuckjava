@@ -238,7 +238,6 @@ The plan lists opcodes in isolation but doesn't model their dependencies:
 | **Vector API** | `mvn test -Pvector` | Enable JDK 25 Vector API tests (opt-in, not default). |
 | **FFM Tests** | `mvn test -Pffm` | Enable Foreign Memory API tests (opt-in, not default). |
 | **Formatting** | `mvn spotless:apply` | Enforce code style consistency before porting. |
-| **Native Image** | `mvn -Pnative package` | Verify GraalVM compatibility for the ported opcodes. |
 
 ### Maven Profile Structure (to create)
 ```xml

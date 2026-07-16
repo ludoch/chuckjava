@@ -27,15 +27,6 @@ mvn javafx:run
 # Package (fat JAR)
 mvn package
 
-# Build GraalVM native executable (all platforms — requires JAVA_HOME → GraalVM JDK 27)
-#   Windows: set JAVA_HOME=C:\path\to\graalvm-jdk-25
-#   Mac/Linux: export JAVA_HOME=/path/to/graalvm-jdk-25
-mvn -Pnative package -DskipTests
-#   Output: target/chuck  (Linux/Mac)  or  target/chuck.exe  (Windows)
-
-# Run native tests (108 tests, excludes DslExamplesTest + PolyphonyDSLTest)
-mvn -Pnative -DskipNativeTests=false test
-
 # Build self-contained JavaFX IDE bundle (all platforms)
 # Includes AOT cache training run (JEP 483) for faster IDE startup. Add -DskipAot=true to skip.
 mvn -Pide-bundle package -DskipTests                        # app-image (default, all OSes)
@@ -222,7 +213,7 @@ The pipeline: `.ck` source → `ChuckANTLRLexer` → `ChuckANTLRParser` → `Chu
 - `MidiFileIn` — `open(string)`, `read(MidiMsg)`, `more()`, `rewind()`, `close()`, `size()`, `numTracks()`, `resolution()`; uses `javax.sound.midi.MidiSystem`; merges and sorts all tracks by tick
 - `HidOut` — stub; `open()` always returns 0 (native USB HID reports not available in standard Java SE)
 
-All four classes registered in `ChuckFactory` and in `reflect-config.json` for GraalVM native image.
+All four classes registered in `ChuckFactory` for dynamic reflection.
 
 ### Math Library Additions (2026-04-06)
 
@@ -242,45 +233,23 @@ All functions from section 5.2 of `missing.md` are now implemented in `MathInstr
 
 The emitter's existing `default` fallthrough already pushes all args and calls `MathFunc`; no emitter changes were needed.
 
-### GraalVM Native Image & IDE Bundle (2026-04-05)
 
-**Native executable (`-Pnative` profile):**
+### IDE Bundle & Run Scripts
 
-- `NativeMain.java` — headless entry point (no JavaFX dependency)
-- `ChuckCLI.java` — IDE launch now uses `Class.forName()` so native image compiles cleanly
-- `src/main/resources/META-INF/native-image/org.chuck/chuck-java/` — auto-discovered config:
-  - `native-image.properties` — `--enable-preview`, `--add-modules=jdk.incubator.vector`, ANTLR build-time init, `--no-fallback`
-  - `reflect-config.json` — reflection registrations for `Std`, `RegEx`, `Reflect`, `SerialIO`, `ChuckUGen`, `ChuckShred` (needed for `CallMethod` dispatch), ANTLR classes
-  - `resource-config.json` — includes `examples/*.ck` resources
-- No GraalVM path in pom.xml — relies entirely on `JAVA_HOME` pointing at GraalVM JDK 27
-- Output: `target/chuck` (Linux/Mac) or `target/chuck.exe` (Windows) — ~49 MB, no JRE needed
+**Self-contained workstation execution (`run.sh` / `run.bat`):**
+- Automatically provisions OpenJDK 27-ea (from Eclipse Adoptium) via `scripts/ensure-jdk27.sh` if Java 27 is not found in `./jdk27` or on system PATH.
+- Automatically builds the IDE fat JAR (`chuck-ide/target/chuck-ide-1.0-SNAPSHOT.jar`) if missing or sources changed.
+- Launches `chuck-ide.jar` with all required Project Loom, vector API (`--add-modules jdk.incubator.vector`), and preview flags (`--enable-preview --enable-native-access=ALL-UNNAMED`).
 
-**Native test support (`-DskipNativeTests=false`):**
+**IDE package profile (`-Pide-bundle` profile):**
+- Uses `jpackage` to produce a self-contained desktop application bundle (`app-image`, `dmg`, `msi`).
+- Fat JAR includes `ServicesResourceTransformer` (merges JavaFX `META-INF/services/` entries).
+- **AOT cache (JEP 483, JDK 24+):** build performs a training run to generate `chuck.aot` alongside the JAR. Skip with `-DskipAot=true`.
 
-- 108 of 130 tests run natively; 22 excluded (`DslExamplesTest` + `PolyphonyDSLTest`) because they use `ChuckDSL.load()` → `javax.tools.JavaCompiler` which is unavailable in native image
-- `ChuckShred.allPublicMethods` in reflect-config fixes `me.running()` / `me.numArgs()` in native image
-
-**IDE bundle (`-Pide-bundle` profile):**
-
-- Uses `jpackage` to produce a self-contained directory or installer
-- `jpackage.type` property defaults to `app-image`; override per-platform: `dmg`, `deb`, `rpm`, `msi`, `exe`
-- Fat JAR includes `ServicesResourceTransformer` (merges JavaFX `META-INF/services/` entries)
-- Output: `target/chuck-ide-bundle/chuck-ide/` (Linux/Windows) or `.app`/`.dmg` (macOS)
-- **AOT cache (JEP 483, JDK 24+):** build does a training run to generate `chuck.aot` alongside the JAR; the cache is bundled inside the app-image and loaded via `-XX:AOTCache=$APPDIR/lib/app/chuck.aot`. Pre-warms class loading and ANTLR ATN init, reducing IDE startup time. Skip with `-DskipAot=true` (CI and Docker use this automatically).
-
-**Cross-platform CI (`/.github/workflows/build.yml`):**
-
-- GitHub Actions matrix: `ubuntu-latest`, `macos-latest`, `windows-latest`
-- Each runner: (1) runs JVM tests, (2) builds native CLI, (3) runs 108 native tests, (4) builds IDE bundle
-- macOS builds `.dmg`; Windows/Linux build `app-image`
-- Release job attaches all three native binaries to GitHub Releases automatically
-
-**Docker (`Dockerfile`):**
-
-- Builds Linux native binary from any platform with Docker installed
-- Based on `ghcr.io/graalvm/native-image-community:25`
-- `docker build --output dist/linux .` → extracts `chuck` binary
-- `docker build --target full --output dist/linux .` → extracts `chuck` + IDE bundle
+**Release GitHub Action (`.github/workflows/release.yml`):**
+- Triggered on tag creation or `workflow_dispatch`.
+- Builds the `chuck-ide` fat JAR on `temurin` JDK 27-ea.
+- Bundles `chuck-ide.jar`, `run.sh`, `run.bat`, and `scripts/ensure-jdk27.sh` into `chuck-java-workstation.zip` and attaches it to the GitHub Release.
 
 ### Major Additions (2026-04-06)
 

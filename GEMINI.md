@@ -12,12 +12,11 @@ Operate using a **Research -> Strategy -> Execution** lifecycle.
 
 ## Technology Stack & Environment
 
--   **Runtime:** JDK 27 (early-access) (requires `--enable-preview` and `jdk.incubator.vector`).
+-   **Runtime:** JDK 27 (early-access) (requires `--enable-preview` and `jdk.incubator.vector`). Auto-provisioned by `run.sh` / `run.bat`.
 -   **Build Tool:** Maven.
 -   **Parser:** ANTLR4 (grammar in `src/main/antlr4/org/chuck/compiler/ChuckANTLR.g4`).
 -   **Concurrency:** Java Virtual Threads (Project Loom).
 -   **GUI:** JavaFX (profile `ide-bundle`).
--   **Native:** GraalVM Native Image (profile `native`).
 
 ## Engineering Standards
 
@@ -29,12 +28,12 @@ Operate using a **Research -> Strategy -> Execution** lifecycle.
     -   Always update or add tests for any change.
     -   **Always run `mvn spotless:apply`** to format the code before committing.
     -   **Always run `mvn clean package`** to trigger all regressions, including code style verification (Spotless) and full unit test suites.
-    -   Use `mvn test` for fast JVM tests and `mvn -Pnative -DskipNativeTests=false test` for native tests.
+    -   Use `mvn test` for fast JVM tests across modules.
     -   **Validation is mandatory.** A task is not complete until verified by tests and project-specific build/linting commands.
 -   **ANTLR Parser:** When changing the grammar, verify against all examples using `mvn test -Dtest=ParseAllExamplesTest`.
 -   **CI/CD:**
-    -   `unit-tests.yml`: For fast JVM unit tests (on-demand).
-    -   `native-build.yml`: For expensive GraalVM native builds (on-demand or on release).
+    -   `unit-tests.yml`: For JVM unit tests across all modules.
+    -   `release.yml`: For building and packaging self-contained ChucK-Java workstation releases (`run.sh`, `run.bat`, `ensure-jdk27.sh`, `chuck-ide.jar`).
     -   `maven-publish.yml`: For publishing the Maven artifact to GitHub Packages (on-demand).
 
 ## Project-Specific Commands

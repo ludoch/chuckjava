@@ -42,35 +42,4 @@
       </plugin>
     </plugins>
   </build>
-  <profiles>
-    <profile>
-      <id>native</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.graalvm.buildtools</groupId>
-            <artifactId>native-maven-plugin</artifactId>
-            <version>1.0.0</version>
-            <extensions>true</extensions>
-            <executions>
-              <execution>
-                <id>build-native</id>
-                <phase>package</phase>
-                <goals>
-                  <goal>compile-no-fork</goal>
-                </goals>
-              </execution>
-            </executions>
-            <configuration>
-              <imageName>chuck</imageName>
-              <mainClass>org.chuck.NativeMain</mainClass>
-              <buildArgs>
-                <buildArg>--no-fallback</buildArg>
-              </buildArgs>
-            </configuration>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-  </profiles>
 </project>

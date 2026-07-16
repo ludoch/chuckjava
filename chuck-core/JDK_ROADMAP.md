@@ -20,10 +20,10 @@ The current estimate for graduation is JDK 28–30 (2027–2028).
 
 **Impact on this project:**
 - `VectorAudio.java`, all compiler flags (`--add-modules jdk.incubator.vector`), surefire args,
-  and the `native-image.properties` `--add-modules` flag all stay as-is through JDK 27.
+  all stay as-is through JDK 27.
 - No risk of breakage — incubator APIs are stable between releases even while not final.
 - When the API *does* graduate, all of the `--add-modules=jdk.incubator.vector` flags disappear
-  from `pom.xml`, `native-image.properties`, and CLAUDE.md. That is the main simplification.
+  from `pom.xml` and CLAUDE.md. That is the main simplification.
 
 **What to watch:** JEP 529 release notes for API changes between incubations (historically minor).
 
@@ -62,10 +62,6 @@ public value class ChuckDuration {
     // identity-free; JVM flattens into arrays and caller stack frames
 }
 ```
-
-**GraalVM caveat:** native-image support for Valhalla value types will lag the JDK by at least
-one release cycle. Do not use value classes in code paths that must compile to `chuck.exe` until
-GraalVM explicitly supports them.
 
 ---
 
