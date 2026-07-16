@@ -31,15 +31,18 @@ You can run ChucK-Java in different modes:
 
 ## 🎹 Features
 
+- **100% Java DSL Pass Rate**: Full batch translation and `javac` compilation pass rate across all 636 `.ck` example scripts (`ChuckToDSLConverter.java`).
+- **High-Fidelity Audio Parity**: Bit-exact and high-fidelity STK / UGen parity vs native C++ ChucK (`SndBuf` special resources, `VisualizerPanel` trigger lock).
 - **Native RtMidiJava Support**: Ultra-low latency MIDI drivers via pure Java FFM (Panama).
-- **High-Performance Audio**: Optimized Vector API paths and Project Loom concurrency.
-- **Modern IDE Workstation**: Interactive JavaFX IDE with live coding, visualizers, and code editor.
+- **High-Performance Audio**: Optimized Vector API paths and Project Loom virtual threads concurrency (`JDK 27-ea`).
+- **Modern IDE Workstation**: Interactive JavaFX IDE with live coding, CRT oscilloscope trigger locking, logarithmic FFT spectrum analyzer ($20\text{ Hz}$–$20\text{ kHz}$), live WAV recording, detachable Virtual Console (`miniAudicle` parity), and interactive Shred Inspector.
 
 ## 📚 Documentation
 
 Explore the detailed guides and documentation files available in this repository:
 
 ### Core Guides
+- [End-User Workstation Guidebook](docs/USER_GUIDE.md): **NEW** Comprehensive illustrated manual covering all IDE screens, visualizer graphs, Virtual Console filtering, Shred Inspector, and live audio recording.
 - [Java DSL Guide](chuck-core/JAVA_DSL.md): Learn how to write ChucK code in pure Java.
 - [Language Specification](chuck-core/LANGUAGE.md): Deep dive into the ChucK-Java language features.
 - [Hosting Guide](chuck-core/HOSTING.md): Embed the ChucK engine into your own Java apps.
@@ -47,10 +50,11 @@ Explore the detailed guides and documentation files available in this repository
 ### Reference
 - [UGen Reference](chuck-core/UGEN_REFERENCE.md): Detailed list of available Unit Generators and their parameters.
 - [MIDI Guide](chuck-core/MIDI_GUIDE.md): How to use MIDI input, output, and polyphony.
+- [Compatibility Report](COMPATIBILITY.md): Mathematical and empirical parity report vs native C++ ChucK.
 
 ### Project & Developer Notes
 - [JDK Roadmap](chuck-core/JDK_ROADMAP.md): Analysis of future JDK features for ChucK-Java.
 - [Maven Guide](MAVEN_GUIDE.md): How to use ChucK-Java as a dependency and publish artifacts.
-- [TODO List](TODO.md): Current task list and future ideas.
+- [TODO List](TODO.md): Current task list and completed milestones.
 - [DSP Guidelines](DSP_GUIDELINES.md): Best practices for DSP development in Java.
 - [Project Guidelines](GEMINI.md): Foundational mandates for working on the project.

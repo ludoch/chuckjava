@@ -12,19 +12,21 @@ This document tracks the mathematical and functional compatibility level of Chuc
 | **Filter (LPF/ResonZ)** | **Bit-Exact** | ✅ | Matches native SuperCollider-derived biquad formulas. |
 | **Filter (TwoPole/Zero)** | **Bit-Exact** | ✅ | Matches native STK-style implementations and normalization. |
 | **Oscillators** | **High Parity** | ✅ | Aligned sample-then-increment phase accumulation. |
+| **SndBuf (`special:*`)** | **High Parity** | ✅ | Bundled exact `special_dope.wav` resource and algorithmic `mand1`, `mandpluk`, `impuls20`, `sinewave`, `fwavblnk`, and percussion generators (`0.0000` RMS diff on `15_sndbuf.ck`). |
 | **STK FM Voices** | **High Parity** | ✅ | Verbatim ports of the STK FM engine — see §4. |
 | **STK Waveguide/Sampling** | **High Parity** | ✅ | Mandolin (commuted dual-string) and Moog (sampling) — see §4. |
 | **STK Instruments (other)** | **Acceptable** | ✅ | Close parity ($< 0.1$–$0.2$ RMS), limited by float precision accumulation. |
 
-## 4. STK Instrument Parity (measured vs native ChucK 1.5.5.9)
+## 4. STK Instrument & Sound Buffer Parity (measured vs native ChucK 1.5.5.9)
 
-The following instruments are **verbatim ports** of their `ugen_stk.cpp` algorithms (shared
+The following instruments and sound buffers are **verbatim ports** of their `ugen_stk.cpp` / `sndbuf.cpp` algorithms (shared
 DSP primitives live in `org.chuck.audio.stk.fm` and `org.chuck.audio.stk.util`; rawwave tables
-are extracted from `util_raw.c`). RMS measured against the freshly built native `chuck` at
+are extracted from `util_raw.c` and bundled resources). RMS measured against the freshly built native `chuck` at
 44.1 kHz, best-shift aligned, over the audio payload:
 
-| Instrument | Family | RMS vs native | Tier |
+| Instrument / Buffer | Family | RMS vs native | Tier |
 | :--- | :--- | :--- | :--- |
+| SndBuf (`special:dope`) | Sound buffer | 0.0000 | High Parity |
 | BeeThree | 4-op FM | 0.0021 | High Parity |
 | Wurley | 4-op FM (e-piano) | 0.0067 | High Parity |
 | Rhodey | 4-op FM (e-piano) | 0.0042 | High Parity |
