@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.Collections;
 import java.util.List;
 import org.chuck.audio.ChuckUGen;
 import org.chuck.core.ChuckVM;
@@ -26,7 +25,8 @@ public class ChuginLoaderTest {
         UGenRegistry.isRegistered("FoldbackSaturator"),
         "FoldbackSaturator chugin must be registered");
     assertTrue(UGenRegistry.isRegistered("KasFilter"), "KasFilter chugin must be registered");
-    assertTrue(UGenRegistry.isRegistered("WPDiodeLadder"), "WPDiodeLadder chugin must be registered");
+    assertTrue(
+        UGenRegistry.isRegistered("WPDiodeLadder"), "WPDiodeLadder chugin must be registered");
 
     ChuckUGen crusher = UGenRegistry.instantiate("Bitcrusher", 44100.0f, null);
     assertNotNull(crusher, "Should instantiate Bitcrusher cleanly from UGenRegistry");

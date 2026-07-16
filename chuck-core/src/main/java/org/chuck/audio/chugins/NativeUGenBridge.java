@@ -32,7 +32,10 @@ public class NativeUGenBridge extends ChuckUGen {
         this.hasNativeTick = true;
       } catch (Exception e) {
         System.err.println(
-            "[ChuginLoader] Failed to downcall link symbol for " + ugenName + ": " + e.getMessage());
+            "[ChuginLoader] Failed to downcall link symbol for "
+                + ugenName
+                + ": "
+                + e.getMessage());
         this.hasNativeTick = false;
       }
     }

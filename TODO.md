@@ -22,6 +22,15 @@
 - [x] **Phase 6 Multi-Channel Surround Bus & Auxiliary Stem Routing (`org.chuck.audio`)**:
   - Dynamic $N$-Channel matrix audio routing (`dac.chan(0..N-1)`) supporting Stereo (2), Quadraphonic (4), 5.1 (6), and 7.1 Surround (8) across `ChuckVM` and FFM audio backends.
   - Multi-track Stem Export (`WvOut.openMultiTrack`) in both `chuck-ide` (`[● Record Stems]`) and CLI (`--stems:<base>`), exporting individual mono/stereo WAV files per channel alongside $N$-channel interleaved master exports.
+- [x] **Phase 7 Project Panama FFM Chugin & Native Library Bridge (`org.chuck.audio.chugins`)**:
+  - Dynamic FFM plugin discovery (`ChuginLoader`) loading `.chug`, `.so`, `.dylib`, and `.dll` native symbols directly without JNI.
+  - Native C/C++ downcall invocation bridge (`NativeUGenBridge`) and 15 built-in simulation Chugins (`Bitcrusher`, `FoldbackSaturator`, `KasFilter`, `FIR`, `Overdrive`, `PowerADSR`, etc.).
+- [x] **Phase 8 Live OSC (Open Sound Control) Networking & Laptop Orchestra Engine (`org.chuck.network`)**:
+  - Recursive `#bundle` parsing and type-tag formatting with leading comma (`OscIn`, `OscMsg`, `OscBundle`).
+  - Project Loom virtual thread event synchronization (`o => now;`) and external listener hooks (`ChuckEvent.addListener/removeListener`).
+- [x] **Phase 9 Interactive Faust / Inline DSP Equation Live-Coding DSL Tab (`org.chuck.ide.dsp`)**:
+  - Dedicated **DSP / Faust** tab in `chuck-ide` featuring instant templates (`2-Operator FM Bell`, `4-Pole Resonant LPF`, `Non-Linear Foldback Wavefolder`, `Karplus-Strong Pluck`).
+  - One-click zero-allocation synthesis sporking (`[⚡ Spork Live DSP]`) with real-time parameter faders (`faderRack`).
 - [x] **Consequence Undo/Redo System (`org.chuck.ide.model`)**: Bounded Command/Memento undo/redo stack (`UndoRedoStack`) with coalescing and global VM action tracking.
 
 ## Future Enhancements

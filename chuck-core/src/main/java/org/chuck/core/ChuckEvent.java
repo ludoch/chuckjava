@@ -7,8 +7,8 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ChuckEvent extends UserObject {
   protected final ReentrantLock eventLock = new ReentrantLock();
   protected final List<ChuckShred> waitingShreds = new ArrayList<>();
-  private final java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<ChuckEvent>> listeners =
-      new java.util.concurrent.CopyOnWriteArrayList<>();
+  private final java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<ChuckEvent>>
+      listeners = new java.util.concurrent.CopyOnWriteArrayList<>();
 
   public void addListener(java.util.function.Consumer<ChuckEvent> listener) {
     listeners.add(listener);

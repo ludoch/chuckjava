@@ -208,6 +208,11 @@ public class ChuckIDE extends Application {
     Tab controlTab = new Tab("Control", controlSurface);
     controlTab.setClosable(false);
 
+    org.chuck.ide.dsp.FaustLiveCodingTab dspTabComp = new org.chuck.ide.dsp.FaustLiveCodingTab();
+    dspTabComp.setVm(vm);
+    Tab dspTab = new Tab("DSP/Faust", dspTabComp);
+    dspTab.setClosable(false);
+
     midiMonitor = new MidiMonitor();
     Tab midiTab = new Tab("MIDI", midiMonitor);
     midiTab.setClosable(false);
@@ -227,7 +232,7 @@ public class ChuckIDE extends Application {
     Tab settingsTab = new Tab("Settings", prefsTabComp);
     settingsTab.setClosable(false);
 
-    leftTabPane = new TabPane(projectTab, controlTab, midiTab, settingsTab);
+    leftTabPane = new TabPane(projectTab, dspTab, controlTab, midiTab, settingsTab);
     leftTabPane.setPrefWidth(320);
 
     // ── CENTER PANEL ──

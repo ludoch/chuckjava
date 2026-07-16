@@ -10,9 +10,9 @@ import java.util.Optional;
 import org.chuck.core.UGenRegistry;
 
 /**
- * Dynamic Chugin (.chug) and native shared library loader using Java 27 Foreign Function & Memory API
- * (Project Panama). Probes search directories and registers discovered plugins directly into the
- * central UGenRegistry without JNI.
+ * Dynamic Chugin (.chug) and native shared library loader using Java 27 Foreign Function & Memory
+ * API (Project Panama). Probes search directories and registers discovered plugins directly into
+ * the central UGenRegistry without JNI.
  */
 public class ChuginLoader {
   private static final List<SymbolLookup> LOADED_LIBRARIES = new ArrayList<>();
@@ -38,10 +38,15 @@ public class ChuginLoader {
       File dir = new File(pathStr);
       if (!dir.exists() || !dir.isDirectory()) continue;
 
-      File[] files = dir.listFiles((d, name) -> {
-        String n = name.toLowerCase();
-        return n.endsWith(".chug") || n.endsWith(".so") || n.endsWith(".dylib") || n.endsWith(".dll");
-      });
+      File[] files =
+          dir.listFiles(
+              (d, name) -> {
+                String n = name.toLowerCase();
+                return n.endsWith(".chug")
+                    || n.endsWith(".so")
+                    || n.endsWith(".dylib")
+                    || n.endsWith(".dll");
+              });
       if (files == null) continue;
 
       for (File pluginFile : files) {
@@ -56,7 +61,8 @@ public class ChuginLoader {
   private static boolean probeAndRegisterLibrary(File pluginFile) {
     try {
       // Use shared arena so native library remains loaded across the VM lifecycle
-      SymbolLookup lookup = SymbolLookup.libraryLookup(pluginFile.getAbsolutePath(), Arena.ofShared());
+      SymbolLookup lookup =
+          SymbolLookup.libraryLookup(pluginFile.getAbsolutePath(), Arena.ofShared());
       LOADED_LIBRARIES.add(lookup);
 
       String baseName = pluginFile.getName();
@@ -81,10 +87,16 @@ public class ChuginLoader {
       final String ugenName = baseName;
 
       UGenRegistry.register(ugenName, (sr, args) -> new NativeUGenBridge(ugenName, sym, sr));
-      System.out.println("[ChuginLoader] ✅ Loaded native chugin: " + ugenName + " from " + pluginFile.getName());
+      System.out.println(
+          "[ChuginLoader] ✅ Loaded native chugin: " + ugenName + " from " + pluginFile.getName());
       return true;
     } catch (Exception e) {
-      System.out.println("[ChuginLoader] ⚠️ Skipping library " + pluginFile.getName() + " (not a compatible FFM chugin: " + e.getMessage() + ")");
+      System.out.println(
+          "[ChuginLoader] ⚠️ Skipping library "
+              + pluginFile.getName()
+              + " (not a compatible FFM chugin: "
+              + e.getMessage()
+              + ")");
       return false;
     }
   }
