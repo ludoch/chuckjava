@@ -179,6 +179,7 @@ public class ChuckVM {
     this.blackhole = new Blackhole();
 
     org.chuck.audio.ChuckUGen.ALL_UGENS.clear();
+    org.chuck.audio.chugins.ChuginLoader.loadChuginsFromPaths(java.util.Collections.emptyList());
 
     // Initialize special globals
 

@@ -63,9 +63,12 @@ public class ChuckCLI {
         verbose = Integer.parseInt(arg.substring("--verbose:".length()));
       } else if (arg.startsWith("--chugin-path:")) {
         String paths = arg.substring("--chugin-path:".length());
+        java.util.List<String> pathsList = new java.util.ArrayList<>();
         for (String p : paths.split(java.io.File.pathSeparator)) {
+          pathsList.add(p);
           if (verbose > 0) System.out.println("[chuck]: added chugin search path: " + p);
         }
+        org.chuck.audio.chugins.ChuginLoader.loadChuginsFromPaths(pathsList);
       } else if (arg.startsWith("--abort.shred:")) {
         otfCommands.add("abort:" + arg.substring("--abort.shred:".length()));
       } else {

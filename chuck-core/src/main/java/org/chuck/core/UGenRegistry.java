@@ -211,7 +211,7 @@ public class UGenRegistry {
     register("Perlin", (sr, args) -> new Perlin(sr));
   }
 
-  private static void register(String name, UGenFactory factory) {
+  public static synchronized void register(String name, UGenFactory factory) {
     if (REGISTRY.containsKey(name)) {
       // System.out.println("[chuck]: skipping duplicate registration for UGen: " + name);
       return;
