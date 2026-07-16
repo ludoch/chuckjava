@@ -101,7 +101,56 @@ ChucK-Java includes a built-in, low-latency 16-bit/32-bit PCM audio recorder (`W
 
 ---
 
-## 7. Menu Bar & Example Library
+## 7. Pluggable Native FFM Audio Backends (Phase 3)
+
+ChucK-Java bypasses standard JVM sound limitations by using Java 27's **Foreign Function & Memory API (Project Panama)** (`org.chuck.audio.backend`) to communicate directly with OS audio hardware at ultra-low latencies (`<5 ms`).
+
+### Auto-Negotiated Audio Drivers (`AudioBackendRegistry`):
+- **macOS CoreAudio (`CoreAudioBackend.java`):** Downcalls directly into `/System/Library/Frameworks/AudioToolbox.framework/AudioToolbox` (`AudioOutputUnitStart`), running the system `DefaultOutputUnit` at hardware buffer sizes of `64–128 samples (~1.4 ms to 2.9 ms)`.
+- **Windows WASAPI Exclusive / Shared (`WASAPIBackend.java`):** Probes `Ole32.dll` (`CoInitializeEx`) and `Avrt.dll` (`AvSetMmThreadCharacteristicsW` boosted to `"Pro Audio"` `THREAD_PRIORITY_TIME_CRITICAL`) for low-latency hardware stream rendering.
+- **Cross-Platform JACK (`JackBackend.java`):** Probes `libjack.so.0` / `libjack.dylib` (`jack_client_open`, `jack_activate`), connecting ChucK-Java straight into pro audio callback graphs across Linux and macOS.
+- **Universal JavaSound Fallback (`JavaSoundBackend.java`):** If native FFM symbols or audio hardware are unavailable, or if `-Dchuck.ffm.disable=true` is set, the engine seamlessly falls back to standard `javax.sound.sampled` lines without breaking scripts.
+
+---
+
+## 8. Interactive Control Surface, Automation & MIDI Learn (Phase 4)
+
+The **Control Surface (`ControlSurface.java`)** tab on the left panel automatically discovers all `global` variables (`global float freq;`, `global int bpm;`) across active shreds and turns them into an interactive parameter automation and MIDI control dashboard.
+
+![Control Surface, MIDI Learn & Parameter Automation](images/chuck_ide_control_surface.png)
+
+### 8.1. Global Variable Discovery & Interactive Sliders
+Whenever your `.ck` scripts declare `global float` or `global int` variables, `ControlSurface` automatically generates a dedicated **ControlRow** fader. Dragging the slider immediately pushes `vm.setGlobalFloat(key, val)` / `vm.setGlobalInt(key, val)` right into the active ChucK shreds at real-time audio frame rates.
+
+### 8.2. Two-Way MIDI CC Learn (`[L]`)
+Bind any physical hardware MIDI controller knob, fader, or expression pedal to a global variable with one click:
+1. Click the **`[L]` (Learn)** button on any control row (the button turns yellow with `Learning...`).
+2. Move any knob or slider on your physical MIDI keyboard or controller.
+3. ChucK-Java auto-detects the incoming Control Change message and instantly binds the row (e.g. **`[L]` turns green with `CC 74 (Ch 1)`**).
+4. Moving the hardware fader immediately moves the on-screen slider, pushes values to the VM, and syncs the progress bars on the **MIDI Monitor** tab!
+5. *To Unmap:* Right-click the `[L]` button and select **"Unmap MIDI"**. All bindings persist automatically across IDE restarts via `Preferences`.
+
+### 8.3. Parameter Automation Recording & Looping (`[● Rec]` & `[▶ Play]`)
+You can record your fader movements and MIDI tweaks over time into automated breakpoint curves:
+- **`[● Rec]` (Record Automation):** Toggle the red record button (`●`). As you drag the slider or turn your MIDI knob while shreds are running, the automation engine (`AutomationTrack.java`) records exact time-stamped `(sampleTime, value)` breakpoints.
+- **`[▶ Play]` (Loop Automation):** Toggle the green play button (`▶`). The automation engine continuously interpolates along the recorded breakpoint curve (`evaluate(absTime, defaultVal)`) across loop iterations, animating the slider and pushing real-time parameter changes into the audio engine automatically.
+
+### 8.4. Interactive Breakpoint Curve Canvas (`[📈]` / `AutomationCanvas.java`)
+Click the **`[📈]` (Curve Editor)** toggle button on any control row to expand an interactive breakpoint curve editor right inside the row:
+- **Mouse Breakpoint Editing:** Click or drag anywhere on the dark canvas with your mouse to insert new breakpoints or reshape your recorded envelope waveform on the fly.
+- **Algorithmic LFO & Curve Presets:** Use the bottom dropdown menu (`Presets...`) to instantly generate mathematically exact automation curves across the loop duration:
+  - `Sine LFO (1x)` / `Sine LFO (2x)`: Smooth sinusoidal modulation curves.
+  - `Triangle LFO`: Linear rising and falling triangular waves.
+  - `Ramp Up` / `Ramp Down`: Linear sweeps from min to max.
+  - `Random S&H`: 8-step Random Sample & Hold step breakpoints.
+- **`[Clear Curve]`:** Instantly wipes all recorded breakpoints on that parameter.
+
+### 8.5. Custom Range Scaling (`[Set Range]`)
+Below the curve editor, every control row provides **`Min:`** and **`Max:`** text boxes with a **`[Set Range]`** button. Type any custom physical bounds (e.g. `Min: 20.0`, `Max: 20000.0` for audio frequencies, or `-12.0` to `12.0` for decibels) to scale standard `0..127` MIDI CC values directly into exact physical engineering units!
+
+---
+
+## 9. Menu Bar & Example Library
 
 The top menu bar organizes the complete functionality of the ChucK-Java environment:
 
