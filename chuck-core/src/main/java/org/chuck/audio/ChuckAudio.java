@@ -723,12 +723,23 @@ public class ChuckAudio {
                             }
                             vm.advanceTime(1);
                             smoothedGain += gainSmoothAlpha * (effectiveTargetGain - smoothedGain);
+                            float leftSample = 0.0f, rightSample = 0.0f;
                             for (int c = 0; c < numChannels; c++) {
                               float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
+                              if (c == 0) leftSample = sample;
+                              if (c == 1) rightSample = sample;
                               sumSq += (double) sample * sample;
                               float abs = Math.abs(sample);
                               if (abs > bufPeak[c]) bufPeak[c] = abs;
                               writeSample(outSeg, fmt, i, c, numChannels, sample);
+                            }
+                            if (recorder != null && recorder.isRecording()) {
+                              try {
+                                recorder.record(
+                                    leftSample, numChannels > 1 ? rightSample : leftSample);
+                              } catch (IOException e) {
+                                // ignore write errors during real-time loop to avoid glitching
+                              }
                             }
                           }
                         }

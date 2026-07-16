@@ -47,6 +47,9 @@ public class StatusBar extends HBox {
     vuRight.setPrefWidth(60);
     vuRight.setPrefHeight(12);
 
+    recordLabel.setPrefWidth(75);
+    recordLabel.setStyle("-fx-text-fill: red; -fx-font-weight: bold;");
+
     Region spacer = new Region();
     HBox.setHgrow(spacer, javafx.scene.layout.Priority.ALWAYS);
 
@@ -55,6 +58,8 @@ public class StatusBar extends HBox {
             fileNameLabel,
             new Separator(Orientation.VERTICAL),
             vmTimeLabel,
+            new Separator(Orientation.VERTICAL),
+            recordLabel,
             new Separator(Orientation.VERTICAL),
             lineColLabel,
             new Separator(Orientation.VERTICAL),
@@ -68,6 +73,16 @@ public class StatusBar extends HBox {
             vuRight);
   }
 
+  private final Label recordLabel = new Label("");
+
+  public void updateRecordStatus() {
+    if (audio != null && audio.isRecording()) {
+      recordLabel.setText("● RECORDING");
+    } else {
+      recordLabel.setText("");
+    }
+  }
+
   public void setCaretPosition(int line, int col) {
     lineColLabel.setText("Ln " + line + ", Col " + col);
   }
@@ -79,7 +94,10 @@ public class StatusBar extends HBox {
   public void updateVMText() {
     long nowSample = vm.getCurrentTime();
     double seconds = nowSample / (double) vm.getSampleRate();
-    vmTimeLabel.setText(String.format("Time: %.3fs", seconds));
+    long mins = (long) seconds / 60;
+    double secs = seconds % 60.0;
+    int shreds = vm.getActiveShredCount();
+    vmTimeLabel.setText(String.format("Time: %02d:%05.2fs [Shreds: %d]", mins, secs, shreds));
   }
 
   public void updateCpuLoad() {

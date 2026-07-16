@@ -479,6 +479,13 @@ public class ChuckIDE extends Application {
 
     viewMenu.getItems().addAll(zoomIn, zoomOut, new SeparatorMenuItem(), showKeyboard);
 
+    // Audio Menu
+    Menu audioMenuBar = new Menu("_Audio");
+    MenuItem recordMenuItem = new MenuItem("Record DAC to WAV...");
+    recordMenuItem.setAccelerator(new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN));
+    recordMenuItem.setOnAction(e -> toggleRecording());
+    audioMenuBar.getItems().add(recordMenuItem);
+
     Menu tutorialMenu = createTutorialMenu();
     Menu examplesMenu = new Menu("_Examples");
 
@@ -564,7 +571,8 @@ public class ChuckIDE extends Application {
         });
     helpMenu.getItems().addAll(githubItem, aboutItem);
 
-    mb.getMenus().addAll(fileMenu, editMenu, viewMenu, tutorialMenu, examplesMenu, helpMenu);
+    mb.getMenus()
+        .addAll(fileMenu, editMenu, viewMenu, audioMenuBar, tutorialMenu, examplesMenu, helpMenu);
     return mb;
   }
 
@@ -769,7 +777,12 @@ public class ChuckIDE extends Application {
           print("VM cleared.\n");
         });
 
-    return new ToolBar(addBtn, replaceBtn, new Separator(), clearBtn);
+    Button recordBtn = new Button("● Record WAV");
+    recordBtn.setStyle("-fx-font-weight: bold;");
+    recordBtn.setOnAction(e -> toggleRecording());
+    recordBtnRef = recordBtn;
+
+    return new ToolBar(addBtn, replaceBtn, new Separator(), clearBtn, new Separator(), recordBtn);
   }
 
   private void addShred() {
@@ -850,6 +863,7 @@ public class ChuckIDE extends Application {
       public void handle(long now) {
         updateVMLogic();
         statusBar.updateVUMeters();
+        statusBar.updateRecordStatus();
         if (now - lastTextUpdate > 100_000_000L) {
           statusBar.updateVMText();
           statusBar.updateCpuLoad();
@@ -858,6 +872,39 @@ public class ChuckIDE extends Application {
         }
       }
     }.start();
+  }
+
+  private Button recordBtnRef;
+
+  private void toggleRecording() {
+    if (audio == null) return;
+    try {
+      if (audio.isRecording()) {
+        audio.stopRecording();
+        if (recordBtnRef != null) {
+          recordBtnRef.setText("● Record WAV");
+          recordBtnRef.setStyle("-fx-font-weight: bold;");
+        }
+        print("Audio recording stopped and saved.\n");
+      } else {
+        FileChooser fc = new FileChooser();
+        fc.setTitle("Record Master DAC to WAV File");
+        fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("WAV Audio (*.wav)", "*.wav"));
+        fc.setInitialFileName("recording_" + System.currentTimeMillis() + ".wav");
+        File f = fc.showSaveDialog(stage);
+        if (f != null) {
+          audio.startRecording(f.getAbsolutePath());
+          if (recordBtnRef != null) {
+            recordBtnRef.setText("■ Stop REC");
+            recordBtnRef.setStyle(
+                "-fx-background-color: #ff6666; -fx-text-fill: white; -fx-font-weight: bold;");
+          }
+          print("Recording audio to: " + f.getAbsolutePath() + "\n");
+        }
+      }
+    } catch (Exception ex) {
+      print("Recording error: " + ex.getMessage() + "\n");
+    }
   }
 
   private void updateVMLogic() {
