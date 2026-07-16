@@ -62,6 +62,13 @@ public class SndBuf extends ChuckUGen {
     if (path.equals(currentPath)) return; // Avoid redundant loads
     currentPath = path;
 
+    if (path.toLowerCase().startsWith("special:")) {
+      if (tryLoadSpecial(path)) {
+        pos = 0;
+        return;
+      }
+    }
+
     // Try loading as a real file
     try {
       java.io.File file = org.chuck.core.ChuckConfig.resolveFile(path);
@@ -270,5 +277,93 @@ public class SndBuf extends ChuckUGen {
 
   public int ready() {
     return samples != null && samples.length > 0 ? 1 : 0;
+  }
+
+  private boolean tryLoadSpecial(String path) {
+    String name = path.substring(8).toLowerCase();
+    int srate = (int) sampleRate;
+    if (srate <= 0) srate = 44100;
+
+    switch (name) {
+      case "mand1" -> {
+        samples = normalizeCopy(org.chuck.audio.stk.util.WaveData.MAND1);
+        return true;
+      }
+      case "mandpluk" -> {
+        samples = normalizeCopy(org.chuck.audio.stk.util.WaveData.MANDPLUK);
+        return true;
+      }
+      case "impuls20" -> {
+        samples = normalizeCopy(org.chuck.audio.stk.util.WaveData.IMPULS20);
+        return true;
+      }
+      case "sinewave" -> {
+        samples = normalizeCopy(org.chuck.audio.stk.fm.Rawwaves.SINEWAVE);
+        return true;
+      }
+      case "fwavblnk" -> {
+        samples = normalizeCopy(org.chuck.audio.stk.fm.Rawwaves.FWAVBLNK);
+        return true;
+      }
+      case "dope", "doh" -> {
+        try (java.io.InputStream ris =
+            SndBuf.class.getResourceAsStream("/org/chuck/audio/util/special_dope.wav")) {
+          if (ris != null) {
+            WavData wavData = WavReader.read(ris);
+            samples = wavData.channels[0];
+            return true;
+          }
+        } catch (IOException ignored) {
+        }
+        samples = new float[srate / 2];
+        return true;
+      }
+      case "kick" -> {
+        samples = new float[srate / 4];
+        for (int i = 0; i < samples.length; i++) {
+          double t = i / (double) srate;
+          double freq = 55.0 + 100.0 * Math.exp(-50.0 * t);
+          samples[i] = (float) (Math.sin(2.0 * Math.PI * freq * t) * Math.exp(-20.0 * t));
+        }
+        return true;
+      }
+      case "snare", "clap" -> {
+        samples = new float[srate / 4];
+        for (int i = 0; i < samples.length; i++) {
+          double t = i / (double) srate;
+          double noise = (Math.random() * 2.0 - 1.0) * Math.exp(-30.0 * t);
+          double tone = Math.sin(2.0 * Math.PI * 190.0 * t) * Math.exp(-25.0 * t);
+          samples[i] = (float) (noise * 0.7 + tone * 0.3);
+        }
+        return true;
+      }
+      case "hihat" -> {
+        samples = new float[srate / 8];
+        for (int i = 0; i < samples.length; i++) {
+          double t = i / (double) srate;
+          samples[i] = (float) ((Math.random() * 2.0 - 1.0) * Math.exp(-70.0 * t));
+        }
+        return true;
+      }
+      default -> {
+        // Fallback for any glot_* or vowel / unknown special sound: 0.5s synth pulse/formant
+        samples = new float[srate / 2];
+        for (int i = 0; i < samples.length; i++) {
+          double t = i / (double) srate;
+          double pulse =
+              Math.sin(2.0 * Math.PI * 220.0 * t) + 0.5 * Math.sin(2.0 * Math.PI * 440.0 * t);
+          samples[i] = (float) (pulse * 0.5 * Math.exp(-6.0 * t));
+        }
+        return true;
+      }
+    }
+  }
+
+  private float[] normalizeCopy(float[] raw) {
+    float[] out = new float[raw.length];
+    float max = 1e-9f;
+    for (float v : raw) if (Math.abs(v) > max) max = Math.abs(v);
+    for (int i = 0; i < raw.length; i++) out[i] = raw[i] / max;
+    return out;
   }
 }

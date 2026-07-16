@@ -17,18 +17,57 @@ public class SndBuf2 extends StereoUGen {
     this.samples = new float[2][0];
   }
 
+  private String currentPath = "";
+
   public void setRead(String path) {
+    if (path == null || path.isEmpty()) {
+      samples = new float[2][0];
+      currentPath = "";
+      return;
+    }
+
+    if (path.equals(currentPath)) return; // Avoid redundant loads
+    currentPath = path;
+
+    if (path.toLowerCase().startsWith("special:")) {
+      // Delegate to SndBuf to synthesize the special mono wave and duplicate to both stereo
+      // channels
+      SndBuf helper = new SndBuf(sampleRate);
+      helper.setRead(path);
+      float[] mono = new float[helper.samples() > 0 ? (int) helper.samples() : 0];
+      for (int i = 0; i < mono.length; i++) {
+        helper.setPos(i);
+        mono[i] = helper.compute(0.0f, 0L);
+      }
+      samples[0] = mono;
+      samples[1] = mono.clone();
+      pos = 0;
+      return;
+    }
+
     try {
-      java.io.File file = new java.io.File(path);
-      if (!file.exists()) {
-        samples = new float[2][0];
+      java.io.File file = org.chuck.core.ChuckConfig.resolveFile(path);
+      if (file != null && file.exists()) {
+        WavData wavData = WavReader.read(file);
+        samples[0] = wavData.channels[0];
+        samples[1] = wavData.channels.length > 1 ? wavData.channels[1] : wavData.channels[0];
+        pos = 0;
         return;
       }
 
-      WavData wavData = WavReader.read(file);
-      int n = wavData.frameCount();
-      samples[0] = wavData.channels[0];
-      samples[1] = wavData.channels[1];
+      // Resource fallback
+      String resourcePath = path.replace("\\", "/");
+      if (!resourcePath.startsWith("/")) resourcePath = "/" + resourcePath;
+      java.io.InputStream ris = SndBuf.class.getResourceAsStream(resourcePath);
+      if (ris != null) {
+        WavData wavData = WavReader.read(ris);
+        samples[0] = wavData.channels[0];
+        samples[1] = wavData.channels.length > 1 ? wavData.channels[1] : wavData.channels[0];
+        pos = 0;
+        return;
+      }
+
+      samples = new float[2][0];
     } catch (IOException e) {
       samples = new float[2][0];
     }
