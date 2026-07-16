@@ -12,6 +12,9 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.sound.sampled.*;
+import org.chuck.audio.backend.AudioBackend;
+import org.chuck.audio.backend.AudioBackendStream;
+import org.chuck.audio.backend.AudioStreamConfig;
 import org.chuck.audio.util.Gain;
 import org.chuck.audio.util.WvOut;
 import org.chuck.core.ChuckVM;
@@ -241,6 +244,11 @@ public class ChuckAudio {
   private TargetDataLine inputLine; // null if no mic available
   private boolean running = false;
 
+  /** Non-null selects the {@link AudioBackend} path (e.g. {@code AlsaBackend}) over JavaSound. */
+  private final AudioBackend backend;
+
+  private AudioBackendStream backendStream;
+
   // Zipper-noise prevention: UI sets targetGain; audio thread smooths toward it each sample.
   private volatile float targetGain = 0.8f;
   private float smoothedGain = 0.8f;
@@ -258,8 +266,6 @@ public class ChuckAudio {
 
   // Optional recorder
   private WvOut recorder;
-  private org.chuck.audio.backend.AudioBackend activeBackend;
-  private org.chuck.audio.backend.AudioBackendStream activeBackendStream;
 
   /** Name of the preferred output mixer (empty = system default). */
   private String outputDeviceName = "";
@@ -270,14 +276,29 @@ public class ChuckAudio {
   // ── Construction ──────────────────────────────────────────────────────────
 
   public ChuckAudio(ChuckVM vm, int bufferSize, int numChannels, float sampleRate) {
+    this(vm, bufferSize, numChannels, sampleRate, null);
+  }
+
+  /**
+   * Same as {@link #ChuckAudio(ChuckVM, int, int, float)}, but drives the engine through a
+   * pluggable {@link AudioBackend} (e.g. {@code AlsaBackend}) instead of the built-in JavaSound
+   * path. Passing {@code null} is identical to the 4-arg constructor.
+   */
+  public ChuckAudio(
+      ChuckVM vm, int bufferSize, int numChannels, float sampleRate, AudioBackend backend) {
     this.vm = vm;
     this.bufferSize = bufferSize;
-    this.effectiveBufferSize = bufferSize; // updated in initJavaSound
+    this.effectiveBufferSize = bufferSize; // updated in initJavaSound/initBackend
     this.numChannels = numChannels;
     this.numInputChannels = numChannels;
     this.sampleRate = sampleRate;
     this.actualSampleRate = sampleRate;
-    initJavaSound();
+    this.backend = backend;
+    if (backend == null) {
+      initJavaSound();
+    } else {
+      initBackend(backend);
+    }
   }
 
   // ── Configuration setters ─────────────────────────────────────────────────
@@ -402,7 +423,7 @@ public class ChuckAudio {
    * period). Corresponds to {@code RTAUDIO_OUTPUT_UNDERFLOW} status flag.
    */
   public boolean isOutputLineReady() {
-    return outputLine != null;
+    return backend != null ? backendStream != null : outputLine != null;
   }
 
   public javax.sound.sampled.SourceDataLine getOutputLine() {
@@ -534,50 +555,6 @@ public class ChuckAudio {
     }
     gainSmoothAlpha = (float) (1.0 - Math.exp(-1.0 / (sampleRate * 0.02)));
 
-    // Phase 3: Probe AudioBackendRegistry for low-latency FFM backend (CoreAudio/WASAPI/JACK)
-    activeBackend = org.chuck.audio.backend.AudioBackendRegistry.getDefaultBackend();
-    if (activeBackend != null && !activeBackend.name().equals("JavaSound")) {
-      org.chuck.audio.backend.AudioStreamConfig config =
-          new org.chuck.audio.backend.AudioStreamConfig(
-              outputDeviceName.isEmpty() ? null : outputDeviceName,
-              inputDeviceName.isEmpty() ? null : inputDeviceName,
-              (int) sampleRate,
-              numChannels,
-              0,
-              bufferSize,
-              numBuffers,
-              sampleFormat,
-              minimizeLatency,
-              scheduleRealtime);
-      try {
-        activeBackendStream = activeBackend.openStream(config);
-        if (activeBackendStream != null) {
-          actualSampleRate = activeBackendStream.getActualSampleRate();
-          effectiveBufferSize = activeBackendStream.getEffectiveBufferSize();
-          outputLatencySamples = activeBackendStream.getOutputLatencySamples();
-          inputLatencySamples = activeBackendStream.getInputLatencySamples();
-          logger.log(
-              Level.INFO,
-              String.format(
-                  "[AudioEngine] Low-latency FFM backend '%s' opened successfully (SR=%dHz, Latency=%d samples / %.1f ms)",
-                  activeBackend.name(),
-                  actualSampleRate,
-                  outputLatencySamples,
-                  getOutputLatencyMs()));
-          return;
-        }
-      } catch (Exception e) {
-        logger.log(
-            Level.INFO,
-            "[AudioEngine] FFM backend "
-                + activeBackend.name()
-                + " stream open failed ("
-                + e.getMessage()
-                + "). Falling back to JavaSound.");
-        activeBackendStream = null;
-      }
-    }
-
     // ── Output ───────────────────────────────────────────────────────────────
     outputLine = openOutputWithFallback(sampleFormat, sampleRate, numChannels);
     if (outputLine == null) {
@@ -635,200 +612,385 @@ public class ChuckAudio {
     }
   }
 
+  /**
+   * Backend-driven equivalent of {@link #initJavaSound()}. Deliberately does not consult {@code
+   * chuck.audio.dummy} — that flag's no-op behavior is scoped to the legacy JavaSound path only;
+   * passing an explicit {@link AudioBackend} is itself the opt-in and should always actually run.
+   */
+  private void initBackend(AudioBackend backend) {
+    gainSmoothAlpha = (float) (1.0 - Math.exp(-1.0 / (sampleRate * 0.02)));
+
+    AudioStreamConfig config =
+        new AudioStreamConfig(
+            outputDeviceName,
+            inputDeviceName,
+            (int) sampleRate,
+            numChannels,
+            numInputChannels,
+            bufferSize,
+            numBuffers,
+            sampleFormat,
+            minimizeLatency,
+            scheduleRealtime);
+    try {
+      backendStream = backend.openStream(config);
+    } catch (Exception e) {
+      logger.log(Level.SEVERE, "[Audio] Backend '" + backend.name() + "' failed to open stream", e);
+      backendStream = null;
+      return;
+    }
+
+    // The AudioBackend contract doesn't report negotiated format back, only rate/buffer/latency -
+    // report what we asked for, matching JavaSoundBackend's own convention on its success path.
+    actualFormat = sampleFormat;
+    actualSampleRate = backendStream.getActualSampleRate();
+    effectiveBufferSize = backendStream.getEffectiveBufferSize();
+    outputLatencySamples = backendStream.getOutputLatencySamples();
+    inputLatencySamples = backendStream.getInputLatencySamples();
+    logger.log(
+        Level.INFO,
+        String.format(
+            "[Audio] Backend '%s' opened: %.0f Hz, effectiveBufferSize=%d, numBuffers=%d",
+            backend.name(), actualSampleRate, effectiveBufferSize, numBuffers));
+  }
+
   // ── Audio engine thread ───────────────────────────────────────────────────
 
   private Thread audioEngineThread;
 
   public void start() {
-    if (running || (outputLine == null && activeBackendStream == null)) return;
-    running = true;
-    if (activeBackendStream != null) {
-      activeBackendStream.start();
+    if (running) return;
+    if (backend != null) {
+      if (backendStream == null) return;
+      running = true;
+      backendStream.start();
+      audioEngineThread =
+          Thread.ofPlatform()
+              .name("ChucK-Audio-Engine")
+              .daemon(true)
+              .unstarted(() -> runBackendLoop(backendStream));
     } else {
-      if (outputLine != null) outputLine.start();
+      if (outputLine == null) return;
+      running = true;
+      outputLine.start();
       if (inputLine != null) inputLine.start();
+      audioEngineThread =
+          Thread.ofPlatform()
+              .name("ChucK-Audio-Engine")
+              .daemon(true)
+              .unstarted(this::runJavaSoundLoop);
     }
-
-    final AudioSampleFormat fmt = actualFormat; // capture for lambda
-    final int bps = fmt.bytesPerSample;
-    final int effBuf = effectiveBufferSize; // Phase 2: may differ from bufferSize
-
-    audioEngineThread =
-        Thread.ofPlatform()
-            .name("ChucK-Audio-Engine")
-            .daemon(true)
-            .unstarted(
-                () -> {
-                  // Phase 3: raise OS-level priority once the thread is running
-                  if (scheduleRealtime) {
-                    applyRealtimePriority(Thread.currentThread());
-                  }
-                  try (Arena arena = Arena.ofShared()) {
-                    int bytesPerBuffer = effBuf * numChannels * bps;
-                    int inBytesPerBuffer = effBuf * numInputChannels * 2; // input always INT16
-                    MemorySegment outSeg = arena.allocate(bytesPerBuffer);
-                    byte[] outBuf = new byte[bytesPerBuffer];
-                    byte[] inBuf = inputLine != null ? new byte[inBytesPerBuffer] : null;
-                    float[] bufPeak = new float[numChannels];
-
-                    // Phase 2 (non-interleaved block path): pre-allocated DAC output buffers.
-                    // Used when no ADC input is needed — avoids per-sample loop overhead.
-                    final boolean useBlockPath = (inputLine == null);
-                    float[][] dacBuffers = useBlockPath ? new float[numChannels][effBuf] : null;
-
-                    long expectedBufferNanos = (long) (effBuf * 1_000_000_000.0 / actualSampleRate);
-                    lastBufferTimeNanos = System.nanoTime();
-
-                    while (running) {
-                      long startTime = System.nanoTime();
-                      boolean isIdle = (vm.getActiveShredCount() == 0);
-
-                      long elapsed = startTime - lastBufferTimeNanos;
-                      long drift = elapsed - expectedBufferNanos;
-                      if (drift > 0) {
-                        totalDriftNanos.addAndGet(drift);
-                        driftCount.incrementAndGet();
-                        if (drift > maxDriftNanos.get()) maxDriftNanos.set(drift);
-
-                        // Phase 1-E: underrun detection — late by more than one buffer period
-                        if (drift > expectedBufferNanos) {
-                          long u = underrunCount.incrementAndGet();
-                          if (u - underrunLogCount >= 100) {
-                            underrunLogCount = u;
-                            logger.log(
-                                Level.WARNING,
-                                String.format(
-                                    "[Audio] Output underrun #%d (drift %.1f ms)", u, drift / 1e6));
-                          }
-                        }
-                      }
-                      lastBufferTimeNanos = startTime;
-
-                      // ── Capture ──────────────────────────────────────────────
-                      if (inputLine != null && inBuf != null) {
-                        int available = inputLine.available();
-                        // Phase 1-E: overflow detection — more than 2× buffer queued
-                        if (available > inBytesPerBuffer * 2) {
-                          long o = overflowCount.incrementAndGet();
-                          if (o - overflowLogCount >= 100) {
-                            overflowLogCount = o;
-                            logger.log(
-                                Level.WARNING,
-                                String.format(
-                                    "[Audio] Input overflow #%d (%d bytes queued)", o, available));
-                          }
-                        }
-                        if (available >= inBytesPerBuffer) {
-                          inputLine.read(inBuf, 0, inBytesPerBuffer);
-                        }
-                      }
-
-                      double sumSq = 0;
-                      for (int c = 0; c < numChannels; c++) bufPeak[c] = 0;
-
-                      // ── Idle Optimization ──
-                      if (isIdle && smoothedGain < 0.0001f) {
-                        // Truly idle: output silence and sleep to save CPU
-                        smoothedGain = 0.0f; // Ensure it hits zero exactly
-                        for (int i = 0; i < effBuf; i++) {
-                          for (int c = 0; c < numChannels; c++) {
-                            writeSample(outSeg, fmt, i, c, numChannels, 0.0f);
-                          }
-                        }
-                        try {
-                          Thread.sleep(5);
-                        } catch (InterruptedException ignored) {
-                        }
-                      } else {
-                        // Not idle OR fading out
-                        float effectiveTargetGain = isIdle ? 0.0f : targetGain;
-
-                        if (useBlockPath) {
-                          vm.advanceTime(dacBuffers, 0, effBuf);
-                          float gainStart = smoothedGain;
-                          for (int step = 0; step < effBuf; step++) {
-                            smoothedGain += gainSmoothAlpha * (effectiveTargetGain - smoothedGain);
-                          }
-                          float gainEnd = smoothedGain;
-                          for (int i = 0; i < effBuf; i++) {
-                            float g = gainStart + (gainEnd - gainStart) * i / effBuf;
-                            for (int c = 0; c < numChannels; c++) {
-                              float sample = dacBuffers[c][i] * g;
-                              sumSq += (double) sample * sample;
-                              float abs = Math.abs(sample);
-                              if (abs > bufPeak[c]) bufPeak[c] = abs;
-                              writeSample(outSeg, fmt, i, c, numChannels, sample);
-                            }
-                          }
-                        } else {
-                          for (int i = 0; i < effBuf; i++) {
-                            // Feed ADC (always INT16 from input)
-                            if (inBuf != null) {
-                              for (int c = 0; c < numChannels; c++) {
-                                int inputChan = Math.min(c, numInputChannels - 1);
-                                int idx = (i * numInputChannels + inputChan) * 2;
-                                short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
-                                vm.adc.setInputSample(c, pcm / 32768.0f);
-                              }
-                            }
-                            vm.advanceTime(1);
-                            smoothedGain += gainSmoothAlpha * (effectiveTargetGain - smoothedGain);
-                            float leftSample = 0.0f, rightSample = 0.0f;
-                            for (int c = 0; c < numChannels; c++) {
-                              float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
-                              if (c < frameSamples.length) frameSamples[c] = sample;
-                              if (c == 0) leftSample = sample;
-                              if (c == 1) rightSample = sample;
-                              sumSq += (double) sample * sample;
-                              float abs = Math.abs(sample);
-                              if (abs > bufPeak[c]) bufPeak[c] = abs;
-                              writeSample(outSeg, fmt, i, c, numChannels, sample);
-                            }
-                            if (recorder != null && recorder.isRecording()) {
-                              try {
-                                recorder.recordFrame(frameSamples, numChannels);
-                              } catch (IOException e) {
-                                // ignore write errors during real-time loop to avoid glitching
-                              }
-                            }
-                          }
-                        }
-                      }
-
-                      if (verbose > 1
-                          || (verbose > 0 && vm.getCurrentTime() % (actualSampleRate * 2) == 0)) {
-                        double rms = Math.sqrt(sumSq / ((double) effBuf * numChannels));
-                        if (rms > 1e-9) {
-                          vm.print(String.format("[Audio] Engine RMS: %.6f\n", rms));
-                        }
-                      }
-
-                      // Publish peak levels for VU meters (~10 ms decay per buffer)
-                      for (int c = 0; c < numChannels && c < peakOut.length; c++) {
-                        peakOut[c] = Math.max(bufPeak[c], peakOut[c] * 0.97f);
-                      }
-
-                      if (activeBackendStream != null) {
-                        activeBackendStream.writeOutput(new float[0], 0, 0);
-                      } else if (outputLine != null) {
-                        // Transfer off-heap → byte array → JavaSound
-                        MemorySegment.copy(
-                            outSeg, ValueLayout.JAVA_BYTE, 0, outBuf, 0, bytesPerBuffer);
-                        outputLine.write(outBuf, 0, outBuf.length);
-                      }
-
-                      long endTime = System.nanoTime();
-                      cpuLoad = (double) (endTime - startTime) / expectedBufferNanos;
-                    }
-                  } catch (Throwable t) {
-                    logger.log(Level.SEVERE, "CRITICAL: Audio Engine Thread Crashed!", t);
-                    vm.print("Audio Engine Error: " + t.getMessage());
-                  }
-                });
     if (scheduleRealtime) {
       audioEngineThread.setPriority(Thread.MAX_PRIORITY);
     }
     audioEngineThread.start();
+  }
+
+  /** The legacy JavaSound engine loop body - unchanged behavior, only extracted out of start(). */
+  private void runJavaSoundLoop() {
+    // Phase 3: raise OS-level priority once the thread is running
+    if (scheduleRealtime) {
+      applyRealtimePriority(Thread.currentThread());
+    }
+    final AudioSampleFormat fmt = actualFormat;
+    final int bps = fmt.bytesPerSample;
+    final int effBuf = effectiveBufferSize; // Phase 2: may differ from bufferSize
+
+    try (Arena arena = Arena.ofShared()) {
+      int bytesPerBuffer = effBuf * numChannels * bps;
+      int inBytesPerBuffer = effBuf * numInputChannels * 2; // input always INT16
+      MemorySegment outSeg = arena.allocate(bytesPerBuffer);
+      byte[] outBuf = new byte[bytesPerBuffer];
+      byte[] inBuf = inputLine != null ? new byte[inBytesPerBuffer] : null;
+      float[] bufPeak = new float[numChannels];
+
+      // Phase 2 (non-interleaved block path): pre-allocated DAC output buffers.
+      // Used when no ADC input is needed — avoids per-sample loop overhead.
+      final boolean useBlockPath = (inputLine == null);
+      float[][] dacBuffers = useBlockPath ? new float[numChannels][effBuf] : null;
+
+      long expectedBufferNanos = (long) (effBuf * 1_000_000_000.0 / actualSampleRate);
+      lastBufferTimeNanos = System.nanoTime();
+
+      while (running) {
+        long startTime = System.nanoTime();
+        boolean isIdle = (vm.getActiveShredCount() == 0);
+
+        long elapsed = startTime - lastBufferTimeNanos;
+        long drift = elapsed - expectedBufferNanos;
+        if (drift > 0) {
+          totalDriftNanos.addAndGet(drift);
+          driftCount.incrementAndGet();
+          if (drift > maxDriftNanos.get()) maxDriftNanos.set(drift);
+
+          // Phase 1-E: underrun detection — late by more than one buffer period
+          if (drift > expectedBufferNanos) {
+            long u = underrunCount.incrementAndGet();
+            if (u - underrunLogCount >= 100) {
+              underrunLogCount = u;
+              logger.log(
+                  Level.WARNING,
+                  String.format("[Audio] Output underrun #%d (drift %.1f ms)", u, drift / 1e6));
+            }
+          }
+        }
+        lastBufferTimeNanos = startTime;
+
+        // ── Capture ──────────────────────────────────────────────
+        if (inputLine != null && inBuf != null) {
+          int available = inputLine.available();
+          // Phase 1-E: overflow detection — more than 2× buffer queued
+          if (available > inBytesPerBuffer * 2) {
+            long o = overflowCount.incrementAndGet();
+            if (o - overflowLogCount >= 100) {
+              overflowLogCount = o;
+              logger.log(
+                  Level.WARNING,
+                  String.format("[Audio] Input overflow #%d (%d bytes queued)", o, available));
+            }
+          }
+          if (available >= inBytesPerBuffer) {
+            inputLine.read(inBuf, 0, inBytesPerBuffer);
+          }
+        }
+
+        double sumSq = 0;
+        for (int c = 0; c < numChannels; c++) bufPeak[c] = 0;
+
+        // ── Idle Optimization ──
+        if (isIdle && smoothedGain < 0.0001f) {
+          // Truly idle: output silence and sleep to save CPU
+          smoothedGain = 0.0f; // Ensure it hits zero exactly
+          for (int i = 0; i < effBuf; i++) {
+            for (int c = 0; c < numChannels; c++) {
+              writeSample(outSeg, fmt, i, c, numChannels, 0.0f);
+            }
+          }
+          try {
+            Thread.sleep(5);
+          } catch (InterruptedException ignored) {
+          }
+        } else {
+          // Not idle OR fading out
+          float effectiveTargetGain = isIdle ? 0.0f : targetGain;
+
+          if (useBlockPath) {
+            vm.advanceTime(dacBuffers, 0, effBuf);
+            float gainStart = smoothedGain;
+            for (int step = 0; step < effBuf; step++) {
+              smoothedGain += gainSmoothAlpha * (effectiveTargetGain - smoothedGain);
+            }
+            float gainEnd = smoothedGain;
+            for (int i = 0; i < effBuf; i++) {
+              float g = gainStart + (gainEnd - gainStart) * i / effBuf;
+              for (int c = 0; c < numChannels; c++) {
+                float sample = dacBuffers[c][i] * g;
+                sumSq += (double) sample * sample;
+                float abs = Math.abs(sample);
+                if (abs > bufPeak[c]) bufPeak[c] = abs;
+                writeSample(outSeg, fmt, i, c, numChannels, sample);
+              }
+            }
+          } else {
+            for (int i = 0; i < effBuf; i++) {
+              // Feed ADC (always INT16 from input)
+              if (inBuf != null) {
+                for (int c = 0; c < numChannels; c++) {
+                  int inputChan = Math.min(c, numInputChannels - 1);
+                  int idx = (i * numInputChannels + inputChan) * 2;
+                  short pcm = (short) ((inBuf[idx + 1] << 8) | (inBuf[idx] & 0xFF));
+                  vm.adc.setInputSample(c, pcm / 32768.0f);
+                }
+              }
+              vm.advanceTime(1);
+              smoothedGain += gainSmoothAlpha * (effectiveTargetGain - smoothedGain);
+              float leftSample = 0.0f, rightSample = 0.0f;
+              for (int c = 0; c < numChannels; c++) {
+                float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
+                if (c < frameSamples.length) frameSamples[c] = sample;
+                if (c == 0) leftSample = sample;
+                if (c == 1) rightSample = sample;
+                sumSq += (double) sample * sample;
+                float abs = Math.abs(sample);
+                if (abs > bufPeak[c]) bufPeak[c] = abs;
+                writeSample(outSeg, fmt, i, c, numChannels, sample);
+              }
+              if (recorder != null && recorder.isRecording()) {
+                try {
+                  recorder.recordFrame(frameSamples, numChannels);
+                } catch (IOException e) {
+                  // ignore write errors during real-time loop to avoid glitching
+                }
+              }
+            }
+          }
+        }
+
+        if (verbose > 1 || (verbose > 0 && vm.getCurrentTime() % (actualSampleRate * 2) == 0)) {
+          double rms = Math.sqrt(sumSq / ((double) effBuf * numChannels));
+          if (rms > 1e-9) {
+            vm.print(String.format("[Audio] Engine RMS: %.6f\n", rms));
+          }
+        }
+
+        // Publish peak levels for VU meters (~10 ms decay per buffer)
+        for (int c = 0; c < numChannels && c < peakOut.length; c++) {
+          peakOut[c] = Math.max(bufPeak[c], peakOut[c] * 0.97f);
+        }
+
+        // Transfer off-heap → byte array → JavaSound
+        MemorySegment.copy(outSeg, ValueLayout.JAVA_BYTE, 0, outBuf, 0, bytesPerBuffer);
+        outputLine.write(outBuf, 0, outBuf.length);
+
+        long endTime = System.nanoTime();
+        cpuLoad = (double) (endTime - startTime) / expectedBufferNanos;
+      }
+    } catch (Throwable t) {
+      logger.log(Level.SEVERE, "CRITICAL: Audio Engine Thread Crashed!", t);
+      vm.print("Audio Engine Error: " + t.getMessage());
+    }
+  }
+
+  /**
+   * Backend-driven equivalent of {@link #runJavaSoundLoop()}: identical drift/underrun tracking,
+   * idle-gain-fade, and block-vs-per-sample path selection, but the final "hand samples to the
+   * driver" step goes through {@link AudioBackendStream#writeOutput}/{@link
+   * AudioBackendStream#readInput} instead of a raw {@code SourceDataLine}/{@code TargetDataLine} -
+   * the backend does its own format encoding internally, so there's no {@code writeSample}/{@code
+   * MemorySegment} dance here.
+   */
+  private void runBackendLoop(AudioBackendStream stream) {
+    if (scheduleRealtime) {
+      applyRealtimePriority(Thread.currentThread());
+    }
+    final int effBuf = effectiveBufferSize;
+    // Mirrors runJavaSoundLoop(): capture forces the per-sample path since the block path
+    // (vm.advanceTime(float[][],...)) has no way to feed per-sample ADC input.
+    final boolean useBlockPath = (numInputChannels <= 0);
+
+    try {
+      float[] outFloats = new float[effBuf * numChannels];
+      short[] inShorts = !useBlockPath ? new short[effBuf * numInputChannels] : null;
+      float[] bufPeak = new float[numChannels];
+      float[][] dacBuffers = useBlockPath ? new float[numChannels][effBuf] : null;
+
+      long expectedBufferNanos = (long) (effBuf * 1_000_000_000.0 / actualSampleRate);
+      lastBufferTimeNanos = System.nanoTime();
+
+      while (running) {
+        long startTime = System.nanoTime();
+        boolean isIdle = (vm.getActiveShredCount() == 0);
+
+        long elapsed = startTime - lastBufferTimeNanos;
+        long drift = elapsed - expectedBufferNanos;
+        if (drift > 0) {
+          totalDriftNanos.addAndGet(drift);
+          driftCount.incrementAndGet();
+          if (drift > maxDriftNanos.get()) maxDriftNanos.set(drift);
+
+          if (drift > expectedBufferNanos) {
+            long u = underrunCount.incrementAndGet();
+            if (u - underrunLogCount >= 100) {
+              underrunLogCount = u;
+              logger.log(
+                  Level.WARNING,
+                  String.format("[Audio] Output underrun #%d (drift %.1f ms)", u, drift / 1e6));
+            }
+          }
+        }
+        lastBufferTimeNanos = startTime;
+
+        // ── Capture ──────────────────────────────────────────────
+        if (inShorts != null) {
+          int read = stream.readInput(inShorts, 0, inShorts.length);
+          if (read < inShorts.length) {
+            java.util.Arrays.fill(inShorts, Math.max(read, 0), inShorts.length, (short) 0);
+          }
+        }
+
+        double sumSq = 0;
+        for (int c = 0; c < numChannels; c++) bufPeak[c] = 0;
+
+        if (isIdle && smoothedGain < 0.0001f) {
+          smoothedGain = 0.0f;
+          java.util.Arrays.fill(outFloats, 0.0f);
+          try {
+            Thread.sleep(5);
+          } catch (InterruptedException ignored) {
+          }
+        } else {
+          float effectiveTargetGain = isIdle ? 0.0f : targetGain;
+
+          if (useBlockPath) {
+            vm.advanceTime(dacBuffers, 0, effBuf);
+            float gainStart = smoothedGain;
+            for (int step = 0; step < effBuf; step++) {
+              smoothedGain += gainSmoothAlpha * (effectiveTargetGain - smoothedGain);
+            }
+            float gainEnd = smoothedGain;
+            for (int i = 0; i < effBuf; i++) {
+              float g = gainStart + (gainEnd - gainStart) * i / effBuf;
+              for (int c = 0; c < numChannels; c++) {
+                float sample = dacBuffers[c][i] * g;
+                sumSq += (double) sample * sample;
+                float abs = Math.abs(sample);
+                if (abs > bufPeak[c]) bufPeak[c] = abs;
+                outFloats[i * numChannels + c] = sample;
+              }
+            }
+          } else {
+            for (int i = 0; i < effBuf; i++) {
+              if (inShorts != null) {
+                for (int c = 0; c < numChannels; c++) {
+                  int inputChan = Math.min(c, numInputChannels - 1);
+                  short pcm = inShorts[i * numInputChannels + inputChan];
+                  vm.adc.setInputSample(c, pcm / 32768.0f);
+                }
+              }
+              vm.advanceTime(1);
+              smoothedGain += gainSmoothAlpha * (effectiveTargetGain - smoothedGain);
+              float leftSample = 0.0f, rightSample = 0.0f;
+              for (int c = 0; c < numChannels; c++) {
+                float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
+                if (c < frameSamples.length) frameSamples[c] = sample;
+                if (c == 0) leftSample = sample;
+                if (c == 1) rightSample = sample;
+                sumSq += (double) sample * sample;
+                float abs = Math.abs(sample);
+                if (abs > bufPeak[c]) bufPeak[c] = abs;
+                outFloats[i * numChannels + c] = sample;
+              }
+              if (recorder != null && recorder.isRecording()) {
+                try {
+                  recorder.recordFrame(frameSamples, numChannels);
+                } catch (IOException e) {
+                  // ignore write errors during real-time loop to avoid glitching
+                }
+              }
+            }
+          }
+        }
+
+        if (verbose > 1 || (verbose > 0 && vm.getCurrentTime() % (actualSampleRate * 2) == 0)) {
+          double rms = Math.sqrt(sumSq / ((double) effBuf * numChannels));
+          if (rms > 1e-9) {
+            vm.print(String.format("[Audio] Engine RMS: %.6f\n", rms));
+          }
+        }
+
+        for (int c = 0; c < numChannels && c < peakOut.length; c++) {
+          peakOut[c] = Math.max(bufPeak[c], peakOut[c] * 0.97f);
+        }
+
+        stream.writeOutput(outFloats, 0, outFloats.length);
+
+        long endTime = System.nanoTime();
+        cpuLoad = (double) (endTime - startTime) / expectedBufferNanos;
+      }
+    } catch (Throwable t) {
+      logger.log(Level.SEVERE, "CRITICAL: Audio Engine Thread Crashed!", t);
+      vm.print("Audio Engine Error: " + t.getMessage());
+    }
   }
 
   /**
@@ -995,18 +1157,20 @@ public class ChuckAudio {
     } catch (IOException e) {
       // ignore on shutdown
     }
-    if (activeBackendStream != null) {
-      activeBackendStream.stop();
-      activeBackendStream.close();
-      activeBackendStream = null;
-    }
-    if (inputLine != null) {
-      inputLine.stop();
-      inputLine.close();
-    }
-    if (outputLine != null) {
-      outputLine.stop();
-      outputLine.close();
+    if (backend != null) {
+      if (backendStream != null) {
+        backendStream.stop();
+        backendStream.close();
+      }
+    } else {
+      if (inputLine != null) {
+        inputLine.stop();
+        inputLine.close();
+      }
+      if (outputLine != null) {
+        outputLine.stop();
+        outputLine.close();
+      }
     }
   }
 }

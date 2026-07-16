@@ -4,6 +4,8 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import org.chuck.audio.ChuckAudio;
+import org.chuck.audio.backend.AudioBackend;
+import org.chuck.audio.backend.AudioBackendRegistry;
 import org.chuck.core.*;
 
 public class ChuckCLI {
@@ -210,7 +212,8 @@ public class ChuckCLI {
 
       ChuckAudio audio = null;
       if (!silent) {
-        audio = new ChuckAudio(vm, bufferSize, numChannels, (float) sampleRate);
+        audio =
+            new ChuckAudio(vm, bufferSize, numChannels, (float) sampleRate, resolveAudioBackend());
         if (stemsPrefix != null) {
           audio.startMultiTrackRecording(stemsPrefix);
           System.out.println("  [Audio] Recording multi-track stems with prefix: " + stemsPrefix);
@@ -303,6 +306,40 @@ public class ChuckCLI {
       System.err.println("❌ VM Error: " + e.getMessage());
       e.printStackTrace();
     }
+  }
+
+  /**
+   * Opt-in low-latency audio backend selection via {@code -Dchuck.audio.backend=<name>} (e.g.
+   * {@code alsa}, {@code jack}, {@code coreaudio}, {@code wasapi}), resolved through the shared
+   * {@link AudioBackendRegistry}. Returns {@code null} (the default JavaSound path, unchanged)
+   * unless the property names a known, available backend - falls back with a warning rather than
+   * failing the whole run if the requested backend isn't available on this machine.
+   *
+   * <p>Deliberately does NOT call {@link AudioBackendRegistry#getDefaultBackend()}'s auto-priority
+   * selection when the property is unset: several registered backends (CoreAudio/WASAPI/JACK) are
+   * still native-lifecycle scaffolding with no real audio data path yet, so auto-selecting one of
+   * them by default would silently produce no audio out of the box. Explicit opt-in avoids that.
+   */
+  private static AudioBackend resolveAudioBackend() {
+    String name = System.getProperty("chuck.audio.backend", "").trim();
+    if (name.isEmpty()) return null;
+
+    AudioBackend backend = AudioBackendRegistry.getBackendByName(name);
+    if (backend == null) {
+      System.err.println(
+          "⚠️  Unknown chuck.audio.backend '" + name + "'; using default JavaSound.");
+      return null;
+    }
+    if (backend.name().equalsIgnoreCase("javasound")) return null;
+    if (!backend.isAvailable()) {
+      System.err.println(
+          "⚠️  Audio backend '"
+              + backend.name()
+              + "' is not available on this machine; using default JavaSound.");
+      return null;
+    }
+    System.out.println("[chuck]: using audio backend: " + backend.name());
+    return backend;
   }
 
   private void printRichError(ChuckCompilerException e) {
