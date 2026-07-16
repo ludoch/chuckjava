@@ -776,6 +776,7 @@ public class ChuckAudio {
                             float leftSample = 0.0f, rightSample = 0.0f;
                             for (int c = 0; c < numChannels; c++) {
                               float sample = vm.getDacChannel(c).getLastOut() * smoothedGain;
+                              if (c < frameSamples.length) frameSamples[c] = sample;
                               if (c == 0) leftSample = sample;
                               if (c == 1) rightSample = sample;
                               sumSq += (double) sample * sample;
@@ -785,8 +786,7 @@ public class ChuckAudio {
                             }
                             if (recorder != null && recorder.isRecording()) {
                               try {
-                                recorder.record(
-                                    leftSample, numChannels > 1 ? rightSample : leftSample);
+                                recorder.recordFrame(frameSamples, numChannels);
                               } catch (IOException e) {
                                 // ignore write errors during real-time loop to avoid glitching
                               }
@@ -934,11 +934,21 @@ public class ChuckAudio {
 
   // ── Recorder ─────────────────────────────────────────────────────────────
 
+  private final float[] frameSamples =
+      new float[64]; // Pre-allocated scratch frame buffer for up to 64 surround channels
+
   public void startRecording(String filename) throws IOException {
     if (recorder == null) {
       recorder = new WvOut(sampleRate, numChannels);
     }
     recorder.open(filename);
+  }
+
+  public void startMultiTrackRecording(String baseFilename) throws IOException {
+    if (recorder == null) {
+      recorder = new WvOut(sampleRate, numChannels);
+    }
+    recorder.openMultiTrack(baseFilename);
   }
 
   public void stopRecording() throws IOException {

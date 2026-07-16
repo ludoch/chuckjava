@@ -22,7 +22,8 @@ public class PreferencesTab extends ScrollPane {
 
   @FunctionalInterface
   public interface AudioRestartHandler {
-    void handle(int sampleRate, int bufferSize, String outputDevice, String inputDevice);
+    void handle(
+        int sampleRate, int bufferSize, int channels, String outputDevice, String inputDevice);
   }
 
   private final Preferences prefs;
@@ -86,6 +87,9 @@ public class PreferencesTab extends ScrollPane {
         new ChoiceBox<>(FXCollections.observableArrayList(128, 256, 512, 1024, 2048));
     bufBox.setValue(prefs.getInt("audio.bufferSize", 512));
 
+    ChoiceBox<Integer> chanBox = new ChoiceBox<>(FXCollections.observableArrayList(2, 4, 6, 8));
+    chanBox.setValue(prefs.getInt("audio.channels", 2));
+
     List<String> outDevices = ChuckAudio.getOutputDeviceNames();
     ChoiceBox<String> outDevBox = new ChoiceBox<>(FXCollections.observableArrayList(outDevices));
     String currentOut = prefs.get("audio.outputDevice", "");
@@ -104,9 +108,16 @@ public class PreferencesTab extends ScrollPane {
     applyBtn.setMaxWidth(Double.MAX_VALUE);
     applyBtn.setOnAction(
         e -> {
+          prefs.putInt("audio.sampleRate", srBox.getValue());
+          prefs.putInt("audio.bufferSize", bufBox.getValue());
+          prefs.putInt("audio.channels", chanBox.getValue());
           if (audioRestartHandler != null) {
             audioRestartHandler.handle(
-                srBox.getValue(), bufBox.getValue(), outDevBox.getValue(), inDevBox.getValue());
+                srBox.getValue(),
+                bufBox.getValue(),
+                chanBox.getValue(),
+                outDevBox.getValue(),
+                inDevBox.getValue());
           }
         });
 
@@ -123,12 +134,14 @@ public class PreferencesTab extends ScrollPane {
     grid.add(srBox, 1, 0);
     grid.add(new Label("Buffer Size:"), 0, 1);
     grid.add(bufBox, 1, 1);
-    grid.add(new Label("Output Device:"), 0, 2);
-    grid.add(outDevBox, 1, 2);
-    grid.add(new Label("Input Device:"), 0, 3);
-    grid.add(inDevBox, 1, 3);
-    grid.add(parallelCb, 0, 4, 2, 1);
-    grid.add(applyBtn, 0, 5, 2, 1);
+    grid.add(new Label("Surround Channels:"), 0, 2);
+    grid.add(chanBox, 1, 2);
+    grid.add(new Label("Output Device:"), 0, 3);
+    grid.add(outDevBox, 1, 3);
+    grid.add(new Label("Input Device:"), 0, 4);
+    grid.add(inDevBox, 1, 4);
+    grid.add(parallelCb, 0, 5, 2, 1);
+    grid.add(applyBtn, 0, 6, 2, 1);
 
     TitledPane pane = new TitledPane("Audio Engine", grid);
     pane.setCollapsible(false);

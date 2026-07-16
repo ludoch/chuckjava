@@ -10,6 +10,8 @@ public class ChuckCLI {
   private int sampleRate = 44100;
   private int bufferSize = 512;
   private int numChannels = 2;
+  private String recordFilename = null;
+  private String stemsPrefix = null;
   private boolean silent = false;
   private boolean loop = false;
   private boolean dump = false;
@@ -51,6 +53,10 @@ public class ChuckCLI {
         bufferSize = Integer.parseInt(arg.substring("--bufsize:".length()));
       } else if (arg.startsWith("--chan:")) {
         numChannels = Integer.parseInt(arg.substring("--chan:".length()));
+      } else if (arg.startsWith("--rec:")) {
+        recordFilename = arg.substring("--rec:".length());
+      } else if (arg.startsWith("--stems:")) {
+        stemsPrefix = arg.substring("--stems:".length());
       } else if (arg.startsWith("--timeout:")) {
         timeoutSeconds = Integer.parseInt(arg.substring("--timeout:".length()));
       } else if (arg.startsWith("--verbose:")) {
@@ -195,13 +201,20 @@ public class ChuckCLI {
             "🎸 ChucK-Java (JDK 27) - [VERIFIED] " + (silent ? "Silent Mode" : "Real-time Audio"));
       }
 
-      ChuckVM vm = new ChuckVM(sampleRate);
+      ChuckVM vm = new ChuckVM(sampleRate, numChannels);
       vm.addPrintListener(System.out::print);
       vm.setLogLevel(verbose);
 
       ChuckAudio audio = null;
       if (!silent) {
         audio = new ChuckAudio(vm, bufferSize, numChannels, (float) sampleRate);
+        if (stemsPrefix != null) {
+          audio.startMultiTrackRecording(stemsPrefix);
+          System.out.println("  [Audio] Recording multi-track stems with prefix: " + stemsPrefix);
+        } else if (recordFilename != null) {
+          audio.startRecording(recordFilename);
+          System.out.println("  [Audio] Recording master DAC mix to: " + recordFilename);
+        }
         audio.start();
       }
 
@@ -315,7 +328,9 @@ public class ChuckCLI {
     System.out.println("  --srate:<N>      Set sampling rate (default 44100)");
     System.out.println("  --bufsize:<N>    Set audio buffer size (default 512)");
     System.out.println("  --chan:<N>       Set number of channels (default 2)");
-    System.out.println("  --timeout:<N>    Exit after N seconds");
+    System.out.println("  --rec:<F>        Record master DAC output to WAV file <F>");
+    System.out.println(
+        "  --stems:<P>      Record multi-track surround stems (<P>_ch0.wav ... <P>_chN.wav)");
     System.out.println("  --chugin-path:<P> Set chugin search path(s)");
     System.out.println("  --gui / --ide    Force launch the JavaFX IDE");
     System.out.println("  --about / --help Print this help message");

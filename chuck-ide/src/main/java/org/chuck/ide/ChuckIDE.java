@@ -91,6 +91,9 @@ public class ChuckIDE extends Application {
   private boolean prefUseSpaces = true;
   private int prefTabWidth = 4;
   private int prefSampleRate = 44100;
+  private int prefChannels = 2;
+  private Button recordBtnRef;
+  private Button stemBtnRef;
 
   @Override
   public void start(Stage primaryStage) {
@@ -156,7 +159,8 @@ public class ChuckIDE extends Application {
     prefSmartIndent = prefs.getBoolean("editor.smartIndent", true);
     prefUseSpaces = prefs.getBoolean("editor.useSpaces", true);
     prefTabWidth = prefs.getInt("editor.tabWidth", 4);
-    prefSampleRate = prefs.getInt("audio.srate", 44100);
+    prefSampleRate = prefs.getInt("audio.srate", prefs.getInt("audio.sampleRate", 44100));
+    prefChannels = prefs.getInt("audio.channels", 2);
 
     recentFiles.clear();
     for (int i = 0; i < MAX_RECENT; i++) {
@@ -166,8 +170,8 @@ public class ChuckIDE extends Application {
   }
 
   private void initVM() {
-    vm = new ChuckVM(prefSampleRate, 2);
-    audio = new ChuckAudio(vm, 512, 2, (float) prefSampleRate);
+    vm = new ChuckVM(prefSampleRate, prefChannels);
+    audio = new ChuckAudio(vm, 512, prefChannels, (float) prefSampleRate);
     vm.setAudio(audio);
 
     vm.addPrintListener(this::print);
@@ -211,8 +215,13 @@ public class ChuckIDE extends Application {
     PreferencesTab prefsTabComp = new PreferencesTab(prefs);
     prefsTabComp.setOnEditorSettingsChanged(this::applyPreferences);
     prefsTabComp.setOnAudioRestart(
-        (sr, bs, out, in) -> {
-          print("Audio configuration updated. Please restart IDE for hardware changes.\n");
+        (sr, bs, ch, out, in) -> {
+          print(
+              "Audio configuration updated ("
+                  + ch
+                  + " channels, "
+                  + sr
+                  + "Hz). Please restart IDE for hardware changes.\n");
           audio.setMasterGain(prefs.getFloat("audio.masterGain", 0.8f));
         });
     Tab settingsTab = new Tab("Settings", prefsTabComp);
@@ -487,7 +496,11 @@ public class ChuckIDE extends Application {
     MenuItem recordMenuItem = new MenuItem("Record DAC to WAV...");
     recordMenuItem.setAccelerator(new KeyCodeCombination(KeyCode.R, KeyCombination.CONTROL_DOWN));
     recordMenuItem.setOnAction(e -> toggleRecording());
-    audioMenuBar.getItems().add(recordMenuItem);
+    MenuItem recordStemsItem = new MenuItem("Record Multi-Track Stems...");
+    recordStemsItem.setAccelerator(
+        new KeyCodeCombination(KeyCode.S, KeyCombination.CONTROL_DOWN, KeyCombination.SHIFT_DOWN));
+    recordStemsItem.setOnAction(e -> toggleStemRecording());
+    audioMenuBar.getItems().addAll(recordMenuItem, recordStemsItem);
 
     Menu tutorialMenu = createTutorialMenu();
     Menu examplesMenu = new Menu("_Examples");
@@ -785,7 +798,13 @@ public class ChuckIDE extends Application {
     recordBtn.setOnAction(e -> toggleRecording());
     recordBtnRef = recordBtn;
 
-    return new ToolBar(addBtn, replaceBtn, new Separator(), clearBtn, new Separator(), recordBtn);
+    Button stemBtn = new Button("● Record Stems");
+    stemBtn.setStyle("-fx-font-weight: bold; -fx-text-fill: #1b5e20;");
+    stemBtn.setOnAction(e -> toggleStemRecording());
+    stemBtnRef = stemBtn;
+
+    return new ToolBar(
+        addBtn, replaceBtn, new Separator(), clearBtn, new Separator(), recordBtn, stemBtn);
   }
 
   private void addShred() {
@@ -877,8 +896,6 @@ public class ChuckIDE extends Application {
     }.start();
   }
 
-  private Button recordBtnRef;
-
   private void toggleRecording() {
     if (audio == null) return;
     try {
@@ -887,6 +904,10 @@ public class ChuckIDE extends Application {
         if (recordBtnRef != null) {
           recordBtnRef.setText("● Record WAV");
           recordBtnRef.setStyle("-fx-font-weight: bold;");
+        }
+        if (stemBtnRef != null) {
+          stemBtnRef.setText("● Record Stems");
+          stemBtnRef.setStyle("-fx-font-weight: bold; -fx-text-fill: #1b5e20;");
         }
         print("Audio recording stopped and saved.\n");
       } else {
@@ -903,6 +924,46 @@ public class ChuckIDE extends Application {
                 "-fx-background-color: #ff6666; -fx-text-fill: white; -fx-font-weight: bold;");
           }
           print("Recording audio to: " + f.getAbsolutePath() + "\n");
+        }
+      }
+    } catch (Exception ex) {
+      print("Recording error: " + ex.getMessage() + "\n");
+    }
+  }
+
+  private void toggleStemRecording() {
+    if (audio == null) return;
+    try {
+      if (audio.isRecording()) {
+        audio.stopRecording();
+        if (recordBtnRef != null) {
+          recordBtnRef.setText("● Record WAV");
+          recordBtnRef.setStyle("-fx-font-weight: bold;");
+        }
+        if (stemBtnRef != null) {
+          stemBtnRef.setText("● Record Stems");
+          stemBtnRef.setStyle("-fx-font-weight: bold; -fx-text-fill: #1b5e20;");
+        }
+        print("Multi-track stem recording stopped and saved.\n");
+      } else {
+        FileChooser fc = new FileChooser();
+        fc.setTitle("Record Multi-Track Stems Base Path");
+        fc.setInitialFileName("stems_" + System.currentTimeMillis() + "_mix");
+        File f = fc.showSaveDialog(stage);
+        if (f != null) {
+          String base = f.getAbsolutePath().replaceFirst("\\.wav$", "");
+          audio.startMultiTrackRecording(base);
+          if (stemBtnRef != null) {
+            stemBtnRef.setText("■ Stop Stems");
+            stemBtnRef.setStyle(
+                "-fx-background-color: #ff6666; -fx-text-fill: white; -fx-font-weight: bold;");
+          }
+          print(
+              "Recording "
+                  + prefChannels
+                  + "-channel multi-track stems with prefix: "
+                  + base
+                  + "\n");
         }
       }
     } catch (Exception ex) {
