@@ -23,13 +23,13 @@ public class SetArrayInt implements ChuckInstr {
 
     if (!(rawArr instanceof ChuckArray arr)) {
       // Discard value and push 0 to keep stack balanced
-      shred.reg.pop();
+      shred.reg.popDiscard();
       shred.reg.push(0L);
       return;
     }
 
     if (index < 0 || index >= arr.size()) {
-      shred.reg.pop();
+      shred.reg.popDiscard();
       shred.reg.push(0L);
       return;
     }

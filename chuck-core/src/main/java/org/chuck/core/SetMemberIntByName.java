@@ -36,7 +36,7 @@ public class SetMemberIntByName implements ChuckInstr {
     }
     Object rawObj = shred.reg.popObject();
     if (rawObj == null) {
-      shred.reg.pop();
+      shred.reg.popDiscard();
       shred.reg.push(0L);
       return;
     }

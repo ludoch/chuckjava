@@ -165,7 +165,17 @@ public class ChuckContext {
     }
 
     public void pop(int n) {
-      sp = Math.max(0, sp - n);
+      for (int i = 0; i < n && sp > 0; i++) {
+        sp--;
+        refs[sp] = null;
+      }
+    }
+
+    public void popDiscard() {
+      if (sp > 0) {
+        sp--;
+        refs[sp] = null;
+      }
     }
 
     public long popAsLong() {

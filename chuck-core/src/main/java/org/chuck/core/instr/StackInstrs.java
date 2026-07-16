@@ -8,7 +8,7 @@ public class StackInstrs {
   public static class Pop implements ChuckInstr {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
-      s.reg.pop();
+      s.reg.popDiscard();
     }
   }
 

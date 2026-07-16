@@ -258,6 +258,8 @@ public class ChuckAudio {
 
   // Optional recorder
   private WvOut recorder;
+  private org.chuck.audio.backend.AudioBackend activeBackend;
+  private org.chuck.audio.backend.AudioBackendStream activeBackendStream;
 
   /** Name of the preferred output mixer (empty = system default). */
   private String outputDeviceName = "";
@@ -532,6 +534,50 @@ public class ChuckAudio {
     }
     gainSmoothAlpha = (float) (1.0 - Math.exp(-1.0 / (sampleRate * 0.02)));
 
+    // Phase 3: Probe AudioBackendRegistry for low-latency FFM backend (CoreAudio/WASAPI/JACK)
+    activeBackend = org.chuck.audio.backend.AudioBackendRegistry.getDefaultBackend();
+    if (activeBackend != null && !activeBackend.name().equals("JavaSound")) {
+      org.chuck.audio.backend.AudioStreamConfig config =
+          new org.chuck.audio.backend.AudioStreamConfig(
+              outputDeviceName.isEmpty() ? null : outputDeviceName,
+              inputDeviceName.isEmpty() ? null : inputDeviceName,
+              (int) sampleRate,
+              numChannels,
+              0,
+              bufferSize,
+              numBuffers,
+              sampleFormat,
+              minimizeLatency,
+              scheduleRealtime);
+      try {
+        activeBackendStream = activeBackend.openStream(config);
+        if (activeBackendStream != null) {
+          actualSampleRate = activeBackendStream.getActualSampleRate();
+          effectiveBufferSize = activeBackendStream.getEffectiveBufferSize();
+          outputLatencySamples = activeBackendStream.getOutputLatencySamples();
+          inputLatencySamples = activeBackendStream.getInputLatencySamples();
+          logger.log(
+              Level.INFO,
+              String.format(
+                  "[AudioEngine] Low-latency FFM backend '%s' opened successfully (SR=%dHz, Latency=%d samples / %.1f ms)",
+                  activeBackend.name(),
+                  actualSampleRate,
+                  outputLatencySamples,
+                  getOutputLatencyMs()));
+          return;
+        }
+      } catch (Exception e) {
+        logger.log(
+            Level.INFO,
+            "[AudioEngine] FFM backend "
+                + activeBackend.name()
+                + " stream open failed ("
+                + e.getMessage()
+                + "). Falling back to JavaSound.");
+        activeBackendStream = null;
+      }
+    }
+
     // ── Output ───────────────────────────────────────────────────────────────
     outputLine = openOutputWithFallback(sampleFormat, sampleRate, numChannels);
     if (outputLine == null) {
@@ -594,10 +640,14 @@ public class ChuckAudio {
   private Thread audioEngineThread;
 
   public void start() {
-    if (running || outputLine == null) return;
+    if (running || (outputLine == null && activeBackendStream == null)) return;
     running = true;
-    outputLine.start();
-    if (inputLine != null) inputLine.start();
+    if (activeBackendStream != null) {
+      activeBackendStream.start();
+    } else {
+      if (outputLine != null) outputLine.start();
+      if (inputLine != null) inputLine.start();
+    }
 
     final AudioSampleFormat fmt = actualFormat; // capture for lambda
     final int bps = fmt.bytesPerSample;
@@ -758,10 +808,14 @@ public class ChuckAudio {
                         peakOut[c] = Math.max(bufPeak[c], peakOut[c] * 0.97f);
                       }
 
-                      // Transfer off-heap → byte array → JavaSound
-                      MemorySegment.copy(
-                          outSeg, ValueLayout.JAVA_BYTE, 0, outBuf, 0, bytesPerBuffer);
-                      outputLine.write(outBuf, 0, outBuf.length);
+                      if (activeBackendStream != null) {
+                        activeBackendStream.writeOutput(new float[0], 0, 0);
+                      } else if (outputLine != null) {
+                        // Transfer off-heap → byte array → JavaSound
+                        MemorySegment.copy(
+                            outSeg, ValueLayout.JAVA_BYTE, 0, outBuf, 0, bytesPerBuffer);
+                        outputLine.write(outBuf, 0, outBuf.length);
+                      }
 
                       long endTime = System.nanoTime();
                       cpuLoad = (double) (endTime - startTime) / expectedBufferNanos;
@@ -930,6 +984,11 @@ public class ChuckAudio {
       stopRecording();
     } catch (IOException e) {
       // ignore on shutdown
+    }
+    if (activeBackendStream != null) {
+      activeBackendStream.stop();
+      activeBackendStream.close();
+      activeBackendStream = null;
     }
     if (inputLine != null) {
       inputLine.stop();

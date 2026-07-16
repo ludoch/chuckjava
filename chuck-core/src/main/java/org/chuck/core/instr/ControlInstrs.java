@@ -101,7 +101,7 @@ public class ControlInstrs {
       if (!isTrue) {
         s.setPc(target);
       } else {
-        s.reg.pop();
+        s.reg.popDiscard();
       }
     }
   }
@@ -129,7 +129,7 @@ public class ControlInstrs {
       if (isTrue) {
         s.setPc(target);
       } else {
-        s.reg.pop();
+        s.reg.popDiscard();
       }
     }
   }

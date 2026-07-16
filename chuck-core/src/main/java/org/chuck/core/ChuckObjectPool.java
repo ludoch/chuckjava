@@ -49,6 +49,15 @@ public class ChuckObjectPool {
       strBlockIdx = 0;
       strIdx = BLOCK_SIZE;
     }
+
+    public void resetDurations() {
+      durBlockIdx = 0;
+      if (!durBlocks.isEmpty()) {
+        durIdx = 0;
+      } else {
+        durIdx = BLOCK_SIZE;
+      }
+    }
   }
 
   private static final ConcurrentLinkedQueue<ShredAllocator> allocatorPool =

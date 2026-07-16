@@ -104,7 +104,7 @@ public class LogicInstrs {
     @Override
     public void execute(ChuckVM vm, ChuckShred s) {
       if (s.reg.getSp() < 2) {
-        s.reg.pop();
+        s.reg.popDiscard();
         s.reg.push(0L);
         return;
       }

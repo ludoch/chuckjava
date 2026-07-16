@@ -15,8 +15,10 @@ public class UserObject extends Chugen {
   /** Non-null if this class (or an ancestor) extends the built-in Event type. */
   public final ChuckEvent eventDelegate;
 
-  /** Raw-long storage for int/float fields (floats stored as Double.doubleToRawLongBits). */
-  private final Map<String, Long> primitiveFields = new LinkedHashMap<>();
+  /** Raw-long array storage for int/float fields (zero Long boxing). */
+  private long[] primitiveSlotValues = new long[8];
+
+  private final Map<String, Integer> primitiveSlotMap = new LinkedHashMap<>();
 
   /** Names of fields declared as float/double. */
   private final java.util.Set<String> floatFields = new java.util.HashSet<>();
@@ -38,6 +40,9 @@ public class UserObject extends Chugen {
     this.eventDelegate = extendsEvent ? new ChuckEvent() : null;
 
     if (fieldDefs != null) {
+      if (fieldDefs.size() > primitiveSlotValues.length) {
+        primitiveSlotValues = new long[fieldDefs.size() + 4];
+      }
       for (String[] f : fieldDefs) {
         boolean isFloat = f.length > 0 && ("float".equals(f[0]) || "double".equals(f[0]));
         long initVal;
@@ -53,18 +58,36 @@ public class UserObject extends Chugen {
         } else {
           initVal = isFloat ? Double.doubleToRawLongBits(0.0) : 0L;
         }
-        primitiveFields.put(f[1], initVal);
+        int slot = primitiveSlotMap.size();
+        primitiveSlotMap.put(f[1], slot);
+        primitiveSlotValues[slot] = initVal;
         if (isFloat) floatFields.add(f[1]);
       }
     }
   }
 
   public long getPrimitiveField(String name) {
-    return primitiveFields.getOrDefault(name, 0L);
+    Integer slot = primitiveSlotMap.get(name);
+    if (slot != null && slot < primitiveSlotValues.length) {
+      return primitiveSlotValues[slot];
+    }
+    return 0L;
   }
 
   public void setPrimitiveField(String name, long value) {
-    primitiveFields.put(name, value);
+    Integer slot = primitiveSlotMap.get(name);
+    if (slot != null && slot < primitiveSlotValues.length) {
+      primitiveSlotValues[slot] = value;
+      return;
+    }
+    int newSlot = primitiveSlotMap.size();
+    if (newSlot >= primitiveSlotValues.length) {
+      long[] next = new long[Math.max(primitiveSlotValues.length * 2, newSlot + 4)];
+      System.arraycopy(primitiveSlotValues, 0, next, 0, primitiveSlotValues.length);
+      primitiveSlotValues = next;
+    }
+    primitiveSlotMap.put(name, newSlot);
+    primitiveSlotValues[newSlot] = value;
   }
 
   public double getFloatField(String name) {
