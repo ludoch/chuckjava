@@ -81,35 +81,69 @@ public class OscIn extends ChuckEvent implements AutoCloseable {
             });
   }
 
+  public void removeAddress(String addr) {
+    String path = addr.contains(",") ? addr.substring(0, addr.indexOf(",")).trim() : addr.trim();
+    addresses.remove(path);
+  }
+
+  public void removeAllAddresses() {
+    addresses.clear();
+  }
+
+  public Set<String> getAddresses() {
+    return addresses;
+  }
+
   private void parseAndDispatch(byte[] data, int length) {
     try {
       ByteBuffer buf = ByteBuffer.wrap(data, 0, length);
-      String address = readOscString(buf);
-      if (address == null || !address.startsWith("/")) return;
-
-      if (!matchesAnyAddress(address)) return;
-
-      String typeTag = readOscString(buf);
-      if (typeTag == null) typeTag = ",";
-      if (!typeTag.startsWith(",")) typeTag = "," + typeTag;
-
-      OscMsg msg = new OscMsg();
-      msg.address = address;
-
-      for (int i = 1; i < typeTag.length(); i++) {
-        char t = typeTag.charAt(i);
-        if (t == ' ') continue;
-        switch (t) {
-          case 'i' -> msg.addInt(buf.getInt());
-          case 'f' -> msg.addFloat(buf.getFloat());
-          case 's' -> msg.addString(readOscString(buf));
-        }
-      }
-
-      messages.addLast(msg);
-      broadcast(vm);
+      parsePacket(buf);
     } catch (Exception ignored) {
     }
+  }
+
+  private void parsePacket(ByteBuffer buf) {
+    if (!buf.hasRemaining()) return;
+    int startPos = buf.position();
+    String firstStr = readOscString(buf);
+    if (firstStr == null) return;
+
+    if ("#bundle".equals(firstStr)) {
+      if (buf.remaining() >= 8) buf.getLong(); // timetag
+      while (buf.hasRemaining() && buf.remaining() >= 4) {
+        int elemLen = buf.getInt();
+        if (elemLen <= 0 || elemLen > buf.remaining()) break;
+        int nextPos = buf.position() + elemLen;
+        parsePacket(buf);
+        buf.position(nextPos);
+      }
+      return;
+    }
+
+    String address = firstStr;
+    if (!address.startsWith("/") || !matchesAnyAddress(address)) return;
+
+    String typeTag = buf.hasRemaining() ? readOscString(buf) : ",";
+    if (typeTag == null) typeTag = ",";
+    if (!typeTag.startsWith(",")) typeTag = "," + typeTag;
+
+    OscMsg msg = new OscMsg();
+    msg.address = address;
+
+    for (int i = 1; i < typeTag.length(); i++) {
+      if (!buf.hasRemaining()) break;
+      char t = typeTag.charAt(i);
+      if (t == ' ') continue;
+      switch (t) {
+        case 'i' -> msg.addInt(buf.getInt());
+        case 'f' -> msg.addFloat(buf.getFloat());
+        case 's' -> msg.addString(readOscString(buf));
+      }
+    }
+
+    messages.addLast(msg);
+    ChuckVM targetVm = (this.vm != null) ? this.vm : ChuckVM.CURRENT_VM.get();
+    broadcast(targetVm);
   }
 
   private boolean matchesAnyAddress(String address) {

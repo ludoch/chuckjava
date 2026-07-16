@@ -12,7 +12,7 @@ public class OscMsg extends org.chuck.core.ChuckObject {
   }
 
   public String typetag() {
-    StringBuilder sb = new StringBuilder();
+    StringBuilder sb = new StringBuilder(",");
     for (Object o : args) {
       if (o instanceof Integer) sb.append("i");
       else if (o instanceof Float || o instanceof Double) sb.append("f");

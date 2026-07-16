@@ -7,6 +7,25 @@ import java.util.concurrent.locks.ReentrantLock;
 public class ChuckEvent extends UserObject {
   protected final ReentrantLock eventLock = new ReentrantLock();
   protected final List<ChuckShred> waitingShreds = new ArrayList<>();
+  private final java.util.concurrent.CopyOnWriteArrayList<java.util.function.Consumer<ChuckEvent>> listeners =
+      new java.util.concurrent.CopyOnWriteArrayList<>();
+
+  public void addListener(java.util.function.Consumer<ChuckEvent> listener) {
+    listeners.add(listener);
+  }
+
+  public void removeListener(java.util.function.Consumer<ChuckEvent> listener) {
+    listeners.remove(listener);
+  }
+
+  protected void notifyListeners() {
+    for (java.util.function.Consumer<ChuckEvent> l : listeners) {
+      try {
+        l.accept(this);
+      } catch (Exception ignored) {
+      }
+    }
+  }
 
   public ChuckEvent() {
     super("Event", null, null, false);
@@ -54,6 +73,7 @@ public class ChuckEvent extends UserObject {
   }
 
   public void signal(ChuckVM vm) {
+    notifyListeners();
     ChuckShred toWake = null;
     eventLock.lock();
     try {
@@ -86,6 +106,7 @@ public class ChuckEvent extends UserObject {
   }
 
   public void broadcast(ChuckVM vm) {
+    notifyListeners();
     List<ChuckShred> toWake = new ArrayList<>();
     eventLock.lock();
     try {
