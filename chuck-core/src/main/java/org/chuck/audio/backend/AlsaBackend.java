@@ -50,10 +50,9 @@ public class AlsaBackend implements AudioBackend {
     if (!isAvailable()) {
       throw new IllegalStateException("ALSA (libasound.so.2) is not available on this platform");
     }
-    String outName = orDefault(config.outputDeviceName());
     NegotiatedParams playback =
-        openAndConfigure(
-            outName,
+        openWithFallback(
+            config.outputDeviceName(),
             AlsaNative.SND_PCM_STREAM_PLAYBACK,
             config.numOutputChannels(),
             config.sampleFormat(),
@@ -66,8 +65,8 @@ public class AlsaBackend implements AudioBackend {
     if (config.numInputChannels() > 0) {
       try {
         capture =
-            openAndConfigure(
-                orDefault(config.inputDeviceName()),
+            openWithFallback(
+                config.inputDeviceName(),
                 AlsaNative.SND_PCM_STREAM_CAPTURE,
                 config.numInputChannels(),
                 AudioSampleFormat.INT16, // capture is always INT16, matching AudioBackendStream's
@@ -95,8 +94,49 @@ public class AlsaBackend implements AudioBackend {
         inputLatencySamples);
   }
 
-  private static String orDefault(String deviceName) {
-    return deviceName == null || deviceName.isEmpty() ? "default" : deviceName;
+  /**
+   * When a specific device name was requested, opens exactly that (fails loudly if it doesn't work
+   * — an explicit request shouldn't silently redirect elsewhere). When none was requested, tries
+   * {@code "default"} first, then falls through the actually-enumerated devices in order - some
+   * environments (observed: a PipeWire-managed {@code "default"} PCM under a container) return
+   * {@code EPERM} from {@code hw_params_any} on {@code "default"} while a concrete {@code
+   * plughw:}/{@code sysdefault:} device opens fine, so a single hardcoded {@code "default"} attempt
+   * isn't reliable enough as the sole no-device-requested behavior.
+   */
+  private NegotiatedParams openWithFallback(
+      String requestedName,
+      int stream,
+      int channels,
+      AudioSampleFormat fmt,
+      int rate,
+      int periodFrames,
+      int periods,
+      boolean nonblock)
+      throws Exception {
+    boolean explicit = requestedName != null && !requestedName.isEmpty();
+    List<String> candidates = new ArrayList<>();
+    if (explicit) {
+      candidates.add(requestedName);
+    } else {
+      candidates.add("default");
+      for (DeviceInfo info : enumerate(stream)) {
+        if (!candidates.contains(info.name())) candidates.add(info.name());
+      }
+    }
+
+    Exception last = null;
+    for (String name : candidates) {
+      try {
+        return openAndConfigure(name, stream, channels, fmt, rate, periodFrames, periods, nonblock);
+      } catch (Exception e) {
+        last = e;
+        logger.log(
+            Level.FINE, "[AlsaBackend] PCM open failed for '" + name + "': " + e.getMessage());
+      }
+    }
+    String direction = stream == AlsaNative.SND_PCM_STREAM_PLAYBACK ? "output" : "input";
+    if (last != null) throw last;
+    throw new java.io.IOException("No ALSA " + direction + " device available");
   }
 
   /** Holds an open+configured PCM handle plus the values ALSA actually negotiated. */

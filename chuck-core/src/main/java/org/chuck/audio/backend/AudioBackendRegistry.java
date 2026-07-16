@@ -9,9 +9,10 @@ import java.util.logging.Logger;
 /**
  * Registry and discovery service for available {@link AudioBackend} drivers in ChucK-Java.
  *
- * <p>Probes native FFM low-latency backends ({@link CoreAudioBackend}, {@link WASAPIBackend}, and
- * {@link JackBackend}) alongside the cross-platform {@link JavaSoundBackend}, and selects the
- * optimal driver based on system properties ({@code -Dchuck.audio.backend=<name>}) and host OS.
+ * <p>Probes native FFM low-latency backends ({@link CoreAudioBackend}, {@link WASAPIBackend},
+ * {@link AlsaBackend}, and {@link JackBackend}) alongside the cross-platform {@link
+ * JavaSoundBackend}, and selects the optimal driver based on system properties ({@code
+ * -Dchuck.audio.backend=<name>}) and host OS.
  */
 public class AudioBackendRegistry {
   private static final Logger logger = Logger.getLogger(AudioBackendRegistry.class.getName());
@@ -19,9 +20,11 @@ public class AudioBackendRegistry {
 
   static {
     // Probe backends in priority order: FFM Low-Latency first, JavaSound last as guaranteed
-    // fallback
+    // fallback. AlsaBackend sits ahead of JackBackend: both are Linux-capable, but ALSA has a
+    // real, hardware-verified data path while JACK's is still native-lifecycle scaffolding.
     registerBackendSafe(new CoreAudioBackend());
     registerBackendSafe(new WASAPIBackend());
+    registerBackendSafe(new AlsaBackend());
     registerBackendSafe(new JackBackend());
     registerBackendSafe(new JavaSoundBackend());
   }
