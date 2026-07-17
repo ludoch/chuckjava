@@ -2,7 +2,27 @@
 
 ChucK-Java is a powerful port of the ChucK audio programming language to the Java platform, leveraging modern JDK 27 features like Project Loom (Virtual Threads) and the Vector API for high-performance audio synthesis.
 
-## 🚀 Getting Started
+## 🎵 Quick Start (For End Users)
+
+If you just want to run the interactive ChucK-Java IDE and Workstation:
+
+1. **Download the Release**: Go to the [Releases](https://github.com/ludoch/chuckjava/releases) page and download the latest `chuck-java-workstation.zip` release package.
+2. **Unzip the Package**: Extract the contents of the ZIP file to any folder on your machine.
+3. **Launch the Workstation**:
+   - **macOS / Linux**: Open your terminal inside the extracted directory and run:
+     ```bash
+     ./run.sh
+     ```
+   - **Windows**: Run the batch script:
+     ```cmd
+     run.bat
+     ```
+4. **Zero-Configuration Setup**: The launch scripts will automatically check for a local JDK 27 installation. If one is not found, they will safely download a sandboxed, local **JDK 27 (early-access)** environment directly into the directory so everything runs instantly out-of-the-box.
+5. **Learn the Workstation**: Check out the comprehensive, illustrated [End-User Workstation Guidebook](docs/USER_GUIDE.md) for full details on navigating the IDE, monitoring live threads (Shreds), mapping MIDI controllers, and sporking custom audio DSP.
+
+---
+
+## 🛠️ Developer Setup & Getting Started
 
 ### Prerequisites
 - **JDK 27** (early-access; with preview features enabled)
