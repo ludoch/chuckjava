@@ -122,6 +122,25 @@ The **Control Surface (`ControlSurface.java`)** tab on the left panel automatica
 ### 8.1. Global Variable Discovery & Interactive Sliders
 Whenever your `.ck` scripts declare `global float` or `global int` variables, `ControlSurface` automatically generates a dedicated **ControlRow** fader. Dragging the slider immediately pushes `vm.setGlobalFloat(key, val)` / `vm.setGlobalInt(key, val)` right into the active ChucK shreds at real-time audio frame rates.
 
+For example, declare global variables at the top of your ChucK script like this:
+```ck
+// Declare global controls
+global float myFreq;
+global int myVolume;
+
+// Set initial defaults
+440.0 => myFreq;
+80 => myVolume;
+
+SinOsc s => dac;
+while (true) {
+    myFreq => s.freq;
+    (myVolume / 100.0) => s.gain;
+    10::ms => now;
+}
+```
+As soon as you add this script to the VM, `myFreq` and `myVolume` will dynamically appear as slider rows inside the **Control** tab!
+
 ### 8.2. Two-Way MIDI CC Learn (`[L]`)
 Bind any physical hardware MIDI controller knob, fader, or expression pedal to a global variable with one click:
 1. Click the **`[L]` (Learn)** button on any control row (the button turns yellow with `Learning...`).
