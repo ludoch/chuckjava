@@ -46,8 +46,18 @@ public class SwingScreenshotGenerator {
     BufferedImage controlImg = renderControlSurfaceAndAutomation();
     ImageIO.write(controlImg, "png", new File(docsDir, "chuck_ide_control_surface.png"));
 
+    // 6. Capture Faust/DSP Live Coding Tab
+    System.out.println("[Screenshot] Renders Faust/DSP Live Coding Tab...");
+    BufferedImage dspImg = renderFaustLiveCodingTab();
+    ImageIO.write(dspImg, "png", new File(docsDir, "chuck_ide_faust_dsp.png"));
+
+    // 7. Capture Preferences Panel
+    System.out.println("[Screenshot] Renders Preferences & Surround Audio Panel...");
+    BufferedImage prefsImg = renderPreferencesPanel();
+    ImageIO.write(prefsImg, "png", new File(docsDir, "chuck_ide_preferences.png"));
+
     System.out.println(
-        "[Screenshot] ✅ All 5 workstation images exported successfully to docs/images/");
+        "[Screenshot] ✅ All 7 workstation images exported successfully to docs/images/");
   }
 
   private static BufferedImage renderVirtualConsole() {
@@ -631,6 +641,166 @@ public class SwingScreenshotGenerator {
     root.add(new JScrollPane(rowsPanel), BorderLayout.CENTER);
 
     return layoutAndCapture(root, 480, 480);
+  }
+
+  private static BufferedImage renderFaustLiveCodingTab() {
+    JPanel root = new JPanel(new BorderLayout());
+    root.setBackground(new Color(248, 248, 248));
+    root.setSize(520, 520);
+    root.setBorder(new EmptyBorder(10, 10, 10, 10));
+
+    // Header Toolbar
+    JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+    toolbar.setBackground(new Color(240, 240, 240));
+    toolbar.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, new Color(200, 200, 200)));
+    JLabel title = new JLabel("Faust / Inline DSP Engine");
+    title.setFont(new Font("SansSerif", Font.BOLD, 12));
+    JComboBox<String> templates =
+        new JComboBox<>(
+            new String[] {"2-Operator FM Bell Synth", "4-Pole Resonant Low-Pass Filter"});
+    templates.setFont(new Font("SansSerif", Font.PLAIN, 11));
+    JButton sporkBtn = new JButton("⚡ Spork Live DSP");
+    sporkBtn.setBackground(new Color(0, 230, 118));
+    sporkBtn.setForeground(new Color(0, 51, 0));
+    sporkBtn.setOpaque(true);
+    sporkBtn.setBorderPainted(false);
+    sporkBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
+    JButton stopBtn = new JButton("■ Stop DSP");
+    stopBtn.setBackground(new Color(255, 82, 82));
+    stopBtn.setForeground(Color.WHITE);
+    stopBtn.setOpaque(true);
+    stopBtn.setBorderPainted(false);
+    stopBtn.setFont(new Font("SansSerif", Font.BOLD, 11));
+    toolbar.add(title);
+    toolbar.add(templates);
+    toolbar.add(sporkBtn);
+    toolbar.add(stopBtn);
+    root.add(toolbar, BorderLayout.NORTH);
+
+    // Editor + Fader split
+    JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+    split.setDividerLocation(200);
+
+    JTextArea editor =
+        new JTextArea(
+            """
+        // Faust / DSP Inline: 2-Operator Frequency Modulation Bell
+        // Parameters: carrierFreq, modRatio, modIndex, gain
+
+        global float carrierFreq; 440.0 => carrierFreq;
+        global float modRatio; 1.414 => modRatio;
+        global float modIndex; 200.0 => modIndex;
+        global float dspGain; 0.6 => dspGain;
+
+        SinOsc mod => SinOsc car => dac;
+        2 => car.sync; // frequency modulation input
+
+        while(true) {
+            carrierFreq * modRatio => mod.freq;
+            modIndex => mod.gain;
+            carrierFreq => car.freq;
+            dspGain => car.gain;
+            1::ms => now;
+        }
+        """);
+    editor.setFont(new Font("Monospaced", Font.PLAIN, 12));
+    editor.setBackground(new Color(30, 30, 30));
+    editor.setForeground(new Color(0, 230, 118));
+    editor.setBorder(new EmptyBorder(8, 8, 8, 8));
+    split.setTopComponent(new JScrollPane(editor));
+
+    JPanel faderRack = new JPanel();
+    faderRack.setLayout(new BoxLayout(faderRack, BoxLayout.Y_AXIS));
+    faderRack.setBackground(Color.WHITE);
+    faderRack.setBorder(new EmptyBorder(8, 8, 8, 8));
+    JLabel rackTitle = new JLabel("Live DSP Parameter Rack");
+    rackTitle.setFont(new Font("SansSerif", Font.BOLD, 11));
+    faderRack.add(rackTitle);
+
+    addDspFaderRow(faderRack, "carrierFreq", 440.0, 20.0, 2000.0);
+    addDspFaderRow(faderRack, "modRatio", 1.414, 0.5, 8.0);
+    addDspFaderRow(faderRack, "modIndex", 200.0, 0.0, 1000.0);
+    addDspFaderRow(faderRack, "dspGain", 0.6, 0.0, 1.0);
+
+    split.setBottomComponent(new JScrollPane(faderRack));
+    root.add(split, BorderLayout.CENTER);
+
+    return layoutAndCapture(root, 520, 520);
+  }
+
+  private static void addDspFaderRow(JPanel p, String name, double value, double min, double max) {
+    JPanel row = new JPanel(new BorderLayout(8, 0));
+    row.setBackground(Color.WHITE);
+    row.setBorder(new EmptyBorder(4, 0, 4, 0));
+    JLabel nameLabel = new JLabel(String.format("%-12s: %.2f", name, value));
+    nameLabel.setFont(new Font("Monospaced", Font.PLAIN, 11));
+    JSlider s = new JSlider((int) min, (int) max, (int) value);
+    s.setBackground(Color.WHITE);
+    row.add(nameLabel, BorderLayout.WEST);
+    row.add(s, BorderLayout.CENTER);
+    p.add(row);
+  }
+
+  private static BufferedImage renderPreferencesPanel() {
+    JPanel root = new JPanel();
+    root.setLayout(new BoxLayout(root, BoxLayout.Y_AXIS));
+    root.setBackground(new Color(248, 248, 248));
+    root.setSize(480, 520);
+    root.setBorder(new EmptyBorder(12, 12, 12, 12));
+
+    JLabel title = new JLabel("Preferences & Audio Settings");
+    title.setFont(new Font("SansSerif", Font.BOLD, 15));
+    title.setBorder(new EmptyBorder(0, 0, 10, 0));
+    root.add(title);
+
+    // Audio Section
+    JPanel audioSec = new JPanel(new GridLayout(5, 2, 8, 8));
+    audioSec.setBorder(BorderFactory.createTitledBorder("Audio Engine Settings"));
+    audioSec.setBackground(new Color(248, 248, 248));
+    addPrefComboRow(audioSec, "Sample Rate:", "44100 Hz");
+    addPrefComboRow(audioSec, "Buffer Size:", "512 samples");
+    addPrefComboRow(audioSec, "Surround Channels:", "8 Channels (7.1 Surround)");
+    addPrefComboRow(audioSec, "Output Device:", "Default CoreAudio Output (Low-Latency FFM)");
+
+    // Master Gain
+    JLabel gainLbl = new JLabel("Master Gain:");
+    gainLbl.setFont(new Font("SansSerif", Font.BOLD, 11));
+    JSlider gainSlider = new JSlider(0, 100, 80);
+    gainSlider.setBackground(new Color(248, 248, 248));
+    audioSec.add(gainLbl);
+    audioSec.add(gainSlider);
+    root.add(audioSec);
+
+    root.add(Box.createVerticalStrut(10));
+
+    // Visualizer Section
+    JPanel visSec = new JPanel(new GridLayout(2, 2, 8, 8));
+    visSec.setBorder(BorderFactory.createTitledBorder("Visualizer Settings"));
+    visSec.setBackground(new Color(248, 248, 248));
+    addPrefComboRow(visSec, "FFT Size:", "1024");
+    addPrefComboRow(visSec, "Scope Window Size:", "512");
+    root.add(visSec);
+
+    root.add(Box.createVerticalStrut(10));
+
+    // Editor Settings
+    JPanel editSec = new JPanel(new GridLayout(2, 2, 8, 8));
+    editSec.setBorder(BorderFactory.createTitledBorder("Editor Settings"));
+    editSec.setBackground(new Color(248, 248, 248));
+    addPrefComboRow(editSec, "Theme:", "Dark (VSCode / OneDark)");
+    addPrefComboRow(editSec, "Font Size:", "13 pt");
+    root.add(editSec);
+
+    return layoutAndCapture(root, 480, 520);
+  }
+
+  private static void addPrefComboRow(JPanel p, String lText, String selection) {
+    JLabel lbl = new JLabel(lText);
+    lbl.setFont(new Font("SansSerif", Font.BOLD, 11));
+    JComboBox<String> combo = new JComboBox<>(new String[] {selection});
+    combo.setFont(new Font("SansSerif", Font.PLAIN, 11));
+    p.add(lbl);
+    p.add(combo);
   }
 
   private static BufferedImage layoutAndCapture(JComponent root, int width, int height) {

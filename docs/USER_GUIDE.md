@@ -188,3 +188,105 @@ The top menu bar organizes the complete functionality of the ChucK-Java environm
   - `Audio & Synthesis`: `stk`, `filter`, `effects`, `analysis`, `deep`, `stereo`, `multi`.
   - `External I/O & Specialized`: `midi`, `hid`, `osc`, `ai` (`word2vec`, `wekinator`).
 - **Help:** Direct links to the official ChucK-Java GitHub repository and version about dialog (`ChucK-Java v1.5 Workstation on JDK 27-ea`).
+
+---
+
+## 10. Pluggable Audio Preferences & Surround Configuration
+
+Open the **Settings** tab on the left panel (`PreferencesTab.java`) to customize your synthesis engine, graphics visualizers, and editor theme options.
+
+![Audio Preferences, Visualizers & Surround Configuration](images/chuck_ide_preferences.png)
+
+### 10.1. Sample Rate & Buffer Size Options
+- **Sample Rate:** Choose from `22050Hz`, `44100Hz`, `48000Hz`, `88200Hz`, or `96000Hz`. Updates apply instantly on the next VM restart.
+- **Buffer Size:** Set from `128` (ultra low-latency, higher CPU) to `2048` samples (high stability, higher latency).
+
+### 10.2. Multi-Channel Surround Bus Configuration
+ChucK-Java supports dynamic, sample-accurate surround-sound audio routing:
+- **Surround Channels Selection:** Select from **`2` (Stereo)**, **`4` (Quadraphonic)**, **`6` (5.1 Surround)**, or **`8` (7.1 Surround)**. 
+- **ChucK Routing Parity:** In your ChucK scripts, route signals to individual channels using the matrix bus:
+  ```ck
+  SinOsc s1 => dac.chan(0); // Left front
+  SawOsc s2 => dac.chan(1); // Right front
+  Noise  s3 => dac.chan(4); // Surround center/LFE
+  ```
+
+### 10.3. Multi-Track Stem Recording (`[● Record Stems]`)
+When working in multi-channel/surround modes, toggle **`[● Record Stems]`** on the toolbar:
+- Generates a primary interleaved multi-channel WAV master.
+- Simultaneously exports individual, clean mono/stereo stem files for each active channel output (`recording_ch0.wav` … `recording_ch7.wav`). 
+- Perfect for import and mixdown inside professional DAWs (Ableton, Logic, Reaper).
+
+---
+
+## 11. Faust & Inline DSP Live-Coding Dashboard
+
+The dedicated **DSP / Faust** tab (`FaustLiveCodingTab.java`) provides a lightweight playground for typing inline mathematical equations and live-compiling custom synthesis structures.
+
+![Faust & Inline DSP Live Coding Dashboard](images/chuck_ide_faust_dsp.png)
+
+### 11.1. Quick DSP Synthesis Templates
+Select from 4 high-performance presets in the top dropdown:
+- **`2-Operator FM Bell Synth`:** Frequency Modulation synthesis with carrier and modulator frequency oscillators.
+- **`4-Pole Resonant Low-Pass Filter`:** Sweep biquad filter with adjustable cutoff frequency and resonance peaks.
+- **`Non-Linear Foldback Wavefolder`:** Harmonic-rich wavefolding distortion scaling input amplitude peaks.
+- **`Karplus-Strong Plucked String`:** Physical modeling feedback delay loop recreating acoustic string plucks.
+
+### 11.2. One-Click VM Live Compilation (`[⚡ Spork Live DSP]`)
+- Click **`⚡ Spork Live DSP`** to instantly compile your equation script and spork it into the running `ChuckVM`. Any running Faust-style shred is automatically terminated and replaced, ensuring seamless live-coding voice swaps.
+- Click **`■ Stop DSP`** to immediately silence and stop the DSP shred.
+
+### 11.3. Real-Time Parameter Fader Rack
+- Declaring `global float` variables (e.g. `global float cutoffFreq;`) at the top of your code dynamically populates fader sliders in the bottom parameter rack.
+- Dragging any slider instantly calls `vm.setGlobalFloat` at audio frame rates, letting you shape filter sweeps, FM indices, and synth damping on the fly.
+
+---
+
+## 12. Open Sound Control (OSC) & Live Network Orchestras
+
+ChucK-Java includes a pure-Java, virtual-threaded network stack (`org.chuck.network`) implementing the **Open Sound Control (OSC)** protocol over UDP. Essential for laptop orchestras (SMC/PLOrk), multi-device installations, and remote MIDI/OSC controller apps.
+
+### 12.1. UDP Message Dispatching (`OscIn`, `OscOut`, `OscMsg`)
+Create low-latency network listeners and senders directly in ChucK:
+```ck
+// Set up OSC receiver on port 6449
+OscIn oin; oin.port(6449);
+oin.addAddress("/test/freq, f"); // expect float
+
+// Set up sender
+OscOut oout; oout.dest("127.0.0.1", 6449);
+
+OscMsg msg;
+while (true) {
+    // Wait for network message on virtual thread
+    oin => now;
+    
+    // Process all queued messages
+    while (oin.recv(msg)) {
+        msg.getFloat(0) => float f;
+        <<< "OSC Received frequency: ", f >>>;
+    }
+}
+```
+
+### 12.2. Timetagged Bundle Unmarshaling (`OscBundle`)
+Group multiple OSC messages into atomic, time-aligned network packets:
+- Senders compile packets via `OscBundle` and dispatch them with `oout.send(bundle)`.
+- Sieve and dispatch nested messages recursively inside `OscIn` parser loops on packet arrival.
+
+---
+
+## 13. Project Panama FFM Chugin Native Plugins
+
+Extend the capabilities of ChucK-Java with high-performance native C/C++ plugins (Chugins) using Java 27's **Foreign Function & Memory API (FFM)**.
+
+### 13.1. Dynamic Library Discovery (`ChuginLoader.java`)
+- On startup, the VM scans directory paths specified via the `--chugin-path` flag.
+- Dynamically loads native shared libraries (`*.chug`, `*.so`, `*.dylib`, `*.dll`) using `SymbolLookup.libraryLookup()`.
+- Resolves processing symbols (`chugin_compute` or `<name>_tick`) directly into downcall method handles, bypassing JNI compile targets.
+
+### 13.2. FFM Downcall Bridge (`NativeUGenBridge.java`)
+- Wraps native DSP symbols inside lightweight `MethodHandle` execution stubs.
+- Renders audio frames at native C speeds directly within the `ChuckVM` sample loop.
+- Automatically registers 15 built-in simulation Chugins (`Bitcrusher`, `KasFilter`, `FoldbackSaturator`, `WPDiodeLadder`, etc.) if no external paths are provided.
+
